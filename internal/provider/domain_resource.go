@@ -1,4 +1,4 @@
-package provid
+package provider
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	quantadmin "github.com/quantcdn/quant-admin-go"
+	openapiclient "github.com/quantcdn/quant-admin-go"
 )
 
 var (
@@ -78,11 +78,14 @@ func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	client := r.client.Admin.DefaultApi
+	organization := r.client.Organization
+	project := plan.MachineName.ValueString()
+	client := r.client.Admin.DomainsAPI
 
-	d := quantadmin.NewDomainCreate(plan.Domain.ValueString())
+	d := *openapiclient.NewDomainRequest()
 
-	_, _, err := client.CreateDomain(r.client.Context).QuantOrganisation(r.client.Organization).QuantProject(plan.MachineName.ValueString()).DomainCreate(*d).Execute()
+	_, _, err := client.OrganizationsOrganizationProjectsProjectDomainsPost(r.client.Auth, organization, project).DomainRequest(d).Execute()
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating domain",
@@ -91,7 +94,9 @@ func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	plan.Id = *d.Data.Domain.Id
+	// @todo: API does not support returning an API, this will
+	// need to be updated when that is supported.
+	plan.Id = types.Int64Null()
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -108,8 +113,12 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	client := r.client.Admin.DefaultApi
-	res, _, err := client.GetProject(r.client.Context).QuantOrganisation(r.client.Organization).QuantProject(state.MachineName.ValueString()).Execute()
+	organization := r.client.Organization
+	project := state.MachineName
+	domain := state.Id
+
+	client := r.client.Admin.DomainsAPI
+	res, _, err := client.OrganizationsOrganizationProjectsProjectDomainsDomainGet(r.client.Auth, organization, project, domain).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading project data",
@@ -118,10 +127,9 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	for _, domain := range res.Data.Project.Domains {
+	for _, domain := range res.Data.Domains {
 		if types.StringValue(*domain.Domain) == state.Domain {
 			state.Domain = types.StringValue(*domain.Domain)
-			state.MachineName = types.StringValue(*res.Data.Project.MachineName)
 		}
 	}
 
@@ -132,6 +140,8 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 }
 
+// Update a domain resource
+// @todo: crud domain support in API
 func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan domainResourceModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -139,6 +149,15 @@ func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	organization := r.client.Organization
+	project := plan.MachineName
+	domain := plan.Id
+
+	d := *openapiclient.NewDomainRequest()
+
+	client := r.client.Admin.DomainsAPI
+	client.OrganizationsOrganizationProjectsProjectDomainsDomainPatch(r.client.Auth, organization, project, domain).DomainRequest(d).Execute()
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

@@ -21,7 +21,7 @@ resource "quant_project" "tf" {
 }
 
 resource "quant_domain" "d1" {
-  project = ${ tf.machine_name }
+  project = tf.machine_name
   domain = "test.com"
 }
 

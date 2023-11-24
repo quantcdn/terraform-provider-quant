@@ -7,8 +7,8 @@ import (
 )
 
 type Client struct {
-	Admin   *quantadmin.APIClient
-	Context context.Context
+	Admin *quantadmin.APIClient
+	Auth  context.Context
 
 	Organization string
 	Project      string
@@ -24,7 +24,7 @@ func New(secret string, org string) *Client {
 
 	return &Client{
 		Admin:        client,
-		Context:      ctx,
+		Auth:         ctx,
 		Organization: org,
 	}
 }

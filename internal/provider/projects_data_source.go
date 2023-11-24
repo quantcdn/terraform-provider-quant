@@ -81,8 +81,8 @@ func (d *projectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 	var state projectsDataSourceModel
 
 	// @todo maybe abstract interacting with the clients.
-	client := d.client.Admin.DefaultApi
-	r, _, err := client.GetProjects(d.client.Context).QuantOrganisation(d.client.Organization).Execute()
+	client := d.client.Admin.ProjectsAPI
+	r, _, err := client.OrganizationsOrganizationProjectsGet(d.client.Auth, d.client.Organization).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(

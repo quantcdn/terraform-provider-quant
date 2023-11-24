@@ -151,6 +151,14 @@ github.com/quantcdn/quant-admin-go v0.0.0-20231019234901-e225c664a85c h1:kCHP29d
 github.com/quantcdn/quant-admin-go v0.0.0-20231019234901-e225c664a85c/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
 github.com/quantcdn/quant-admin-go v0.0.0-20231027041747-538916683f83 h1:xZuV4AUHwsZa1lrTm/D5vLsw1R4NM6I5sVN6FTiGg34=
 github.com/quantcdn/quant-admin-go v0.0.0-20231027041747-538916683f83/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117025053-ff5cf8613e4e h1:6o5KrESQKnn28ovHS2MAp8EGzPQkxCLaYeiz3QXjqxQ=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117025053-ff5cf8613e4e/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117033614-a98fd5ae7858 h1:Jn2AE5PXV6f424tJ/0xukNHWwUUjzQuFDEiGbGB2yyo=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117033614-a98fd5ae7858/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117040548-38cde67d7888 h1:q9ikqXj6ogW2ZMpM8zeJ+YJHODot99cghFOfnXudJ0o=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117040548-38cde67d7888/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117043017-d2b58d60fcb5 h1:WRf6niHGYnwTy/j+r0/2JomOJ2B2QZzhu8cQjn6nOWc=
+github.com/quantcdn/quant-admin-go v0.0.0-20231117043017-d2b58d60fcb5/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
 github.com/rogpeppe/go-internal v1.6.1 h1:/FiVV8dS/e+YqF2JvO3yXRFbBLTIuSDkuC7aBOAvL+k=
 github.com/russross/blackfriday v1.6.0 h1:KqfZb0pUVN2lYqZUYRddxF4OR8ZMURnJIG5Y3VRLtww=
 github.com/russross/blackfriday v1.6.0/go.mod h1:ti0ldHuxg49ri4ksnFxlkCfN+hvslNlmVHqNRXXJNAY=

@@ -115,13 +115,23 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	client := r.client.Admin.DefaultApi
+	client := r.client.Admin.ProjectsAPI
 
 	// Construct the project object for the API.
-	p := quantadmin.NewProjectCreate(plan.Name.ValueString(), plan.Region.ValueString())
+	p := *quantadmin.NewProjectRequest()
+
+	p.SetName(plan.Name.ValueString())
+	p.SetRegion(plan.Region.ValueString())
 
 	p.SetAllowQueryParams(plan.AllowQueryParams.ValueBool())
-	p.SetBasicAuthPreviewOnly(plan.BasicAuthPreviewOnly.ValueBool())
+
+	var previewOnly string
+	if plan.BasicAuthPreviewOnly.ValueBool() {
+		previewOnly = "true"
+	} else {
+		previewOnly = "false"
+	}
+	p.SetBasicAuthPreviewOnly(previewOnly)
 
 	if plan.BasicAuthPassword.IsNull() && !plan.BasicAuthUsername.IsNull() {
 		resp.Diagnostics.AddAttributeWarning(
@@ -144,7 +154,8 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		p.SetBasicAuthPassword(plan.BasicAuthPassword.ValueString())
 	}
 
-	res, _, err := client.CreateProject(r.client.Context).QuantOrganisation(r.client.Organization).ProjectCreate(*p).Execute()
+	organization := r.client.Organization
+	res, _, err := client.OrganizationsOrganizationProjectsPost(r.client.Auth, organization).ProjectRequest(p).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -154,7 +165,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	plan.MachineName = types.StringValue(*res.Data.Project.MachineName)
+	plan.MachineName = types.StringValue(*res.Data.Projects[0].MachineName)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -181,8 +192,12 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	client := r.client.Admin.DefaultApi
-	res, _, err := client.GetProject(r.client.Context).QuantOrganisation(r.client.Organization).QuantProject(state.MachineName.ValueString()).Execute()
+	organization := r.client.Organization
+	project := state.MachineName.ValueString()
+
+	client := r.client.Admin.ProjectsAPI
+	res, _, err := client.OrganizationsOrganizationProjectsProjectGet(context.Background(), organization, project).Execute()
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading project data",
@@ -191,8 +206,8 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	state.AllowQueryParams = types.BoolValue(*res.Data.Project.GetConfig().QueryParamsEnabled)
-	state.MachineName = types.StringValue(*res.Data.Project.MachineName)
+	state.AllowQueryParams = types.BoolValue(false)
+	state.MachineName = types.StringValue(*res.Data.Projects[0].MachineName)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -210,10 +225,19 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	p := quantadmin.NewProjectCreate(plan.Name.ValueString(), plan.Region.ValueString())
+	p := *quantadmin.NewProjectRequest()
+	p.SetName(plan.Name.ValueString())
+	p.SetRegion(plan.Region.ValueString())
 
 	p.SetAllowQueryParams(plan.AllowQueryParams.ValueBool())
-	p.SetBasicAuthPreviewOnly(plan.BasicAuthPreviewOnly.ValueBool())
+
+	var previewOnly string
+	if plan.BasicAuthPreviewOnly.ValueBool() {
+		previewOnly = "true"
+	} else {
+		previewOnly = "false"
+	}
+	p.SetBasicAuthPreviewOnly(previewOnly)
 
 	if plan.BasicAuthPassword.IsNull() && !plan.BasicAuthUsername.IsNull() {
 		resp.Diagnostics.AddAttributeWarning(
@@ -236,8 +260,12 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		p.SetBasicAuthPassword(plan.BasicAuthPassword.ValueString())
 	}
 
-	client := r.client.Admin.DefaultApi
-	_, _, err := client.EditProject(r.client.Context).QuantOrganisation(r.client.Organization).QuantProject(plan.MachineName.ValueString()).Execute()
+	organization := r.client.Organization
+	project := plan.MachineName.ValueString()
+
+	client := r.client.Admin.ProjectsAPI
+
+	_, _, err := client.OrganizationsOrganizationProjectsProjectPatch(r.client.Auth, organization, project).ProjectRequest(p).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -271,8 +299,12 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	client := r.client.Admin.DefaultApi
-	_, _, err := client.DeleteProject(r.client.Context).QuantOrganisation(r.client.Organization).QuantProject(state.MachineName.ValueString()).Execute()
+	organization := r.client.Organization
+	project := state.MachineName.ValueString()
+
+	client := r.client.Admin.ProjectsAPI
+	_, _, err := client.OrganizationsOrganizationProjectsProjectDelete(r.client.Auth, organization, project).Execute()
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Deleting Quant project",
