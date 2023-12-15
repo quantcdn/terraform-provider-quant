@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/helpers"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -166,41 +167,27 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 		)
 	}
 
-	var cl []string
-	for _, country := range plan.Countries {
-		cl = append(cl, country.ValueString())
-	}
-
 	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
 		if plan.CountryInclude.ValueBool() {
-			rule.SetCountryIs(cl)
+			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
 		} else {
-			rule.SetCountryIsNot(cl)
+			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
 		}
-	}
-
-	var ml []string
-	for _, method := range plan.Methods {
-		ml = append(ml, method.ValueString())
 	}
 
 	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
 		if plan.MethodInclude.ValueBool() {
-			rule.SetMethodIs(ml)
+			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
 		} else {
-			rule.SetMethodIsNot(ml)
+			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
 		}
 	}
 
-	var ips []string
-	for _, ip := range plan.Ips {
-		ips = append(ips, ip.ValueString())
-	}
 	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
 		if plan.IpInclude.ValueBool() {
-			rule.SetIpIs(ips)
+			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
 		} else {
-			rule.SetIpIsNot(ips)
+			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
 		}
 	}
 
@@ -219,7 +206,7 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 	rule.SetStatusCode(int32(plan.StatusCode.ValueInt64()))
 
 	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectPost(context.Background(), organization, project, plan.Uuid.ValueString()).Execute()
+	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectPost(context.Background(), organization, project).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -229,6 +216,11 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	plan.Uuid = types.StringValue(*res.Data.Rules[0].Uuid)
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -249,8 +241,8 @@ func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadReques
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating HashiCups Order",
-			"Could not update order, unexpected error: "+err.Error(),
+			"Error reading rule",
+			"Could not read rule, unexpected error: "+err.Error(),
 		)
 	}
 
@@ -276,41 +268,27 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 		)
 	}
 
-	var cl []string
-	for _, country := range plan.Countries {
-		cl = append(cl, country.ValueString())
-	}
-
 	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
 		if plan.CountryInclude.ValueBool() {
-			rule.SetCountryIs(cl)
+			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
 		} else {
-			rule.SetCountryIsNot(cl)
+			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
 		}
-	}
-
-	var ml []string
-	for _, method := range plan.Methods {
-		ml = append(ml, method.ValueString())
 	}
 
 	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
 		if plan.MethodInclude.ValueBool() {
-			rule.SetMethodIs(ml)
+			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
 		} else {
-			rule.SetMethodIsNot(ml)
+			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
 		}
 	}
 
-	var ips []string
-	for _, ip := range plan.Ips {
-		ips = append(ips, ip.ValueString())
-	}
 	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
 		if plan.IpInclude.ValueBool() {
-			rule.SetIpIs(ips)
+			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
 		} else {
-			rule.SetIpIsNot(ips)
+			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
 		}
 	}
 
@@ -332,13 +310,19 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 	project := plan.Project.ValueString()
 
 	client := r.client.Admin.RulesAPI
-	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectPost(context.Background(), organization, project, plan.Uuid.ValueString()).Execute()
+	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRulePatch(context.Background(), organization, project, plan.Uuid.ValueString()).RuleRedirectRequest(*rule).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating HashiCups Order",
-			"Could not update order, unexpected error: "+err.Error(),
+			"Error updating rule",
+			"Could not update rule, unexpected error: "+err.Error(),
 		)
+	}
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 }
 

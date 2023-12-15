@@ -15,30 +15,28 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource              = &ruleAuth{}
-	_ resource.ResourceWithConfigure = &ruleAuth{}
+	_ resource.Resource              = &ruleHeaders{}
+	_ resource.ResourceWithConfigure = &ruleHeaders{}
 )
 
-// NewruleAuth is a helper function to simplify the provider implementation.
-func NewRuleAuthResource() resource.Resource {
-	return &ruleAuth{}
+// NewruleHeaders is a helper function to simplify the provider implementation.
+func NewRuleHeadersResource() resource.Resource {
+	return &ruleHeaders{}
 }
 
-// ruleAuth is the resource implementation.
-type ruleAuth struct {
+// ruleHeaders is the resource implementation.
+type ruleHeaders struct {
 	client *client.Client
 }
 
-type ruleAuthModel struct {
+type ruleHeadersModel struct {
 	Name     types.String `tfsdk:"name"`
 	Uuid     types.String `tfsdk:"uuid"`
 	Project  types.String `tfsdk:"project"`
 	Disabled types.Bool   `tfsdk:"disabled"`
 
-	Domain   types.String `tfsdk:"domain"`
-	Url      types.String `tfsdk:"url"`
-	AuthUser types.String `tfsdk:"auth_user"`
-	AuthPass types.String `tfsdk:"auth_pass"`
+	Domain types.String `tfsdk:"domain"`
+	Url    types.String `tfsdk:"url"`
 
 	// Rule selection.
 	CountryInclude types.Bool     `tfsdk:"country_include"`
@@ -48,10 +46,12 @@ type ruleAuthModel struct {
 	IpInclude      types.Bool     `tfsdk:"ip_include"`
 	Ips            []types.String `tfsdk:"ips"`
 	OnlyWithCookie types.String   `tfsdk:"only_with_cookie"`
+
+	Headers map[string]interface{} `tfsdk:"headeres"`
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *ruleAuth) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *ruleHeaders) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -71,12 +71,12 @@ func (r *ruleAuth) Configure(_ context.Context, req resource.ConfigureRequest, r
 }
 
 // Metadata returns the resource type name.
-func (r *ruleAuth) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *ruleHeaders) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_rule_authentication"
 }
 
 // Schema defines the schema for the resource.
-func (r *ruleAuth) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *ruleHeaders) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
@@ -124,21 +124,13 @@ func (r *ruleAuth) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 				MarkdownDescription: "Apply rule only if the cookie is present",
 				Optional:            true,
 			},
-			"auth_user": schema.StringAttribute{
-				MarkdownDescription: "HTTP authentication username",
-				Required:            true,
-			},
-			"auth_pass": schema.StringAttribute{
-				MarkdownDescription: "HTTP authentication password",
-				Required:            true,
-			},
 		},
 	}
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *ruleAuth) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ruleAuthModel
+func (r *ruleHeaders) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan ruleHeadersModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -152,51 +144,38 @@ func (r *ruleAuth) Create(ctx context.Context, req resource.CreateRequest, resp 
 		)
 	}
 
-	rule := openapi.NewRuleAuthRequest()
+	proxy := openapi.NewRuleProxyRequest()
+
+	proxy.SetName(plan.Name.ValueString())
+	proxy.SetDisabled(plan.Disabled.ValueBool())
+	proxy.SetDomain(plan.Domain.ValueString())
 
 	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
 		if plan.CountryInclude.ValueBool() {
-			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
+			proxy.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
 		} else {
-			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+			proxy.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
 		}
 	}
 
 	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
 		if plan.MethodInclude.ValueBool() {
-			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
+			proxy.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
 		} else {
-			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+			proxy.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
 		}
 	}
 
 	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
 		if plan.IpInclude.ValueBool() {
-			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
+			proxy.SetIpIs(helpers.FlattenToStrings(plan.Ips))
 		} else {
-			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+			proxy.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
 		}
 	}
 
-	rule.SetName(plan.Name.ValueString())
-	rule.SetDomain(plan.Domain.ValueString())
-	rule.SetAuthUser(plan.AuthUser.ValueString())
-	rule.SetAuthPass(plan.AuthUser.ValueString())
-
-	organization := r.client.Organization
-	project := plan.Project.ValueString()
-
-	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectPost(context.Background(), organization, project).Execute()
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating rule",
-			"Could not create rule, unexpected error: "+err.Error(),
-		)
-	}
-
-	plan.Uuid = types.StringValue(*res.GetData().Rules[0].Uuid)
+	// Rule behaviour.
+	proxy.SetUrl(plan.Url.ValueString())
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -206,8 +185,8 @@ func (r *ruleAuth) Create(ctx context.Context, req resource.CreateRequest, resp 
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *ruleAuth) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state ruleAuthModel
+func (r *ruleHeaders) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state ruleHeadersModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -223,8 +202,8 @@ func (r *ruleAuth) Read(ctx context.Context, req resource.ReadRequest, resp *res
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading rule",
-			"Could not read rule, unexpected error: "+err.Error(),
+			"Error Updating HashiCups Order",
+			"Could not update order, unexpected error: "+err.Error(),
 		)
 	}
 
@@ -233,69 +212,24 @@ func (r *ruleAuth) Read(ctx context.Context, req resource.ReadRequest, resp *res
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *ruleAuth) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan ruleAuthModel
+func (r *ruleHeaders) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan ruleHeadersModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if plan.CountryInclude.IsNull() && plan.IpInclude.IsNull() && plan.MethodInclude.IsNull() {
-		resp.Diagnostics.AddError(
-			"Rule criteria is missing",
-			"Could not crete a rule due to missing criteria; must provide country, ip and/or method",
-		)
-	}
-
-	rule := openapi.NewRuleAuthRequest()
-
-	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
-		if plan.CountryInclude.ValueBool() {
-			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
-		} else {
-			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
-		}
-	}
-
-	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
-		if plan.MethodInclude.ValueBool() {
-			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
-		} else {
-			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
-		}
-	}
-
-	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
-		if plan.IpInclude.ValueBool() {
-			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
-		} else {
-			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
-		}
-	}
-
-	rule.SetName(plan.Name.ValueString())
-	rule.SetDomain(plan.Domain.ValueString())
-	rule.SetAuthUser(plan.AuthUser.ValueString())
-	rule.SetAuthPass(plan.AuthUser.ValueString())
-
-	organization := r.client.Organization
-	project := plan.Project.ValueString()
-
-	client := r.client.Admin.RulesAPI
-	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRulePatch(context.Background(), organization, project, plan.Uuid.ValueString()).Execute()
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating rule",
-			"Could not update rule, unexpected error: "+err.Error(),
-		)
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *ruleAuth) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state ruleAuthModel
+func (r *ruleHeaders) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state ruleHeadersModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -304,7 +238,7 @@ func (r *ruleAuth) Delete(ctx context.Context, req resource.DeleteRequest, resp 
 
 	if state.Project.IsNull() {
 		resp.Diagnostics.AddError(
-			"Error deleting rule",
+			"Error Deleting Quant project",
 			"Invalid state: project machine name is unknown.",
 		)
 		return
@@ -318,8 +252,8 @@ func (r *ruleAuth) Delete(ctx context.Context, req resource.DeleteRequest, resp 
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting rule",
-			"Could not delete rule, unexpected error: "+err.Error(),
+			"Error Deleting Quant project",
+			"Could not delete project, unexpected error: "+err.Error(),
 		)
 		return
 	}

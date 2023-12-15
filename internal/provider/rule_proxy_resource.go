@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/helpers"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -70,7 +71,7 @@ type WafConfig struct {
 	BlockIp            []types.String `tfsdk:"block_ip"`
 	BlockUa            []types.String `tfsdk:"block_ua"`
 	BlockReferer       []types.String `tfsdk:"block_referer"`
-	NotifySlack        []types.String `tfsdk:"notify_slack"`
+	NotifySlack        types.String   `tfsdk:"notify_slack"`
 	NotifySlackHitsRpm types.Int64    `tfsdk:"notify_slack_rpm"`
 	Httpbl             struct {
 		Enabled           types.Bool `tfsdk:"httpbl_enabled"`
@@ -295,6 +296,91 @@ func (r *ruleProxy) Create(ctx context.Context, req resource.CreateRequest, resp
 			"Could not crete a rule due to missing criteria; must provide country, ip and/or method",
 		)
 	}
+
+	proxy := openapi.NewRuleProxyRequest()
+
+	proxy.SetName(plan.Name.ValueString())
+	proxy.SetDisabled(plan.Disabled.ValueBool())
+	proxy.SetDomain(plan.Domain.ValueString())
+
+	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
+		if plan.CountryInclude.ValueBool() {
+			proxy.SetCountry("country_is")
+			proxy.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
+		} else {
+			proxy.SetCountry("country_is_not")
+			proxy.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+		}
+	}
+
+	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
+		if plan.MethodInclude.ValueBool() {
+			proxy.SetMethod("method_is")
+			proxy.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
+		} else {
+			proxy.SetMethod("method_is_not")
+			proxy.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+		}
+	}
+
+	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
+		if plan.IpInclude.ValueBool() {
+			proxy.SetIp("ip_is")
+			proxy.SetIpIs(helpers.FlattenToStrings(plan.Ips))
+		} else {
+			proxy.SetIp("ip_is_not")
+			proxy.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+		}
+	}
+
+	// Rule behaviour.
+	proxy.SetUrl(plan.Url.ValueString())
+	proxy.SetTo(plan.To.ValueString())
+	proxy.SetHost(plan.Host.ValueString())
+	proxy.SetAuthUser(plan.AuthUser.ValueString())
+	proxy.SetAuthPass(plan.AuthPass.ValueString())
+	// proxy.SetDisableSslVerify(plan.DisableSSLVerify.BoolValue())
+	proxy.SetCacheLifetime(int32(plan.CacheLifetime.ValueInt64()))
+	proxy.SetOnlyProxy404(plan.Only404.ValueBool())
+	proxy.SetStripHeaders(helpers.FlattenToStrings(plan.StripHeaders))
+	proxy.SetWafEnabled(plan.WafEnable.ValueBool())
+
+	var wafConfig openapi.RuleProxyRequestWafConfig
+	wafConfig.SetMode(plan.WafConfig.Mode.ValueString())
+	wafConfig.SetParanoiaLevel(int32(plan.WafConfig.ParanoiaLevel.ValueInt64()))
+
+	// @todo: Update client — IPs should probably be strings.
+	// wafConfig.SetAllowIp(helpers.FlattenToInt32(plan.WafConfig.AllowIp))
+	// wafConfig.SetBlockIp(helpers.FlattenToInt32(plan.WafConfig.BlockIp))
+
+	wafConfig.SetAllowRules(helpers.FlattenToInt32(plan.WafConfig.AllowRules))
+	wafConfig.SetBlockReferer(helpers.FlattenToStrings(plan.WafConfig.BlockReferer))
+	wafConfig.SetBlockUa(helpers.FlattenToStrings(plan.WafConfig.BlockUa))
+	wafConfig.SetNotifySlack(plan.WafConfig.NotifySlack.ValueString())
+	wafConfig.SetNotifySlackHitsRpm(int32(plan.WafConfig.NotifySlackHitsRpm.ValueInt64()))
+
+	proxy.SetWafConfig(wafConfig)
+
+	organization := r.client.Organization
+	project := plan.Project.ValueString()
+
+	client := r.client.Admin.RulesAPI
+	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyPost(context.Background(), organization, project).RuleProxyRequest(*proxy).Execute()
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating rule",
+			"Could not create rule, unexpected error: "+err.Error(),
+		)
+	}
+
+	plan.Uuid = types.StringValue(*res.GetData().Rules[0].Uuid)
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -305,38 +391,6 @@ func (r *ruleProxy) Read(ctx context.Context, req resource.ReadRequest, resp *re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	proxy := openapi.NewRuleProxyRequest()
-
-	proxy.SetName(state.Name.ValueString())
-	proxy.SetDisabled(state.Disabled.ValueBool())
-	proxy.SetDomain(state.Domain.ValueString())
-
-	// Rule selection.
-
-	// Rule behaviour.
-	proxy.SetUrl(state.Url.ValueString())
-	proxy.SetTo(state.To.ValueString())
-	proxy.SetHost(state.Host.ValueString())
-	proxy.SetAuthUser(state.AuthUser.ValueString())
-	proxy.SetAuthPass(state.AuthPass.ValueString())
-	// proxy.SetDisableSslVerify(state.DisableSSLVerify.BoolValue())
-	proxy.SetCacheLifetime(int32(state.CacheLifetime.ValueInt64()))
-	proxy.SetOnlyProxy404(state.Only404.ValueBool())
-
-	var sh []string
-	for _, s := range state.StripHeaders {
-		sh = append(sh, s.ValueString())
-	}
-	proxy.SetStripHeaders(sh)
-
-	proxy.SetWafEnabled(state.WafEnable.ValueBool())
-
-	// @todo: Investigate openapi generation for WAF config.
-	var wafConfig openapi.RuleProxyRequestWafConfig
-	wafConfig.SetMode(state.WafConfig.Mode.ValueString())
-
-	proxy.SetWafConfig(wafConfig)
 
 	organization := r.client.Organization
 	project := state.Project.ValueString()
@@ -363,14 +417,41 @@ func (r *ruleProxy) Update(ctx context.Context, req resource.UpdateRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	proxy := openapi.NewRuleProxyRequest()
 
 	proxy.SetName(plan.Name.ValueString())
 	proxy.SetDisabled(plan.Disabled.ValueBool())
 	proxy.SetDomain(plan.Domain.ValueString())
 
-	// Rule selection.
+	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
+		if plan.CountryInclude.ValueBool() {
+			proxy.SetCountry("country_is")
+			proxy.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
+		} else {
+			proxy.SetCountry("country_is_not")
+			proxy.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+		}
+	}
+
+	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
+		if plan.MethodInclude.ValueBool() {
+			proxy.SetMethod("method_is")
+			proxy.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
+		} else {
+			proxy.SetMethod("method_is_not")
+			proxy.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+		}
+	}
+
+	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
+		if plan.IpInclude.ValueBool() {
+			proxy.SetIp("ip_is")
+			proxy.SetIpIs(helpers.FlattenToStrings(plan.Ips))
+		} else {
+			proxy.SetIp("ip_is_not")
+			proxy.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+		}
+	}
 
 	// Rule behaviour.
 	proxy.SetUrl(plan.Url.ValueString())
@@ -381,18 +462,22 @@ func (r *ruleProxy) Update(ctx context.Context, req resource.UpdateRequest, resp
 	// proxy.SetDisableSslVerify(plan.DisableSSLVerify.BoolValue())
 	proxy.SetCacheLifetime(int32(plan.CacheLifetime.ValueInt64()))
 	proxy.SetOnlyProxy404(plan.Only404.ValueBool())
-
-	var sh []string
-	for _, s := range plan.StripHeaders {
-		sh = append(sh, s.ValueString())
-	}
-	proxy.SetStripHeaders(sh)
-
+	proxy.SetStripHeaders(helpers.FlattenToStrings(plan.StripHeaders))
 	proxy.SetWafEnabled(plan.WafEnable.ValueBool())
 
-	// @todo: Investigate openapi generation for WAF config.
 	var wafConfig openapi.RuleProxyRequestWafConfig
 	wafConfig.SetMode(plan.WafConfig.Mode.ValueString())
+	wafConfig.SetParanoiaLevel(int32(plan.WafConfig.ParanoiaLevel.ValueInt64()))
+
+	// @todo: Update client — IPs should probably be strings.
+	// wafConfig.SetAllowIp(helpers.FlattenToInt32(plan.WafConfig.AllowIp))
+	// wafConfig.SetBlockIp(helpers.FlattenToInt32(plan.WafConfig.BlockIp))
+
+	wafConfig.SetAllowRules(helpers.FlattenToInt32(plan.WafConfig.AllowRules))
+	wafConfig.SetBlockReferer(helpers.FlattenToStrings(plan.WafConfig.BlockReferer))
+	wafConfig.SetBlockUa(helpers.FlattenToStrings(plan.WafConfig.BlockUa))
+	wafConfig.SetNotifySlack(plan.WafConfig.NotifySlack.ValueString())
+	wafConfig.SetNotifySlackHitsRpm(int32(plan.WafConfig.NotifySlackHitsRpm.ValueInt64()))
 
 	proxy.SetWafConfig(wafConfig)
 
@@ -400,7 +485,7 @@ func (r *ruleProxy) Update(ctx context.Context, req resource.UpdateRequest, resp
 	project := plan.Project.ValueString()
 
 	client := r.client.Admin.RulesAPI
-	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRuleGet(context.Background(), organization, project, plan.Uuid.ValueString()).Execute()
+	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyRulePatch(context.Background(), organization, project, plan.Uuid.ValueString()).RuleProxyRequest(*proxy).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -409,6 +494,11 @@ func (r *ruleProxy) Update(ctx context.Context, req resource.UpdateRequest, resp
 		)
 	}
 
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

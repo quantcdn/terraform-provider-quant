@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	openapi "github.com/quantcdn/quant-admin-go"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -89,9 +90,20 @@ func (d *projectsDataSource) Read(ctx context.Context, req datasource.ReadReques
 			"Unable to Read Quant Projects",
 			err.Error(),
 		)
+		return
 	}
 
-	for _, project := range r.Data.Projects {
+	var projects []openapi.Project
+	projects, ok := r.Data.GetProjectsOk()
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unable to read projects",
+			"Unable to read projects",
+		)
+		return
+	}
+
+	for _, project := range projects {
 		projectState := projectModel{
 			Name:        types.StringValue(project.GetName()),
 			MachineName: types.StringValue(project.GetMachineName()),
