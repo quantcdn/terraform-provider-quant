@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.19.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-testing v1.5.1
-	github.com/quantcdn/quant-admin-go v0.0.0-20231125003304-256c4300c1ec
+	github.com/quantcdn/quant-admin-go v0.0.0-20240112013300-6bccba28626b
 )
 
 require (
