@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/helpers"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
@@ -37,6 +41,7 @@ type ruleRedirectResourceModel struct {
 	Disabled types.Bool   `tfsdk:"disabled"`
 
 	Domain types.String `tfsdk:"domain"`
+	Url    types.String `tfsdk:"url"`
 
 	// Rule selection.
 	CountryInclude types.Bool     `tfsdk:"country_include"`
@@ -48,7 +53,6 @@ type ruleRedirectResourceModel struct {
 	OnlyWithCookie types.String   `tfsdk:"only_with_cookie"`
 
 	// Rule behaviour.
-	Url        types.String `tfsdk:"url"`
 	To         types.String `tfsdk:"to"`
 	StatusCode types.Int64  `tfsdk:"status_code"`
 }
@@ -82,7 +86,15 @@ func (r *ruleRedirectResource) Metadata(_ context.Context, req resource.Metadata
 func (r *ruleRedirectResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"uuid": schema.StringAttribute{
+				MarkdownDescription: "The rules UUID",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
+
 				MarkdownDescription: "A name for the rule",
 				Optional:            true,
 			},
@@ -94,15 +106,20 @@ func (r *ruleRedirectResource) Schema(_ context.Context, _ resource.SchemaReques
 				MarkdownDescription: "If this rule is disabled",
 				Optional:            true,
 				Default:             booldefault.StaticBool(false),
+				Computed:            true,
 			},
 			"domain": schema.StringAttribute{
 				MarkdownDescription: "The domain the rule applies to",
 				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("any"),
 			},
 			"countries": schema.ListAttribute{
 				MarkdownDescription: "A list of countries",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
+
 			"country_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the country list",
 				Optional:            true,
@@ -110,6 +127,7 @@ func (r *ruleRedirectResource) Schema(_ context.Context, _ resource.SchemaReques
 			"methods": schema.ListAttribute{
 				MarkdownDescription: "A list of HTTP methods",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"method_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the methods",
@@ -118,6 +136,7 @@ func (r *ruleRedirectResource) Schema(_ context.Context, _ resource.SchemaReques
 			"ips": schema.ListAttribute{
 				MarkdownDescription: "A list of IP addresses",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"ip_include": schema.BoolAttribute{
 				MarkdownDescription: "Include hte IP addresses",
@@ -160,35 +179,20 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 
 	rule := openapi.NewRuleRedirectRequest()
 
-	if plan.CountryInclude.IsNull() && plan.IpInclude.IsNull() && plan.MethodInclude.IsNull() {
-		resp.Diagnostics.AddError(
-			"Rule criteria is missing",
-			"Could not crete a rule due to missing criteria; must provide country, ip and/or method",
-		)
+	if plan.Url.IsNull() {
+		plan.Url = types.StringValue("*")
 	}
 
-	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
-		if plan.CountryInclude.ValueBool() {
-			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
-		} else {
-			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
-		}
+	if plan.CountryInclude.IsNull() {
+		rule.SetCountry("any")
 	}
 
-	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
-		if plan.MethodInclude.ValueBool() {
-			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
-		} else {
-			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
-		}
+	if plan.MethodInclude.IsNull() {
+		rule.SetMethod("any")
 	}
 
-	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
-		if plan.IpInclude.ValueBool() {
-			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
-		} else {
-			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
-		}
+	if plan.IpInclude.IsNull() {
+		rule.SetIp("any")
 	}
 
 	if plan.StatusCode.ValueInt64() != 301 || plan.StatusCode.ValueInt64() != 302 {
@@ -202,11 +206,27 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 	rule.SetName(plan.Name.ValueString())
 	rule.SetDomain(plan.Domain.ValueString())
 	rule.SetUrl(plan.Url.ValueString())
-	rule.SetTo(plan.To.ValueString())
-	rule.SetStatusCode(int32(plan.StatusCode.ValueInt64()))
+	rule.SetRedirectTo(plan.To.ValueString())
+	rule.SetRedirectCode(int32(plan.StatusCode.ValueInt64()))
 
 	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectPost(context.Background(), organization, project).Execute()
+	res, i, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectPost(context.Background(), organization, project).Execute()
+
+	if i.StatusCode == http.StatusForbidden {
+		resp.Diagnostics.AddError(
+			"Error create rule",
+			"You are not authorised to make this request, please check credentials.",
+		)
+		return
+	}
+
+	if i.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError(
+			"Error creating rule",
+			"Could not create the rule, unexpected error "+helpers.ErrorFromAPIBody(i.Body),
+		)
+		return
+	}
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -235,19 +255,48 @@ func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadReques
 	organization := r.client.Organization
 	project := state.Project.ValueString()
 
-	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRuleGet(context.Background(), organization, project, state.Uuid.ValueString()).Execute()
-	rule := res.Data.Rules[0]
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading rule",
-			"Could not read rule, unexpected error: "+err.Error(),
+	if state.Uuid.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Rule uuid is null",
+			"The rule uuid is null and data is not able to be updated from the API",
 		)
+	} else {
+
+		client := r.client.Admin.RulesAPI
+		res, i, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRuleGet(context.Background(), organization, project, state.Uuid.ValueString()).Execute()
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading header rule",
+				"Could not read rule, unexpected error: "+err.Error(),
+			)
+		}
+
+		if i.StatusCode != http.StatusOK {
+			resp.Diagnostics.AddError(
+				"Error reading header rule",
+				"Could not load rule definition for "+state.Uuid.ValueString()+" "+helpers.ErrorFromAPIBody(i.Body),
+			)
+			return
+		}
+
+		if len(res.Data.Rules) == 0 {
+			resp.Diagnostics.AddError(
+				"Unkonwn UUID",
+				"Could not load rule definition for"+state.Uuid.ValueString(),
+			)
+			return
+		}
+
+		rule := res.Data.Rules[0]
+		state.Uuid = types.StringValue(*rule.Uuid)
 	}
 
-	// @todo — move more from Rule.config to the state.
-	state.Uuid = types.StringValue(*rule.Uuid)
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -259,64 +308,87 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	rule := openapi.NewRuleRedirectRequest()
-
-	if plan.CountryInclude.IsNull() && plan.IpInclude.IsNull() && plan.MethodInclude.IsNull() {
-		resp.Diagnostics.AddError(
-			"Rule criteria is missing",
-			"Could not crete a rule due to missing criteria; must provide country, ip and/or method",
+	if plan.Uuid.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Rule uuid is null",
+			"The rule uuid is null and data is not able to be updated from the API",
 		)
-	}
+	} else {
+		rule := openapi.NewRuleRedirectRequest()
 
-	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
-		if plan.CountryInclude.ValueBool() {
-			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
-		} else {
-			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+		rule.SetName(plan.Name.ValueString())
+		rule.SetDisabled(plan.Disabled.ValueBool())
+		rule.SetDomain(plan.Domain.ValueString())
+
+		if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
+			if plan.CountryInclude.ValueBool() {
+				rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
+			} else {
+				rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+			}
 		}
-	}
 
-	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
-		if plan.MethodInclude.ValueBool() {
-			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
-		} else {
-			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+		if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
+			if plan.MethodInclude.ValueBool() {
+				rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
+			} else {
+				rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+			}
 		}
-	}
 
-	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
-		if plan.IpInclude.ValueBool() {
-			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
-		} else {
-			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+		if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
+			if plan.IpInclude.ValueBool() {
+				rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
+			} else {
+				rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+			}
 		}
-	}
 
-	if plan.StatusCode.ValueInt64() != 301 || plan.StatusCode.ValueInt64() != 302 {
-		resp.Diagnostics.AddError(
-			"Invalid redirect status code",
-			fmt.Sprintf("Redirect code must be [301, 302] %d given", plan.StatusCode.ValueInt64()),
-		)
-		return
-	}
+		if plan.StatusCode.ValueInt64() != 301 || plan.StatusCode.ValueInt64() != 302 {
+			resp.Diagnostics.AddError(
+				"Invalid redirect status code",
+				fmt.Sprintf("Redirect code must be [301, 302] %d given", plan.StatusCode.ValueInt64()),
+			)
+			return
+		}
 
-	rule.SetName(plan.Name.ValueString())
-	rule.SetDomain(plan.Domain.ValueString())
-	rule.SetUrl(plan.Url.ValueString())
-	rule.SetTo(plan.To.ValueString())
-	rule.SetStatusCode(int32(plan.StatusCode.ValueInt64()))
+		rule.SetName(plan.Name.ValueString())
+		rule.SetDomain(plan.Domain.ValueString())
+		rule.SetUrl(plan.Url.ValueString())
+		rule.SetRedirectTo(plan.To.ValueString())
+		rule.SetRedirectCode(int32(plan.StatusCode.ValueInt64()))
 
-	organization := r.client.Organization
-	project := plan.Project.ValueString()
+		organization := r.client.Organization
+		project := plan.Project.ValueString()
 
-	client := r.client.Admin.RulesAPI
-	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRulePatch(context.Background(), organization, project, plan.Uuid.ValueString()).RuleRedirectRequest(*rule).Execute()
+		client := r.client.Admin.RulesAPI
+		res, i, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRulePatch(context.Background(), organization, project, plan.Uuid.ValueString()).RuleRedirectRequest(*rule).Execute()
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating rule",
-			"Could not update rule, unexpected error: "+err.Error(),
-		)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating rule",
+				"Could not update rule, unexpected error: "+err.Error(),
+			)
+		}
+
+		if i.StatusCode != http.StatusOK {
+			resp.Diagnostics.AddError(
+				"Error reading header rule",
+				"Could not load rule definition for "+plan.Uuid.ValueString()+" "+helpers.ErrorFromAPIBody(i.Body),
+			)
+			return
+		}
+
+		if len(res.Data.Rules) == 0 {
+			resp.Diagnostics.AddError(
+				"Unkonwn UUID",
+				"Could not load rule definition for"+plan.Uuid.ValueString(),
+			)
+			return
+		}
+
+		r := res.Data.Rules[0]
+		plan.Uuid = types.StringValue(*r.Uuid)
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -336,9 +408,17 @@ func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	if state.Project.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error Deleting Quant project",
+		resp.Diagnostics.AddWarning(
+			"Unable to delete rule",
 			"Invalid state: project machine name is unknown.",
+		)
+		return
+	}
+
+	if state.Uuid.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Unable to delete rule",
+			"Invalid state: UUID is unknown.",
 		)
 		return
 	}
@@ -351,8 +431,8 @@ func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting Quant project",
-			"Could not delete project, unexpected error: "+err.Error(),
+			"Error Deleting rule ",
+			"Could not delete rule, unexpected error: "+err.Error(),
 		)
 		return
 	}

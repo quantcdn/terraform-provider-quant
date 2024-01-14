@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
@@ -91,14 +92,18 @@ func (r *ruleAuth) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 				MarkdownDescription: "If this rule is disabled",
 				Optional:            true,
 				Default:             booldefault.StaticBool(false),
+				Computed:            true,
 			},
 			"domain": schema.StringAttribute{
 				MarkdownDescription: "The domain the rule applies to",
 				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("any"),
 			},
 			"countries": schema.ListAttribute{
 				MarkdownDescription: "A list of countries",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"country_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the country list",
@@ -107,6 +112,7 @@ func (r *ruleAuth) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 			"methods": schema.ListAttribute{
 				MarkdownDescription: "A list of HTTP methods",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"method_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the methods",
@@ -115,6 +121,7 @@ func (r *ruleAuth) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 			"ips": schema.ListAttribute{
 				MarkdownDescription: "A list of IP addresses",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"ip_include": schema.BoolAttribute{
 				MarkdownDescription: "Include hte IP addresses",

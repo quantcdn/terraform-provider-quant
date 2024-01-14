@@ -3,37 +3,44 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/helpers"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	openapi "github.com/quantcdn/quant-admin-go"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource              = &rulecustomResponse{}
-	_ resource.ResourceWithConfigure = &rulecustomResponse{}
+	_ resource.Resource              = &ruleCustomResponse{}
+	_ resource.ResourceWithConfigure = &ruleCustomResponse{}
 )
 
-// NewrulecustomResponse is a helper function to simplify the provider implementation.
-func NewRulecustomResponseResource() resource.Resource {
-	return &rulecustomResponse{}
+// NewruleCustomResponse is a helper function to simplify the provider implementation.
+func NewruleCustomResponseResource() resource.Resource {
+	return &ruleCustomResponse{}
 }
 
-// rulecustomResponse is the resource implementation.
-type rulecustomResponse struct {
+// ruleCustomResponse is the resource implementation.
+type ruleCustomResponse struct {
 	client *client.Client
 }
 
-type rulecustomResponseModel struct {
+type ruleCustomResponseModel struct {
 	Name     types.String `tfsdk:"name"`
 	Uuid     types.String `tfsdk:"uuid"`
 	Project  types.String `tfsdk:"project"`
 	Disabled types.Bool   `tfsdk:"disabled"`
 
 	Domain types.String `tfsdk:"domain"`
+	Url    types.String `tfsdk:"url"`
 
 	// Rule selection.
 	CountryInclude types.Bool     `tfsdk:"country_include"`
@@ -50,7 +57,7 @@ type rulecustomResponseModel struct {
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *rulecustomResponse) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *ruleCustomResponse) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -70,17 +77,20 @@ func (r *rulecustomResponse) Configure(_ context.Context, req resource.Configure
 }
 
 // Metadata returns the resource type name.
-func (r *rulecustomResponse) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *ruleCustomResponse) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_rule_custom_response"
 }
 
 // Schema defines the schema for the resource.
-func (r *rulecustomResponse) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *ruleCustomResponse) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				MarkdownDescription: "A name for the rule",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"project": schema.StringAttribute{
 				MarkdownDescription: "The project machine name",
@@ -90,14 +100,24 @@ func (r *rulecustomResponse) Schema(_ context.Context, _ resource.SchemaRequest,
 				MarkdownDescription: "If this rule is disabled",
 				Optional:            true,
 				Default:             booldefault.StaticBool(false),
+				Computed:            true,
 			},
 			"domain": schema.StringAttribute{
 				MarkdownDescription: "The domain the rule applies to",
 				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("any"),
+			},
+			"url": schema.StringAttribute{
+				MarkdownDescription: "The URL to apply to",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("/*"),
 			},
 			"countries": schema.ListAttribute{
 				MarkdownDescription: "A list of countries",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"country_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the country list",
@@ -106,6 +126,7 @@ func (r *rulecustomResponse) Schema(_ context.Context, _ resource.SchemaRequest,
 			"methods": schema.ListAttribute{
 				MarkdownDescription: "A list of HTTP methods",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"method_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the methods",
@@ -114,6 +135,7 @@ func (r *rulecustomResponse) Schema(_ context.Context, _ resource.SchemaRequest,
 			"ips": schema.ListAttribute{
 				MarkdownDescription: "A list of IP addresses",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"ip_include": schema.BoolAttribute{
 				MarkdownDescription: "Include hte IP addresses",
@@ -136,25 +158,106 @@ func (r *rulecustomResponse) Schema(_ context.Context, _ resource.SchemaRequest,
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *rulecustomResponse) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan rulecustomResponseModel
+func (r *ruleCustomResponse) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan ruleCustomResponseModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if plan.CountryInclude.IsNull() && plan.IpInclude.IsNull() && plan.MethodInclude.IsNull() {
+	if plan.Url.IsNull() {
+		plan.Url = types.StringValue("*")
+	}
+
+	rule := openapi.NewRuleCustomResponseRequest()
+
+	if plan.CountryInclude.IsNull() {
+		rule.SetCountry("any")
+	}
+
+	if plan.MethodInclude.IsNull() {
+		rule.SetMethod("any")
+	}
+
+	if plan.IpInclude.IsNull() {
+		rule.SetIp("any")
+	}
+
+	rule.SetName(plan.Name.ValueString())
+	rule.SetDisabled(plan.Disabled.ValueBool())
+	rule.SetDomain(plan.Domain.ValueString())
+
+	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
+		if plan.CountryInclude.ValueBool() {
+			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
+		} else {
+			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+		}
+	}
+
+	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
+		if plan.MethodInclude.ValueBool() {
+			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
+		} else {
+			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+		}
+	}
+
+	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
+		if plan.IpInclude.ValueBool() {
+			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
+		} else {
+			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+		}
+	}
+
+	// Rule behaviour.
+	rule.SetUrl(plan.Url.ValueString())
+	rule.SetCustomResponseBody(plan.CustomResponseBody.ValueString())
+	rule.SetCustomResponseStatusCode(int32(plan.CustomResponseStatusCode.ValueInt64()))
+
+	organization := r.client.Organization
+	project := plan.Project.ValueString()
+
+	client := r.client.Admin.RulesAPI
+	res, i, err := client.OrganizationsOrganizationProjectsProjectRulesCustomResponsePost(r.client.Auth, organization, project).RuleCustomResponseRequest(*rule).Execute()
+	if i.StatusCode == http.StatusForbidden {
 		resp.Diagnostics.AddError(
-			"Rule criteria is missing",
-			"Could not crete a rule due to missing criteria; must provide country, ip and/or method",
+			"Error create rule",
+			"You are not authorised to make this request, please check credentials.",
 		)
+		return
+	}
+
+	if i.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError(
+			"Error creating rule",
+			"Could not create the rule, unexpected error "+helpers.ErrorFromAPIBody(i.Body),
+		)
+		return
+	}
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating rule",
+			"Could not create rule, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	plan.Uuid = types.StringValue(*res.GetData().Rules[0].Uuid)
+
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *rulecustomResponse) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state rulecustomResponseModel
+func (r *ruleCustomResponse) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state ruleCustomResponseModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -164,25 +267,132 @@ func (r *rulecustomResponse) Read(ctx context.Context, req resource.ReadRequest,
 	organization := r.client.Organization
 	project := state.Project.ValueString()
 
-	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRuleGet(context.Background(), organization, project, state.Uuid.ValueString()).Execute()
-	rule := res.Data.Rules[0]
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Updating HashiCups Order",
-			"Could not update order, unexpected error: "+err.Error(),
+	if state.Uuid.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Rule uuid is null",
+			"The rule uuid is null and data is not able to be updated from the API",
 		)
+	} else {
+		client := r.client.Admin.RulesAPI
+		res, i, err := client.OrganizationsOrganizationProjectsProjectRulesCustomResponseRuleGet(context.Background(), organization, project, state.Uuid.ValueString()).Execute()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading header rule",
+				"Could not read rule, unexpected error: "+err.Error(),
+			)
+		}
+
+		if i.StatusCode != http.StatusOK {
+			resp.Diagnostics.AddError(
+				"Error reading header rule",
+				"Could not load rule definition for "+state.Uuid.ValueString()+" "+helpers.ErrorFromAPIBody(i.Body),
+			)
+			return
+		}
+		if len(res.Data.Rules) == 0 {
+			resp.Diagnostics.AddError(
+				"Unkonwn UUID",
+				"Could not load rule definition for "+state.Uuid.ValueString(),
+			)
+			return
+		}
+
+		rule := res.Data.Rules[0]
+		state.Uuid = types.StringValue(*rule.Uuid)
 	}
 
-	// @todo — move more from Rule.config to the state.
-	state.Uuid = types.StringValue(*rule.Uuid)
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *rulecustomResponse) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan rulecustomResponseModel
+func (r *ruleCustomResponse) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan ruleCustomResponseModel
 	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Uuid.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Rule uuid is null",
+			"The rule uuid is null and data is not able to be updated from the API",
+		)
+	} else {
+		rule := openapi.NewRuleCustomResponseRequest()
+
+		rule.SetName(plan.Name.ValueString())
+		rule.SetDisabled(plan.Disabled.ValueBool())
+		rule.SetDomain(plan.Domain.ValueString())
+
+		if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
+			if plan.CountryInclude.ValueBool() {
+				rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
+			} else {
+				rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+			}
+		}
+
+		if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
+			if plan.MethodInclude.ValueBool() {
+				rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
+			} else {
+				rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+			}
+		}
+
+		if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
+			if plan.IpInclude.ValueBool() {
+				rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
+			} else {
+				rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+			}
+		}
+
+		// Rule behaviour.
+		rule.SetUrl(plan.Url.ValueString())
+		rule.SetCustomResponseBody(plan.CustomResponseBody.ValueString())
+		rule.SetCustomResponseStatusCode(int32(plan.CustomResponseStatusCode.ValueInt64()))
+
+		organization := r.client.Organization
+		project := plan.Project.ValueString()
+
+		client := r.client.Admin.RulesAPI
+		res, i, err := client.OrganizationsOrganizationProjectsProjectRulesCustomResponseRulePatch(r.client.Auth, organization, project, plan.Uuid.ValueString()).RuleCustomResponseRequest(*rule).Execute()
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating rule",
+				"Could not update rule, unexpected error: "+err.Error(),
+			)
+		}
+
+		if i.StatusCode != http.StatusOK {
+			resp.Diagnostics.AddError(
+				"Error reading header rule",
+				"Could not load rule definition for "+plan.Uuid.ValueString()+" "+helpers.ErrorFromAPIBody(i.Body),
+			)
+			return
+		}
+
+		if len(res.Data.Rules) == 0 {
+			resp.Diagnostics.AddError(
+				"Unkonwn UUID",
+				"Could not load rule definition for"+plan.Uuid.ValueString(),
+			)
+			return
+		}
+
+		r := res.Data.Rules[0]
+		plan.Uuid = types.StringValue(*r.Uuid)
+	}
+
+	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -190,8 +400,8 @@ func (r *rulecustomResponse) Update(ctx context.Context, req resource.UpdateRequ
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *rulecustomResponse) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state rulecustomResponseModel
+func (r *ruleCustomResponse) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state ruleCustomResponseModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -210,12 +420,12 @@ func (r *rulecustomResponse) Delete(ctx context.Context, req resource.DeleteRequ
 	project := state.Project.ValueString()
 
 	client := r.client.Admin.RulesAPI
-	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesAuthRuleDelete(r.client.Auth, organization, project, state.Uuid.ValueString()).Execute()
+	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesCustomResponseRuleDelete(r.client.Auth, organization, project, state.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting Quant project",
-			"Could not delete project, unexpected error: "+err.Error(),
+			"Error Deleting rule ",
+			"Could not delete rule, unexpected error: "+err.Error(),
 		)
 		return
 	}

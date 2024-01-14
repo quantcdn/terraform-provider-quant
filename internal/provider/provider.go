@@ -118,5 +118,12 @@ func (p *quantProvider) DataSources(_ context.Context) []func() datasource.DataS
 func (p *quantProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewProjectResource,
+		NewDomainResource,
+		NewCrawlerResource,
+		NewRuleAuthResource,
+		NewRuleHeadersResource,
+		NewRuleProxyResource,
+		NewRuleRedirectResouce,
+		NewruleCustomResponseResource,
 	}
 }

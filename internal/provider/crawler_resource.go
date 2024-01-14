@@ -82,6 +82,7 @@ func (r *crawlerResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"url_list": schema.ListAttribute{
 				ElementType:         types.StringType,
+				Optional:            true,
 				MarkdownDescription: "A list of URLs to include in the crawl",
 			},
 			"headers": schema.SetNestedAttribute{
@@ -185,6 +186,7 @@ func (r *crawlerResource) Read(ctx context.Context, req resource.ReadRequest, re
 	crawler := res.Data.Crawlers[0]
 
 	state.Domain = types.StringValue(crawler.GetDomain())
+	state.UUID = types.StringValue(crawler.GetUuid())
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

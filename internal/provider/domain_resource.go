@@ -130,6 +130,7 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	for _, domain := range res.Data.Domains {
 		if types.StringValue(*domain.Domain) == state.Domain {
 			state.Domain = types.StringValue(*domain.Domain)
+			// state.Id = types.Int64Value(domain.GetId())
 		}
 	}
 

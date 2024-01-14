@@ -123,14 +123,18 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 				MarkdownDescription: "If this rule is disabled",
 				Optional:            true,
 				Default:             booldefault.StaticBool(false),
+				Computed:            true,
 			},
 			"domain": schema.StringAttribute{
 				MarkdownDescription: "The domain the rule applies to",
 				Optional:            true,
+				Default:             stringdefault.StaticString("any"),
+				Computed:            true,
 			},
 			"countries": schema.ListAttribute{
 				MarkdownDescription: "A list of countries",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"country_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the country list",
@@ -139,6 +143,7 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 			"methods": schema.ListAttribute{
 				MarkdownDescription: "A list of HTTP methods",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"method_include": schema.BoolAttribute{
 				MarkdownDescription: "Include the methods",
@@ -147,6 +152,7 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 			"ips": schema.ListAttribute{
 				MarkdownDescription: "A list of IP addresses",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"ip_include": schema.BoolAttribute{
 				MarkdownDescription: "Include hte IP addresses",
@@ -160,7 +166,6 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 			// Rule behaviours
 			"url": schema.StringAttribute{
 				MarkdownDescription: "The URL pattern to apply the rule to",
-				Required:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("*"),
 			},
@@ -197,6 +202,7 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 			"strip_headers": schema.ListAttribute{
 				MarkdownDescription: "Strip headers from the request to origin",
 				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"waf_enabled": schema.BoolAttribute{
 				MarkdownDescription: "If the proxy should have the WAF enabled",
@@ -206,10 +212,10 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 			},
 			"waf_config": schema.SingleNestedAttribute{
 				MarkdownDescription: "WAF configuration for this rule",
+				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"mode": schema.StringAttribute{
 						MarkdownDescription: "The mode to run the WAF in",
-						Required:            true,
 						Computed:            true,
 						Default:             stringdefault.StaticString("report"),
 					},
@@ -222,22 +228,27 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 					"allow_rules": schema.ListAttribute{
 						MarkdownDescription: "A list of rule ids to allow through the WAF",
 						Optional:            true,
+						ElementType:         types.StringType,
 					},
 					"allow_ip": schema.ListAttribute{
 						MarkdownDescription: "A list of IP addresses that are excluded form the WAF",
 						Optional:            true,
+						ElementType:         types.StringType,
 					},
 					"block_ip": schema.ListAttribute{
 						MarkdownDescription: "A list of IP addresses that are blocked",
 						Optional:            true,
+						ElementType:         types.StringType,
 					},
 					"block_ua": schema.ListAttribute{
 						MarkdownDescription: "A list of user agents that are blocked",
 						Optional:            true,
+						ElementType:         types.StringType,
 					},
 					"block_referer": schema.ListAttribute{
 						MarkdownDescription: "A list of referer host names that are blocked",
 						Optional:            true,
+						ElementType:         types.StringType,
 					},
 					"notify_slack": schema.StringAttribute{
 						MarkdownDescription: "A slack webhook URL to notify",
@@ -250,6 +261,7 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 						Default:             int64default.StaticInt64(5),
 					},
 					"httpbl": schema.SingleNestedAttribute{
+						Optional: true,
 						Attributes: map[string]schema.Attribute{
 							"enabled": schema.BoolAttribute{
 								MarkdownDescription: "Enable HTTPBL integration",
@@ -407,6 +419,12 @@ func (r *ruleProxy) Read(ctx context.Context, req resource.ReadRequest, resp *re
 	}
 
 	state.Uuid = types.StringValue(*rule.Uuid)
+
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Update updates the resource and sets the updated Terraform state on success.

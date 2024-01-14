@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/helpers"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -155,12 +156,12 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	organization := r.client.Organization
-	res, _, err := client.OrganizationsOrganizationProjectsPost(r.client.Auth, organization).ProjectRequest(p).Execute()
+	res, d, err := client.OrganizationsOrganizationProjectsPost(r.client.Auth, organization).ProjectRequest(p).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating project",
-			"Could not create project, unexpected error: "+err.Error(),
+			"Could not create project\n"+helpers.ErrorFromAPIBody(d.Body),
 		)
 		return
 	}
