@@ -52,7 +52,7 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *hashicups.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *quant.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return
@@ -270,7 +270,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating HashiCups Order",
+			"Error Updating Quant Projet",
 			"Could not update order, unexpected error: "+err.Error(),
 		)
 	}
