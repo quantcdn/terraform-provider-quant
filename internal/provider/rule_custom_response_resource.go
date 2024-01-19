@@ -85,6 +85,13 @@ func (r *ruleCustomResponse) Metadata(_ context.Context, req resource.MetadataRe
 func (r *ruleCustomResponse) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"uuid": schema.StringAttribute{
+				MarkdownDescription: "The rules UUID",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "A name for the rule",
 				Optional:            true,

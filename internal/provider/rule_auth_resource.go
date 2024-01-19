@@ -9,7 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
@@ -80,6 +82,13 @@ func (r *ruleAuth) Metadata(_ context.Context, req resource.MetadataRequest, res
 func (r *ruleAuth) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"uuid": schema.StringAttribute{
+				MarkdownDescription: "The rules UUID",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "A name for the rule",
 				Optional:            true,
@@ -91,14 +100,20 @@ func (r *ruleAuth) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 			"disabled": schema.BoolAttribute{
 				MarkdownDescription: "If this rule is disabled",
 				Optional:            true,
-				Default:             booldefault.StaticBool(false),
 				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 			"domain": schema.StringAttribute{
 				MarkdownDescription: "The domain the rule applies to",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("any"),
+			},
+			"url": schema.StringAttribute{
+				MarkdownDescription: "The URL to apply to",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("/*"),
 			},
 			"countries": schema.ListAttribute{
 				MarkdownDescription: "A list of countries",
@@ -161,6 +176,27 @@ func (r *ruleAuth) Create(ctx context.Context, req resource.CreateRequest, resp 
 
 	rule := openapi.NewRuleAuthRequest()
 
+	if plan.Url.IsNull() {
+		plan.Url = types.StringValue("*")
+	}
+
+	if plan.CountryInclude.IsNull() {
+		rule.SetCountry("any")
+	}
+
+	if plan.MethodInclude.IsNull() {
+		rule.SetMethod("any")
+	}
+
+	if plan.IpInclude.IsNull() {
+		rule.SetIp("any")
+	}
+
+	rule.SetName(plan.Name.ValueString())
+	rule.SetDisabled(plan.Disabled.ValueBool())
+	rule.SetDomain(plan.Domain.ValueString())
+	rule.SetUrl(plan.Url.ValueString())
+
 	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
 		if plan.CountryInclude.ValueBool() {
 			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
@@ -185,8 +221,7 @@ func (r *ruleAuth) Create(ctx context.Context, req resource.CreateRequest, resp 
 		}
 	}
 
-	rule.SetName(plan.Name.ValueString())
-	rule.SetDomain(plan.Domain.ValueString())
+	// Rule behaviour.
 	rule.SetAuthUser(plan.AuthUser.ValueString())
 	rule.SetAuthPass(plan.AuthUser.ValueString())
 
@@ -257,6 +292,27 @@ func (r *ruleAuth) Update(ctx context.Context, req resource.UpdateRequest, resp 
 
 	rule := openapi.NewRuleAuthRequest()
 
+	if plan.Url.IsNull() {
+		plan.Url = types.StringValue("*")
+	}
+
+	if plan.CountryInclude.IsNull() {
+		rule.SetCountry("any")
+	}
+
+	if plan.MethodInclude.IsNull() {
+		rule.SetMethod("any")
+	}
+
+	if plan.IpInclude.IsNull() {
+		rule.SetIp("any")
+	}
+
+	rule.SetName(plan.Name.ValueString())
+	rule.SetDisabled(plan.Disabled.ValueBool())
+	rule.SetDomain(plan.Domain.ValueString())
+	rule.SetUrl(plan.Url.ValueString())
+
 	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
 		if plan.CountryInclude.ValueBool() {
 			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
@@ -281,8 +337,7 @@ func (r *ruleAuth) Update(ctx context.Context, req resource.UpdateRequest, resp 
 		}
 	}
 
-	rule.SetName(plan.Name.ValueString())
-	rule.SetDomain(plan.Domain.ValueString())
+	// Rule behaviour.
 	rule.SetAuthUser(plan.AuthUser.ValueString())
 	rule.SetAuthPass(plan.AuthUser.ValueString())
 

@@ -10,7 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
@@ -54,7 +56,7 @@ type ruleProxyModel struct {
 	Host             types.String   `tfsdk:"host"`
 	AuthUser         types.String   `tfsdk:"auth_user"`
 	AuthPass         types.String   `tfsdk:"auth_pass"`
-	DisableSSLVerify types.String   `tfsdk:"disable_ssl_verify"`
+	DisableSSLVerify types.Bool     `tfsdk:"disable_ssl_verify"`
 	CacheLifetime    types.Int64    `tfsdk:"cache_lifetime"`
 	Only404          types.Bool     `tfsdk:"only_404"`
 	StripHeaders     []types.String `tfsdk:"strip_headers"`
@@ -111,6 +113,13 @@ func (r *ruleProxy) Metadata(_ context.Context, req resource.MetadataRequest, re
 func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"uuid": schema.StringAttribute{
+				MarkdownDescription: "The rules UUID",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "A name for the rule",
 				Optional:            true,
@@ -122,14 +131,20 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 			"disabled": schema.BoolAttribute{
 				MarkdownDescription: "If this rule is disabled",
 				Optional:            true,
-				Default:             booldefault.StaticBool(false),
 				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 			"domain": schema.StringAttribute{
 				MarkdownDescription: "The domain the rule applies to",
 				Optional:            true,
-				Default:             stringdefault.StaticString("any"),
 				Computed:            true,
+				Default:             stringdefault.StaticString("any"),
+			},
+			"url": schema.StringAttribute{
+				MarkdownDescription: "The URL to apply to",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("*"),
 			},
 			"countries": schema.ListAttribute{
 				MarkdownDescription: "A list of countries",
@@ -164,11 +179,6 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 			},
 
 			// Rule behaviours
-			"url": schema.StringAttribute{
-				MarkdownDescription: "The URL pattern to apply the rule to",
-				Computed:            true,
-				Default:             stringdefault.StaticString("*"),
-			},
 			"to": schema.StringAttribute{
 				MarkdownDescription: "The origin hostname to proxy to",
 				Required:            true,
@@ -309,61 +319,80 @@ func (r *ruleProxy) Create(ctx context.Context, req resource.CreateRequest, resp
 		)
 	}
 
-	proxy := openapi.NewRuleProxyRequest()
+	rule := openapi.NewRuleProxyRequest()
 
-	proxy.SetName(plan.Name.ValueString())
-	proxy.SetDisabled(plan.Disabled.ValueBool())
-	proxy.SetDomain(plan.Domain.ValueString())
+	if plan.Url.IsNull() {
+		plan.Url = types.StringValue("*")
+	}
+
+	if plan.CountryInclude.IsNull() {
+		rule.SetCountry("any")
+	}
+
+	if plan.MethodInclude.IsNull() {
+		rule.SetMethod("any")
+	}
+
+	if plan.IpInclude.IsNull() {
+		rule.SetIp("any")
+	}
+
+	rule.SetName(plan.Name.ValueString())
+	rule.SetDisabled(plan.Disabled.ValueBool())
+	rule.SetDomain(plan.Domain.ValueString())
+	rule.SetUrl(plan.Url.ValueString())
 
 	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
 		if plan.CountryInclude.ValueBool() {
-			proxy.SetCountry("country_is")
-			proxy.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
+			rule.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
 		} else {
-			proxy.SetCountry("country_is_not")
-			proxy.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
+			rule.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
 		}
 	}
 
 	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
 		if plan.MethodInclude.ValueBool() {
-			proxy.SetMethod("method_is")
-			proxy.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
+			rule.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
 		} else {
-			proxy.SetMethod("method_is_not")
-			proxy.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
+			rule.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
 		}
 	}
 
 	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
 		if plan.IpInclude.ValueBool() {
-			proxy.SetIp("ip_is")
-			proxy.SetIpIs(helpers.FlattenToStrings(plan.Ips))
+			rule.SetIpIs(helpers.FlattenToStrings(plan.Ips))
 		} else {
-			proxy.SetIp("ip_is_not")
-			proxy.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
+			rule.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
 		}
 	}
 
 	// Rule behaviour.
-	proxy.SetUrl(plan.Url.ValueString())
-	proxy.SetTo(plan.To.ValueString())
-	proxy.SetHost(plan.Host.ValueString())
-	proxy.SetAuthUser(plan.AuthUser.ValueString())
-	proxy.SetAuthPass(plan.AuthPass.ValueString())
-	// proxy.SetDisableSslVerify(plan.DisableSSLVerify.BoolValue())
-	proxy.SetCacheLifetime(int32(plan.CacheLifetime.ValueInt64()))
-	proxy.SetOnlyProxy404(plan.Only404.ValueBool())
-	proxy.SetStripHeaders(helpers.FlattenToStrings(plan.StripHeaders))
-	proxy.SetWafEnabled(plan.WafEnable.ValueBool())
+	rule.SetTo(plan.To.ValueString())
+	rule.SetHost(plan.Host.ValueString())
+	rule.SetAuthUser(plan.AuthUser.ValueString())
+	rule.SetAuthPass(plan.AuthPass.ValueString())
+	rule.SetDisableSslVerify(plan.DisableSSLVerify.ValueBool())
+	rule.SetCacheLifetime(int32(plan.CacheLifetime.ValueInt64()))
+	rule.SetOnlyProxy404(plan.Only404.ValueBool())
+	rule.SetStripHeaders(helpers.FlattenToStrings(plan.StripHeaders))
+	rule.SetWafEnabled(plan.WafEnable.ValueBool())
 
 	var wafConfig openapi.RuleProxyRequestWafConfig
 	wafConfig.SetMode(plan.WafConfig.Mode.ValueString())
 	wafConfig.SetParanoiaLevel(int32(plan.WafConfig.ParanoiaLevel.ValueInt64()))
 
 	// @todo: Update client — IPs should probably be strings.
-	// wafConfig.SetAllowIp(helpers.FlattenToInt32(plan.WafConfig.AllowIp))
-	// wafConfig.SetBlockIp(helpers.FlattenToInt32(plan.WafConfig.BlockIp))
+	var ips []string
+	for _, v := range plan.WafConfig.AllowIp {
+		ips = append(ips, v.ValueString())
+	}
+	wafConfig.SetAllowIp(ips)
+
+	var blockIps []string
+	for _, v := range plan.WafConfig.BlockIp {
+		blockIps = append(blockIps, v.ValueString())
+	}
+	wafConfig.SetBlockIp(blockIps)
 
 	wafConfig.SetAllowRules(helpers.FlattenToInt32(plan.WafConfig.AllowRules))
 	wafConfig.SetBlockReferer(helpers.FlattenToStrings(plan.WafConfig.BlockReferer))
@@ -371,13 +400,13 @@ func (r *ruleProxy) Create(ctx context.Context, req resource.CreateRequest, resp
 	wafConfig.SetNotifySlack(plan.WafConfig.NotifySlack.ValueString())
 	wafConfig.SetNotifySlackHitsRpm(int32(plan.WafConfig.NotifySlackHitsRpm.ValueInt64()))
 
-	proxy.SetWafConfig(wafConfig)
+	rule.SetWafConfig(wafConfig)
 
 	organization := r.client.Organization
 	project := plan.Project.ValueString()
 
 	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyPost(context.Background(), organization, project).RuleProxyRequest(*proxy).Execute()
+	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyPost(context.Background(), organization, project).RuleProxyRequest(*rule).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -435,61 +464,56 @@ func (r *ruleProxy) Update(ctx context.Context, req resource.UpdateRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	proxy := openapi.NewRuleProxyRequest()
+	rule := openapi.NewRuleProxyRequest()
 
-	proxy.SetName(plan.Name.ValueString())
-	proxy.SetDisabled(plan.Disabled.ValueBool())
-	proxy.SetDomain(plan.Domain.ValueString())
-
-	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
-		if plan.CountryInclude.ValueBool() {
-			proxy.SetCountry("country_is")
-			proxy.SetCountryIs(helpers.FlattenToStrings(plan.Countries))
-		} else {
-			proxy.SetCountry("country_is_not")
-			proxy.SetCountryIsNot(helpers.FlattenToStrings(plan.Countries))
-		}
+	if plan.Url.IsNull() {
+		plan.Url = types.StringValue("*")
 	}
 
-	if !plan.MethodInclude.IsNull() && !plan.MethodInclude.IsUnknown() {
-		if plan.MethodInclude.ValueBool() {
-			proxy.SetMethod("method_is")
-			proxy.SetMethodIs(helpers.FlattenToStrings(plan.Methods))
-		} else {
-			proxy.SetMethod("method_is_not")
-			proxy.SetMethodIsNot(helpers.FlattenToStrings(plan.Methods))
-		}
+	if plan.CountryInclude.IsNull() {
+		rule.SetCountry("any")
 	}
 
-	if !plan.IpInclude.IsNull() && !plan.IpInclude.IsUnknown() {
-		if plan.IpInclude.ValueBool() {
-			proxy.SetIp("ip_is")
-			proxy.SetIpIs(helpers.FlattenToStrings(plan.Ips))
-		} else {
-			proxy.SetIp("ip_is_not")
-			proxy.SetIpIsNot(helpers.FlattenToStrings(plan.Ips))
-		}
+	if plan.MethodInclude.IsNull() {
+		rule.SetMethod("any")
 	}
+
+	if plan.IpInclude.IsNull() {
+		rule.SetIp("any")
+	}
+
+	rule.SetName(plan.Name.ValueString())
+	rule.SetDisabled(plan.Disabled.ValueBool())
+	rule.SetDomain(plan.Domain.ValueString())
+	rule.SetUrl(plan.Url.ValueString())
 
 	// Rule behaviour.
-	proxy.SetUrl(plan.Url.ValueString())
-	proxy.SetTo(plan.To.ValueString())
-	proxy.SetHost(plan.Host.ValueString())
-	proxy.SetAuthUser(plan.AuthUser.ValueString())
-	proxy.SetAuthPass(plan.AuthPass.ValueString())
-	// proxy.SetDisableSslVerify(plan.DisableSSLVerify.BoolValue())
-	proxy.SetCacheLifetime(int32(plan.CacheLifetime.ValueInt64()))
-	proxy.SetOnlyProxy404(plan.Only404.ValueBool())
-	proxy.SetStripHeaders(helpers.FlattenToStrings(plan.StripHeaders))
-	proxy.SetWafEnabled(plan.WafEnable.ValueBool())
+	rule.SetTo(plan.To.ValueString())
+	rule.SetHost(plan.Host.ValueString())
+	rule.SetAuthUser(plan.AuthUser.ValueString())
+	rule.SetAuthPass(plan.AuthPass.ValueString())
+	rule.SetDisableSslVerify(plan.DisableSSLVerify.ValueBool())
+	rule.SetCacheLifetime(int32(plan.CacheLifetime.ValueInt64()))
+	rule.SetOnlyProxy404(plan.Only404.ValueBool())
+	rule.SetStripHeaders(helpers.FlattenToStrings(plan.StripHeaders))
+	rule.SetWafEnabled(plan.WafEnable.ValueBool())
 
 	var wafConfig openapi.RuleProxyRequestWafConfig
 	wafConfig.SetMode(plan.WafConfig.Mode.ValueString())
 	wafConfig.SetParanoiaLevel(int32(plan.WafConfig.ParanoiaLevel.ValueInt64()))
 
 	// @todo: Update client — IPs should probably be strings.
-	// wafConfig.SetAllowIp(helpers.FlattenToInt32(plan.WafConfig.AllowIp))
-	// wafConfig.SetBlockIp(helpers.FlattenToInt32(plan.WafConfig.BlockIp))
+	var ips []string
+	for _, v := range plan.WafConfig.AllowIp {
+		ips = append(ips, v.ValueString())
+	}
+	wafConfig.SetAllowIp(ips)
+
+	var blockIps []string
+	for _, v := range plan.WafConfig.BlockIp {
+		blockIps = append(blockIps, v.ValueString())
+	}
+	wafConfig.SetBlockIp(blockIps)
 
 	wafConfig.SetAllowRules(helpers.FlattenToInt32(plan.WafConfig.AllowRules))
 	wafConfig.SetBlockReferer(helpers.FlattenToStrings(plan.WafConfig.BlockReferer))
@@ -497,13 +521,13 @@ func (r *ruleProxy) Update(ctx context.Context, req resource.UpdateRequest, resp
 	wafConfig.SetNotifySlack(plan.WafConfig.NotifySlack.ValueString())
 	wafConfig.SetNotifySlackHitsRpm(int32(plan.WafConfig.NotifySlackHitsRpm.ValueInt64()))
 
-	proxy.SetWafConfig(wafConfig)
+	rule.SetWafConfig(wafConfig)
 
 	organization := r.client.Organization
 	project := plan.Project.ValueString()
 
 	client := r.client.Admin.RulesAPI
-	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyRulePatch(context.Background(), organization, project, plan.Uuid.ValueString()).RuleProxyRequest(*proxy).Execute()
+	_, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyRulePatch(context.Background(), organization, project, plan.Uuid.ValueString()).RuleProxyRequest(*rule).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(

@@ -33,6 +33,16 @@ output "header_rule_result" {
   value = quant_rule_headers.header_rule.uuid
 }
 
+resource "quant_rule_custom_response" "custom_response" {
+  project = "api-test"
+  name = "Terraform custom response rule"
+  disabled = false
+  domain = "any"
+  url = "/test-response"
+
+  custom_response_status_code = 200
+  custom_response_body = "<h1>This is a custom response</h1>"
+}
 
 # resource "quant_rule_proxy" "proxy_rule" {
 #   project = "api-test"

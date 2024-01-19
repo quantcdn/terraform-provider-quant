@@ -8,7 +8,7 @@ terraform {
 }
 
 resource "quant_project" "tf" {
-  name = "Terraform project"
+  name = "Terraform project 1"
   allow_query_params = false
   basic_auth_username = "quant"
   basic_auth_password = "qcdn"
