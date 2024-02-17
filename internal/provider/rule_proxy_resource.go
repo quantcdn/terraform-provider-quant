@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/helpers"
 
@@ -61,11 +62,10 @@ type ruleProxyModel struct {
 	Only404          types.Bool     `tfsdk:"only_404"`
 	StripHeaders     []types.String `tfsdk:"strip_headers"`
 	WafEnable        types.Bool     `tfsdk:"waf_enabled"`
-	WafConfig        WafConfig      `tfsdk:"waf_config"`
+	WafConfig        wafConfigModel `tfsdk:"waf_config"`
 }
 
-// @todo: Move ot a separate location
-type WafConfig struct {
+type wafConfigModel struct {
 	Mode               types.String   `tfsdk:"mode"`
 	ParanoiaLevel      types.Int64    `tfsdk:"paranoia_level"`
 	AllowRules         []types.Int64  `tfsdk:"allow_rules"`
@@ -75,13 +75,15 @@ type WafConfig struct {
 	BlockReferer       []types.String `tfsdk:"block_referer"`
 	NotifySlack        types.String   `tfsdk:"notify_slack"`
 	NotifySlackHitsRpm types.Int64    `tfsdk:"notify_slack_rpm"`
-	Httpbl             struct {
-		Enabled           types.Bool `tfsdk:"httpbl_enabled"`
-		BlockSuspicious   types.Bool `tfsdk:"block_suspicious"`
-		BlockHarvester    types.Bool `tfsdk:"block_harvester"`
-		BlockSpam         types.Bool `tfsdk:"block_spam"`
-		BlockSearchEgnine types.Bool `tfsdk:"block_search_engine"`
-	} `tfsdk:"httbl"`
+	Httpbl             httpbModel     `tfsdk:"httpbl"`
+}
+
+type httpbModel struct {
+	Enabled           types.Bool `tfsdk:"enabled"`
+	BlockSuspicious   types.Bool `tfsdk:"block_suspicious"`
+	BlockHarvester    types.Bool `tfsdk:"block_harvester"`
+	BlockSpam         types.Bool `tfsdk:"block_spam"`
+	BlockSearchEgnine types.Bool `tfsdk:"block_search_engine"`
 }
 
 // Configure adds the provider configured client to the resource.
@@ -144,7 +146,7 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 				MarkdownDescription: "The URL to apply to",
 				Optional:            true,
 				Computed:            true,
-				Default:             stringdefault.StaticString("*"),
+				Default:             stringdefault.StaticString("/*"),
 			},
 			"countries": schema.ListAttribute{
 				MarkdownDescription: "A list of countries",
@@ -227,6 +229,7 @@ func (r *ruleProxy) Schema(_ context.Context, _ resource.SchemaRequest, resp *re
 					"mode": schema.StringAttribute{
 						MarkdownDescription: "The mode to run the WAF in",
 						Computed:            true,
+						Optional:            true,
 						Default:             stringdefault.StaticString("report"),
 					},
 					"paranoia_level": schema.Int64Attribute{
@@ -312,13 +315,6 @@ func (r *ruleProxy) Create(ctx context.Context, req resource.CreateRequest, resp
 		return
 	}
 
-	if plan.CountryInclude.IsNull() && plan.IpInclude.IsNull() && plan.MethodInclude.IsNull() {
-		resp.Diagnostics.AddError(
-			"Rule criteria is missing",
-			"Could not crete a rule due to missing criteria; must provide country, ip and/or method",
-		)
-	}
-
 	rule := openapi.NewRuleProxyRequest()
 
 	if plan.Url.IsNull() {
@@ -340,7 +336,6 @@ func (r *ruleProxy) Create(ctx context.Context, req resource.CreateRequest, resp
 	rule.SetName(plan.Name.ValueString())
 	rule.SetDisabled(plan.Disabled.ValueBool())
 	rule.SetDomain(plan.Domain.ValueString())
-	rule.SetUrl(plan.Url.ValueString())
 
 	if !plan.CountryInclude.IsNull() && !plan.CountryInclude.IsUnknown() {
 		if plan.CountryInclude.ValueBool() {
@@ -376,6 +371,7 @@ func (r *ruleProxy) Create(ctx context.Context, req resource.CreateRequest, resp
 	rule.SetOnlyProxy404(plan.Only404.ValueBool())
 	rule.SetStripHeaders(helpers.FlattenToStrings(plan.StripHeaders))
 	rule.SetWafEnabled(plan.WafEnable.ValueBool())
+	rule.SetUrl(plan.Url.ValueString())
 
 	var wafConfig openapi.RuleProxyRequestWafConfig
 	wafConfig.SetMode(plan.WafConfig.Mode.ValueString())
@@ -406,7 +402,23 @@ func (r *ruleProxy) Create(ctx context.Context, req resource.CreateRequest, resp
 	project := plan.Project.ValueString()
 
 	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyPost(context.Background(), organization, project).RuleProxyRequest(*rule).Execute()
+	res, i, err := client.OrganizationsOrganizationProjectsProjectRulesProxyPost(context.Background(), organization, project).RuleProxyRequest(*rule).Execute()
+
+	if i.StatusCode == http.StatusForbidden {
+		resp.Diagnostics.AddError(
+			"Error creating rule",
+			"You are not authorised to make this request, please check credentials.",
+		)
+		return
+	}
+
+	if i.StatusCode != http.StatusOK {
+		resp.Diagnostics.AddError(
+			"Error creating rule",
+			"Could not create the rule, unexpected error "+helpers.ErrorFromAPIBody(i.Body),
+		)
+		return
+	}
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -437,7 +449,7 @@ func (r *ruleProxy) Read(ctx context.Context, req resource.ReadRequest, resp *re
 	project := state.Project.ValueString()
 
 	client := r.client.Admin.RulesAPI
-	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesRedirectRuleGet(context.Background(), organization, project, state.Uuid.ValueString()).Execute()
+	res, _, err := client.OrganizationsOrganizationProjectsProjectRulesProxyRuleGet(context.Background(), organization, project, state.Uuid.ValueString()).Execute()
 	rule := res.Data.Rules[0]
 
 	if err != nil {
@@ -502,7 +514,6 @@ func (r *ruleProxy) Update(ctx context.Context, req resource.UpdateRequest, resp
 	wafConfig.SetMode(plan.WafConfig.Mode.ValueString())
 	wafConfig.SetParanoiaLevel(int32(plan.WafConfig.ParanoiaLevel.ValueInt64()))
 
-	// @todo: Update client — IPs should probably be strings.
 	var ips []string
 	for _, v := range plan.WafConfig.AllowIp {
 		ips = append(ips, v.ValueString())
