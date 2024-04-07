@@ -324,4 +324,6 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 		)
 		return
 	}
+
+	return
 }
