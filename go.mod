@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/terraform-plugin-framework v1.7.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.12.0
 	github.com/hashicorp/terraform-plugin-go v0.22.1
-	github.com/quantcdn/quant-admin-go v0.0.0-20231027041747-538916683f83
+	github.com/quantcdn/quant-admin-go v0.0.0-20240407005751-16eb9fb4e733
 )
 
 require (
