@@ -140,7 +140,7 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	// @todo: API to support crawler config overrides.
 	// req.Config = crawler.Config.ValueStringPointer()
 
-	api, _, err := r.client.Instance.CrawlersAPI.CreateCrawlers(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).Execute()
+	api, _, err := r.client.Instance.CrawlersAPI.CreateCrawlers(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).CrawlerRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -260,7 +260,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	diags.Append(crawler.UrlList.ElementsAs(ctx, &urls, false)...)
 	req.UrlList = urls
 
-	api, _, err := r.client.Instance.CrawlersAPI.UpdateCrawler(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	api, _, err := r.client.Instance.CrawlersAPI.UpdateCrawler(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
