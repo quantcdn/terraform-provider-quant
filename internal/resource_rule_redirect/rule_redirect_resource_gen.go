@@ -129,9 +129,10 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"url": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+			"url": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
 			},
 			"uuid": schema.StringAttribute{
 				Computed: true,
@@ -160,7 +161,7 @@ type RuleRedirectModel struct {
 	RedirectCode   types.Int64  `tfsdk:"redirect_code"`
 	RedirectTo     types.String `tfsdk:"redirect_to"`
 	Rule           types.String `tfsdk:"rule"`
-	Url            types.String `tfsdk:"url"`
+	Url            types.List   `tfsdk:"url"`
 	Uuid           types.String `tfsdk:"uuid"`
 }
 

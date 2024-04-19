@@ -160,7 +160,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing crawler.uuid attribute",
-			"To read crawler information the crawler uuid must be provided",
+			"To read crawler information, uuid must be provided.",
 		)
 		return
 	}
@@ -169,7 +169,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		diags.AddAttributeError(
 			path.Root("project"),
 			"Missing crawler.project attribute",
-			"To read crawler information the crawler project must be provided",
+			"To read crawler information, project must be provided.",
 		)
 		return
 	}

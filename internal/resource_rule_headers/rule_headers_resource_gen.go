@@ -164,9 +164,10 @@ func RuleHeadersResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"url": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+			"url": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
 			},
 			"uuid": schema.StringAttribute{
 				Computed: true,
@@ -202,7 +203,7 @@ type RuleHeadersModel struct {
 	Rule             types.String `tfsdk:"rule"`
 	StripHeaders     types.List   `tfsdk:"strip_headers"`
 	To               types.String `tfsdk:"to"`
-	Url              types.String `tfsdk:"url"`
+	Url              types.List   `tfsdk:"url"`
 	Uuid             types.String `tfsdk:"uuid"`
 }
 

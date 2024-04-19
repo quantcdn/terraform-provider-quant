@@ -47,6 +47,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/quantcdn/quant-admin-go v0.0.0-20240407005751-16eb9fb4e733 h1:LE/9i3O0b1jiL51EJLLqagCCKt7dW6j8fJaQtmc4LuU=
 github.com/quantcdn/quant-admin-go v0.0.0-20240407005751-16eb9fb4e733/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
+github.com/quantcdn/quant-admin-go v0.0.0-20240412024410-7a4cd5bb1262 h1:ZfR7rXKO4jOWdM1tdqHhyEy4+067FgMNCsZCQj+sU3s=
+github.com/quantcdn/quant-admin-go v0.0.0-20240412024410-7a4cd5bb1262/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.7.2 h1:4jaiDzPyXQvSd7D0EjG45355tLlV3VOECpq10pLC+8s=
 github.com/stretchr/testify v1.7.2/go.mod h1:R6va5+xMeoiuVRoj+gSkQ7d3FALtqAAGI1FQKckRals=
