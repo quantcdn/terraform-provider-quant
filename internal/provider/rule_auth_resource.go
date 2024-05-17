@@ -10,13 +10,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
 
 var (
-	_ resource.Resource = (*ruleAuthResource)(nil)
+	_ resource.Resource              = (*ruleAuthResource)(nil)
 	_ resource.ResourceWithConfigure = (*ruleAuthResource)(nil)
 )
 
@@ -24,7 +23,7 @@ func NewRuleAuthResource() resource.Resource {
 	return &ruleAuthResource{}
 }
 
-type ruleAuthResource struct{
+type ruleAuthResource struct {
 	client *client.Client
 }
 
@@ -145,29 +144,35 @@ func callRuleAuthCreate(ctx context.Context, r *ruleAuthResource, rule *resource
 		return
 	}
 
-	req := *openapi.NewRuleAuthRequest()
+	req := *openapi.NewRuleAuthRequestWithDefaults()
 
 	setRuleAuthCountryFilters(ctx, rule, &req)
 	setRuleAuthMethodFilters(ctx, rule, &req)
 	setRuleAuthIpFilters(ctx, rule, &req)
 
 	var urls []string
-	rule.Url.ElementsAs(ctx, urls, false)
-	req.Url = urls
+	rule.Urls.ElementsAs(ctx, urls, false)
+	req.SetUrls(urls)
 
 	if rule.Domain.IsNull() {
-		req.Domain = utils.GetRuleAny()
+		req.SetDomain(*utils.GetRuleAny())
 	} else {
-		req.Domain = rule.Domain.ValueStringPointer()
+		req.SetDomain(rule.Domain.ValueString())
 	}
 
-	req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
-	req.Disabled = rule.Disabled.ValueBoolPointer()
+	// req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
 
-	req.AuthUser = rule.AuthUser.ValueStringPointer()
-	req.AuthPass = rule.AuthPass.ValueStringPointer()
+	req.SetDisabled(rule.Disabled.ValueBool())
 
-	api, _, err := r.client.Instance.RulesAPI.CreateRuleAuth(r.client.AuthContext, org, rule.Project.ValueString()).RuleAuthRequest(req).Execute()
+	req.SetAuthPass(rule.AuthPass.ValueString())
+	req.SetAuthUser(rule.AuthUser.ValueString())
+
+	org := r.client.Organization
+	if !rule.Organization.IsNull() {
+		org = rule.Organization.ValueString()
+	}
+
+	api, _, err := r.client.Instance.RulesAuthAPI.RulesAuthCreate(r.client.AuthContext, org, rule.Project.ValueString()).RuleAuthRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to create authentication rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -204,7 +209,7 @@ func callRuleAuthRead(ctx context.Context, r *ruleAuthResource, rule *resource_r
 		org = rule.Organization.ValueString()
 	}
 
-	api, _, err := r.client.Instance.RulesAPI.GetRuleAuth(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	api, _, err := r.client.Instance.RulesAuthAPI.RulesAuthRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to read rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -248,34 +253,35 @@ func callRuleAuthUpdate(ctx context.Context, r *ruleAuthResource, rule *resource
 		return
 	}
 
-	req := *openapi.NewRuleAuthRequest()
+	req := *openapi.NewRuleAuthRequestWithDefaults()
 
 	setRuleAuthCountryFilters(ctx, rule, &req)
 	setRuleAuthMethodFilters(ctx, rule, &req)
 	setRuleAuthIpFilters(ctx, rule, &req)
 
 	var urls []string
-	rule.Url.ElementsAs(ctx, urls, false)
-	req.Url = urls
+	rule.Urls.ElementsAs(ctx, urls, false)
+	req.SetUrls(urls)
 
 	if rule.Domain.IsNull() {
-		req.Domain = utils.GetRuleAny()
+		req.SetDomain(*utils.GetRuleAny())
 	} else {
-		req.Domain = rule.Domain.ValueStringPointer()
+		req.SetDomain(rule.Domain.ValueString())
 	}
 
-	req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
-	req.Disabled = rule.Disabled.ValueBoolPointer()
+	// req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
 
-	req.AuthUser = rule.AuthUser.ValueStringPointer()
-	req.AuthPass = rule.AuthPass.ValueStringPointer()
+	req.SetDisabled(rule.Disabled.ValueBool())
+
+	req.SetAuthPass(rule.AuthPass.ValueString())
+	req.SetAuthUser(rule.AuthUser.ValueString())
 
 	org := r.client.Organization
 	if !rule.Organization.IsNull() {
 		org = rule.Organization.ValueString()
 	}
 
-	api, _, err := r.client.Instance.RulesAPI.UpdateRuleAuth(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).RuleAuthRequest(req).Execute()
+	api, _, err := r.client.Instance.RulesAuthAPI.RulesAuthUpdate(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).RuleAuthRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to read rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -313,7 +319,7 @@ func callRuleAuthDelete(ctx context.Context, r *ruleAuthResource, rule *resource
 		org = rule.Organization.ValueString()
 	}
 
-	_, _, err := r.client.Instance.RulesAPI.DeleteRuleAuth(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.RulesAuthAPI.RulesAuthDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to delete rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -337,12 +343,12 @@ func setRuleAuthCountryFilters(ctx context.Context, rule *resource_rule_auth.Rul
 		var countryList []string
 
 		switch rule.Country.ValueStringPointer() {
-			case utils.GetFilterIs("country"):
-				rule.CountryIs.ElementsAs(ctx, &countryList, false)
-				req.CountryIs = countryList
-			case utils.GetFilterIsNot("country"):
-				rule.CountryIsNot.ElementsAs(ctx, &countryList, false)
-				req.CountryIsNot = countryList
+		case utils.GetFilterIs("country"):
+			rule.CountryIs.ElementsAs(ctx, &countryList, false)
+			req.CountryIs = countryList
+		case utils.GetFilterIsNot("country"):
+			rule.CountryIsNot.ElementsAs(ctx, &countryList, false)
+			req.CountryIsNot = countryList
 		}
 	}
 
@@ -362,12 +368,12 @@ func setRuleAuthMethodFilters(ctx context.Context, rule *resource_rule_auth.Rule
 		req.Method = rule.Method.ValueStringPointer()
 		var list []string
 		switch rule.Method.ValueStringPointer() {
-			case utils.GetFilterIs("method"):
-				rule.MethodIs.ElementsAs(ctx, &list, false)
-				req.MethodIs = list
-			case utils.GetFilterIsNot("method"):
-				rule.MethodIsNot.ElementsAs(ctx, &list, false)
-				req.MethodIsNot = list
+		case utils.GetFilterIs("method"):
+			rule.MethodIs.ElementsAs(ctx, &list, false)
+			req.MethodIs = list
+		case utils.GetFilterIsNot("method"):
+			rule.MethodIsNot.ElementsAs(ctx, &list, false)
+			req.MethodIsNot = list
 		}
 	}
 
@@ -387,12 +393,12 @@ func setRuleAuthIpFilters(ctx context.Context, rule *resource_rule_auth.RuleAuth
 		req.Ip = rule.Ip.ValueStringPointer()
 		var list []string
 		switch rule.Ip.ValueStringPointer() {
-			case utils.GetFilterIs("ip"):
-				rule.IpIs.ElementsAs(ctx, &list, false)
-				req.IpIs = list
-			case utils.GetFilterIsNot("ip"):
-				rule.IpIsNot.ElementsAs(ctx, &list, false)
-				req.IpIsNot = list
+		case utils.GetFilterIs("ip"):
+			rule.IpIs.ElementsAs(ctx, &list, false)
+			req.IpIs = list
+		case utils.GetFilterIsNot("ip"):
+			rule.IpIsNot.ElementsAs(ctx, &list, false)
+			req.IpIsNot = list
 		}
 	}
 

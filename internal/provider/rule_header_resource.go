@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_headers"
@@ -11,14 +10,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
 
 var (
-	_ resource.Resource = (*ruleHeaderResource)(nil)
+	_ resource.Resource              = (*ruleHeaderResource)(nil)
 	_ resource.ResourceWithConfigure = (*ruleHeaderResource)(nil)
 )
 
@@ -80,7 +77,7 @@ func (r *ruleHeaderResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	// Read API call logic
-	resp.Diagnostics.Append(callRuleHeaderRead...(ctx, r, &data)...)
+	resp.Diagnostics.Append(callRuleHeaderRead(ctx, r, &data)...)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -127,35 +124,32 @@ func callRuleHeaderCreate(ctx context.Context, r *ruleHeaderResource, rule *reso
 		return
 	}
 
-	req := *openapi.NewRuleHeaderRequest()
+	req := *openapi.NewRuleHeaderRequestWithDefaults()
 
 	setRuleHeaderCountryFilters(ctx, rule, &req)
 	setRuleHeaderMethodFilters(ctx, rule, &req)
 	setRuleHeaderIpFilters(ctx, rule, &req)
 
 	var urls []string
-	rule.Url.ElementsAs(ctx, urls, false)
-	req.Url = urls
+	rule.Urls.ElementsAs(ctx, urls, false)
+	req.SetUrls(urls)
 
 	if rule.Domain.IsNull() {
-		req.Domain = utils.GetRuleAny()
+		req.SetDomain(*utils.GetRuleAny())
 	} else {
-		req.Domain = rule.Domain.ValueStringPointer()
+		req.SetDomain(rule.Domain.ValueString())
 	}
 
-	req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
-	req.Disabled = rule.Disabled.ValueBoolPointer()
+	// req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
+	req.SetDisabled(rule.Disabled.ValueBool())
 
-	var headers map[string]interface{}
-
-	providedHeaders, d := types.ObjectValueFrom(ctx, rule.Headers.AttributeTypes(ctx), rule)
-	diags.Append(d...)
+	var headers map[string]string
+	rule.Headers.ElementsAs(ctx, headers, true)
+	req.SetHeaders(headers)
 
 	if diags.HasError() {
 		return
 	}
-
-	diags.Append(providedHeaders.As(ctx, &headers, basetypes.ObjectAsOptions{})...)
 
 	if diags.HasError() {
 		return
@@ -166,8 +160,7 @@ func callRuleHeaderCreate(ctx context.Context, r *ruleHeaderResource, rule *reso
 		org = rule.Organization.ValueString()
 	}
 
-
-	api, _, err := r.client.Instance.RulesAPI.CreateRuleHeaders(r.client.AuthContext, org, rule.Project.ValueString()).RuleHeaderRequest(req).Execute()
+	api, _, err := r.client.Instance.RulesHeadersAPI.RulesHeadersCreate(r.client.AuthContext, org, rule.Project.ValueString()).RuleHeaderRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to create header rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -205,7 +198,7 @@ func callRuleHeaderRead(ctx context.Context, r *ruleHeaderResource, rule *resour
 		org = rule.Organization.ValueString()
 	}
 
-	api, _, err := r.client.Instance.RulesAPI.GetRuleHeaders(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	api, _, err := r.client.Instance.RulesHeadersAPI.RulesHeadersRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to read rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -220,7 +213,7 @@ func callRuleHeaderRead(ctx context.Context, r *ruleHeaderResource, rule *resour
 }
 
 func callRuleHeaderUpdate(ctx context.Context, r *ruleHeaderResource, rule *resource_rule_headers.RuleHeadersModel) (diags diag.Diagnostics) {
-	if rule.Uuid.IsNull() || rule.Uuid.IsNull() {
+	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing rule.uuid attribute",
@@ -245,33 +238,30 @@ func callRuleHeaderUpdate(ctx context.Context, r *ruleHeaderResource, rule *reso
 		org = rule.Organization.ValueString()
 	}
 
-	req := *openapi.NewRuleHeaderRequest()
+	req := *openapi.NewRuleHeaderRequestWithDefaults()
 
 	setRuleHeaderCountryFilters(ctx, rule, &req)
 	setRuleHeaderMethodFilters(ctx, rule, &req)
 	setRuleHeaderIpFilters(ctx, rule, &req)
 
 	if rule.Domain.IsNull() {
-		req.Domain = utils.GetRuleAny()
+		req.SetDomain(*utils.GetRuleAny())
 	} else {
-		req.Domain = rule.Domain.ValueStringPointer()
+		req.SetDomain(rule.Domain.ValueString())
 	}
 
-	req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
-	req.Disabled = rule.Disabled.ValueBoolPointer()
+	// req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
+	req.SetDisabled(rule.Disabled.ValueBool())
 
-	var headers map[string]interface{}
-
-	providedHeaders, d := types.ObjectValueFrom(ctx, rule.Headers.AttributeTypes(ctx), rule)
-	diags.Append(d...)
+	var headers map[string]string
+	rule.Headers.ElementsAs(ctx, headers, true)
+	req.SetHeaders(headers)
 
 	if diags.HasError() {
 		return
 	}
 
-	diags.Append(providedHeaders.As(ctx, &headers, basetypes.ObjectAsOptions{})...)
-
-	_, _, err := r.client.Instance.RulesAPI.UpdateRuleHeaders(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).RuleHeaderRequest(req).Execute()
+	_, _, err := r.client.Instance.RulesHeadersAPI.RulesHeadersUpdate(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).RuleHeaderRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -307,7 +297,7 @@ func callRuleHeaderDelete(ctx context.Context, r *ruleHeaderResource, rule *reso
 		org = rule.Organization.ValueString()
 	}
 
-	_, _, err := r.client.Instance.RulesAPI.DeleteRuleHeaders(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.RulesHeadersAPI.RulesHeadersDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to delete rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -332,12 +322,12 @@ func setRuleHeaderCountryFilters(ctx context.Context, rule *resource_rule_header
 		var countryList []string
 
 		switch rule.Country.ValueStringPointer() {
-			case utils.GetFilterIs("country"):
-				rule.CountryIs.ElementsAs(ctx, &countryList, false)
-				req.CountryIs = countryList
-			case utils.GetFilterIsNot("country"):
-				rule.CountryIsNot.ElementsAs(ctx, &countryList, false)
-				req.CountryIsNot = countryList
+		case utils.GetFilterIs("country"):
+			rule.CountryIs.ElementsAs(ctx, &countryList, false)
+			req.CountryIs = countryList
+		case utils.GetFilterIsNot("country"):
+			rule.CountryIsNot.ElementsAs(ctx, &countryList, false)
+			req.CountryIsNot = countryList
 		}
 	}
 
@@ -357,12 +347,12 @@ func setRuleHeaderMethodFilters(ctx context.Context, rule *resource_rule_headers
 		req.Method = rule.Method.ValueStringPointer()
 		var list []string
 		switch rule.Method.ValueStringPointer() {
-			case utils.GetFilterIs("method"):
-				rule.MethodIs.ElementsAs(ctx, &list, false)
-				req.MethodIs = list
-			case utils.GetFilterIsNot("method"):
-				rule.MethodIsNot.ElementsAs(ctx, &list, false)
-				req.MethodIsNot = list
+		case utils.GetFilterIs("method"):
+			rule.MethodIs.ElementsAs(ctx, &list, false)
+			req.MethodIs = list
+		case utils.GetFilterIsNot("method"):
+			rule.MethodIsNot.ElementsAs(ctx, &list, false)
+			req.MethodIsNot = list
 		}
 	}
 
@@ -382,12 +372,12 @@ func setRuleHeaderIpFilters(ctx context.Context, rule *resource_rule_headers.Rul
 		req.Ip = rule.Ip.ValueStringPointer()
 		var list []string
 		switch rule.Ip.ValueStringPointer() {
-			case utils.GetFilterIs("ip"):
-				rule.IpIs.ElementsAs(ctx, &list, false)
-				req.IpIs = list
-			case utils.GetFilterIsNot("ip"):
-				rule.IpIsNot.ElementsAs(ctx, &list, false)
-				req.IpIsNot = list
+		case utils.GetFilterIs("ip"):
+			rule.IpIs.ElementsAs(ctx, &list, false)
+			req.IpIs = list
+		case utils.GetFilterIsNot("ip"):
+			rule.IpIsNot.ElementsAs(ctx, &list, false)
+			req.IpIsNot = list
 		}
 	}
 

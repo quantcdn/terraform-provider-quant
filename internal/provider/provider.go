@@ -25,7 +25,7 @@ type quantProvider struct{}
 
 type quantProviderModel struct {
 	Bearer types.String `tfsdk:"bearer"`
-	Organization types.String `tfsdk:"bearer"`
+	Organization types.String `tfsdk:"organization"`
 }
 
 func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
@@ -119,7 +119,9 @@ func (p *quantProvider) Metadata(ctx context.Context, req provider.MetadataReque
 }
 
 func (p *quantProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewProjectsDataSource,
+	}
 }
 
 func (p *quantProvider) Resources(ctx context.Context) []func() resource.Resource {

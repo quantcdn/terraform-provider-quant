@@ -14,15 +14,15 @@ import (
 )
 
 var (
-	_ resource.Resource = (*projectResource)(nil)
-	_ resource.ResourceWithConfigure = (*projectResource) (nil)
+	_ resource.Resource              = (*projectResource)(nil)
+	_ resource.ResourceWithConfigure = (*projectResource)(nil)
 )
 
 func NewProjectResource() resource.Resource {
 	return &projectResource{}
 }
 
-type projectResource struct{
+type projectResource struct {
 	client *client.Client
 }
 
@@ -124,16 +124,23 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 // Create project request.
 func callProjectCreateAPI(ctx context.Context, r *projectResource, project *resource_project.ProjectModel) (diags diag.Diagnostics) {
-	req := *openapiclient.NewProjectRequest()
+	req := *openapiclient.NewProjectRequestWithDefaults()
 
-	req.AllowQueryParams = project.AllowQueryParams.ValueBoolPointer()
+	if project.Name.IsNull() || project.Name.IsUnknown() {
+		diags.AddAttributeError(
+			path.Root("name"),
+			"Missing project.name attribute",
+			"Cannot create a project without a name.",
+		)
+		return
+	}
 
 	if project.BasicAuthUsername.IsNull() && !project.BasicAuthPassword.IsNull() {
 		diags.AddError(
 			"Missing basic authentication username",
 			"To enable basic authentication both username and password must be provided.",
 		)
-		return diags
+		return
 	}
 
 	if !project.BasicAuthUsername.IsNull() && project.BasicAuthPassword.IsNull() {
@@ -141,52 +148,63 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 			"Missing basic authentication password",
 			"To enable basic authentication both username and password must be provided.",
 		)
-		return diags
+		return
 	}
 
-	req.BasicAuthPassword = project.BasicAuthPassword.ValueStringPointer()
-	req.BasicAuthUsername = project.BasicAuthUsername.ValueStringPointer()
-	req.BasicAuthPreviewOnly = project.BasicAuthPreviewOnly.ValueStringPointer()
+	req.SetName(project.Name.ValueString())
+	req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
+	req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
+	req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
+	req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
 
-	// Validate the S3 credentials for S3 sync, if one s3 value is provided
-	// ensure that all S3 values are provided.
-	if project.CustomS3SyncAccessKey.IsNull() || project.CustomS3SyncBucket.IsNull() || project.CustomS3SyncRegion.IsNull() || project.CustomS3SyncSecretKey.IsNull() {
-		s3Detail := "To enable S3 synchronisation custom_s3_sync_access_key, custom_s3_sync_secret_key, "+
-		"custom_s3_sync_bucket and custom_s3_sync_region must be provided."
-
-		if !project.CustomS3SyncAccessKey.IsNull() {
-			diags.AddError("Missing s3 sync access key", s3Detail)
-		}
-
-		if !project.CustomS3SyncBucket.IsNull() {
-			diags.AddError("Missing s3 sync bucket", s3Detail)
-		}
-		if !project.CustomS3SyncSecretKey.IsNull() {
-			diags.AddError("Missing s3 sync secret key", s3Detail)
-		}
-		if !project.CustomS3SyncRegion.IsNull() {
-			diags.AddError("Missing s3 sync region", s3Detail)
-		}
+	if project.Region.IsNull() || project.Region.IsUnknown() {
+		project.Region = types.StringValue("au")
 	}
 
-	// @todo: API to support setting the git url.
-	// req.GitUrl = project.GitUrl.ValueStringPointer()
+	req.SetRegion(project.Region.ValueString())
 
-	req.Name = project.Name.ValueStringPointer()
+	// @todo: add support for s3 sync.
 
-	apiProject, _, err :=  r.client.Instance.ProjectsAPI.CreateProject(r.client.AuthContext, r.client.Organization).ProjectRequest(req).Execute()
+	apiProject, _, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).ProjectRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
 			"Unable to add the project",
-			fmt.Sprintf("Error: %s", err.Error()),
+			fmt.Sprintf("Error: %v", err),
 		)
+		return
 	}
 
 	project.Id = types.Int64Value(int64(apiProject.GetId()))
 	project.MachineName = types.StringValue(apiProject.GetMachineName())
+	project.Project = types.StringValue(apiProject.GetMachineName())
 	project.CreatedAt = types.StringValue(apiProject.GetCreatedAt())
+	project.UpdatedAt = types.StringValue(apiProject.GetUpdatedAt())
 	project.Uuid = types.StringValue(apiProject.GetUuid())
+
+	// project.ProjectType = types.StringValue(apiProject.GetProjectType())
+	project.GitUrl = types.StringValue(apiProject.GetGitUrl())
+	project.OrganizationId = types.Int64Value(int64(apiProject.GetOrganizationId()))
+	project.ParentProjectId = types.Int64Value(int64(apiProject.GetParentProjectId()))
+	project.Region = types.StringValue(apiProject.GetRegion())
+
+	if apiProject.GetSecurityScore() == "" {
+		project.SecurityScore = types.StringNull()
+	} else {
+		project.SecurityScore = types.StringValue(apiProject.GetSecurityScore())
+	}
+
+	project.Organization = types.StringValue(r.client.Organization)
+
+	if apiProject.GetCreatedAt() == "" {
+		project.DeletedAt = types.StringNull()
+	} else {
+		project.DeletedAt = types.StringValue(apiProject.GetDeletedAt())
+	}
+
+	if project.AllowQueryParams.IsNull() || project.AllowQueryParams.IsUnknown() {
+		project.AllowQueryParams = types.BoolNull()
+	}
 
 	return diags
 }
@@ -206,9 +224,7 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 		org = *project.Organization.ValueStringPointer()
 	}
 
-	req := *openapiclient.NewProjectRequest()
-
-	req.AllowQueryParams = project.AllowQueryParams.ValueBoolPointer()
+	req := *openapiclient.NewProjectRequestWithDefaults()
 
 	if project.BasicAuthUsername.IsNull() && !project.BasicAuthPassword.IsNull() {
 		diags.AddError(
@@ -226,32 +242,13 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 		return diags
 	}
 
-	req.BasicAuthPassword = project.BasicAuthPassword.ValueStringPointer()
-	req.BasicAuthUsername = project.BasicAuthUsername.ValueStringPointer()
-	req.BasicAuthPreviewOnly = project.BasicAuthPreviewOnly.ValueStringPointer()
+	req.SetName(project.Name.ValueString())
+	req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
+	req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
+	req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
+	req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
 
-	// Validate the S3 credentials for S3 sync, if one s3 value is provided
-	// ensure that all S3 values are provided.
-	if project.CustomS3SyncAccessKey.IsNull() || project.CustomS3SyncBucket.IsNull() || project.CustomS3SyncRegion.IsNull() || project.CustomS3SyncSecretKey.IsNull() {
-		s3Detail := "To enable S3 synchronisation custom_s3_sync_access_key, custom_s3_sync_secret_key, "+
-		"custom_s3_sync_bucket and custom_s3_sync_region must be provided."
-
-		if !project.CustomS3SyncAccessKey.IsNull() {
-			diags.AddError("Missing s3 sync access key", s3Detail)
-		}
-
-		if !project.CustomS3SyncBucket.IsNull() {
-			diags.AddError("Missing s3 sync bucket", s3Detail)
-		}
-		if !project.CustomS3SyncSecretKey.IsNull() {
-			diags.AddError("Missing s3 sync secret key", s3Detail)
-		}
-		if !project.CustomS3SyncRegion.IsNull() {
-			diags.AddError("Missing s3 sync region", s3Detail)
-		}
-	}
-
-	api, _, err := r.client.Instance.ProjectsAPI.UpdateProject(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	api, _, err := r.client.Instance.ProjectsAPI.ProjectsUpdate(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update project", fmt.Sprintf("Error: %s", err.Error()))
@@ -264,10 +261,9 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 
 func callProjectReadAPI(ctx context.Context, r *projectResource, project *resource_project.ProjectModel) (diags diag.Diagnostics) {
 	if project.MachineName.IsNull() || project.MachineName.IsUnknown() {
-		diags.AddAttributeError(
-			path.Root("machine_name"),
-			"Missing project.machine_name attribute",
-			"To read project information the project machine name needs to be known, plese import the terraform state.",
+		diags.AddError(
+			"Unable to read project",
+			"The project machine name is unknown, this may indicate an issue with your local state.",
 		)
 		return
 	}
@@ -277,7 +273,7 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 		org = *project.Organization.ValueStringPointer()
 	}
 
-	api, _, err := r.client.Instance.ProjectsAPI.GetProject(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
 		diags.Append(diag.NewErrorDiagnostic(
@@ -290,12 +286,13 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 	project.Id = types.Int64Value(int64(api.GetId()))
 	project.MachineName = types.StringValue(api.GetMachineName())
 	project.CreatedAt = types.StringValue(api.GetCreatedAt())
+	project.UpdatedAt = types.StringValue(api.GetUpdatedAt())
 	project.Uuid = types.StringValue(api.GetUuid())
 
-	// @todo: API does not return these values.)
-	// project.BasicAuthPassword = types.StringValue(api.GetBasicAuthPassword())
-	// project.BasicAuthUsername = types.StringValue(api.GetBasicAuthUsername())
-	// project.BasicAuthPreviewOnly = types.StringValue(api.GetBasicAuthPreviewOnly())
+	project.SecurityScore = types.StringValue(api.GetSecurityScore())
+	project.GitUrl = types.StringValue(api.GetGitUrl())
+
+	// @todo: Support basic auth details from API.
 
 	return diags
 }
@@ -315,7 +312,7 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 		org = project.Organization.ValueString()
 	}
 
-	_, _, err := r.client.Instance.ProjectsAPI.DeleteProject(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	_, _, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError(

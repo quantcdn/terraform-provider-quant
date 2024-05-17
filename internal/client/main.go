@@ -6,12 +6,11 @@ import (
 	openapi "github.com/quantcdn/quant-admin-go"
 )
 
-
 type Client struct {
-	AuthContext context.Context
-	Bearer string
+	AuthContext  context.Context
+	Bearer       string
 	Organization string
-	Instance *openapi.APIClient
+	Instance     *openapi.APIClient
 }
 
 // Rather than the practioner providing an organization for all resources
@@ -23,9 +22,9 @@ func New(bearer string, organization string) *Client {
 	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
 
 	return &Client{
-		Bearer: bearer,
-		AuthContext: ctx,
-		Instance: client,
+		Bearer:       bearer,
+		AuthContext:  ctx,
+		Instance:     client,
 		Organization: organization,
 	}
 }

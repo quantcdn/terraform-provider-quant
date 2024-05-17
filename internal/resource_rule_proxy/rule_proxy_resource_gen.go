@@ -8,6 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -32,13 +35,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"config": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{},
-				CustomType: ConfigType{
-					ObjectType: types.ObjectType{
-						AttrTypes: ConfigValue{}.AttributeTypes(ctx),
-					},
-				},
+			"config": schema.StringAttribute{
 				Computed: true,
 			},
 			"country": schema.StringAttribute{
@@ -68,10 +65,12 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"disabled": schema.BoolAttribute{
 				Optional: true,
 				Computed: true,
+				Default:  booldefault.StaticBool(false),
 			},
 			"domain": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				Default:  stringdefault.StaticString("any"),
 			},
 			"host": schema.StringAttribute{
 				Optional: true,
@@ -125,21 +124,13 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"only_with_cookie": schema.StringAttribute{
+			"organization": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 			},
-			"organization": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Organization machine name",
-				MarkdownDescription: "Organization machine name",
-			},
 			"project": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Project machine name",
-				MarkdownDescription: "Project machine name",
+				Optional: true,
+				Computed: true,
 			},
 			"rule": schema.StringAttribute{
 				Optional: true,
@@ -151,10 +142,9 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Computed:    true,
 			},
 			"to": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Required: true,
 			},
-			"url": schema.ListAttribute{
+			"urls": schema.ListAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
 				Computed:    true,
@@ -170,7 +160,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						Computed:    true,
 					},
 					"allow_rules": schema.ListAttribute{
-						ElementType: types.Int64Type,
+						ElementType: types.StringType,
 						Optional:    true,
 						Computed:    true,
 					},
@@ -210,22 +200,27 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 							"block_harvester": schema.BoolAttribute{
 								Optional: true,
 								Computed: true,
+								Default:  booldefault.StaticBool(false),
 							},
-							"block_search_engine": schema.BoolAttribute{
+							"block_search_enginer": schema.BoolAttribute{
 								Optional: true,
 								Computed: true,
+								Default:  booldefault.StaticBool(false),
 							},
 							"block_spam": schema.BoolAttribute{
 								Optional: true,
 								Computed: true,
+								Default:  booldefault.StaticBool(false),
 							},
 							"block_suspicious": schema.BoolAttribute{
 								Optional: true,
 								Computed: true,
+								Default:  booldefault.StaticBool(false),
 							},
 							"httpbl_enabled": schema.BoolAttribute{
 								Optional: true,
 								Computed: true,
+								Default:  booldefault.StaticBool(false),
 							},
 						},
 						CustomType: HttpblType{
@@ -238,12 +233,10 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					},
 					"inject_headers": schema.ListAttribute{
 						ElementType: types.StringType,
-						Optional:    true,
-						Computed:    true,
+						Required:    true,
 					},
 					"mode": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Required: true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(
 								"block",
@@ -259,16 +252,13 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						Attributes: map[string]schema.Attribute{
 							"origin_status_code": schema.ListAttribute{
 								ElementType: types.Int64Type,
-								Optional:    true,
-								Computed:    true,
+								Required:    true,
 							},
 							"period": schema.Int64Attribute{
-								Optional: true,
-								Computed: true,
+								Required: true,
 							},
 							"slack_webhook": schema.StringAttribute{
-								Optional: true,
-								Computed: true,
+								Required: true,
 							},
 						},
 						CustomType: NotifyConfigType{
@@ -280,24 +270,25 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						Computed: true,
 					},
 					"notify_email": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Required: true,
 					},
 					"notify_slack": schema.StringAttribute{
 						Optional: true,
 						Computed: true,
 					},
-					"notify_slack_hits_rpm": schema.Int64Attribute{
+					"notify_slack_hist_rpm": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
 					},
 					"origin_timeout": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
+						Default:  int64default.StaticInt64(30),
 					},
 					"paranoia_level": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
+						Default:  int64default.StaticInt64(1),
 					},
 					"proxy_alert_enabled": schema.BoolAttribute{
 						Optional: true,
@@ -324,7 +315,7 @@ type RuleProxyModel struct {
 	AuthPass         types.String   `tfsdk:"auth_pass"`
 	AuthUser         types.String   `tfsdk:"auth_user"`
 	CacheLifetime    types.Int64    `tfsdk:"cache_lifetime"`
-	Config           ConfigValue    `tfsdk:"config"`
+	Config           types.String   `tfsdk:"config"`
 	Country          types.String   `tfsdk:"country"`
 	CountryIs        types.List     `tfsdk:"country_is"`
 	CountryIsNot     types.List     `tfsdk:"country_is_not"`
@@ -340,266 +331,15 @@ type RuleProxyModel struct {
 	MethodIsNot      types.List     `tfsdk:"method_is_not"`
 	Name             types.String   `tfsdk:"name"`
 	OnlyProxy404     types.Bool     `tfsdk:"only_proxy_404"`
-	OnlyWithCookie   types.String   `tfsdk:"only_with_cookie"`
 	Organization     types.String   `tfsdk:"organization"`
 	Project          types.String   `tfsdk:"project"`
 	Rule             types.String   `tfsdk:"rule"`
 	StripHeaders     types.List     `tfsdk:"strip_headers"`
 	To               types.String   `tfsdk:"to"`
-	Url              types.List     `tfsdk:"url"`
+	Urls             types.List     `tfsdk:"urls"`
 	Uuid             types.String   `tfsdk:"uuid"`
 	WafConfig        WafConfigValue `tfsdk:"waf_config"`
 	WafEnabled       types.Bool     `tfsdk:"waf_enabled"`
-}
-
-var _ basetypes.ObjectTypable = ConfigType{}
-
-type ConfigType struct {
-	basetypes.ObjectType
-}
-
-func (t ConfigType) Equal(o attr.Type) bool {
-	other, ok := o.(ConfigType)
-
-	if !ok {
-		return false
-	}
-
-	return t.ObjectType.Equal(other.ObjectType)
-}
-
-func (t ConfigType) String() string {
-	return "ConfigType"
-}
-
-func (t ConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	if diags.HasError() {
-		return nil, diags
-	}
-
-	return ConfigValue{
-		state: attr.ValueStateKnown,
-	}, diags
-}
-
-func NewConfigValueNull() ConfigValue {
-	return ConfigValue{
-		state: attr.ValueStateNull,
-	}
-}
-
-func NewConfigValueUnknown() ConfigValue {
-	return ConfigValue{
-		state: attr.ValueStateUnknown,
-	}
-}
-
-func NewConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ConfigValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
-	ctx := context.Background()
-
-	for name, attributeType := range attributeTypes {
-		attribute, ok := attributes[name]
-
-		if !ok {
-			diags.AddError(
-				"Missing ConfigValue Attribute Value",
-				"While creating a ConfigValue value, a missing attribute value was detected. "+
-					"A ConfigValue must contain values for all attributes, even if null or unknown. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("ConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
-			)
-
-			continue
-		}
-
-		if !attributeType.Equal(attribute.Type(ctx)) {
-			diags.AddError(
-				"Invalid ConfigValue Attribute Type",
-				"While creating a ConfigValue value, an invalid attribute value was detected. "+
-					"A ConfigValue must use a matching attribute type for the value. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("ConfigValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
-					fmt.Sprintf("ConfigValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
-			)
-		}
-	}
-
-	for name := range attributes {
-		_, ok := attributeTypes[name]
-
-		if !ok {
-			diags.AddError(
-				"Extra ConfigValue Attribute Value",
-				"While creating a ConfigValue value, an extra attribute value was detected. "+
-					"A ConfigValue must not contain values beyond the expected attribute types. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("Extra ConfigValue Attribute Name: %s", name),
-			)
-		}
-	}
-
-	if diags.HasError() {
-		return NewConfigValueUnknown(), diags
-	}
-
-	if diags.HasError() {
-		return NewConfigValueUnknown(), diags
-	}
-
-	return ConfigValue{
-		state: attr.ValueStateKnown,
-	}, diags
-}
-
-func NewConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ConfigValue {
-	object, diags := NewConfigValue(attributeTypes, attributes)
-
-	if diags.HasError() {
-		// This could potentially be added to the diag package.
-		diagsStrings := make([]string, 0, len(diags))
-
-		for _, diagnostic := range diags {
-			diagsStrings = append(diagsStrings, fmt.Sprintf(
-				"%s | %s | %s",
-				diagnostic.Severity(),
-				diagnostic.Summary(),
-				diagnostic.Detail()))
-		}
-
-		panic("NewConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
-	}
-
-	return object
-}
-
-func (t ConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-	if in.Type() == nil {
-		return NewConfigValueNull(), nil
-	}
-
-	if !in.Type().Equal(t.TerraformType(ctx)) {
-		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
-	}
-
-	if !in.IsKnown() {
-		return NewConfigValueUnknown(), nil
-	}
-
-	if in.IsNull() {
-		return NewConfigValueNull(), nil
-	}
-
-	attributes := map[string]attr.Value{}
-
-	val := map[string]tftypes.Value{}
-
-	err := in.As(&val)
-
-	if err != nil {
-		return nil, err
-	}
-
-	for k, v := range val {
-		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
-
-		if err != nil {
-			return nil, err
-		}
-
-		attributes[k] = a
-	}
-
-	return NewConfigValueMust(ConfigValue{}.AttributeTypes(ctx), attributes), nil
-}
-
-func (t ConfigType) ValueType(ctx context.Context) attr.Value {
-	return ConfigValue{}
-}
-
-var _ basetypes.ObjectValuable = ConfigValue{}
-
-type ConfigValue struct {
-	state attr.ValueState
-}
-
-func (v ConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 0)
-
-	objectType := tftypes.Object{AttributeTypes: attrTypes}
-
-	switch v.state {
-	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 0)
-
-		if err := tftypes.ValidateValue(objectType, vals); err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		return tftypes.NewValue(objectType, vals), nil
-	case attr.ValueStateNull:
-		return tftypes.NewValue(objectType, nil), nil
-	case attr.ValueStateUnknown:
-		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
-	default:
-		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
-	}
-}
-
-func (v ConfigValue) IsNull() bool {
-	return v.state == attr.ValueStateNull
-}
-
-func (v ConfigValue) IsUnknown() bool {
-	return v.state == attr.ValueStateUnknown
-}
-
-func (v ConfigValue) String() string {
-	return "ConfigValue"
-}
-
-func (v ConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	objVal, diags := types.ObjectValue(
-		map[string]attr.Type{},
-		map[string]attr.Value{})
-
-	return objVal, diags
-}
-
-func (v ConfigValue) Equal(o attr.Value) bool {
-	other, ok := o.(ConfigValue)
-
-	if !ok {
-		return false
-	}
-
-	if v.state != other.state {
-		return false
-	}
-
-	if v.state != attr.ValueStateKnown {
-		return true
-	}
-
-	return true
-}
-
-func (v ConfigValue) Type(ctx context.Context) attr.Type {
-	return ConfigType{
-		basetypes.ObjectType{
-			AttrTypes: v.AttributeTypes(ctx),
-		},
-	}
-}
-
-func (v ConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
-	return map[string]attr.Type{}
 }
 
 var _ basetypes.ObjectTypable = WafConfigType{}
@@ -915,22 +655,22 @@ func (t WafConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectV
 			fmt.Sprintf(`notify_slack expected to be basetypes.StringValue, was: %T`, notifySlackAttribute))
 	}
 
-	notifySlackHitsRpmAttribute, ok := attributes["notify_slack_hits_rpm"]
+	notifySlackHistRpmAttribute, ok := attributes["notify_slack_hist_rpm"]
 
 	if !ok {
 		diags.AddError(
 			"Attribute Missing",
-			`notify_slack_hits_rpm is missing from object`)
+			`notify_slack_hist_rpm is missing from object`)
 
 		return nil, diags
 	}
 
-	notifySlackHitsRpmVal, ok := notifySlackHitsRpmAttribute.(basetypes.Int64Value)
+	notifySlackHistRpmVal, ok := notifySlackHistRpmAttribute.(basetypes.Int64Value)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`notify_slack_hits_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackHitsRpmAttribute))
+			fmt.Sprintf(`notify_slack_hist_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackHistRpmAttribute))
 	}
 
 	originTimeoutAttribute, ok := attributes["origin_timeout"]
@@ -1008,7 +748,7 @@ func (t WafConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectV
 		NotifyConfig:             notifyConfigVal,
 		NotifyEmail:              notifyEmailVal,
 		NotifySlack:              notifySlackVal,
-		NotifySlackHitsRpm:       notifySlackHitsRpmVal,
+		NotifySlackHistRpm:       notifySlackHistRpmVal,
 		OriginTimeout:            originTimeoutVal,
 		ParanoiaLevel:            paranoiaLevelVal,
 		ProxyAlertEnabled:        proxyAlertEnabledVal,
@@ -1367,22 +1107,22 @@ func NewWafConfigValue(attributeTypes map[string]attr.Type, attributes map[strin
 			fmt.Sprintf(`notify_slack expected to be basetypes.StringValue, was: %T`, notifySlackAttribute))
 	}
 
-	notifySlackHitsRpmAttribute, ok := attributes["notify_slack_hits_rpm"]
+	notifySlackHistRpmAttribute, ok := attributes["notify_slack_hist_rpm"]
 
 	if !ok {
 		diags.AddError(
 			"Attribute Missing",
-			`notify_slack_hits_rpm is missing from object`)
+			`notify_slack_hist_rpm is missing from object`)
 
 		return NewWafConfigValueUnknown(), diags
 	}
 
-	notifySlackHitsRpmVal, ok := notifySlackHitsRpmAttribute.(basetypes.Int64Value)
+	notifySlackHistRpmVal, ok := notifySlackHistRpmAttribute.(basetypes.Int64Value)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`notify_slack_hits_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackHitsRpmAttribute))
+			fmt.Sprintf(`notify_slack_hist_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackHistRpmAttribute))
 	}
 
 	originTimeoutAttribute, ok := attributes["origin_timeout"]
@@ -1460,7 +1200,7 @@ func NewWafConfigValue(attributeTypes map[string]attr.Type, attributes map[strin
 		NotifyConfig:             notifyConfigVal,
 		NotifyEmail:              notifyEmailVal,
 		NotifySlack:              notifySlackVal,
-		NotifySlackHitsRpm:       notifySlackHitsRpmVal,
+		NotifySlackHistRpm:       notifySlackHistRpmVal,
 		OriginTimeout:            originTimeoutVal,
 		ParanoiaLevel:            paranoiaLevelVal,
 		ProxyAlertEnabled:        proxyAlertEnabledVal,
@@ -1552,7 +1292,7 @@ type WafConfigValue struct {
 	NotifyConfig             basetypes.ObjectValue `tfsdk:"notify_config"`
 	NotifyEmail              basetypes.StringValue `tfsdk:"notify_email"`
 	NotifySlack              basetypes.StringValue `tfsdk:"notify_slack"`
-	NotifySlackHitsRpm       basetypes.Int64Value  `tfsdk:"notify_slack_hits_rpm"`
+	NotifySlackHistRpm       basetypes.Int64Value  `tfsdk:"notify_slack_hist_rpm"`
 	OriginTimeout            basetypes.Int64Value  `tfsdk:"origin_timeout"`
 	ParanoiaLevel            basetypes.Int64Value  `tfsdk:"paranoia_level"`
 	ProxyAlertEnabled        basetypes.BoolValue   `tfsdk:"proxy_alert_enabled"`
@@ -1569,7 +1309,7 @@ func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, er
 		ElemType: types.StringType,
 	}.TerraformType(ctx)
 	attrTypes["allow_rules"] = basetypes.ListType{
-		ElemType: types.Int64Type,
+		ElemType: types.StringType,
 	}.TerraformType(ctx)
 	attrTypes["block_ip"] = basetypes.ListType{
 		ElemType: types.StringType,
@@ -1597,7 +1337,7 @@ func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, er
 	}.TerraformType(ctx)
 	attrTypes["notify_email"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["notify_slack"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["notify_slack_hits_rpm"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["notify_slack_hist_rpm"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["origin_timeout"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["paranoia_level"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["proxy_alert_enabled"] = basetypes.BoolType{}.TerraformType(ctx)
@@ -1736,13 +1476,13 @@ func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, er
 
 		vals["notify_slack"] = val
 
-		val, err = v.NotifySlackHitsRpm.ToTerraformValue(ctx)
+		val, err = v.NotifySlackHistRpm.ToTerraformValue(ctx)
 
 		if err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
 
-		vals["notify_slack_hits_rpm"] = val
+		vals["notify_slack_hist_rpm"] = val
 
 		val, err = v.OriginTimeout.ToTerraformValue(ctx)
 
@@ -1849,7 +1589,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 				ElemType: types.StringType,
 			},
 			"allow_rules": basetypes.ListType{
-				ElemType: types.Int64Type,
+				ElemType: types.StringType,
 			},
 			"block_ip": basetypes.ListType{
 				ElemType: types.StringType,
@@ -1877,14 +1617,14 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_email":          basetypes.StringType{},
 			"notify_slack":          basetypes.StringType{},
-			"notify_slack_hits_rpm": basetypes.Int64Type{},
+			"notify_slack_hist_rpm": basetypes.Int64Type{},
 			"origin_timeout":        basetypes.Int64Type{},
 			"paranoia_level":        basetypes.Int64Type{},
 			"proxy_alert_enabled":   basetypes.BoolType{},
 		}), diags
 	}
 
-	allowRulesVal, d := types.ListValue(types.Int64Type, v.AllowRules.Elements())
+	allowRulesVal, d := types.ListValue(types.StringType, v.AllowRules.Elements())
 
 	diags.Append(d...)
 
@@ -1894,7 +1634,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 				ElemType: types.StringType,
 			},
 			"allow_rules": basetypes.ListType{
-				ElemType: types.Int64Type,
+				ElemType: types.StringType,
 			},
 			"block_ip": basetypes.ListType{
 				ElemType: types.StringType,
@@ -1922,7 +1662,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_email":          basetypes.StringType{},
 			"notify_slack":          basetypes.StringType{},
-			"notify_slack_hits_rpm": basetypes.Int64Type{},
+			"notify_slack_hist_rpm": basetypes.Int64Type{},
 			"origin_timeout":        basetypes.Int64Type{},
 			"paranoia_level":        basetypes.Int64Type{},
 			"proxy_alert_enabled":   basetypes.BoolType{},
@@ -1939,7 +1679,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 				ElemType: types.StringType,
 			},
 			"allow_rules": basetypes.ListType{
-				ElemType: types.Int64Type,
+				ElemType: types.StringType,
 			},
 			"block_ip": basetypes.ListType{
 				ElemType: types.StringType,
@@ -1967,7 +1707,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_email":          basetypes.StringType{},
 			"notify_slack":          basetypes.StringType{},
-			"notify_slack_hits_rpm": basetypes.Int64Type{},
+			"notify_slack_hist_rpm": basetypes.Int64Type{},
 			"origin_timeout":        basetypes.Int64Type{},
 			"paranoia_level":        basetypes.Int64Type{},
 			"proxy_alert_enabled":   basetypes.BoolType{},
@@ -1984,7 +1724,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 				ElemType: types.StringType,
 			},
 			"allow_rules": basetypes.ListType{
-				ElemType: types.Int64Type,
+				ElemType: types.StringType,
 			},
 			"block_ip": basetypes.ListType{
 				ElemType: types.StringType,
@@ -2012,7 +1752,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_email":          basetypes.StringType{},
 			"notify_slack":          basetypes.StringType{},
-			"notify_slack_hits_rpm": basetypes.Int64Type{},
+			"notify_slack_hist_rpm": basetypes.Int64Type{},
 			"origin_timeout":        basetypes.Int64Type{},
 			"paranoia_level":        basetypes.Int64Type{},
 			"proxy_alert_enabled":   basetypes.BoolType{},
@@ -2029,7 +1769,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 				ElemType: types.StringType,
 			},
 			"allow_rules": basetypes.ListType{
-				ElemType: types.Int64Type,
+				ElemType: types.StringType,
 			},
 			"block_ip": basetypes.ListType{
 				ElemType: types.StringType,
@@ -2057,7 +1797,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_email":          basetypes.StringType{},
 			"notify_slack":          basetypes.StringType{},
-			"notify_slack_hits_rpm": basetypes.Int64Type{},
+			"notify_slack_hist_rpm": basetypes.Int64Type{},
 			"origin_timeout":        basetypes.Int64Type{},
 			"paranoia_level":        basetypes.Int64Type{},
 			"proxy_alert_enabled":   basetypes.BoolType{},
@@ -2074,7 +1814,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 				ElemType: types.StringType,
 			},
 			"allow_rules": basetypes.ListType{
-				ElemType: types.Int64Type,
+				ElemType: types.StringType,
 			},
 			"block_ip": basetypes.ListType{
 				ElemType: types.StringType,
@@ -2102,7 +1842,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_email":          basetypes.StringType{},
 			"notify_slack":          basetypes.StringType{},
-			"notify_slack_hits_rpm": basetypes.Int64Type{},
+			"notify_slack_hist_rpm": basetypes.Int64Type{},
 			"origin_timeout":        basetypes.Int64Type{},
 			"paranoia_level":        basetypes.Int64Type{},
 			"proxy_alert_enabled":   basetypes.BoolType{},
@@ -2115,7 +1855,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 				ElemType: types.StringType,
 			},
 			"allow_rules": basetypes.ListType{
-				ElemType: types.Int64Type,
+				ElemType: types.StringType,
 			},
 			"block_ip": basetypes.ListType{
 				ElemType: types.StringType,
@@ -2143,7 +1883,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_email":          basetypes.StringType{},
 			"notify_slack":          basetypes.StringType{},
-			"notify_slack_hits_rpm": basetypes.Int64Type{},
+			"notify_slack_hist_rpm": basetypes.Int64Type{},
 			"origin_timeout":        basetypes.Int64Type{},
 			"paranoia_level":        basetypes.Int64Type{},
 			"proxy_alert_enabled":   basetypes.BoolType{},
@@ -2165,7 +1905,7 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			"notify_config":               notifyConfig,
 			"notify_email":                v.NotifyEmail,
 			"notify_slack":                v.NotifySlack,
-			"notify_slack_hits_rpm":       v.NotifySlackHitsRpm,
+			"notify_slack_hist_rpm":       v.NotifySlackHistRpm,
 			"origin_timeout":              v.OriginTimeout,
 			"paranoia_level":              v.ParanoiaLevel,
 			"proxy_alert_enabled":         v.ProxyAlertEnabled,
@@ -2253,7 +1993,7 @@ func (v WafConfigValue) Equal(o attr.Value) bool {
 		return false
 	}
 
-	if !v.NotifySlackHitsRpm.Equal(other.NotifySlackHitsRpm) {
+	if !v.NotifySlackHistRpm.Equal(other.NotifySlackHistRpm) {
 		return false
 	}
 
@@ -2286,7 +2026,7 @@ func (v WafConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type
 			ElemType: types.StringType,
 		},
 		"allow_rules": basetypes.ListType{
-			ElemType: types.Int64Type,
+			ElemType: types.StringType,
 		},
 		"block_ip": basetypes.ListType{
 			ElemType: types.StringType,
@@ -2314,7 +2054,7 @@ func (v WafConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type
 		},
 		"notify_email":          basetypes.StringType{},
 		"notify_slack":          basetypes.StringType{},
-		"notify_slack_hits_rpm": basetypes.Int64Type{},
+		"notify_slack_hist_rpm": basetypes.Int64Type{},
 		"origin_timeout":        basetypes.Int64Type{},
 		"paranoia_level":        basetypes.Int64Type{},
 		"proxy_alert_enabled":   basetypes.BoolType{},
@@ -2364,22 +2104,22 @@ func (t HttpblType) ValueFromObject(ctx context.Context, in basetypes.ObjectValu
 			fmt.Sprintf(`block_harvester expected to be basetypes.BoolValue, was: %T`, blockHarvesterAttribute))
 	}
 
-	blockSearchEngineAttribute, ok := attributes["block_search_engine"]
+	blockSearchEnginerAttribute, ok := attributes["block_search_enginer"]
 
 	if !ok {
 		diags.AddError(
 			"Attribute Missing",
-			`block_search_engine is missing from object`)
+			`block_search_enginer is missing from object`)
 
 		return nil, diags
 	}
 
-	blockSearchEngineVal, ok := blockSearchEngineAttribute.(basetypes.BoolValue)
+	blockSearchEnginerVal, ok := blockSearchEnginerAttribute.(basetypes.BoolValue)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`block_search_engine expected to be basetypes.BoolValue, was: %T`, blockSearchEngineAttribute))
+			fmt.Sprintf(`block_search_enginer expected to be basetypes.BoolValue, was: %T`, blockSearchEnginerAttribute))
 	}
 
 	blockSpamAttribute, ok := attributes["block_spam"]
@@ -2441,12 +2181,12 @@ func (t HttpblType) ValueFromObject(ctx context.Context, in basetypes.ObjectValu
 	}
 
 	return HttpblValue{
-		BlockHarvester:    blockHarvesterVal,
-		BlockSearchEngine: blockSearchEngineVal,
-		BlockSpam:         blockSpamVal,
-		BlockSuspicious:   blockSuspiciousVal,
-		HttpblEnabled:     httpblEnabledVal,
-		state:             attr.ValueStateKnown,
+		BlockHarvester:     blockHarvesterVal,
+		BlockSearchEnginer: blockSearchEnginerVal,
+		BlockSpam:          blockSpamVal,
+		BlockSuspicious:    blockSuspiciousVal,
+		HttpblEnabled:      httpblEnabledVal,
+		state:              attr.ValueStateKnown,
 	}, diags
 }
 
@@ -2531,22 +2271,22 @@ func NewHttpblValue(attributeTypes map[string]attr.Type, attributes map[string]a
 			fmt.Sprintf(`block_harvester expected to be basetypes.BoolValue, was: %T`, blockHarvesterAttribute))
 	}
 
-	blockSearchEngineAttribute, ok := attributes["block_search_engine"]
+	blockSearchEnginerAttribute, ok := attributes["block_search_enginer"]
 
 	if !ok {
 		diags.AddError(
 			"Attribute Missing",
-			`block_search_engine is missing from object`)
+			`block_search_enginer is missing from object`)
 
 		return NewHttpblValueUnknown(), diags
 	}
 
-	blockSearchEngineVal, ok := blockSearchEngineAttribute.(basetypes.BoolValue)
+	blockSearchEnginerVal, ok := blockSearchEnginerAttribute.(basetypes.BoolValue)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`block_search_engine expected to be basetypes.BoolValue, was: %T`, blockSearchEngineAttribute))
+			fmt.Sprintf(`block_search_enginer expected to be basetypes.BoolValue, was: %T`, blockSearchEnginerAttribute))
 	}
 
 	blockSpamAttribute, ok := attributes["block_spam"]
@@ -2608,12 +2348,12 @@ func NewHttpblValue(attributeTypes map[string]attr.Type, attributes map[string]a
 	}
 
 	return HttpblValue{
-		BlockHarvester:    blockHarvesterVal,
-		BlockSearchEngine: blockSearchEngineVal,
-		BlockSpam:         blockSpamVal,
-		BlockSuspicious:   blockSuspiciousVal,
-		HttpblEnabled:     httpblEnabledVal,
-		state:             attr.ValueStateKnown,
+		BlockHarvester:     blockHarvesterVal,
+		BlockSearchEnginer: blockSearchEnginerVal,
+		BlockSpam:          blockSpamVal,
+		BlockSuspicious:    blockSuspiciousVal,
+		HttpblEnabled:      httpblEnabledVal,
+		state:              attr.ValueStateKnown,
 	}, diags
 }
 
@@ -2685,12 +2425,12 @@ func (t HttpblType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = HttpblValue{}
 
 type HttpblValue struct {
-	BlockHarvester    basetypes.BoolValue `tfsdk:"block_harvester"`
-	BlockSearchEngine basetypes.BoolValue `tfsdk:"block_search_engine"`
-	BlockSpam         basetypes.BoolValue `tfsdk:"block_spam"`
-	BlockSuspicious   basetypes.BoolValue `tfsdk:"block_suspicious"`
-	HttpblEnabled     basetypes.BoolValue `tfsdk:"httpbl_enabled"`
-	state             attr.ValueState
+	BlockHarvester     basetypes.BoolValue `tfsdk:"block_harvester"`
+	BlockSearchEnginer basetypes.BoolValue `tfsdk:"block_search_enginer"`
+	BlockSpam          basetypes.BoolValue `tfsdk:"block_spam"`
+	BlockSuspicious    basetypes.BoolValue `tfsdk:"block_suspicious"`
+	HttpblEnabled      basetypes.BoolValue `tfsdk:"httpbl_enabled"`
+	state              attr.ValueState
 }
 
 func (v HttpblValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
@@ -2700,7 +2440,7 @@ func (v HttpblValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error
 	var err error
 
 	attrTypes["block_harvester"] = basetypes.BoolType{}.TerraformType(ctx)
-	attrTypes["block_search_engine"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["block_search_enginer"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["block_spam"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["block_suspicious"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["httpbl_enabled"] = basetypes.BoolType{}.TerraformType(ctx)
@@ -2719,13 +2459,13 @@ func (v HttpblValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error
 
 		vals["block_harvester"] = val
 
-		val, err = v.BlockSearchEngine.ToTerraformValue(ctx)
+		val, err = v.BlockSearchEnginer.ToTerraformValue(ctx)
 
 		if err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
 
-		vals["block_search_engine"] = val
+		vals["block_search_enginer"] = val
 
 		val, err = v.BlockSpam.ToTerraformValue(ctx)
 
@@ -2782,18 +2522,18 @@ func (v HttpblValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, 
 
 	objVal, diags := types.ObjectValue(
 		map[string]attr.Type{
-			"block_harvester":     basetypes.BoolType{},
-			"block_search_engine": basetypes.BoolType{},
-			"block_spam":          basetypes.BoolType{},
-			"block_suspicious":    basetypes.BoolType{},
-			"httpbl_enabled":      basetypes.BoolType{},
+			"block_harvester":      basetypes.BoolType{},
+			"block_search_enginer": basetypes.BoolType{},
+			"block_spam":           basetypes.BoolType{},
+			"block_suspicious":     basetypes.BoolType{},
+			"httpbl_enabled":       basetypes.BoolType{},
 		},
 		map[string]attr.Value{
-			"block_harvester":     v.BlockHarvester,
-			"block_search_engine": v.BlockSearchEngine,
-			"block_spam":          v.BlockSpam,
-			"block_suspicious":    v.BlockSuspicious,
-			"httpbl_enabled":      v.HttpblEnabled,
+			"block_harvester":      v.BlockHarvester,
+			"block_search_enginer": v.BlockSearchEnginer,
+			"block_spam":           v.BlockSpam,
+			"block_suspicious":     v.BlockSuspicious,
+			"httpbl_enabled":       v.HttpblEnabled,
 		})
 
 	return objVal, diags
@@ -2818,7 +2558,7 @@ func (v HttpblValue) Equal(o attr.Value) bool {
 		return false
 	}
 
-	if !v.BlockSearchEngine.Equal(other.BlockSearchEngine) {
+	if !v.BlockSearchEnginer.Equal(other.BlockSearchEnginer) {
 		return false
 	}
 
@@ -2847,11 +2587,11 @@ func (v HttpblValue) Type(ctx context.Context) attr.Type {
 
 func (v HttpblValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
-		"block_harvester":     basetypes.BoolType{},
-		"block_search_engine": basetypes.BoolType{},
-		"block_spam":          basetypes.BoolType{},
-		"block_suspicious":    basetypes.BoolType{},
-		"httpbl_enabled":      basetypes.BoolType{},
+		"block_harvester":      basetypes.BoolType{},
+		"block_search_enginer": basetypes.BoolType{},
+		"block_spam":           basetypes.BoolType{},
+		"block_suspicious":     basetypes.BoolType{},
+		"httpbl_enabled":       basetypes.BoolType{},
 	}
 }
 

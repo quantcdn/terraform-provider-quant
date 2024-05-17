@@ -4,6 +4,8 @@ package resource_project
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -50,6 +52,10 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 			"deleted_at": schema.StringAttribute{
 				Computed: true,
 			},
+			"fastly_migrated": schema.Int64Attribute{
+				Computed: true,
+				Default:  int64default.StaticInt64(1),
+			},
 			"git_url": schema.StringAttribute{
 				Computed: true,
 			},
@@ -60,35 +66,32 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 				Computed: true,
 			},
 			"name": schema.StringAttribute{
+				Required: true,
+			},
+			"organization": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 			},
-			"organisation_id": schema.Int64Attribute{
+			"organization_id": schema.Int64Attribute{
 				Computed: true,
 			},
-			"organization": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Organization machine name",
-				MarkdownDescription: "Organization machine name",
+			"parent_project_id": schema.Int64Attribute{
+				Computed: true,
 			},
 			"project": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Project machine name",
-				MarkdownDescription: "Project machine name",
-			},
-			"project_parent_id": schema.Int64Attribute{
+				Optional: true,
 				Computed: true,
 			},
 			"project_type": schema.StringAttribute{
 				Computed: true,
+				Default:  stringdefault.StaticString("normal"),
 			},
 			"region": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				Default:  stringdefault.StaticString("au"),
 			},
-			"security_score": schema.Int64Attribute{
+			"security_score": schema.StringAttribute{
 				Computed: true,
 			},
 			"updated_at": schema.StringAttribute{
@@ -112,17 +115,18 @@ type ProjectModel struct {
 	CustomS3SyncRegion    types.String `tfsdk:"custom_s3_sync_region"`
 	CustomS3SyncSecretKey types.String `tfsdk:"custom_s3_sync_secret_key"`
 	DeletedAt             types.String `tfsdk:"deleted_at"`
+	FastlyMigrated        types.Int64  `tfsdk:"fastly_migrated"`
 	GitUrl                types.String `tfsdk:"git_url"`
 	Id                    types.Int64  `tfsdk:"id"`
 	MachineName           types.String `tfsdk:"machine_name"`
 	Name                  types.String `tfsdk:"name"`
-	OrganisationId        types.Int64  `tfsdk:"organisation_id"`
 	Organization          types.String `tfsdk:"organization"`
+	OrganizationId        types.Int64  `tfsdk:"organization_id"`
+	ParentProjectId       types.Int64  `tfsdk:"parent_project_id"`
 	Project               types.String `tfsdk:"project"`
-	ProjectParentId       types.Int64  `tfsdk:"project_parent_id"`
 	ProjectType           types.String `tfsdk:"project_type"`
 	Region                types.String `tfsdk:"region"`
-	SecurityScore         types.Int64  `tfsdk:"security_score"`
+	SecurityScore         types.String `tfsdk:"security_score"`
 	UpdatedAt             types.String `tfsdk:"updated_at"`
 	Uuid                  types.String `tfsdk:"uuid"`
 }

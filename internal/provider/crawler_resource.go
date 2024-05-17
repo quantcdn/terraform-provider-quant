@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	_ resource.Resource = (*crawlerResource)(nil)
+	_ resource.Resource              = (*crawlerResource)(nil)
 	_ resource.ResourceWithConfigure = (*crawlerResource)(nil)
 )
 
@@ -23,7 +23,7 @@ func NewCrawlerResource() resource.Resource {
 	return &crawlerResource{}
 }
 
-type crawlerResource struct{
+type crawlerResource struct {
 	client *client.Client
 }
 
@@ -125,22 +125,21 @@ func (r *crawlerResource) Delete(ctx context.Context, req resource.DeleteRequest
 }
 
 func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	req := *openapi.NewCrawlerRequest()
+	req := *openapi.NewCrawlerRequestWithDefaults()
 
-	req.BrowserMode = crawler.BrowserMode.ValueBoolPointer()
-	req.Domain = crawler.Domain.ValueStringPointer()
-	req.Name = crawler.Name.ValueStringPointer()
+	req.SetBrowserMode(crawler.BrowserMode.ValueBool())
+	req.SetDomain(crawler.Domain.ValueString())
+	req.SetName(crawler.Name.ValueString())
 
 	urls := make([]string, 0, len(crawler.UrlList.Elements()))
 	diags.Append(crawler.UrlList.ElementsAs(ctx, &urls, false)...)
-	req.UrlList = urls
+
+	req.SetUrlList(urls)
 
 	// @todo: Support custom headers.
-
 	// @todo: API to support crawler config overrides.
-	// req.Config = crawler.Config.ValueStringPointer()
 
-	api, _, err := r.client.Instance.CrawlersAPI.CreateCrawlers(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).CrawlerRequest(req).Execute()
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersCreate(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).CrawlerRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -150,7 +149,7 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return diags
 	}
 
-	crawler.Uuid = types.StringValue(*api.Uuid)
+	crawler.Uuid = types.StringValue(api.Uuid)
 
 	return diags
 }
@@ -179,7 +178,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		org = crawler.Organization.ValueString()
 	}
 
-	api, _, err := r.client.Instance.CrawlersAPI.GetCrawler(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
 	if err != nil {
 		diags.AddError("Unable to load crawler", fmt.Sprintf("Error: ", err.Error()))
 		return
@@ -219,7 +218,7 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		org = crawler.Organization.ValueString()
 	}
 
-	_, _, err := r.client.Instance.CrawlersAPI.DeleteCrawler(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
 	if err != nil {
 		diags.AddError("Unable to delete crawler", fmt.Sprintf("Error: %s", err.Error()))
 	}
@@ -250,17 +249,17 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		org = crawler.Organization.ValueString()
 	}
 
-	req := *openapi.NewCrawlerRequest()
+	req := *openapi.NewCrawlerRequestWithDefaults()
 
-	req.BrowserMode = crawler.BrowserMode.ValueBoolPointer()
-	req.Domain = crawler.Domain.ValueStringPointer()
-	req.Name = crawler.Name.ValueStringPointer()
+	req.SetDomain(crawler.Domain.ValueString())
+	req.SetBrowserMode(crawler.BrowserMode.ValueBool())
 
 	urls := make([]string, 0, len(crawler.UrlList.Elements()))
 	diags.Append(crawler.UrlList.ElementsAs(ctx, &urls, false)...)
-	req.UrlList = urls
 
-	api, _, err := r.client.Instance.CrawlersAPI.UpdateCrawler(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequest(req).Execute()
+	req.SetUrlList(urls)
+
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))

@@ -10,13 +10,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
 
 var (
-	_ resource.Resource = (*ruleCustomResponseResource)(nil)
+	_ resource.Resource              = (*ruleCustomResponseResource)(nil)
 	_ resource.ResourceWithConfigure = (*ruleCustomResponseResource)(nil)
 )
 
@@ -24,7 +23,7 @@ func NewRuleCustomResponseResource() resource.Resource {
 	return &ruleCustomResponseResource{}
 }
 
-type ruleCustomResponseResource struct{
+type ruleCustomResponseResource struct {
 	client *client.Client
 }
 
@@ -49,7 +48,6 @@ func (r *ruleCustomResponseResource) Configure(_ context.Context, req resource.C
 	}
 	r.client = client
 }
-
 
 func (r *ruleCustomResponseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data resource_rule_custom_response.RuleCustomResponseModel
@@ -126,36 +124,35 @@ func callRuleCustomeResponseCreate(ctx context.Context, r *ruleCustomResponseRes
 		return
 	}
 
-	req := *openapi.NewRuleCustomResponseRequest()
+	req := *openapi.NewRuleCustomResponseRequestWithDefaults()
 
 	setRuleCustomResponseCountryFilters(ctx, rule, &req)
 	setRuleCustomResponseMethodFilters(ctx, rule, &req)
 	setRuleCustomResponseCountryFilters(ctx, rule, &req)
 
 	var urls []string
-	rule.Url.ElementsAs(ctx, urls, false)
-	req.Url = urls
+	rule.Urls.ElementsAs(ctx, urls, false)
+	req.SetUrls(urls)
 
 	if rule.Domain.IsNull() {
-		req.Domain = utils.GetRuleAny()
+		req.SetDomain(*utils.GetRuleAny())
 	} else {
-		req.Domain = rule.Domain.ValueStringPointer()
+		req.SetDomain(rule.Domain.ValueString())
 	}
 
-	req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
-	req.Disabled = rule.Disabled.ValueBoolPointer()
+	// req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
+	req.SetDisabled(rule.Disabled.ValueBool())
 
 	statusCode := int32(rule.CustomResponseStatusCode.ValueInt64())
-
-	req.CustomResponseBody = rule.CustomResponseBody.ValueStringPointer()
-	req.CustomResponseStatusCode = &statusCode
+	req.SetCustomResponseBody(rule.CustomResponseBody.ValueString())
+	req.SetCustomResponseStatusCode(statusCode)
 
 	org := r.client.Organization
 	if !rule.Organization.IsNull() {
 		org = rule.Organization.ValueString()
 	}
 
-	api, _, err := r.client.Instance.RulesAPI.CreateRuleCustomResponse(r.client.AuthContext, org, rule.Project.ValueString()).RuleCustomResponseRequest(req).Execute()
+	api, _, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseCreate(r.client.AuthContext, org, rule.Project.ValueString()).RuleCustomResponseRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to create rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -191,7 +188,7 @@ func callRuleCustomeResponseRead(ctx context.Context, r *ruleCustomResponseResou
 		org = rule.Organization.ValueString()
 	}
 
-	api, _, err := r.client.Instance.RulesAPI.GetRuleCustomResponse(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	api, _, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to read rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -226,33 +223,32 @@ func callRuleCustomeResponseUpdate(ctx context.Context, r *ruleCustomResponseRes
 		return
 	}
 
-
 	org := r.client.Organization
 	if !rule.Organization.IsNull() {
 		org = rule.Organization.ValueString()
 	}
 
-	req := *openapi.NewRuleCustomResponseRequest()
+	req := *openapi.NewRuleCustomResponseRequestWithDefaults()
 
 	setRuleCustomResponseCountryFilters(ctx, rule, &req)
 	setRuleCustomResponseMethodFilters(ctx, rule, &req)
 	setRuleCustomResponseIpFilters(ctx, rule, &req)
 
 	if rule.Domain.IsNull() {
-		req.Domain = utils.GetRuleAny()
+		req.SetDomain(*utils.GetRuleAny())
 	} else {
-		req.Domain = rule.Domain.ValueStringPointer()
+		req.SetDomain(rule.Domain.ValueString())
 	}
 
-	req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
-	req.Disabled = rule.Disabled.ValueBoolPointer()
+	// req.OnlyWithCookie = rule.OnlyWithCookie.ValueStringPointer()
+	req.SetDisabled(rule.Disabled.ValueBool())
 
 	statusCode := int32(rule.CustomResponseStatusCode.ValueInt64())
 
-	req.CustomResponseBody = rule.CustomResponseBody.ValueStringPointer()
-	req.CustomResponseStatusCode = &statusCode
+	req.SetCustomResponseBody(rule.CustomResponseBody.ValueString())
+	req.SetCustomResponseStatusCode(statusCode)
 
-	_, _, err := r.client.Instance.RulesAPI.UpdateRuleCustomResponse(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseUpdate(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -287,7 +283,7 @@ func callRuleCustomeResponseDelete(ctx context.Context, r *ruleCustomResponseRes
 		org = rule.Organization.ValueString()
 	}
 
-	_, _, err := r.client.Instance.RulesAPI.DeleteRuleCustomResponse(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to delete rule", fmt.Sprintf("Error: %s", err.Error()))
@@ -311,12 +307,12 @@ func setRuleCustomResponseCountryFilters(ctx context.Context, rule *resource_rul
 		var countryList []string
 
 		switch rule.Country.ValueStringPointer() {
-			case utils.GetFilterIs("country"):
-				rule.CountryIs.ElementsAs(ctx, &countryList, false)
-				req.CountryIs = countryList
-			case utils.GetFilterIsNot("country"):
-				rule.CountryIsNot.ElementsAs(ctx, &countryList, false)
-				req.CountryIsNot = countryList
+		case utils.GetFilterIs("country"):
+			rule.CountryIs.ElementsAs(ctx, &countryList, false)
+			req.CountryIs = countryList
+		case utils.GetFilterIsNot("country"):
+			rule.CountryIsNot.ElementsAs(ctx, &countryList, false)
+			req.CountryIsNot = countryList
 		}
 	}
 
@@ -336,12 +332,12 @@ func setRuleCustomResponseMethodFilters(ctx context.Context, rule *resource_rule
 		req.Method = rule.Method.ValueStringPointer()
 		var list []string
 		switch rule.Method.ValueStringPointer() {
-			case utils.GetFilterIs("method"):
-				rule.MethodIs.ElementsAs(ctx, &list, false)
-				req.MethodIs = list
-			case utils.GetFilterIsNot("method"):
-				rule.MethodIsNot.ElementsAs(ctx, &list, false)
-				req.MethodIsNot = list
+		case utils.GetFilterIs("method"):
+			rule.MethodIs.ElementsAs(ctx, &list, false)
+			req.MethodIs = list
+		case utils.GetFilterIsNot("method"):
+			rule.MethodIsNot.ElementsAs(ctx, &list, false)
+			req.MethodIsNot = list
 		}
 	}
 
@@ -361,12 +357,12 @@ func setRuleCustomResponseIpFilters(ctx context.Context, rule *resource_rule_cus
 		req.Ip = rule.Ip.ValueStringPointer()
 		var list []string
 		switch rule.Ip.ValueStringPointer() {
-			case utils.GetFilterIs("ip"):
-				rule.IpIs.ElementsAs(ctx, &list, false)
-				req.IpIs = list
-			case utils.GetFilterIsNot("ip"):
-				rule.IpIsNot.ElementsAs(ctx, &list, false)
-				req.IpIsNot = list
+		case utils.GetFilterIs("ip"):
+			rule.IpIs.ElementsAs(ctx, &list, false)
+			req.IpIs = list
+		case utils.GetFilterIsNot("ip"):
+			rule.IpIsNot.ElementsAs(ctx, &list, false)
+			req.IpIsNot = list
 		}
 	}
 

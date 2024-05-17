@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	_ resource.Resource = (*domainResource)(nil)
+	_ resource.Resource              = (*domainResource)(nil)
 	_ resource.ResourceWithConfigure = (*domainResource)(nil)
 )
 
@@ -23,7 +23,7 @@ func NewDomainResource() resource.Resource {
 	return &domainResource{}
 }
 
-type domainResource struct{
+type domainResource struct {
 	client *client.Client
 }
 
@@ -124,16 +124,16 @@ func (r *domainResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	req := *openapi.NewDomainRequest()
+	req := *openapi.NewDomainRequestWithDefaults()
 
-	req.Domain = domain.Domain.ValueStringPointer()
+	req.Domain = domain.Domain.ValueString()
 
 	org := r.client.Organization
 	if !domain.Organization.IsNull() {
 		org = domain.Organization.ValueString()
 	}
 
-	api, _, err := r.client.Instance.DomainsAPI.CreateDomain(r.client.AuthContext, org, domain.Project.ValueString()).DomainRequest(req).Execute()
+	api, _, err := r.client.Instance.DomainsAPI.DomainsCreate(r.client.AuthContext, org, domain.Project.ValueString()).DomainRequest(req).Execute()
 	if err != nil {
 		diags.AddError("Unable to add domain", fmt.Sprintf("Error: %s", err.Error()))
 	}
@@ -170,7 +170,7 @@ func callDomainUpdateAPI(ctx context.Context, r *domainResource, domain *resourc
 	}
 
 	id := strconv.Itoa(int(domain.Id.ValueInt64()))
-	api, _, err := r.client.Instance.DomainsAPI.UpdateDomain(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
+	api, _, err := r.client.Instance.DomainsAPI.DomainsUpdate(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update domain", fmt.Sprintf("Error: %s", err.Error()))
@@ -208,7 +208,7 @@ func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_
 
 	id := strconv.Itoa(int(domain.Id.ValueInt64()))
 
-	api, _, err := r.client.Instance.DomainsAPI.GetDomain(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
+	api, _, err := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
 	if err != nil {
 		diags.AddError("Unable to read domain", fmt.Sprintf("Error: %s", err.Error()))
 	}
@@ -249,7 +249,7 @@ func callDomainDeleteAPI(ctx context.Context, r *domainResource, domain *resourc
 
 	id := strconv.Itoa(int(domain.Id.ValueInt64()))
 
-	_, _, err := r.client.Instance.DomainsAPI.DeleteDomain(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
+	_, _, err := r.client.Instance.DomainsAPI.DomainsDelete(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to delete project", fmt.Sprintf("Error: %s", err.Error()))
