@@ -59,6 +59,12 @@
 						}
 					},
 					{
+						"name": "name",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
 						"name": "project_id",
 						"int64": {
 							"computed_optional_required": "computed"
@@ -66,6 +72,12 @@
 					},
 					{
 						"name": "updated_at",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "urls_list",
 						"string": {
 							"computed_optional_required": "computed"
 						}
@@ -224,12 +236,6 @@
 						}
 					},
 					{
-						"name": "allow_query_params",
-						"bool": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
 						"name": "created_at",
 						"string": {
 							"computed_optional_required": "computed"
@@ -315,236 +321,6 @@
 					}
 				]
 			}
-		},
-		{
-			"name": "rule_auth",
-			"schema": {
-				"attributes": [
-					{
-						"name": "organization",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "project",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "rule",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "urls",
-						"list": {
-							"computed_optional_required": "computed",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					}
-				]
-			}
-		},
-		{
-			"name": "rule_custom_response",
-			"schema": {
-				"attributes": [
-					{
-						"name": "organization",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "project",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "rule",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "urls",
-						"list": {
-							"computed_optional_required": "computed",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					}
-				]
-			}
-		},
-		{
-			"name": "rule_headers",
-			"schema": {
-				"attributes": [
-					{
-						"name": "organization",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "project",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "rule",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "urls",
-						"list": {
-							"computed_optional_required": "computed",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					}
-				]
-			}
-		},
-		{
-			"name": "rule_proxy",
-			"schema": {
-				"attributes": [
-					{
-						"name": "organization",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "project",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "rule",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "urls",
-						"list": {
-							"computed_optional_required": "computed",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					}
-				]
-			}
-		},
-		{
-			"name": "rule_redirect",
-			"schema": {
-				"attributes": [
-					{
-						"name": "organization",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "project",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "rule",
-						"string": {
-							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "urls",
-						"list": {
-							"computed_optional_required": "computed",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					}
-				]
-			}
 		}
 	],
 	"provider": {
@@ -612,7 +388,10 @@
 					{
 						"name": "domain_verified",
 						"int64": {
-							"computed_optional_required": "computed"
+							"computed_optional_required": "computed",
+							"default": {
+								"static": 0
+							}
 						}
 					},
 					{
@@ -629,6 +408,12 @@
 					},
 					{
 						"name": "updated_at",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "urls_list",
 						"string": {
 							"computed_optional_required": "computed"
 						}
@@ -916,6 +701,12 @@
 						}
 					},
 					{
+						"name": "cookie_name",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
 						"name": "country",
 						"string": {
 							"computed_optional_required": "computed_optional",
@@ -1048,24 +839,18 @@
 						}
 					},
 					{
-						"name": "urls",
-						"list": {
+						"name": "only_with_cookie",
+						"bool": {
 							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
+							"default": {
+								"static": false
 							}
 						}
 					},
 					{
-						"name": "config",
+						"name": "url",
 						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
+							"computed_optional_required": "required"
 						}
 					},
 					{
@@ -1093,6 +878,12 @@
 			"name": "rule_custom_response",
 			"schema": {
 				"attributes": [
+					{
+						"name": "cookie_name",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
 					{
 						"name": "country",
 						"string": {
@@ -1241,24 +1032,18 @@
 						}
 					},
 					{
-						"name": "urls",
-						"list": {
+						"name": "only_with_cookie",
+						"bool": {
 							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
+							"default": {
+								"static": false
 							}
 						}
 					},
 					{
-						"name": "config",
+						"name": "url",
 						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
+							"computed_optional_required": "required"
 						}
 					},
 					{
@@ -1286,6 +1071,12 @@
 			"name": "rule_headers",
 			"schema": {
 				"attributes": [
+					{
+						"name": "cookie_name",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
 					{
 						"name": "country",
 						"string": {
@@ -1428,113 +1219,7 @@
 						}
 					},
 					{
-						"name": "urls",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "organization",
-						"string": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "project",
-						"string": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "rule",
-						"string": {
-							"computed_optional_required": "computed_optional"
-						}
-					}
-				]
-			}
-		},
-		{
-			"name": "rule_proxy",
-			"schema": {
-				"attributes": [
-					{
-						"name": "auth_pass",
-						"string": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "auth_user",
-						"string": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "cache_lifetime",
-						"int64": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "country",
-						"string": {
-							"computed_optional_required": "computed_optional",
-							"validators": [
-								{
-									"custom": {
-										"imports": [
-											{
-												"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-											}
-										],
-										"schema_definition": "stringvalidator.OneOf(\n\"country_is\",\n\"country_is_not\",\n)"
-									}
-								}
-							]
-						}
-					},
-					{
-						"name": "country_is",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "country_is_not",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "disable_ssl_verify",
-						"bool": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "disabled",
+						"name": "only_with_cookie",
 						"bool": {
 							"computed_optional_required": "computed_optional",
 							"default": {
@@ -1543,378 +1228,9 @@
 						}
 					},
 					{
-						"name": "domain",
-						"string": {
-							"computed_optional_required": "computed_optional",
-							"default": {
-								"static": "any"
-							}
-						}
-					},
-					{
-						"name": "host",
-						"string": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "ip",
-						"string": {
-							"computed_optional_required": "computed_optional",
-							"validators": [
-								{
-									"custom": {
-										"imports": [
-											{
-												"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-											}
-										],
-										"schema_definition": "stringvalidator.OneOf(\n\"ip_is\",\n\"ip_is_not\",\n)"
-									}
-								}
-							]
-						}
-					},
-					{
-						"name": "ip_is",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "ip_is_not",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "method",
-						"string": {
-							"computed_optional_required": "computed_optional",
-							"validators": [
-								{
-									"custom": {
-										"imports": [
-											{
-												"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-											}
-										],
-										"schema_definition": "stringvalidator.OneOf(\n\"method_is\",\n\"method_is_not\",\n)"
-									}
-								}
-							]
-						}
-					},
-					{
-						"name": "method_is",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "method_is_not",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "name",
-						"string": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "only_proxy_404",
-						"bool": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "strip_headers",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "to",
+						"name": "url",
 						"string": {
 							"computed_optional_required": "required"
-						}
-					},
-					{
-						"name": "urls",
-						"list": {
-							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
-							}
-						}
-					},
-					{
-						"name": "waf_config",
-						"single_nested": {
-							"computed_optional_required": "computed_optional",
-							"attributes": [
-								{
-									"name": "allow_ip",
-									"list": {
-										"computed_optional_required": "computed_optional",
-										"element_type": {
-											"string": {}
-										}
-									}
-								},
-								{
-									"name": "allow_rules",
-									"list": {
-										"computed_optional_required": "computed_optional",
-										"element_type": {
-											"string": {}
-										}
-									}
-								},
-								{
-									"name": "block_ip",
-									"list": {
-										"computed_optional_required": "computed_optional",
-										"element_type": {
-											"string": {}
-										}
-									}
-								},
-								{
-									"name": "block_referer",
-									"list": {
-										"computed_optional_required": "computed_optional",
-										"element_type": {
-											"string": {}
-										}
-									}
-								},
-								{
-									"name": "block_ua",
-									"list": {
-										"computed_optional_required": "computed_optional",
-										"element_type": {
-											"string": {}
-										}
-									}
-								},
-								{
-									"name": "failover_lifetime",
-									"int64": {
-										"computed_optional_required": "computed_optional"
-									}
-								},
-								{
-									"name": "failover_mode",
-									"bool": {
-										"computed_optional_required": "computed_optional"
-									}
-								},
-								{
-									"name": "failover_origin_status_code",
-									"int64": {
-										"computed_optional_required": "computed_optional"
-									}
-								},
-								{
-									"name": "failover_origin_ttfb",
-									"int64": {
-										"computed_optional_required": "computed_optional"
-									}
-								},
-								{
-									"name": "httpbl",
-									"single_nested": {
-										"computed_optional_required": "computed_optional",
-										"attributes": [
-											{
-												"name": "block_harvester",
-												"bool": {
-													"computed_optional_required": "computed_optional",
-													"default": {
-														"static": false
-													}
-												}
-											},
-											{
-												"name": "block_search_enginer",
-												"bool": {
-													"computed_optional_required": "computed_optional",
-													"default": {
-														"static": false
-													}
-												}
-											},
-											{
-												"name": "block_spam",
-												"bool": {
-													"computed_optional_required": "computed_optional",
-													"default": {
-														"static": false
-													}
-												}
-											},
-											{
-												"name": "block_suspicious",
-												"bool": {
-													"computed_optional_required": "computed_optional",
-													"default": {
-														"static": false
-													}
-												}
-											},
-											{
-												"name": "httpbl_enabled",
-												"bool": {
-													"computed_optional_required": "computed_optional",
-													"default": {
-														"static": false
-													}
-												}
-											}
-										]
-									}
-								},
-								{
-									"name": "inject_headers",
-									"list": {
-										"computed_optional_required": "required",
-										"element_type": {
-											"string": {}
-										}
-									}
-								},
-								{
-									"name": "mode",
-									"string": {
-										"computed_optional_required": "required",
-										"validators": [
-											{
-												"custom": {
-													"imports": [
-														{
-															"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-														}
-													],
-													"schema_definition": "stringvalidator.OneOf(\n\"block\",\n\"report\",\n)"
-												}
-											}
-										]
-									}
-								},
-								{
-									"name": "notify",
-									"string": {
-										"computed_optional_required": "computed_optional"
-									}
-								},
-								{
-									"name": "notify_config",
-									"single_nested": {
-										"computed_optional_required": "computed_optional",
-										"attributes": [
-											{
-												"name": "origin_status_code",
-												"list": {
-													"computed_optional_required": "required",
-													"element_type": {
-														"int64": {}
-													}
-												}
-											},
-											{
-												"name": "period",
-												"int64": {
-													"computed_optional_required": "required"
-												}
-											},
-											{
-												"name": "slack_webhook",
-												"string": {
-													"computed_optional_required": "required"
-												}
-											}
-										]
-									}
-								},
-								{
-									"name": "notify_email",
-									"string": {
-										"computed_optional_required": "required"
-									}
-								},
-								{
-									"name": "notify_slack",
-									"string": {
-										"computed_optional_required": "computed_optional"
-									}
-								},
-								{
-									"name": "notify_slack_hist_rpm",
-									"int64": {
-										"computed_optional_required": "computed_optional"
-									}
-								},
-								{
-									"name": "origin_timeout",
-									"int64": {
-										"computed_optional_required": "computed_optional",
-										"default": {
-											"static": 30
-										}
-									}
-								},
-								{
-									"name": "paranoia_level",
-									"int64": {
-										"computed_optional_required": "computed_optional",
-										"default": {
-											"static": 1
-										}
-									}
-								},
-								{
-									"name": "proxy_alert_enabled",
-									"bool": {
-										"computed_optional_required": "computed_optional"
-									}
-								}
-							]
-						}
-					},
-					{
-						"name": "waf_enabled",
-						"bool": {
-							"computed_optional_required": "computed_optional"
-						}
-					},
-					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
-						}
-					},
-					{
-						"name": "uuid",
-						"string": {
-							"computed_optional_required": "computed"
 						}
 					},
 					{
@@ -1943,6 +1259,12 @@
 			"schema": {
 				"attributes": [
 					{
+						"name": "cookie_name",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
 						"name": "country",
 						"string": {
 							"computed_optional_required": "computed_optional",
@@ -2075,24 +1397,33 @@
 						}
 					},
 					{
-						"name": "urls",
-						"list": {
+						"name": "only_with_cookie",
+						"bool": {
 							"computed_optional_required": "computed_optional",
-							"element_type": {
-								"string": {}
+							"default": {
+								"static": false
 							}
 						}
 					},
 					{
-						"name": "config",
-						"string": {
-							"computed_optional_required": "computed"
+						"name": "redirect_code",
+						"int64": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": 301
+							}
 						}
 					},
 					{
-						"name": "uuid",
+						"name": "redirect_to",
 						"string": {
-							"computed_optional_required": "computed"
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "url",
+						"string": {
+							"computed_optional_required": "required"
 						}
 					},
 					{

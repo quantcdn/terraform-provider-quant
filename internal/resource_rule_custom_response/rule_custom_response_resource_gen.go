@@ -17,7 +17,8 @@ import (
 func RuleCustomResponseResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"config": schema.StringAttribute{
+			"cookie_name": schema.StringAttribute{
+				Optional: true,
 				Computed: true,
 			},
 			"country": schema.StringAttribute{
@@ -102,6 +103,11 @@ func RuleCustomResponseResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
+			"only_with_cookie": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
 			"organization": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -114,20 +120,15 @@ func RuleCustomResponseResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"urls": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
-			},
-			"uuid": schema.StringAttribute{
-				Computed: true,
+			"url": schema.StringAttribute{
+				Required: true,
 			},
 		},
 	}
 }
 
 type RuleCustomResponseModel struct {
-	Config                   types.String `tfsdk:"config"`
+	CookieName               types.String `tfsdk:"cookie_name"`
 	Country                  types.String `tfsdk:"country"`
 	CountryIs                types.List   `tfsdk:"country_is"`
 	CountryIsNot             types.List   `tfsdk:"country_is_not"`
@@ -142,9 +143,9 @@ type RuleCustomResponseModel struct {
 	MethodIs                 types.List   `tfsdk:"method_is"`
 	MethodIsNot              types.List   `tfsdk:"method_is_not"`
 	Name                     types.String `tfsdk:"name"`
+	OnlyWithCookie           types.Bool   `tfsdk:"only_with_cookie"`
 	Organization             types.String `tfsdk:"organization"`
 	Project                  types.String `tfsdk:"project"`
 	Rule                     types.String `tfsdk:"rule"`
-	Urls                     types.List   `tfsdk:"urls"`
-	Uuid                     types.String `tfsdk:"uuid"`
+	Url                      types.String `tfsdk:"url"`
 }

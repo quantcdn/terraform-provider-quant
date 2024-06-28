@@ -6,6 +6,7 @@ import (
 	"context"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -16,7 +17,8 @@ import (
 func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"config": schema.StringAttribute{
+			"cookie_name": schema.StringAttribute{
+				Optional: true,
 				Computed: true,
 			},
 			"country": schema.StringAttribute{
@@ -93,6 +95,11 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
+			"only_with_cookie": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
 			"organization": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -101,39 +108,44 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
+			"redirect_code": schema.Int64Attribute{
+				Optional: true,
+				Computed: true,
+				Default:  int64default.StaticInt64(301),
+			},
+			"redirect_to": schema.StringAttribute{
+				Required: true,
+			},
 			"rule": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 			},
-			"urls": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
-			},
-			"uuid": schema.StringAttribute{
-				Computed: true,
+			"url": schema.StringAttribute{
+				Required: true,
 			},
 		},
 	}
 }
 
 type RuleRedirectModel struct {
-	Config       types.String `tfsdk:"config"`
-	Country      types.String `tfsdk:"country"`
-	CountryIs    types.List   `tfsdk:"country_is"`
-	CountryIsNot types.List   `tfsdk:"country_is_not"`
-	Disabled     types.Bool   `tfsdk:"disabled"`
-	Domain       types.String `tfsdk:"domain"`
-	Ip           types.String `tfsdk:"ip"`
-	IpIs         types.List   `tfsdk:"ip_is"`
-	IpIsNot      types.List   `tfsdk:"ip_is_not"`
-	Method       types.String `tfsdk:"method"`
-	MethodIs     types.List   `tfsdk:"method_is"`
-	MethodIsNot  types.List   `tfsdk:"method_is_not"`
-	Name         types.String `tfsdk:"name"`
-	Organization types.String `tfsdk:"organization"`
-	Project      types.String `tfsdk:"project"`
-	Rule         types.String `tfsdk:"rule"`
-	Urls         types.List   `tfsdk:"urls"`
-	Uuid         types.String `tfsdk:"uuid"`
+	CookieName     types.String `tfsdk:"cookie_name"`
+	Country        types.String `tfsdk:"country"`
+	CountryIs      types.List   `tfsdk:"country_is"`
+	CountryIsNot   types.List   `tfsdk:"country_is_not"`
+	Disabled       types.Bool   `tfsdk:"disabled"`
+	Domain         types.String `tfsdk:"domain"`
+	Ip             types.String `tfsdk:"ip"`
+	IpIs           types.List   `tfsdk:"ip_is"`
+	IpIsNot        types.List   `tfsdk:"ip_is_not"`
+	Method         types.String `tfsdk:"method"`
+	MethodIs       types.List   `tfsdk:"method_is"`
+	MethodIsNot    types.List   `tfsdk:"method_is_not"`
+	Name           types.String `tfsdk:"name"`
+	OnlyWithCookie types.Bool   `tfsdk:"only_with_cookie"`
+	Organization   types.String `tfsdk:"organization"`
+	Project        types.String `tfsdk:"project"`
+	RedirectCode   types.Int64  `tfsdk:"redirect_code"`
+	RedirectTo     types.String `tfsdk:"redirect_to"`
+	Rule           types.String `tfsdk:"rule"`
+	Url            types.String `tfsdk:"url"`
 }

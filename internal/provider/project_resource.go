@@ -170,7 +170,7 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 	if err != nil {
 		diags.AddError(
 			"Unable to add the project",
-			fmt.Sprintf("Error: %v", err),
+			fmt.Sprintf("Error: project exists with this name"),
 		)
 		return
 	}

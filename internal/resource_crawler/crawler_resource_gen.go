@@ -4,6 +4,7 @@ package resource_crawler
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,6 +35,7 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"domain_verified": schema.Int64Attribute{
 				Computed: true,
+				Default:  int64default.StaticInt64(0),
 			},
 			"headers": schema.MapAttribute{
 				ElementType: types.StringType,
@@ -64,6 +66,9 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				ElementType: types.StringType,
 				Required:    true,
 			},
+			"urls_list": schema.StringAttribute{
+				Computed: true,
+			},
 			"uuid": schema.StringAttribute{
 				Computed: true,
 			},
@@ -87,5 +92,6 @@ type CrawlerModel struct {
 	ProjectId      types.Int64  `tfsdk:"project_id"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
 	UrlList        types.List   `tfsdk:"url_list"`
+	UrlsList       types.String `tfsdk:"urls_list"`
 	Uuid           types.String `tfsdk:"uuid"`
 }

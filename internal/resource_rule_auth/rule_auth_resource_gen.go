@@ -22,7 +22,8 @@ func RuleAuthResourceSchema(ctx context.Context) schema.Schema {
 			"auth_user": schema.StringAttribute{
 				Required: true,
 			},
-			"config": schema.StringAttribute{
+			"cookie_name": schema.StringAttribute{
+				Optional: true,
 				Computed: true,
 			},
 			"country": schema.StringAttribute{
@@ -99,6 +100,11 @@ func RuleAuthResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
+			"only_with_cookie": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
 			"organization": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -111,37 +117,32 @@ func RuleAuthResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"urls": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
-			},
-			"uuid": schema.StringAttribute{
-				Computed: true,
+			"url": schema.StringAttribute{
+				Required: true,
 			},
 		},
 	}
 }
 
 type RuleAuthModel struct {
-	AuthPass     types.String `tfsdk:"auth_pass"`
-	AuthUser     types.String `tfsdk:"auth_user"`
-	Config       types.String `tfsdk:"config"`
-	Country      types.String `tfsdk:"country"`
-	CountryIs    types.List   `tfsdk:"country_is"`
-	CountryIsNot types.List   `tfsdk:"country_is_not"`
-	Disabled     types.Bool   `tfsdk:"disabled"`
-	Domain       types.String `tfsdk:"domain"`
-	Ip           types.String `tfsdk:"ip"`
-	IpIs         types.List   `tfsdk:"ip_is"`
-	IpIsNot      types.List   `tfsdk:"ip_is_not"`
-	Method       types.String `tfsdk:"method"`
-	MethodIs     types.List   `tfsdk:"method_is"`
-	MethodIsNot  types.List   `tfsdk:"method_is_not"`
-	Name         types.String `tfsdk:"name"`
-	Organization types.String `tfsdk:"organization"`
-	Project      types.String `tfsdk:"project"`
-	Rule         types.String `tfsdk:"rule"`
-	Urls         types.List   `tfsdk:"urls"`
-	Uuid         types.String `tfsdk:"uuid"`
+	AuthPass       types.String `tfsdk:"auth_pass"`
+	AuthUser       types.String `tfsdk:"auth_user"`
+	CookieName     types.String `tfsdk:"cookie_name"`
+	Country        types.String `tfsdk:"country"`
+	CountryIs      types.List   `tfsdk:"country_is"`
+	CountryIsNot   types.List   `tfsdk:"country_is_not"`
+	Disabled       types.Bool   `tfsdk:"disabled"`
+	Domain         types.String `tfsdk:"domain"`
+	Ip             types.String `tfsdk:"ip"`
+	IpIs           types.List   `tfsdk:"ip_is"`
+	IpIsNot        types.List   `tfsdk:"ip_is_not"`
+	Method         types.String `tfsdk:"method"`
+	MethodIs       types.List   `tfsdk:"method_is"`
+	MethodIsNot    types.List   `tfsdk:"method_is_not"`
+	Name           types.String `tfsdk:"name"`
+	OnlyWithCookie types.Bool   `tfsdk:"only_with_cookie"`
+	Organization   types.String `tfsdk:"organization"`
+	Project        types.String `tfsdk:"project"`
+	Rule           types.String `tfsdk:"rule"`
+	Url            types.String `tfsdk:"url"`
 }
