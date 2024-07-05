@@ -321,6 +321,1199 @@
 					}
 				]
 			}
+		},
+		{
+			"name": "rule_auth",
+			"schema": {
+				"attributes": [
+					{
+						"name": "organization",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "project",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "rule",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "auth_pass",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "auth_user",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "country",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "country_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "country_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "disabled",
+						"bool": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "domain",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "ip_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "method_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "name",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "only_with_cookie",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "url",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "rule_custom_response",
+			"schema": {
+				"attributes": [
+					{
+						"name": "organization",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "project",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "rule",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "custom_response_body",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "custom_response_status_code",
+									"int64": {
+										"computed_optional_required": "computed"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "country",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "country_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "country_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "disabled",
+						"bool": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "domain",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "ip_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "method_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "name",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "only_with_cookie",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "url",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "rule_headers",
+			"schema": {
+				"attributes": [
+					{
+						"name": "organization",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "project",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "rule",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "headers",
+									"map": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "country",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "country_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "country_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "disabled",
+						"bool": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "domain",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "ip_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "method_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "name",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "only_with_cookie",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "url",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "rule_proxy",
+			"schema": {
+				"attributes": [
+					{
+						"name": "organization",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "project",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "rule",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "auth_pass",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "auth_user",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "cache_lifetime",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "disable_ssl_verify",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "failover_lifetime",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "failover_mode",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "failover_origin_status_codes",
+									"list": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "failover_origin_ttfb",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "host",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "inject_headers",
+									"map": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "notify",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "notify_config",
+									"single_nested": {
+										"computed_optional_required": "computed",
+										"attributes": [
+											{
+												"name": "origin_status_codes",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "period",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "slack_webhook",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "notify_email",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "only_proxy_404",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "origin_timeout",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "proxy_alert_enabled",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "proxy_strip_headers",
+									"list": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "proxy_strip_request_headers",
+									"list": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "to",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "waf_config",
+									"single_nested": {
+										"computed_optional_required": "computed",
+										"attributes": [
+											{
+												"name": "allow_ip",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "allow_rules",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "block_ip",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "block_lists",
+												"single_nested": {
+													"computed_optional_required": "computed",
+													"attributes": [
+														{
+															"name": "ai",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "ip",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "referer",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "user_agent",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														}
+													]
+												}
+											},
+											{
+												"name": "block_referer",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "block_ua",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "httpbl",
+												"single_nested": {
+													"computed_optional_required": "computed",
+													"attributes": [
+														{
+															"name": "api_key",
+															"string": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "block_harvester",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "block_search_engine",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "block_spam",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "block_suspicious",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "httpbl_enabled",
+															"bool": {
+																"computed_optional_required": "computed"
+															}
+														}
+													]
+												}
+											},
+											{
+												"name": "httpbl_enabled",
+												"map": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"bool": {}
+													}
+												}
+											},
+											{
+												"name": "ip_ratelimit_cooldown",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "ip_ratelimit_mode",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "ip_ratelimit_rps",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "mode",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "notify_email",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "notify_slack",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "notify_slack_hits_rpm",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "notify_slack_rpm",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "paranoia_level",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "request_header_name",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "request_header_ratelimit_cooldown",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "request_header_ratelimit_mode",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "request_header_ratelimit_rps",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "waf_ratelimit_cooldown",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "waf_ratelimit_hits",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "waf_ratelimit_mode",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "waf_ratelimit_rps",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "waf_enabled",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "country",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "country_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "country_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "disabled",
+						"bool": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "domain",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "ip_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "method_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "name",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "only_with_cookie",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "url",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "rule_redirect",
+			"schema": {
+				"attributes": [
+					{
+						"name": "organization",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "project",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "rule",
+						"string": {
+							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "redirect_code",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "redirect_to",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "country",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "country_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "country_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "disabled",
+						"bool": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "domain",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "ip_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "ip_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "method_is",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method_is_not",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "name",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "only_with_cookie",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "url",
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					}
+				]
+			}
 		}
 	],
 	"provider": {
@@ -849,8 +2042,43 @@
 					},
 					{
 						"name": "url",
+						"list": {
+							"computed_optional_required": "required",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
 						"string": {
-							"computed_optional_required": "required"
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "auth_pass",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "auth_user",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								}
+							]
 						}
 					},
 					{
@@ -1042,8 +2270,46 @@
 					},
 					{
 						"name": "url",
+						"list": {
+							"computed_optional_required": "required",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
 						"string": {
-							"computed_optional_required": "required"
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "custom_response_body",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "custom_response_status_code",
+									"int64": {
+										"computed_optional_required": "computed",
+										"default": {
+											"static": 200
+										}
+									}
+								}
+							]
 						}
 					},
 					{
@@ -1229,8 +2495,1232 @@
 					},
 					{
 						"name": "url",
+						"list": {
+							"computed_optional_required": "required",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "headers",
+									"map": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "organization",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "project",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "rule",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "rule_proxy",
+			"schema": {
+				"attributes": [
+					{
+						"name": "auth_pass",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "auth_user",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "cache_lifetime",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "cookie_name",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "country",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"validators": [
+								{
+									"custom": {
+										"imports": [
+											{
+												"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+											}
+										],
+										"schema_definition": "stringvalidator.OneOf(\n\"country_is\",\n\"country_is_not\",\n)"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "country_is",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "country_is_not",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "disable_ssl_verify",
+						"bool": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "disabled",
+						"bool": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": false
+							}
+						}
+					},
+					{
+						"name": "domain",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": "any"
+							}
+						}
+					},
+					{
+						"name": "failover_lifetime",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": "300"
+							}
+						}
+					},
+					{
+						"name": "failover_mode",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "failover_origin_status_codes",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "failover_origin_ttfb",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": "2000"
+							}
+						}
+					},
+					{
+						"name": "host",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "inject_headers",
+						"map": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "ip",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"validators": [
+								{
+									"custom": {
+										"imports": [
+											{
+												"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+											}
+										],
+										"schema_definition": "stringvalidator.OneOf(\n\"ip_is\",\n\"ip_is_not\",\n)"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "ip_is",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "ip_is_not",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"validators": [
+								{
+									"custom": {
+										"imports": [
+											{
+												"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+											}
+										],
+										"schema_definition": "stringvalidator.OneOf(\n\"method_is\",\n\"method_is_not\",\n)"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "method_is",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "method_is_not",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "name",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "notify",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": "none"
+							},
+							"validators": [
+								{
+									"custom": {
+										"imports": [
+											{
+												"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+											}
+										],
+										"schema_definition": "stringvalidator.OneOf(\n\"none\",\n\"slack\",\n)"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "notify_config",
+						"single_nested": {
+							"computed_optional_required": "computed_optional",
+							"attributes": [
+								{
+									"name": "origin_status_codes",
+									"list": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "period",
+									"string": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": "60"
+										}
+									}
+								},
+								{
+									"name": "slack_webhook",
+									"string": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": ""
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "only_proxy_404",
+						"bool": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "only_with_cookie",
+						"bool": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": false
+							}
+						}
+					},
+					{
+						"name": "proxy_strip_headers",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "proxy_strip_request_headers",
+						"list": {
+							"computed_optional_required": "computed_optional",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "to",
 						"string": {
 							"computed_optional_required": "required"
+						}
+					},
+					{
+						"name": "url",
+						"list": {
+							"computed_optional_required": "required",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
+						"string": {
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "waf_config",
+						"single_nested": {
+							"computed_optional_required": "computed_optional",
+							"attributes": [
+								{
+									"name": "allow_ip",
+									"list": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "allow_rules",
+									"list": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "block_ip",
+									"list": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "block_lists",
+									"single_nested": {
+										"computed_optional_required": "computed_optional",
+										"attributes": [
+											{
+												"name": "ai",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											},
+											{
+												"name": "ip",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											},
+											{
+												"name": "referer",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											},
+											{
+												"name": "user_agent",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "block_referer",
+									"list": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "block_ua",
+									"list": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "httpbl",
+									"single_nested": {
+										"computed_optional_required": "computed_optional",
+										"attributes": [
+											{
+												"name": "api_key",
+												"string": {
+													"computed_optional_required": "computed_optional"
+												}
+											},
+											{
+												"name": "block_harvester",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											},
+											{
+												"name": "block_search_engine",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											},
+											{
+												"name": "block_spam",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											},
+											{
+												"name": "block_suspicious",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											},
+											{
+												"name": "httpbl_enabled",
+												"bool": {
+													"computed_optional_required": "computed_optional",
+													"default": {
+														"static": false
+													}
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "httpbl_enabled",
+									"map": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"bool": {}
+										}
+									}
+								},
+								{
+									"name": "ip_ratelimit_cooldown",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 30
+										}
+									}
+								},
+								{
+									"name": "ip_ratelimit_mode",
+									"string": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": "disabled"
+										},
+										"validators": [
+											{
+												"custom": {
+													"imports": [
+														{
+															"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+														}
+													],
+													"schema_definition": "stringvalidator.OneOf(\n\"disabled\",\n\"block\",\n\"report\",\n)"
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "ip_ratelimit_rps",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 5
+										}
+									}
+								},
+								{
+									"name": "mode",
+									"string": {
+										"computed_optional_required": "required",
+										"validators": [
+											{
+												"custom": {
+													"imports": [
+														{
+															"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+														}
+													],
+													"schema_definition": "stringvalidator.OneOf(\n\"block\",\n\"report\",\n)"
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "notify_email",
+									"list": {
+										"computed_optional_required": "computed_optional",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "notify_slack",
+									"string": {
+										"computed_optional_required": "computed_optional"
+									}
+								},
+								{
+									"name": "notify_slack_hits_rpm",
+									"int64": {
+										"computed_optional_required": "computed_optional"
+									}
+								},
+								{
+									"name": "notify_slack_rpm",
+									"int64": {
+										"computed_optional_required": "computed_optional"
+									}
+								},
+								{
+									"name": "paranoia_level",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 1
+										}
+									}
+								},
+								{
+									"name": "request_header_name",
+									"string": {
+										"computed_optional_required": "computed_optional"
+									}
+								},
+								{
+									"name": "request_header_ratelimit_cooldown",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 30
+										}
+									}
+								},
+								{
+									"name": "request_header_ratelimit_mode",
+									"string": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": "disabled"
+										},
+										"validators": [
+											{
+												"custom": {
+													"imports": [
+														{
+															"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+														}
+													],
+													"schema_definition": "stringvalidator.OneOf(\n\"disabled\",\n\"block\",\n\"report\",\n)"
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "request_header_ratelimit_rps",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 5
+										}
+									}
+								},
+								{
+									"name": "waf_ratelimit_cooldown",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 300
+										}
+									}
+								},
+								{
+									"name": "waf_ratelimit_hits",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 10
+										}
+									}
+								},
+								{
+									"name": "waf_ratelimit_mode",
+									"string": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": "disabled"
+										},
+										"validators": [
+											{
+												"custom": {
+													"imports": [
+														{
+															"path": "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+														}
+													],
+													"schema_definition": "stringvalidator.OneOf(\n\"disabled\",\n\"block\",\n\"report\",\n)"
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "waf_ratelimit_rps",
+									"int64": {
+										"computed_optional_required": "computed_optional",
+										"default": {
+											"static": 5
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "waf_enabled",
+						"bool": {
+							"computed_optional_required": "computed_optional",
+							"default": {
+								"static": false
+							}
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "auth_pass",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "auth_user",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "cache_lifetime",
+									"string": {
+										"computed_optional_required": "computed",
+										"default": {
+											"static": "0"
+										}
+									}
+								},
+								{
+									"name": "disable_ssl_verify",
+									"bool": {
+										"computed_optional_required": "computed",
+										"default": {
+											"static": true
+										}
+									}
+								},
+								{
+									"name": "failover_lifetime",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "failover_mode",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "failover_origin_status_codes",
+									"list": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "failover_origin_ttfb",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "host",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "inject_headers",
+									"map": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "notify",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "notify_config",
+									"single_nested": {
+										"computed_optional_required": "computed",
+										"attributes": [
+											{
+												"name": "origin_status_codes",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "period",
+												"string": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": "60"
+													}
+												}
+											},
+											{
+												"name": "slack_webhook",
+												"string": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": ""
+													}
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "notify_email",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "only_proxy_404",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "origin_timeout",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "proxy_alert_enabled",
+									"bool": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "proxy_strip_headers",
+									"list": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "proxy_strip_request_headers",
+									"list": {
+										"computed_optional_required": "computed",
+										"element_type": {
+											"string": {}
+										}
+									}
+								},
+								{
+									"name": "to",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								},
+								{
+									"name": "waf_config",
+									"single_nested": {
+										"computed_optional_required": "computed",
+										"attributes": [
+											{
+												"name": "allow_ip",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "allow_rules",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "block_ip",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "block_lists",
+												"single_nested": {
+													"computed_optional_required": "computed",
+													"attributes": [
+														{
+															"name": "ai",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														},
+														{
+															"name": "ip",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														},
+														{
+															"name": "referer",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														},
+														{
+															"name": "user_agent",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														}
+													]
+												}
+											},
+											{
+												"name": "block_referer",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "block_ua",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "httpbl",
+												"single_nested": {
+													"computed_optional_required": "computed",
+													"attributes": [
+														{
+															"name": "api_key",
+															"string": {
+																"computed_optional_required": "computed"
+															}
+														},
+														{
+															"name": "block_harvester",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														},
+														{
+															"name": "block_search_engine",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														},
+														{
+															"name": "block_spam",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														},
+														{
+															"name": "block_suspicious",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														},
+														{
+															"name": "httpbl_enabled",
+															"bool": {
+																"computed_optional_required": "computed",
+																"default": {
+																	"static": false
+																}
+															}
+														}
+													]
+												}
+											},
+											{
+												"name": "httpbl_enabled",
+												"map": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"bool": {}
+													}
+												}
+											},
+											{
+												"name": "ip_ratelimit_cooldown",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 30
+													}
+												}
+											},
+											{
+												"name": "ip_ratelimit_mode",
+												"string": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": "disabled"
+													}
+												}
+											},
+											{
+												"name": "ip_ratelimit_rps",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 5
+													}
+												}
+											},
+											{
+												"name": "mode",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "notify_email",
+												"list": {
+													"computed_optional_required": "computed",
+													"element_type": {
+														"string": {}
+													}
+												}
+											},
+											{
+												"name": "notify_slack",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "notify_slack_hits_rpm",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "notify_slack_rpm",
+												"int64": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "paranoia_level",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 1
+													}
+												}
+											},
+											{
+												"name": "request_header_name",
+												"string": {
+													"computed_optional_required": "computed"
+												}
+											},
+											{
+												"name": "request_header_ratelimit_cooldown",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 30
+													}
+												}
+											},
+											{
+												"name": "request_header_ratelimit_mode",
+												"string": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": "disabled"
+													}
+												}
+											},
+											{
+												"name": "request_header_ratelimit_rps",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 5
+													}
+												}
+											},
+											{
+												"name": "waf_ratelimit_cooldown",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 300
+													}
+												}
+											},
+											{
+												"name": "waf_ratelimit_hits",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 10
+													}
+												}
+											},
+											{
+												"name": "waf_ratelimit_mode",
+												"string": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": "disabled"
+													}
+												}
+											},
+											{
+												"name": "waf_ratelimit_rps",
+												"int64": {
+													"computed_optional_required": "computed",
+													"default": {
+														"static": 5
+													}
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "waf_enabled",
+									"bool": {
+										"computed_optional_required": "computed",
+										"default": {
+											"static": false
+										}
+									}
+								}
+							]
 						}
 					},
 					{
@@ -1407,10 +3897,10 @@
 					},
 					{
 						"name": "redirect_code",
-						"int64": {
+						"string": {
 							"computed_optional_required": "computed_optional",
 							"default": {
-								"static": 301
+								"static": "301"
 							}
 						}
 					},
@@ -1422,8 +3912,46 @@
 					},
 					{
 						"name": "url",
+						"list": {
+							"computed_optional_required": "required",
+							"element_type": {
+								"string": {}
+							}
+						}
+					},
+					{
+						"name": "uuid",
 						"string": {
-							"computed_optional_required": "required"
+							"computed_optional_required": "computed_optional"
+						}
+					},
+					{
+						"name": "action",
+						"string": {
+							"computed_optional_required": "computed"
+						}
+					},
+					{
+						"name": "action_config",
+						"single_nested": {
+							"computed_optional_required": "computed",
+							"attributes": [
+								{
+									"name": "redirect_code",
+									"string": {
+										"computed_optional_required": "computed",
+										"default": {
+											"static": "301"
+										}
+									}
+								},
+								{
+									"name": "redirect_to",
+									"string": {
+										"computed_optional_required": "computed"
+									}
+								}
+							]
 						}
 					},
 					{

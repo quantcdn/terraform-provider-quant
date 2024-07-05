@@ -162,7 +162,7 @@ func TestCreateProxyRule(t *testing.T) {
 
 	req.SetWafEnabled(true)
 
-	waf := *openapi.NewRuleWAFConfigWithDefaults()
+	waf := *openapi.NewWAFConfigWithDefaults()
 	waf.SetMode("block")
 	waf.SetParanoiaLevel(1)
 	waf.SetAllowRules([]string{"10001"})
@@ -173,7 +173,7 @@ func TestCreateProxyRule(t *testing.T) {
 
 	// Dictionary support.
 
-	httpbl := *openapi.NewProxyConfigHttpblWithDefaults()
+	httpbl := *openapi.NewHttpblWithDefaults()
 	httpbl.SetHttpblEnabled(false)
 	httpbl.SetBlockHarvester(true)
 	httpbl.SetBlockSearchEngine(true)
@@ -183,7 +183,7 @@ func TestCreateProxyRule(t *testing.T) {
 
 	waf.SetHttpbl(httpbl)
 
-	notify := *openapi.NewProxyNotifyConfigWithDefaults()
+	notify := *openapi.NewNotifyConfigWithDefaults()
 	notify.SetPeriod("120")
 	notify.SetSlackWebhook("https://slack.com")
 	notify.SetOriginStatusCodes([]string{"200"})
@@ -192,7 +192,7 @@ func TestCreateProxyRule(t *testing.T) {
 
 	req.SetWafConfig(waf)
 
-	r, res, err := client.RulesProxyAPI.RulesProxyCreate(ctx, "quant", project).RuleProxyRequest(req).Execute()
+	r, _, err := client.RulesProxyAPI.RulesProxyCreate(ctx, "quant", project).RuleProxyRequest(req).Execute()
 
 	if err != nil {
 		t.Logf("Error: %v", err.Error())

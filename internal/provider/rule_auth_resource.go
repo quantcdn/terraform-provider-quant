@@ -150,10 +150,6 @@ func callRuleAuthCreate(ctx context.Context, r *ruleAuthResource, rule *resource
 	setRuleAuthMethodFilters(ctx, rule, &req)
 	setRuleAuthIpFilters(ctx, rule, &req)
 
-	var urls []string
-	rule.Urls.ElementsAs(ctx, urls, false)
-	req.SetUrls(urls)
-
 	if rule.Domain.IsNull() {
 		req.SetDomain(*utils.GetRuleAny())
 	} else {

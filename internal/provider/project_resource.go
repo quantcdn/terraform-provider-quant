@@ -16,6 +16,7 @@ import (
 var (
 	_ resource.Resource              = (*projectResource)(nil)
 	_ resource.ResourceWithConfigure = (*projectResource)(nil)
+	_ resource.ResourceWithImportState = (*projectResource)(nil)
 )
 
 func NewProjectResource() resource.Resource {
@@ -120,6 +121,21 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// Delete API call logic
 	resp.Diagnostics.Append(callProjectDeleteAPI(ctx, r, &data)...)
+}
+
+// Import state for a given machine name.
+func (r *projectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	var data resource_project.ProjectModel
+	data.MachineName = types.StringValue(req.ID)
+
+	// Read API call logic
+	resp.Diagnostics.Append(callProjectReadAPI(ctx, r, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 // Create project request.
