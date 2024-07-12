@@ -286,7 +286,7 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 
 	org := r.client.Organization
 	if !project.Organization.IsNull() {
-		org = *project.Organization.ValueStringPointer()
+		org = project.Organization.ValueString()
 	}
 
 	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()

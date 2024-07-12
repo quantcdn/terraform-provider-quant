@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"strings"
 	"terraform-provider-quant/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,6 +16,7 @@ import (
 var (
 	_ resource.Resource = (*ruleProxyResource)(nil)
 	_ resource.ResourceWithConfigure = (*ruleProxyResource)(nil)
+	_ resource.ResourceWithImportState = (*ruleProxyResource)(nil)
 )
 
 func NewRuleProxyResource() resource.Resource {
@@ -32,7 +35,7 @@ type ruleProxyResourceModel struct {
 	Country                   types.String      `tfsdk:"country"`
 	CountryIs                 types.List        `tfsdk:"country_is"`
 	CountryIsNot              types.List        `tfsdk:"country_is_not"`
-	DisableSslVerify          types.Bool        `tfsdk:"disable_ssl_verify"`
+	DisableSslVerify          types.String       `tfsdk:"disable_ssl_verify"`
 	Disabled                  types.Bool        `tfsdk:"disabled"`
 	Domain                    types.String      `tfsdk:"domain"`
 	FailoverLifetime          types.String      `tfsdk:"failover_lifetime"`
@@ -450,6 +453,32 @@ func (r *ruleProxyResource) Delete(ctx context.Context, req resource.DeleteReque
 	resp.Diagnostics.Append(callRuleProxyDeleteAPI(ctx, r, &data)...)
 }
 
+func (r *ruleProxyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	var data ruleProxyResourceModel
+
+	parts := strings.Split(req.ID, "/")
+
+	if len(parts) != 2 {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"The ID must follow the pattern project/uuid to import.",
+		)
+		return
+	}
+
+	data.Project = types.StringValue(parts[0])
+	data.Uuid = types.StringValue(parts[1])
+
+	// Read API call logic
+	resp.Diagnostics.Append(callRuleProxyReadAPI(ctx, r, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
 func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *ruleProxyResourceModel) (diags diag.Diagnostics) {
 	req := *openapi.NewRuleProxyRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
@@ -503,7 +532,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 		req.SetAuthPass(data.AuthPass.ValueString())
 	}
 
-	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
+	req.SetDisableSslVerify(data.DisableSslVerify.ValueString())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
 
 	req.SetFailoverMode(data.FailoverMode.ValueString())
@@ -641,7 +670,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 		req.SetAuthPass(data.AuthPass.ValueString())
 	}
 
-	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
+	req.SetDisableSslVerify(data.DisableSslVerify.ValueString())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
 
 	req.SetFailoverMode(data.FailoverMode.ValueString())
@@ -761,7 +790,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, rule *ruleP
 	rule.AuthPass = types.StringValue(*api.ActionConfig.AuthPass)
 	rule.AuthUser = types.StringValue(*api.ActionConfig.AuthUser)
 	rule.CacheLifetime = types.StringValue(*api.ActionConfig.CacheLifetime)
-	rule.DisableSslVerify = types.BoolValue(*api.ActionConfig.DisableSslVerify)
+	rule.DisableSslVerify = types.StringValue(*api.ActionConfig.DisableSslVerify)
 	// rule.FailoverMode = types.StringValue(*api.ActionConfig.FailoverMode)
 	rule.FailoverMode = types.StringValue("true")
 	rule.FailoverLifetime = types.StringValue(*api.ActionConfig.FailoverLifetime)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"sort"
 	"strings"
 	"terraform-provider-quant/internal/client"
@@ -142,6 +143,7 @@ func (r *headerResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 func (r *headerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data headerResourceModel
+	data.Project = types.StringValue(req.ID)
 
 	// Read API call logic
 	resp.Diagnostics.Append(callHeaderReadAPI(ctx, r, &data)...)
@@ -195,6 +197,7 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource 
 // Load headers from the API.
 func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
 	api, _, err := h.client.Instance.HeadersAPI.HeadersList(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).Execute()
+
 	if err != nil {
 		diags.AddError("Error retrieving headers", err.Error())
 		return
@@ -212,6 +215,7 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 		return
 	}
 
+	resource.Id = types.StringValue(generateID(api))
 	resource.Headers = headers
 	return
 }

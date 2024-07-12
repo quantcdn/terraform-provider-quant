@@ -127,5 +127,7 @@ func (p *quantProvider) DataSources(ctx context.Context) []func() datasource.Dat
 func (p *quantProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewProjectResource,
+		NewHeaderResource,
+		NewRuleProxyResource,
 	}
 }
