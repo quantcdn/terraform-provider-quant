@@ -129,5 +129,6 @@ func (p *quantProvider) Resources(ctx context.Context) []func() resource.Resourc
 		NewProjectResource,
 		NewHeaderResource,
 		NewRuleProxyResource,
+		NewRuleRedirectResource,
 	}
 }
