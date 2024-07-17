@@ -249,7 +249,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		org = crawler.Organization.ValueString()
 	}
 
-	req := *openapi.NewCrawlerRequestWithDefaults()
+	req := *openapi.NewCrawlerRequestUpdateWithDefaults()
 
 	req.SetDomain(crawler.Domain.ValueString())
 	req.SetBrowserMode(crawler.BrowserMode.ValueBool())
@@ -259,8 +259,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	req.SetUrlList(urls)
 
-	api, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequest(req).Execute()
-
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequestUpdate(req).Execute()
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
 		return

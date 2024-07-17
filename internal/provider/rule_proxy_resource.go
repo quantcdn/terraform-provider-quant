@@ -424,20 +424,34 @@ func (r *ruleProxyResource) Read(ctx context.Context, req resource.ReadRequest, 
 }
 
 func (r *ruleProxyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ruleProxyResourceModel
+	var plan ruleProxyResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	var state ruleProxyResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	plan.Uuid = state.Uuid
+
 	// Update API call logic
-	resp.Diagnostics.Append(callRuleProxyUpdateAPI(ctx, r, &data)...)
+	resp.Diagnostics.Append(callRuleProxyUpdateAPI(ctx, r, &plan)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(callRuleProxyReadAPI(ctx, r, &plan)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ruleProxyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -613,11 +627,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	}
 
 	org := r.client.Organization
-	if !data.Organization.IsNull() {
-		org = data.Organization.ValueString()
-	}
-
-	req := *openapi.NewRuleProxyRequestWithDefaults()
+	req := *openapi.NewRuleProxyRequestUpdateWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	var domains []string
@@ -729,7 +739,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	}
 	req.NotifyConfig.SetOriginStatusCodes(originStatusCodes)
 
-	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyUpdate(r.client.AuthContext, org, data.Project.ValueString(), data.Uuid.ValueString()).RuleProxyRequest(req).Execute()
+	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyUpdate(r.client.AuthContext, org, data.Project.ValueString(), data.Uuid.ValueString()).RuleProxyRequestUpdate(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to update rule proxy", err.Error())
@@ -750,10 +760,6 @@ func callRuleProxyDeleteAPI(ctx context.Context, r *ruleProxyResource, rule *rul
 	}
 
 	org := r.client.Organization
-	if !rule.Organization.IsNull() {
-		org = rule.Organization.ValueString()
-	}
-
 	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
@@ -775,10 +781,6 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, rule *ruleP
 	}
 
 	org := r.client.Organization
-	if !rule.Organization.IsNull() {
-		org = rule.Organization.ValueString()
-	}
-
 	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {

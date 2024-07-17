@@ -179,6 +179,10 @@ func generateID(headers map[string]string) string {
 func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
 	req := *openapi.NewHeadersCreateRequestWithDefaults()
 
+	if req.Headers == nil {
+		req.Headers = make(map[string]string)
+	}
+
 	for k, v := range resource.Headers.Elements() {
 		req.Headers[k] = v.String()
 	}

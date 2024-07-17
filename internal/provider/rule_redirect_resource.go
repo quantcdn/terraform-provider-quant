@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/utils"
@@ -11,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
@@ -69,8 +69,7 @@ func (r *ruleRedirectResource) Schema(ctx context.Context, req resource.SchemaRe
 		},
 	}
 	attributes["redirect_code"] = schema.StringAttribute{
-		Computed: true,
-		Default:  stringdefault.StaticString("301"),
+		Required: true,
 		Validators: []validator.String{
 			stringvalidator.OneOf("301", "302", "303"),
 		},
@@ -111,6 +110,10 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 	// Create API call logic
 	resp.Diagnostics.Append(callRuleRedirectCreateAPI(ctx, r, &data)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -133,20 +136,34 @@ func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ruleRedirectResourceModel
+	var plan ruleRedirectResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Update API call logic
-	resp.Diagnostics.Append(callRuleRedirectUpdateAPI(ctx, r, &data)...)
+	var state ruleRedirectResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	plan.Uuid = state.Uuid
 
-	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	// Update API call logic
+	resp.Diagnostics.Append(callRuleRedirectUpdateAPI(ctx, r, &plan)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(callRuleRedirectReadAPI(ctx, r, &plan)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Save updated plan into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -236,18 +253,15 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	req.SetRedirectTo(rule.RedirectTo.ValueString())
 
 	org := r.client.Organization
-	if !rule.Organization.IsNull() {
-		org = rule.Organization.ValueString()
-	}
-
-	api, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectCreate(r.client.AuthContext, org, rule.Project.ValueString()).RuleRedirectRequest(req).Execute()
+	res, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectCreate(r.client.AuthContext, org, rule.Project.ValueString()).RuleRedirectRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to create rule", err.Error())
 		return
 	}
 
-	rule.Uuid = types.StringValue(api.Uuid)
+	rule.Uuid = types.StringValue(res.GetUuid())
+
 	return
 }
 
@@ -263,13 +277,11 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 	}
 
 	org := r.client.Organization
-	if !rule.Organization.IsNull() {
-		org = rule.Organization.ValueString()
-	}
+	api, res, err := r.client.Instance.RulesRedirectAPI.RulesRedirectRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
-	api, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 	if err != nil {
 		diags.AddError("Failed to read rule", err.Error())
+		diags.AddError("Response", fmt.Sprintf("%v", res))
 		return
 	}
 
@@ -346,7 +358,7 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		return
 	}
 
-	req := *openapi.NewRuleRedirectRequestWithDefaults()
+	req := *openapi.NewRuleRedirectRequestUpdateWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
@@ -394,11 +406,7 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	req.SetRedirectTo(rule.RedirectTo.ValueString())
 
 	org := r.client.Organization
-	if !rule.Organization.IsNull() {
-		org = rule.Organization.ValueString()
-	}
-
-	_, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectUpdate(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).RuleRedirectRequest(req).Execute()
+	_, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectUpdate(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).RuleRedirectRequestUpdate(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to update rule", err.Error())
@@ -419,8 +427,8 @@ func callRuleRedirectDeleteAPI(ctx context.Context, r *ruleRedirectResource, rul
 	}
 
 	org := r.client.Organization
-
 	_, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+
 	if err != nil {
 		diags.AddError("Failed to delete rule", err.Error())
 		return

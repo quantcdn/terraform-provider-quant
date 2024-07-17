@@ -369,7 +369,7 @@
 								},
 								{
 									"name": "cache_lifetime",
-									"string": {
+									"int64": {
 										"computed_optional_required": "computed"
 									}
 								},
@@ -721,6 +721,64 @@
 												}
 											},
 											{
+												"name": "thresholds",
+												"list_nested": {
+													"computed_optional_required": "computed",
+													"nested_object": {
+														"attributes": [
+															{
+																"name": "cooldown",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "hits",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "minutes",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "mode",
+																"string": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "notify_slack",
+																"string": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "rps",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "type",
+																"string": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "value",
+																"string": {
+																	"computed_optional_required": "computed"
+																}
+															}
+														]
+													}
+												}
+											},
+											{
 												"name": "waf_ratelimit_cooldown",
 												"int64": {
 													"computed_optional_required": "computed"
@@ -788,8 +846,11 @@
 					},
 					{
 						"name": "domain",
-						"string": {
-							"computed_optional_required": "computed"
+						"list": {
+							"computed_optional_required": "computed",
+							"element_type": {
+								"string": {}
+							}
 						}
 					},
 					{
@@ -1250,7 +1311,7 @@
 					},
 					{
 						"name": "cache_lifetime",
-						"string": {
+						"int64": {
 							"computed_optional_required": "computed_optional"
 						}
 					},
@@ -1313,10 +1374,10 @@
 					},
 					{
 						"name": "domain",
-						"string": {
-							"computed_optional_required": "computed_optional",
-							"default": {
-								"static": "any"
+						"list": {
+							"computed_optional_required": "required",
+							"element_type": {
+								"string": {}
 							}
 						}
 					},
@@ -1857,6 +1918,67 @@
 									}
 								},
 								{
+									"name": "thresholds",
+									"list_nested": {
+										"computed_optional_required": "computed_optional",
+										"nested_object": {
+											"attributes": [
+												{
+													"name": "cooldown",
+													"int64": {
+														"computed_optional_required": "computed_optional"
+													}
+												},
+												{
+													"name": "hits",
+													"int64": {
+														"computed_optional_required": "computed_optional"
+													}
+												},
+												{
+													"name": "minutes",
+													"int64": {
+														"computed_optional_required": "computed_optional"
+													}
+												},
+												{
+													"name": "mode",
+													"string": {
+														"computed_optional_required": "computed_optional",
+														"default": {
+															"static": "disabled"
+														}
+													}
+												},
+												{
+													"name": "notify_slack",
+													"string": {
+														"computed_optional_required": "computed_optional"
+													}
+												},
+												{
+													"name": "rps",
+													"int64": {
+														"computed_optional_required": "computed_optional"
+													}
+												},
+												{
+													"name": "type",
+													"string": {
+														"computed_optional_required": "computed_optional"
+													}
+												},
+												{
+													"name": "value",
+													"string": {
+														"computed_optional_required": "computed_optional"
+													}
+												}
+											]
+										}
+									}
+								},
+								{
 									"name": "waf_ratelimit_cooldown",
 									"int64": {
 										"computed_optional_required": "computed_optional",
@@ -1941,10 +2063,10 @@
 								},
 								{
 									"name": "cache_lifetime",
-									"string": {
+									"int64": {
 										"computed_optional_required": "computed",
 										"default": {
-											"static": "0"
+											"static": 0
 										}
 									}
 								},
@@ -2349,6 +2471,67 @@
 													"computed_optional_required": "computed",
 													"default": {
 														"static": 5
+													}
+												}
+											},
+											{
+												"name": "thresholds",
+												"list_nested": {
+													"computed_optional_required": "computed",
+													"nested_object": {
+														"attributes": [
+															{
+																"name": "cooldown",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "hits",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "minutes",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "mode",
+																"string": {
+																	"computed_optional_required": "computed",
+																	"default": {
+																		"static": "disabled"
+																	}
+																}
+															},
+															{
+																"name": "notify_slack",
+																"string": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "rps",
+																"int64": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "type",
+																"string": {
+																	"computed_optional_required": "computed"
+																}
+															},
+															{
+																"name": "value",
+																"string": {
+																	"computed_optional_required": "computed"
+																}
+															}
+														]
 													}
 												}
 											},

@@ -63,6 +63,13 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	resp.Diagnostics.Append(callProjectCreateAPI(ctx, r, &data)...)
 
+	if (resp.Diagnostics.HasError()) {
+		return
+	}
+
+	// Read the API results back into the model for Terraform state.
+	resp.Diagnostics.Append(callProjectReadAPI(ctx, r, &data)...)
+
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -98,8 +105,18 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	var stateData resource_project.ProjectModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &stateData)...)
+	data.MachineName = stateData.MachineName
+
 	// Update API call logic
 	resp.Diagnostics.Append(callProjectUpdateAPI(ctx, r, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(callProjectReadAPI(ctx, r, &data)...)
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -179,9 +196,7 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 
 	req.SetRegion(project.Region.ValueString())
 
-	// @todo: add support for s3 sync.
-
-	apiProject, _, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).ProjectRequest(req).Execute()
+	res, _, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).ProjectRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -191,38 +206,8 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 		return
 	}
 
-	project.Id = types.Int64Value(int64(apiProject.GetId()))
-	project.MachineName = types.StringValue(apiProject.GetMachineName())
-	project.Project = types.StringValue(apiProject.GetMachineName())
-	project.CreatedAt = types.StringValue(apiProject.GetCreatedAt())
-	project.UpdatedAt = types.StringValue(apiProject.GetUpdatedAt())
-	project.Uuid = types.StringValue(apiProject.GetUuid())
-
-	// project.ProjectType = types.StringValue(apiProject.GetProjectType())
-	project.GitUrl = types.StringValue(apiProject.GetGitUrl())
-	project.OrganizationId = types.Int64Value(int64(apiProject.GetOrganizationId()))
-	project.ParentProjectId = types.Int64Value(int64(apiProject.GetParentProjectId()))
-	project.Region = types.StringValue(apiProject.GetRegion())
-
-	if apiProject.GetSecurityScore() == "" {
-		project.SecurityScore = types.StringNull()
-	} else {
-		project.SecurityScore = types.StringValue(apiProject.GetSecurityScore())
-	}
-
-	project.Organization = types.StringValue(r.client.Organization)
-
-	if apiProject.GetCreatedAt() == "" {
-		project.DeletedAt = types.StringNull()
-	} else {
-		project.DeletedAt = types.StringValue(apiProject.GetDeletedAt())
-	}
-
-	if project.AllowQueryParams.IsNull() || project.AllowQueryParams.IsUnknown() {
-		project.AllowQueryParams = types.BoolNull()
-	}
-
-	return diags
+	project.MachineName = types.StringValue(res.GetMachineName())
+	return
 }
 
 func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *resource_project.ProjectModel) (diags diag.Diagnostics) {
@@ -236,11 +221,7 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	org := r.client.Organization
-	if !project.Organization.IsNull() {
-		org = *project.Organization.ValueStringPointer()
-	}
-
-	req := *openapiclient.NewProjectRequestWithDefaults()
+	req := *openapiclient.NewProjectRequestUpdateWithDefaults()
 
 	if project.BasicAuthUsername.IsNull() && !project.BasicAuthPassword.IsNull() {
 		diags.AddError(
@@ -264,13 +245,12 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 	req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
 	req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
 
-	api, _, err := r.client.Instance.ProjectsAPI.ProjectsUpdate(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	api := r.client.Instance.ProjectsAPI.ProjectsUpdate(r.client.AuthContext, org, project.MachineName.ValueString())
+	_, _, err := api.ProjectRequestUpdate(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update project", fmt.Sprintf("Error: %s", err.Error()))
 	}
-
-	project.UpdatedAt = types.StringValue(api.GetUpdatedAt())
 
 	return
 }
@@ -285,10 +265,6 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 	}
 
 	org := r.client.Organization
-	if !project.Organization.IsNull() {
-		org = project.Organization.ValueString()
-	}
-
 	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
@@ -307,8 +283,56 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 
 	project.SecurityScore = types.StringValue(api.GetSecurityScore())
 	project.GitUrl = types.StringValue(api.GetGitUrl())
+	project.OrganizationId = types.Int64Value(int64(api.GetOrganizationId()))
 
-	// @todo: Support basic auth details from API.
+	// API doesn't currently return these values
+	if project.AllowQueryParams.IsNull() || project.AllowQueryParams.IsUnknown() {
+		project.AllowQueryParams = types.BoolNull()
+	}
+
+	if project.BasicAuthPassword.IsNull() || project.BasicAuthPassword.IsUnknown() {
+		project.BasicAuthPassword = types.StringNull()
+	}
+
+	if project.BasicAuthUsername.IsNull() || project.BasicAuthUsername.IsUnknown() {
+		project.BasicAuthUsername = types.StringNull()
+	}
+
+	if project.BasicAuthPreviewOnly.IsNull() || project.BasicAuthPreviewOnly.IsUnknown() {
+		project.BasicAuthPreviewOnly = types.StringNull()
+	}
+
+	if project.CustomS3SyncAccessKey.IsNull() || project.CustomS3SyncAccessKey.IsUnknown() {
+		project.CustomS3SyncAccessKey = types.StringNull()
+	}
+
+	if project.CustomS3SyncRegion.IsNull() || project.CustomS3SyncRegion.IsUnknown() {
+		project.CustomS3SyncRegion = types.StringNull()
+	}
+
+	if project.CustomS3SyncSecretKey.IsNull() || project.CustomS3SyncSecretKey.IsUnknown() {
+		project.CustomS3SyncSecretKey = types.StringNull()
+	}
+
+	if project.CustomS3SyncBucket.IsNull() || project.CustomS3SyncBucket.IsUnknown() {
+		project.CustomS3SyncBucket = types.StringNull()
+	}
+
+	if project.Project.IsNull() || project.Project.IsUnknown() {
+		project.Project = types.StringNull()
+	}
+
+	if project.ParentProjectId.IsNull() || project.ParentProjectId.IsUnknown() {
+		project.ParentProjectId = types.Int64Null()
+	}
+
+	if project.Organization.IsNull() || project.Organization.IsUnknown() {
+		project.Organization = types.StringNull()
+	}
+
+	if project.DeletedAt.IsNull() || project.DeletedAt.IsUnknown() {
+		project.DeletedAt = types.StringNull()
+	}
 
 	return diags
 }
@@ -324,10 +348,6 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	org := r.client.Organization
-	if !project.Organization.IsNull() {
-		org = project.Organization.ValueString()
-	}
-
 	_, _, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
