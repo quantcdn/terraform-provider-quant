@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/utils"
 
@@ -28,43 +29,44 @@ type ruleProxyResource struct {
 }
 
 type ruleProxyResourceModel struct {
-	AuthPass                  types.String      `tfsdk:"auth_pass"`
-	AuthUser                  types.String      `tfsdk:"auth_user"`
-	CacheLifetime             types.Int64       `tfsdk:"cache_lifetime"`
-	CookieName                types.String      `tfsdk:"cookie_name"`
-	Country                   types.String      `tfsdk:"country"`
-	CountryIs                 types.List        `tfsdk:"country_is"`
-	CountryIsNot              types.List        `tfsdk:"country_is_not"`
-	DisableSslVerify          types.Bool        `tfsdk:"disable_ssl_verify"`
-	Disabled                  types.Bool        `tfsdk:"disabled"`
-	Domain                    types.List        `tfsdk:"domain"`
-	FailoverLifetime          types.String      `tfsdk:"failover_lifetime"`
-	FailoverMode              types.Bool        `tfsdk:"failover_mode"`
-	FailoverOriginStatusCodes types.List        `tfsdk:"failover_origin_status_codes"`
-	FailoverOriginTtfb        types.String      `tfsdk:"failover_origin_ttfb"`
-	Host                      types.String      `tfsdk:"host"`
-	InjectHeaders             types.Map         `tfsdk:"inject_headers"`
-	Ip                        types.String      `tfsdk:"ip"`
-	IpIs                      types.List        `tfsdk:"ip_is"`
-	IpIsNot                   types.List        `tfsdk:"ip_is_not"`
-	Method                    types.String      `tfsdk:"method"`
-	MethodIs                  types.List        `tfsdk:"method_is"`
-	MethodIsNot               types.List        `tfsdk:"method_is_not"`
-	Name                      types.String      `tfsdk:"name"`
-	Notify                    types.String      `tfsdk:"notify"`
-	NotifyConfig              NotifyConfigValue `tfsdk:"notify_config"`
-	OnlyProxy404              types.Bool        `tfsdk:"only_proxy_404"`
-	OnlyWithCookie            types.Bool        `tfsdk:"only_with_cookie"`
-	Organization              types.String      `tfsdk:"organization"`
-	Project                   types.String      `tfsdk:"project"`
-	ProxyStripHeaders         types.List        `tfsdk:"proxy_strip_headers"`
-	ProxyStripRequestHeaders  types.List        `tfsdk:"proxy_strip_request_headers"`
-	Rule                      types.String      `tfsdk:"rule"`
-	To                        types.String      `tfsdk:"to"`
-	Url                       types.List        `tfsdk:"url"`
-	Uuid                      types.String      `tfsdk:"uuid"`
-	WafConfig                 WafConfigValue    `tfsdk:"waf_config"`
-	WafEnabled                types.Bool        `tfsdk:"waf_enabled"`
+	AuthPass                  types.String       `tfsdk:"auth_pass"`
+	AuthUser                  types.String       `tfsdk:"auth_user"`
+	CacheLifetime             types.Int64        `tfsdk:"cache_lifetime"`
+	CookieName                types.String       `tfsdk:"cookie_name"`
+	Country                   types.String       `tfsdk:"country"`
+	CountryIs                 types.List         `tfsdk:"country_is"`
+	CountryIsNot              types.List         `tfsdk:"country_is_not"`
+	DisableSslVerify          types.Bool         `tfsdk:"disable_ssl_verify"`
+	Disabled                  types.Bool         `tfsdk:"disabled"`
+	Domain                    types.List         `tfsdk:"domain"`
+	FailoverLifetime          types.String       `tfsdk:"failover_lifetime"`
+	FailoverMode              types.Bool         `tfsdk:"failover_mode"`
+	FailoverOriginStatusCodes types.List         `tfsdk:"failover_origin_status_codes"`
+	FailoverOriginTtfb        types.String       `tfsdk:"failover_origin_ttfb"`
+	Host                      types.String       `tfsdk:"host"`
+	InjectHeaders             types.Map          `tfsdk:"inject_headers"`
+	Ip                        types.String       `tfsdk:"ip"`
+	IpIs                      types.List         `tfsdk:"ip_is"`
+	IpIsNot                   types.List         `tfsdk:"ip_is_not"`
+	Method                    types.String       `tfsdk:"method"`
+	MethodIs                  types.List         `tfsdk:"method_is"`
+	MethodIsNot               types.List         `tfsdk:"method_is_not"`
+	Name                      types.String       `tfsdk:"name"`
+	Notify                    types.String       `tfsdk:"notify"`
+	NotifyConfig              *NotifyConfigValue `tfsdk:"notify_config"`
+	OnlyProxy404              types.Bool         `tfsdk:"only_proxy_404"`
+	OnlyWithCookie            types.Bool         `tfsdk:"only_with_cookie"`
+	Organization              types.String       `tfsdk:"organization"`
+	Project                   types.String       `tfsdk:"project"`
+	ProxyStripHeaders         types.List         `tfsdk:"proxy_strip_headers"`
+	ProxyStripRequestHeaders  types.List         `tfsdk:"proxy_strip_request_headers"`
+	Rule                      types.String       `tfsdk:"rule"`
+	RuleId                    types.String       `tfsdk:"rule_id"`
+	To                        types.String       `tfsdk:"to"`
+	Url                       types.List         `tfsdk:"url"`
+	Uuid                      types.String       `tfsdk:"uuid"`
+	WafConfig                 *WafConfigValue    `tfsdk:"waf_config"`
+	WafEnabled                types.Bool         `tfsdk:"waf_enabled"`
 }
 
 type NotifyConfigValue struct {
@@ -123,6 +125,9 @@ func (r *ruleProxyResource) Schema(ctx context.Context, req resource.SchemaReque
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"uuid": schema.StringAttribute{
+				Computed: true,
+			},
+			"rule_id": schema.StringAttribute{
 				Computed: true,
 			},
 			"auth_pass": schema.StringAttribute{
@@ -402,6 +407,10 @@ func (r *ruleProxyResource) Create(ctx context.Context, req resource.CreateReque
 	// Create API call logic
 	resp.Diagnostics.Append(callRuleProxyCreateAPI(ctx, r, &data)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -418,6 +427,10 @@ func (r *ruleProxyResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	// Read API call logic
 	resp.Diagnostics.Append(callRuleProxyReadAPI(ctx, r, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -436,6 +449,7 @@ func (r *ruleProxyResource) Update(ctx context.Context, req resource.UpdateReque
 	var state ruleProxyResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	plan.Uuid = state.Uuid
+	plan.RuleId = state.RuleId
 
 	// Update API call logic
 	resp.Diagnostics.Append(callRuleProxyUpdateAPI(ctx, r, &plan)...)
@@ -471,7 +485,7 @@ func (r *ruleProxyResource) Delete(ctx context.Context, req resource.DeleteReque
 func (r *ruleProxyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data ruleProxyResourceModel
 	var err error
-	data.Project, data.Uuid, err = utils.GetRuleImportId(req.ID)
+	data.Project, data.RuleId, err = utils.GetRuleImportId(req.ID)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -496,21 +510,36 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	req.SetName(data.Name.ValueString())
 
 	var domains []string
-	data.Domain.ElementsAs(ctx, domains, false)
+	for _, domain := range data.Domain.Elements() {
+		if strVal, ok := domain.(types.String); ok {
+			domains = append(domains, strVal.ValueString())
+		}
+	}
 	req.SetDomain(domains)
 
 	var urls []string
-	data.Url.ElementsAs(ctx, urls, false)
+	for _, url := range data.Url.Elements() {
+		if strVal, ok := url.(types.String); ok {
+			urls = append(urls, strVal.ValueString())
+		}
+	}
 	req.SetUrl(urls)
 
 	req.SetCountry(data.Country.ValueString())
 	var countryList []string
-
 	if data.Country.ValueString() == "country_is" {
-		data.CountryIs.ElementsAs(ctx, countryList, false)
+		for _, country := range data.CountryIs.Elements() {
+			if strVal, ok := country.(types.String); ok {
+				countryList = append(countryList, strVal.ValueString())
+			}
+		}
 		req.SetCountryIs(countryList)
 	} else if data.Country.ValueString() == "country_is_not" {
-		data.CountryIsNot.ElementsAs(ctx, countryList, false)
+		for _, country := range data.CountryIsNot.Elements() {
+			if strVal, ok := country.(types.String); ok {
+				countryList = append(countryList, strVal.ValueString())
+			}
+		}
 		req.SetCountryIsNot(countryList)
 	}
 
@@ -518,10 +547,18 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	var iplist []string
 
 	if data.Ip.ValueString() == "ip_is" {
-		data.IpIs.ElementsAs(ctx, iplist, false)
+		for _, ip := range data.IpIs.Elements() {
+			if strVal, ok := ip.(types.String); ok {
+				iplist = append(iplist, strVal.ValueString())
+			}
+		}
 		req.SetIpIs(iplist)
 	} else if data.Ip.ValueString() == "ip_is_not" {
-		data.IpIsNot.ElementsAs(ctx, iplist, false)
+		for _, ip := range data.IpIsNot.Elements() {
+			if strVal, ok := ip.(types.String); ok {
+				iplist = append(iplist, strVal.ValueString())
+			}
+		}
 		req.SetIpIsNot(iplist)
 	}
 
@@ -529,10 +566,18 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	var methodList []string
 
 	if data.Method.ValueString() == "method_is" {
-		data.MethodIs.ElementsAs(ctx, methodList, false)
+		for _, method := range data.MethodIs.Elements() {
+			if strVal, ok := method.(types.String); ok {
+				methodList = append(methodList, strVal.ValueString())
+			}
+		}
 		req.SetMethodIs(methodList)
 	} else if data.Method.ValueString() == "method_is_not" {
-		data.MethodIsNot.ElementsAs(ctx, methodList, false)
+		for _, method := range data.MethodIsNot.Elements() {
+			if strVal, ok := method.(types.String); ok {
+				methodList = append(methodList, strVal.ValueString())
+			}
+		}
 		req.SetMethodIsNot(methodList)
 	}
 
@@ -549,6 +594,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 
 	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
+
 	if data.FailoverMode.ValueBool() == true {
 		req.SetFailoverMode("true")
 	} else {
@@ -557,53 +603,80 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 
 	// Set strip headers.
 	var stripHeaders []string
-	data.ProxyStripHeaders.ElementsAs(ctx, stripHeaders, false)
+	for _, header := range data.ProxyStripHeaders.Elements() {
+		stripHeaders = append(stripHeaders, header.String())
+	}
 	req.SetProxyStripHeaders(stripHeaders)
 
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 
-	req.WafConfig.SetMode(data.WafConfig.Mode.ValueString())
-	req.WafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
+	wafConfig := openapi.NewWAFConfigWithDefaults()
+
+	wafConfig.SetMode(data.WafConfig.Mode.ValueString())
+	wafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
 
 	// Set WAF rules.
 	var allowRules []string
-	data.WafConfig.AllowRules.ElementsAs(ctx, allowRules, false)
-	req.WafConfig.SetAllowRules(allowRules)
+	for _, r := range data.WafConfig.AllowRules.Elements() {
+		if strVal, ok := r.(types.String); ok {
+			allowRules = append(allowRules, strVal.ValueString())
+		}
+	}
+	wafConfig.SetAllowRules(allowRules)
 
 	var allowIp []string
-	data.WafConfig.AllowIp.ElementsAs(ctx, allowIp, false)
-	req.WafConfig.SetAllowIp(allowIp)
+	for _, ip := range data.WafConfig.AllowIp.Elements() {
+		if strVal, ok := ip.(types.String); ok {
+			allowIp = append(allowIp, strVal.ValueString())
+		}
+	}
+	wafConfig.SetAllowIp(allowIp)
 
 	var blockIp []string
-	data.WafConfig.BlockIp.ElementsAs(ctx, blockIp, false)
-	req.WafConfig.SetBlockIp(blockIp)
+	for _, ip := range data.WafConfig.BlockIp.Elements() {
+		if strVal, ok := ip.(types.String); ok {
+			blockIp = append(blockIp, strVal.ValueString())
+		}
+	}
+	wafConfig.SetBlockIp(blockIp)
 
 	var blockUserAgent []string
-	data.WafConfig.BlockUa.ElementsAs(ctx, blockUserAgent, false)
-	req.WafConfig.SetBlockUa(blockUserAgent)
+	for _, ua := range data.WafConfig.BlockUa.Elements() {
+		if strVal, ok := ua.(types.String); ok {
+			blockUserAgent = append(blockUserAgent, strVal.ValueString())
+		}
+	}
+	wafConfig.SetBlockUa(blockUserAgent)
 
 	var blockReferer []string
-	data.WafConfig.BlockReferer.ElementsAs(ctx, blockReferer, false)
-	req.WafConfig.SetBlockReferer(blockReferer)
+	for _, referer := range data.WafConfig.BlockReferer.Elements() {
+		if strVal, ok := referer.(types.String); ok {
+			blockReferer = append(blockReferer, strVal.ValueString())
+		}
+	}
+	wafConfig.SetBlockReferer(blockReferer)
 
 	// httpbl dictionary support.
-	req.WafConfig.Httpbl.SetApiKey(data.WafConfig.Httpbl.ApiKey.ValueString())
-	req.WafConfig.Httpbl.SetBlockHarvester(data.WafConfig.Httpbl.BlockHarvester.ValueBool())
-	req.WafConfig.Httpbl.SetBlockSearchEngine(data.WafConfig.Httpbl.BlockSearchEngine.ValueBool())
-	req.WafConfig.Httpbl.SetBlockSpam(data.WafConfig.Httpbl.BlockSpam.ValueBool())
-	req.WafConfig.Httpbl.SetBlockSuspicious(data.WafConfig.Httpbl.BlockSuspicious.ValueBool())
-	req.WafConfig.Httpbl.SetHttpblEnabled(data.WafConfig.Httpbl.Enabled.ValueBool())
+	httpbl := openapi.NewWAFConfigHttpblWithDefaults()
+	httpbl.SetApiKey(data.WafConfig.Httpbl.ApiKey.ValueString())
+	httpbl.SetBlockHarvester(data.WafConfig.Httpbl.BlockHarvester.ValueBool())
+	httpbl.SetBlockSearchEngine(data.WafConfig.Httpbl.BlockSearchEngine.ValueBool())
+	httpbl.SetBlockSpam(data.WafConfig.Httpbl.BlockSpam.ValueBool())
+	httpbl.SetBlockSuspicious(data.WafConfig.Httpbl.BlockSuspicious.ValueBool())
+	httpbl.SetHttpblEnabled(data.WafConfig.Httpbl.Enabled.ValueBool())
+	wafConfig.SetHttpbl(*httpbl)
 
-	req.NotifyConfig.SetPeriod(data.NotifyConfig.Period.ValueString())
-	req.NotifyConfig.SetSlackWebhook(data.NotifyConfig.SlackWebhook.ValueString())
-
-	var originStatusCodes []string
-	for _, v := range data.NotifyConfig.OriginStatusCodes {
-		originStatusCodes = append(originStatusCodes, v.ValueString())
+	var emails []string
+	for _, email := range data.WafConfig.NotifyEmail.Elements() {
+		if e, ok := email.(types.String); ok {
+			emails = append(emails, e.ValueString())
+		}
 	}
-	req.NotifyConfig.SetOriginStatusCodes(originStatusCodes)
+    wafConfig.SetNotifyEmail(emails)
 
-	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, data.Organization.ValueString(), data.Project.ValueString()).RuleProxyRequest(req).Execute()
+	req.SetWafConfig(*wafConfig)
+
+	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleProxyRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to create rule proxy", err.Error())
@@ -611,16 +684,17 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	}
 
 	// API needs to return uuid.
-	data.Uuid = types.StringValue(api.Uuid)
+	data.Uuid = types.StringValue(api.GetUuid())
+	data.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
 
 func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *ruleProxyResourceModel) (diags diag.Diagnostics) {
-	if data.Uuid.IsNull() || data.Uuid.IsUnknown() {
+	if data.RuleId.IsNull() || data.RuleId.IsUnknown() {
 		diags.AddAttributeError(
-			path.Root("uuid"),
-			"Missing rule.uuid attribute",
+			path.Root("rule_id"),
+			"Missing rule.rule_id attribute",
 			"Unable to update unkown rule, please update terraform state.",
 		)
 		return
@@ -628,24 +702,38 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 
 	org := r.client.Organization
 	req := *openapi.NewRuleProxyRequestUpdateWithDefaults()
-	req.SetName(data.Name.ValueString())
 
 	var domains []string
-	data.Domain.ElementsAs(ctx, domains, false)
+	for _, domain := range data.Domain.Elements() {
+		if strVal, ok := domain.(types.String); ok {
+			domains = append(domains, strVal.ValueString())
+		}
+	}
 	req.SetDomain(domains)
 
 	var urls []string
-	data.Url.ElementsAs(ctx, urls, false)
+	for _, url := range data.Url.Elements() {
+		if strVal, ok := url.(types.String); ok {
+			urls = append(urls, strVal.ValueString())
+		}
+	}
 	req.SetUrl(urls)
 
 	req.SetCountry(data.Country.ValueString())
 	var countryList []string
-
 	if data.Country.ValueString() == "country_is" {
-		data.CountryIs.ElementsAs(ctx, countryList, false)
+		for _, country := range data.CountryIs.Elements() {
+			if strVal, ok := country.(types.String); ok {
+				countryList = append(countryList, strVal.ValueString())
+			}
+		}
 		req.SetCountryIs(countryList)
 	} else if data.Country.ValueString() == "country_is_not" {
-		data.CountryIsNot.ElementsAs(ctx, countryList, false)
+		for _, country := range data.CountryIsNot.Elements() {
+			if strVal, ok := country.(types.String); ok {
+				countryList = append(countryList, strVal.ValueString())
+			}
+		}
 		req.SetCountryIsNot(countryList)
 	}
 
@@ -653,10 +741,18 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	var iplist []string
 
 	if data.Ip.ValueString() == "ip_is" {
-		data.IpIs.ElementsAs(ctx, iplist, false)
+		for _, ip := range data.IpIs.Elements() {
+			if strVal, ok := ip.(types.String); ok {
+				iplist = append(iplist, strVal.ValueString())
+			}
+		}
 		req.SetIpIs(iplist)
 	} else if data.Ip.ValueString() == "ip_is_not" {
-		data.IpIsNot.ElementsAs(ctx, iplist, false)
+		for _, ip := range data.IpIsNot.Elements() {
+			if strVal, ok := ip.(types.String); ok {
+				iplist = append(iplist, strVal.ValueString())
+			}
+		}
 		req.SetIpIsNot(iplist)
 	}
 
@@ -664,10 +760,18 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	var methodList []string
 
 	if data.Method.ValueString() == "method_is" {
-		data.MethodIs.ElementsAs(ctx, methodList, false)
+		for _, method := range data.MethodIs.Elements() {
+			if strVal, ok := method.(types.String); ok {
+				methodList = append(methodList, strVal.ValueString())
+			}
+		}
 		req.SetMethodIs(methodList)
 	} else if data.Method.ValueString() == "method_is_not" {
-		data.MethodIsNot.ElementsAs(ctx, methodList, false)
+		for _, method := range data.MethodIsNot.Elements() {
+			if strVal, ok := method.(types.String); ok {
+				methodList = append(methodList, strVal.ValueString())
+			}
+		}
 		req.SetMethodIsNot(methodList)
 	}
 
@@ -685,7 +789,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
 
-	if data.FailoverMode.Equal(types.BoolValue(true)) {
+	if data.FailoverMode.ValueBool() == true {
 		req.SetFailoverMode("true")
 	} else {
 		req.SetFailoverMode("false")
@@ -693,53 +797,79 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 
 	// Set strip headers.
 	var stripHeaders []string
-	data.ProxyStripHeaders.ElementsAs(ctx, stripHeaders, false)
+	for _, header := range data.ProxyStripHeaders.Elements() {
+		stripHeaders = append(stripHeaders, header.String())
+	}
 	req.SetProxyStripHeaders(stripHeaders)
 
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 
-	req.WafConfig.SetMode(data.WafConfig.Mode.ValueString())
-	req.WafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
+	wafConfig := openapi.NewWAFConfigUpdateWithDefaults()
+
+	wafConfig.SetMode(data.WafConfig.Mode.ValueString())
+	wafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
 
 	// Set WAF rules.
 	var allowRules []string
-	data.WafConfig.AllowRules.ElementsAs(ctx, allowRules, false)
-	req.WafConfig.SetAllowRules(allowRules)
+	for _, r := range data.WafConfig.AllowRules.Elements() {
+		if strVal, ok := r.(types.String); ok {
+			allowRules = append(allowRules, strVal.ValueString())
+		}
+	}
+	wafConfig.SetAllowRules(allowRules)
 
 	var allowIp []string
-	data.WafConfig.AllowIp.ElementsAs(ctx, allowIp, false)
-	req.WafConfig.SetAllowIp(allowIp)
+	for _, ip := range data.WafConfig.AllowIp.Elements() {
+		if strVal, ok := ip.(types.String); ok {
+			allowIp = append(allowIp, strVal.ValueString())
+		}
+	}
+	wafConfig.SetAllowIp(allowIp)
 
 	var blockIp []string
-	data.WafConfig.BlockIp.ElementsAs(ctx, blockIp, false)
-	req.WafConfig.SetBlockIp(blockIp)
+	for _, ip := range data.WafConfig.BlockIp.Elements() {
+		if strVal, ok := ip.(types.String); ok {
+			blockIp = append(blockIp, strVal.ValueString())
+		}
+	}
+	wafConfig.SetBlockIp(blockIp)
 
 	var blockUserAgent []string
-	data.WafConfig.BlockUa.ElementsAs(ctx, blockUserAgent, false)
-	req.WafConfig.SetBlockUa(blockUserAgent)
+	for _, ua := range data.WafConfig.BlockUa.Elements() {
+		if strVal, ok := ua.(types.String); ok {
+			blockUserAgent = append(blockUserAgent, strVal.ValueString())
+		}
+	}
+	wafConfig.SetBlockUa(blockUserAgent)
 
 	var blockReferer []string
-	data.WafConfig.BlockReferer.ElementsAs(ctx, blockReferer, false)
-	req.WafConfig.SetBlockReferer(blockReferer)
+	for _, referer := range data.WafConfig.BlockReferer.Elements() {
+		if strVal, ok := referer.(types.String); ok {
+			blockReferer = append(blockReferer, strVal.ValueString())
+		}
+	}
+	wafConfig.SetBlockReferer(blockReferer)
 
 	// httpbl dictionary support.
-	req.WafConfig.Httpbl.SetApiKey(data.WafConfig.Httpbl.ApiKey.ValueString())
-	req.WafConfig.Httpbl.SetBlockHarvester(data.WafConfig.Httpbl.BlockHarvester.ValueBool())
-	req.WafConfig.Httpbl.SetBlockSearchEngine(data.WafConfig.Httpbl.BlockSearchEngine.ValueBool())
-	req.WafConfig.Httpbl.SetBlockSpam(data.WafConfig.Httpbl.BlockSpam.ValueBool())
-	req.WafConfig.Httpbl.SetBlockSuspicious(data.WafConfig.Httpbl.BlockSuspicious.ValueBool())
-	req.WafConfig.Httpbl.SetHttpblEnabled(data.WafConfig.Httpbl.Enabled.ValueBool())
+	httpbl := openapi.NewWAFConfigUpdateHttpblWithDefaults()
+	httpbl.SetApiKey(data.WafConfig.Httpbl.ApiKey.ValueString())
+	httpbl.SetBlockHarvester(data.WafConfig.Httpbl.BlockHarvester.ValueBool())
+	httpbl.SetBlockSearchEngine(data.WafConfig.Httpbl.BlockSearchEngine.ValueBool())
+	httpbl.SetBlockSpam(data.WafConfig.Httpbl.BlockSpam.ValueBool())
+	httpbl.SetBlockSuspicious(data.WafConfig.Httpbl.BlockSuspicious.ValueBool())
+	httpbl.SetHttpblEnabled(data.WafConfig.Httpbl.Enabled.ValueBool())
+	wafConfig.SetHttpbl(*httpbl)
 
-	req.NotifyConfig.SetPeriod(data.NotifyConfig.Period.ValueString())
-	req.NotifyConfig.SetSlackWebhook(data.NotifyConfig.SlackWebhook.ValueString())
-
-	var originStatusCodes []string
-	for _, v := range data.NotifyConfig.OriginStatusCodes {
-		originStatusCodes = append(originStatusCodes, v.ValueString())
+	var emails []string
+	for _, email := range data.WafConfig.NotifyEmail.Elements() {
+		if e, ok := email.(types.String); ok {
+			emails = append(emails, e.ValueString())
+		}
 	}
-	req.NotifyConfig.SetOriginStatusCodes(originStatusCodes)
+	wafConfig.SetNotifyEmail(emails)
+	req.SetWafConfig(*wafConfig)
 
-	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyUpdate(r.client.AuthContext, org, data.Project.ValueString(), data.Uuid.ValueString()).RuleProxyRequestUpdate(req).Execute()
+	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyUpdate(r.client.AuthContext, org, data.Project.ValueString(), data.RuleId.ValueString()).RuleProxyRequestUpdate(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to update rule proxy", err.Error())
@@ -750,7 +880,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *rul
 }
 
 func callRuleProxyDeleteAPI(ctx context.Context, r *ruleProxyResource, rule *ruleProxyResourceModel) (diags diag.Diagnostics) {
-	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
+	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing rule.uuid attribute",
@@ -760,7 +890,7 @@ func callRuleProxyDeleteAPI(ctx context.Context, r *ruleProxyResource, rule *rul
 	}
 
 	org := r.client.Organization
-	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to delete rule proxy", err.Error())
@@ -771,7 +901,7 @@ func callRuleProxyDeleteAPI(ctx context.Context, r *ruleProxyResource, rule *rul
 }
 
 func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, rule *ruleProxyResourceModel) (diags diag.Diagnostics) {
-	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
+	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing rule.uuid attribute",
@@ -781,9 +911,10 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, rule *ruleP
 	}
 
 	org := r.client.Organization
-	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
 
 	if err != nil {
+		diags.AddWarning("Details: ", fmt.Sprintf("Org: %v, Project: %v, Uuid: %v", org, rule.Project.ValueString(), rule.RuleId.ValueString()))
 		diags.AddError("Failed to read rule", err.Error())
 		return
 	}
@@ -946,6 +1077,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, rule *ruleP
 			} else {
 				rule.WafConfig.NotifyEmail = types.ListNull(types.StringType)
 			}
+
 			rule.WafConfig.NotifySlack = types.StringValue(wafconfig.GetNotifySlack())
 			if wafconfig.NotifySlackHitsRpm != nil {
 				rule.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(wafconfig.GetNotifySlackHitsRpm()))

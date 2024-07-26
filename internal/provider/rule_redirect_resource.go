@@ -37,6 +37,7 @@ type ruleRedirectResourceModel struct {
 	Organization   types.String `tfsdk:"organization"`
 	Name           types.String `tfsdk:"name"`
 	Uuid           types.String `tfsdk:"uuid"`
+	RuleId         types.String `tfsdk:"rule_id"`
 	Url            types.List   `tfsdk:"url"`
 	Domain         types.List   `tfsdk:"domain"`
 	Disabled       types.Bool   `tfsdk:"disabled"`
@@ -147,7 +148,7 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 
 	var state ruleRedirectResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	plan.Uuid = state.Uuid
+	plan.RuleId = state.RuleId
 
 	// Update API call logic
 	resp.Diagnostics.Append(callRuleRedirectUpdateAPI(ctx, r, &plan)...)
@@ -157,10 +158,6 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	resp.Diagnostics.Append(callRuleRedirectReadAPI(ctx, r, &plan)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
 
 	// Save updated plan into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -183,7 +180,7 @@ func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRe
 func (r *ruleRedirectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data ruleRedirectResourceModel
 	var err error
-	data.Project, data.Uuid, err = utils.GetRuleImportId(req.ID)
+	data.Project, data.RuleId, err = utils.GetRuleImportId(req.ID)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -192,6 +189,7 @@ func (r *ruleRedirectResource) ImportState(ctx context.Context, req resource.Imp
 		)
 		return
 	}
+
 	// Read API call logic
 	resp.Diagnostics.Append(callRuleRedirectReadAPI(ctx, r, &data)...)
 
@@ -209,51 +207,86 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
-	rule.Domain.ElementsAs(ctx, domains, false)
+	for _, domain := range rule.Domain.Elements() {
+		if strVal, ok := domain.(types.String); ok {
+			domains = append(domains, strVal.ValueString())
+		}
+	}
 	req.SetDomain(domains)
 
 	var urls []string
-	rule.Url.ElementsAs(ctx, urls, false)
+	for _, url := range rule.Url.Elements() {
+		if strVal, ok := url.(types.String); ok {
+			urls = append(urls, strVal.ValueString())
+		}
+	}
 	req.SetUrl(urls)
 
-	req.SetCountry(rule.Country.ValueString())
-	var countryList []string
-
-	if rule.Country.ValueString() == "country_is" {
-		rule.CountryIs.ElementsAs(ctx, countryList, false)
-		req.SetCountryIs(countryList)
-	} else if rule.Country.ValueString() == "country_is_not" {
-		rule.CountryIsNot.ElementsAs(ctx, countryList, false)
-		req.SetCountryIsNot(countryList)
+	if !rule.Country.IsNull() {
+		req.SetCountry(rule.Country.ValueString())
+		var countryList []string
+		if rule.Country.ValueString() == "country_is" {
+			for _, country := range rule.CountryIs.Elements() {
+				if strVal, ok := country.(types.String); ok {
+					countryList = append(countryList, strVal.ValueString())
+				}
+			}
+			req.SetCountryIs(countryList)
+		} else if rule.Country.ValueString() == "country_is_not" {
+			for _, country := range rule.CountryIsNot.Elements() {
+				if strVal, ok := country.(types.String); ok {
+					countryList = append(countryList, strVal.ValueString())
+				}
+			}
+			req.SetCountryIsNot(countryList)
+		}
 	}
 
-	req.SetIp(rule.Ip.ValueString())
-	var iplist []string
-
-	if rule.Ip.ValueString() == "ip_is" {
-		rule.IpIs.ElementsAs(ctx, iplist, false)
-		req.SetIpIs(iplist)
-	} else if rule.Ip.ValueString() == "ip_is_not" {
-		rule.IpIsNot.ElementsAs(ctx, iplist, false)
-		req.SetIpIsNot(iplist)
+	if (!rule.Ip.IsNull()) {
+		req.SetIp(rule.Ip.ValueString())
+		var iplist []string
+		if rule.Ip.ValueString() == "ip_is" {
+			for _, ip := range rule.IpIs.Elements() {
+				if strVal, ok := ip.(types.String); ok {
+					iplist = append(iplist, strVal.ValueString())
+				}
+			}
+			req.SetIpIs(iplist)
+		} else if rule.Ip.ValueString() == "ip_is_not" {
+			for _, ip := range rule.IpIsNot.Elements() {
+				if strVal, ok := ip.(types.String); ok {
+					iplist = append(iplist, strVal.ValueString())
+				}
+			}
+			req.SetIpIsNot(iplist)
+		}
 	}
 
-	req.SetMethod(rule.Method.ValueString())
-	var methodList []string
 
-	if rule.Method.ValueString() == "method_is" {
-		rule.MethodIs.ElementsAs(ctx, methodList, false)
-		req.SetMethodIs(methodList)
-	} else if rule.Method.ValueString() == "method_is_not" {
-		rule.MethodIsNot.ElementsAs(ctx, methodList, false)
-		req.SetMethodIsNot(methodList)
+	if (!rule.Method.IsNull()) {
+		req.SetMethod(rule.Method.ValueString())
+		var methodList []string
+		if rule.Method.ValueString() == "method_is" {
+			for _, method := range rule.MethodIs.Elements() {
+				if strVal, ok := method.(types.String); ok {
+					methodList = append(methodList, strVal.ValueString())
+				}
+			}
+			req.SetMethodIs(methodList)
+		} else if rule.Method.ValueString() == "method_is_not" {
+			for _, method := range rule.MethodIsNot.Elements() {
+				if strVal, ok := method.(types.String); ok {
+					methodList = append(methodList, strVal.ValueString())
+				}
+			}
+			req.SetMethodIsNot(methodList)
+		}
 	}
 
 	req.SetRedirectCode(rule.RedirectCode.ValueString())
 	req.SetRedirectTo(rule.RedirectTo.ValueString())
 
-	org := r.client.Organization
-	res, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectCreate(r.client.AuthContext, org, rule.Project.ValueString()).RuleRedirectRequest(req).Execute()
+	res, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).RuleRedirectRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to create rule", err.Error())
@@ -261,13 +294,15 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	}
 
 	rule.Uuid = types.StringValue(res.GetUuid())
+	rule.RuleId = types.StringValue(res.GetRuleId())
 
 	return
 }
 
+
 // callRuleRedirectReadAPI
 func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule *ruleRedirectResourceModel) (diags diag.Diagnostics) {
-	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
+	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing rule.uuid attribute",
@@ -276,8 +311,7 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 		return
 	}
 
-	org := r.client.Organization
-	api, res, err := r.client.Instance.RulesRedirectAPI.RulesRedirectRead(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	api, res, err := r.client.Instance.RulesRedirectAPI.RulesRedirectRead(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to read rule", err.Error())
@@ -349,7 +383,7 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 
 // callRuleRedirectUpdateAPI
 func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rule *ruleRedirectResourceModel) (diags diag.Diagnostics) {
-	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
+	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing rule.uuid attribute",
@@ -362,54 +396,78 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
-	rule.Domain.ElementsAs(ctx, domains, false)
+	for _, domain := range rule.Domain.Elements() {
+		if strVal, ok := domain.(types.String); ok {
+			domains = append(domains, strVal.ValueString())
+		}
+	}
 	req.SetDomain(domains)
 
 	var urls []string
-	rule.Url.ElementsAs(ctx, urls, false)
+	for _, url := range rule.Url.Elements() {
+		if strVal, ok := url.(types.String); ok {
+			urls = append(urls, strVal.ValueString())
+		}
+	}
 	req.SetUrl(urls)
 
 	req.SetCountry(rule.Country.ValueString())
 	var countryList []string
-
-	if rule.Country.ValueString() == "country_is" {
-		rule.CountryIs.ElementsAs(ctx, countryList, false)
-		req.SetCountryIs(countryList)
-	} else if rule.Country.ValueString() == "country_is_not" {
-		rule.CountryIsNot.ElementsAs(ctx, countryList, false)
-		req.SetCountryIsNot(countryList)
+	for _, country := range rule.CountryIs.Elements() {
+		if strVal, ok := country.(types.String); ok {
+			countryList = append(countryList, strVal.ValueString())
+		}
 	}
+	req.SetCountryIs(countryList)
+	countryList = []string{}
+	for _, country := range rule.CountryIsNot.Elements() {
+		if strVal, ok := country.(types.String); ok {
+			countryList = append(countryList, strVal.ValueString())
+		}
+	}
+	req.SetCountryIsNot(countryList)
 
 	req.SetIp(rule.Ip.ValueString())
 	var iplist []string
-
-	if rule.Ip.ValueString() == "ip_is" {
-		rule.IpIs.ElementsAs(ctx, iplist, false)
-		req.SetIpIs(iplist)
-	} else if rule.Ip.ValueString() == "ip_is_not" {
-		rule.IpIsNot.ElementsAs(ctx, iplist, false)
-		req.SetIpIsNot(iplist)
+	for _, ip := range rule.IpIs.Elements() {
+		if strVal, ok := ip.(types.String); ok {
+			iplist = append(iplist, strVal.ValueString())
+		}
 	}
+	req.SetIpIs(iplist)
+	iplist = []string{}
+	for _, ip := range rule.IpIsNot.Elements() {
+		if strVal, ok := ip.(types.String); ok {
+			iplist = append(iplist, strVal.ValueString())
+		}
+	}
+	req.SetIpIsNot(iplist)
 
 	req.SetMethod(rule.Method.ValueString())
 	var methodList []string
-
-	if rule.Method.ValueString() == "method_is" {
-		rule.MethodIs.ElementsAs(ctx, methodList, false)
-		req.SetMethodIs(methodList)
-	} else if rule.Method.ValueString() == "method_is_not" {
-		rule.MethodIsNot.ElementsAs(ctx, methodList, false)
-		req.SetMethodIsNot(methodList)
+	for _, method := range rule.MethodIs.Elements() {
+		if strVal, ok := method.(types.String); ok {
+			methodList = append(methodList, strVal.ValueString())
+		}
 	}
+	req.SetMethodIs(methodList)
+	methodList = []string{}
+	for _, method := range rule.MethodIsNot.Elements() {
+		if strVal, ok := method.(types.String); ok {
+			methodList = append(methodList, strVal.ValueString())
+		}
+	}
+	req.SetMethodIsNot(methodList)
+
 
 	req.SetRedirectCode(rule.RedirectCode.ValueString())
 	req.SetRedirectTo(rule.RedirectTo.ValueString())
 
-	org := r.client.Organization
-	_, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectUpdate(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).RuleRedirectRequestUpdate(req).Execute()
+	_, res, err := r.client.Instance.RulesRedirectAPI.RulesRedirectUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).RuleRedirectRequestUpdate(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to update rule", err.Error())
+		diags.AddError("Response", fmt.Sprintf("%v", res))
 		return
 	}
 
@@ -418,7 +476,7 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 
 // callRuleRedirectDeleteAPI calls the delete API endpoint with for a given resource.
 func callRuleRedirectDeleteAPI(ctx context.Context, r *ruleRedirectResource, rule *ruleRedirectResourceModel) (diags diag.Diagnostics) {
-	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
+	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing rule.uuid attribute",
@@ -427,7 +485,7 @@ func callRuleRedirectDeleteAPI(ctx context.Context, r *ruleRedirectResource, rul
 	}
 
 	org := r.client.Organization
-	_, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to delete rule", err.Error())
