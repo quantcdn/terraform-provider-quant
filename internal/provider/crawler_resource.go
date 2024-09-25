@@ -180,7 +180,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 
 	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
 	if err != nil {
-		diags.AddError("Unable to load crawler", fmt.Sprintf("Error: ", err.Error()))
+		diags.AddError("Unable to load crawler", fmt.Sprintf("Error: %s", err.Error()))
 		return
 	}
 

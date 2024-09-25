@@ -25,24 +25,3 @@ func TestReadProject(t *testing.T) {
 	assert.Equal(t, "api-test", project.GetName())
 	assert.Equal(t, res.StatusCode, 200)
 }
-
-// func TestCreateProject(t *testing.T) {
-// 	bearer := os.Getenv("QUANT_BEARER")
-
-// 	cfg := openapi.NewConfiguration()
-// 	client := openapi.NewAPIClient(cfg)
-// 	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
-
-// 	req := *openapi.NewProjectRequestWithDefaults()
-// 	req.SetName("tf test 7")
-
-// 	p, res, err := client.ProjectsAPI.ProjectsCreate(ctx, "quant").ProjectRequest(req).Execute()
-
-// 	t.Logf("Response: %v", res)
-
-// 	if err != nil {
-// 		t.Fatalf("unexpected error, %v", err)
-// 	}
-
-// 	t.Logf("Project: %v", p)
-// }
