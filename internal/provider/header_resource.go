@@ -18,11 +18,10 @@ import (
 )
 
 var (
-	_ resource.Resource              = (*headerResource)(nil)
-	_ resource.ResourceWithConfigure = (*headerResource)(nil)
+	_ resource.Resource                = (*headerResource)(nil)
+	_ resource.ResourceWithConfigure   = (*headerResource)(nil)
 	_ resource.ResourceWithImportState = (*headerResource)(nil)
 )
-
 
 func NewHeaderResource() resource.Resource {
 	return &headerResource{}
@@ -33,8 +32,8 @@ type headerResource struct {
 }
 
 type headerResourceModel struct {
-	Id types.String `tfsdk:"id"`
-	Headers types.Map `tfsdk:"headers"`
+	Id      types.String `tfsdk:"id"`
+	Headers types.Map    `tfsdk:"headers"`
 	Project types.String `tfsdk:"project"`
 }
 
@@ -53,7 +52,7 @@ func (r *headerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			},
 			"headers": schema.MapAttribute{
 				ElementType: types.StringType,
-				Required: true,
+				Required:    true,
 				Description: "HTTP headers to be set for the project",
 			},
 		},
@@ -208,7 +207,7 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 	}
 
 	a := make(map[string]attr.Value)
-	for k, v := range(api) {
+	for k, v := range api {
 		a[k] = types.StringValue(v)
 	}
 
