@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	_ resource.Resource              = (*projectResource)(nil)
-	_ resource.ResourceWithConfigure = (*projectResource)(nil)
+	_ resource.Resource                = (*projectResource)(nil)
+	_ resource.ResourceWithConfigure   = (*projectResource)(nil)
 	_ resource.ResourceWithImportState = (*projectResource)(nil)
 )
 
@@ -63,7 +63,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	resp.Diagnostics.Append(callProjectCreateAPI(ctx, r, &data)...)
 
-	if (resp.Diagnostics.HasError()) {
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
