@@ -1,27 +1,69 @@
 package provider_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
-	openapi "github.com/quantcdn/quant-admin-go"
-	"github.com/stretchr/testify/assert"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestReadProject(t *testing.T) {
+func TestProjectResource(t *testing.T) {
 	bearer := os.Getenv("QUANT_BEARER")
-
-	cfg := openapi.NewConfiguration()
-	client := openapi.NewAPIClient(cfg)
-	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
-
-	project, res, err := client.ProjectsAPI.ProjectsRead(ctx, "quant", "api-test").Execute()
-
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
+	if bearer == "" {
+		t.Skip("QUANT_BEARER not set")
 	}
 
-	assert.Equal(t, "api-test", project.GetName())
-	assert.Equal(t, res.StatusCode, 200)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: testProjectResourceConfig("test-project", false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_project.test", "name", "test-project"),
+					resource.TestCheckResourceAttr("quant_project.test", "allow_query_params", "false"),
+					resource.TestCheckResourceAttr("quant_project.test", "region", "au"),
+				),
+			},
+			// Update and Read testing
+			{
+				Config: testProjectResourceConfig("test-project-updated", true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_project.test", "name", "test-project-updated"),
+					resource.TestCheckResourceAttr("quant_project.test", "allow_query_params", "true"),
+					resource.TestCheckResourceAttr("quant_project.test", "region", "au"),
+				),
+			},
+			// Import testing
+			{
+				ResourceName:      "quant_project.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// Ignore auth fields as they're not returned by the API
+				ImportStateVerifyIgnore: []string{
+					"basic_auth_username",
+					"basic_auth_password",
+					"basic_auth_preview_only",
+				},
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func testProjectResourceConfig(name string, allowQueryParams bool) string {
+	return `
+resource "quant_project" "test" {
+  name = "` + name + `"
+  allow_query_params = ` + boolToString(allowQueryParams) + `
+  region = "au"
+}
+`
+}
+
+func boolToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
