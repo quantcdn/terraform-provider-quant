@@ -18,11 +18,10 @@ import (
 )
 
 var (
-	_ resource.Resource              = (*headerResource)(nil)
-	_ resource.ResourceWithConfigure = (*headerResource)(nil)
+	_ resource.Resource                = (*headerResource)(nil)
+	_ resource.ResourceWithConfigure   = (*headerResource)(nil)
 	_ resource.ResourceWithImportState = (*headerResource)(nil)
 )
-
 
 func NewHeaderResource() resource.Resource {
 	return &headerResource{}
@@ -33,8 +32,8 @@ type headerResource struct {
 }
 
 type headerResourceModel struct {
-	Id types.String `tfsdk:"id"`
-	Headers types.Map `tfsdk:"headers"`
+	Id      types.String `tfsdk:"id"`
+	Headers types.Map    `tfsdk:"headers"`
 	Project types.String `tfsdk:"project"`
 }
 
@@ -53,7 +52,7 @@ func (r *headerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			},
 			"headers": schema.MapAttribute{
 				ElementType: types.StringType,
-				Required: true,
+				Required:    true,
 				Description: "HTTP headers to be set for the project",
 			},
 		},
@@ -183,8 +182,14 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource 
 		req.Headers = make(map[string]string)
 	}
 
-	for k, v := range resource.Headers.Elements() {
-		req.Headers[k] = v.String()
+	headers := resource.Headers.Elements()
+	for k, v := range headers {
+		strVal, ok := v.(types.String)
+		if !ok {
+			diags.AddError("Invalid header value type", "Expected string value")
+			return
+		}
+		req.Headers[k] = strVal.ValueString()
 	}
 
 	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersCreateRequest(req).Execute()
@@ -203,12 +208,12 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 	api, _, err := h.client.Instance.HeadersAPI.HeadersList(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).Execute()
 
 	if err != nil {
-		diags.AddError("Error retrieving headers", err.Error())
+		diags.AddError("Error getting custom headers", err.Error())
 		return
 	}
 
 	a := make(map[string]attr.Value)
-	for k, v := range(api) {
+	for k, v := range api {
 		a[k] = types.StringValue(v)
 	}
 
@@ -226,9 +231,12 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 
 // To delete headers we remove just update with an empty map.
 func callHeaderDeleteAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *openapi.NewHeadersCreateRequestWithDefaults()
-	req.Headers = make(map[string]string, 0)
-	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersCreateRequest(req).Execute()
+	req := *openapi.NewHeadersDeleteRequestWithDefaults()
+	req.Headers = []string{}
+	for k := range resource.Headers.Elements() {
+		req.Headers = append(req.Headers, k)
+	}
+	_, _, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersDeleteRequest(req).Execute()
 	if err != nil {
 		diags.AddError("Error removing custom headers", err.Error())
 		return
