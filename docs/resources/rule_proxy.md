@@ -13,7 +13,7 @@ resource "quant_rule_proxy" "test" {
   host = "backend.example.com"
   waf_enabled = true
   waf_config {
-    mode = "detection"
+    mode = "report"
     paranoia_level = 1
     allow_rules = []
     block_ip = []
@@ -30,7 +30,7 @@ resource "quant_rule_proxy" "test" {
 ## Argument Reference
 
 - `name` - (Required) The name of the rule.
-- `project` - (Required) The name of the project.
+- `project` - (Required) The machine name of the project.
 - `domain` - (Required) The domain to apply the rule to.
 - `to` - (Required) The target URL to proxy requests to.
 - `host` - (Required) The host to apply the rule to.

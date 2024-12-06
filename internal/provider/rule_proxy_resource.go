@@ -7,6 +7,7 @@ import (
 	"terraform-provider-quant/internal/resource_rule_proxy"
 	"terraform-provider-quant/internal/utils"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -339,9 +340,216 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
-	// API needs to return uuid.
+	// Set required fields from API response
 	data.Uuid = types.StringValue(api.GetUuid())
 	data.RuleId = types.StringValue(api.GetRuleId())
+	data.Organization = types.StringValue(r.client.Organization)
+	data.Action = types.StringValue("proxy")
+	data.Weight = types.Int64Value(0)
+	data.Name = types.StringValue(api.GetName())
+	data.CookieName = types.StringValue(api.GetOnlyWithCookie())
+	data.Rule = types.StringNull()
+
+	// Convert API domain list to types.List
+	domainList, diag := types.ListValueFrom(ctx, types.StringType, api.Domain)
+	if diag.HasError() {
+		diags.Append(diag...)
+		return
+	}
+	data.Domain = domainList
+
+	// Convert API URL list to types.List
+	urlList, diag := types.ListValueFrom(ctx, types.StringType, api.Url)
+	if diag.HasError() {
+		diags.Append(diag...)
+		return
+	}
+	data.Url = urlList
+
+	// Initialize empty lists for optional fields
+	emptyStringList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+
+	// Handle Method fields
+	if api.Method != nil && *api.Method != "" {
+		data.Method = types.StringValue(*api.Method)
+		if len(api.MethodIs) > 0 {
+			data.MethodIs, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIs)
+		} else {
+			data.MethodIs = emptyStringList
+		}
+		if len(api.MethodIsNot) > 0 {
+			data.MethodIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIsNot)
+		} else {
+			data.MethodIsNot = emptyStringList
+		}
+	} else {
+		data.Method = types.StringNull()
+		data.MethodIs = emptyStringList
+		data.MethodIsNot = emptyStringList
+	}
+
+	// Handle Country fields
+	if api.Country != nil && *api.Country != "" {
+		data.Country = types.StringValue(*api.Country)
+		if len(api.CountryIs) > 0 {
+			data.CountryIs, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIs)
+		} else {
+			data.CountryIs = emptyStringList
+		}
+		if len(api.CountryIsNot) > 0 {
+			data.CountryIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIsNot)
+		} else {
+			data.CountryIsNot = emptyStringList
+		}
+	} else {
+		data.Country = types.StringNull()
+		data.CountryIs = emptyStringList
+		data.CountryIsNot = emptyStringList
+	}
+
+	// Handle IP fields
+	if api.Ip != nil && *api.Ip != "" {
+		data.Ip = types.StringValue(*api.Ip)
+		if len(api.IpIs) > 0 {
+			data.IpIs, _ = types.ListValueFrom(ctx, types.StringType, api.IpIs)
+		} else {
+			data.IpIs = emptyStringList
+		}
+		if len(api.IpIsNot) > 0 {
+			data.IpIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.IpIsNot)
+		} else {
+			data.IpIsNot = emptyStringList
+		}
+	} else {
+		data.Ip = types.StringNull()
+		data.IpIs = emptyStringList
+		data.IpIsNot = emptyStringList
+	}
+
+	// Set proxy configuration
+	data.Proxy.AuthUser = types.StringValue(api.ActionConfig.GetAuthUser())
+	data.Proxy.AuthPass = types.StringValue(api.ActionConfig.GetAuthPass())
+	data.Proxy.CacheLifetime = types.Int64Value(int64(api.ActionConfig.GetCacheLifetime()))
+	data.Proxy.DisableSslVerify = types.BoolValue(api.ActionConfig.GetDisableSslVerify())
+	data.Proxy.OnlyProxy404 = types.BoolValue(api.ActionConfig.GetOnlyProxy404())
+
+	// Set WAF configuration
+	data.WafConfig.NotifySlack = types.StringValue(api.GetActionConfig().WafConfig.GetNotifySlack())
+	data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(api.GetActionConfig().WafConfig.GetNotifySlackHitsRpm()))
+	data.WafConfig.NotifySlackRpm = types.Int64Value(int64(api.GetActionConfig().WafConfig.GetNotifySlackRpm()))
+	data.WafConfig.RequestHeaderName = types.StringValue(api.GetActionConfig().WafConfig.GetRequestHeaderName())
+
+	if len(api.GetActionConfig().WafConfig.GetThresholds()) > 0 {
+		thresholdObjType := types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"cooldown":     types.Int64Type,
+				"hits":         types.Int64Type,
+				"minutes":      types.Int64Type,
+				"mode":         types.StringType,
+				"notify_slack": types.StringType,
+				"rps":          types.Int64Type,
+				"type":         types.StringType,
+				"value":        types.StringType,
+			},
+		}
+		data.WafConfig.Thresholds, _ = types.ListValueFrom(ctx, thresholdObjType, api.GetActionConfig().WafConfig.GetThresholds())
+	} else {
+		data.WafConfig.Thresholds = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"cooldown":     types.Int64Type,
+				"hits":         types.Int64Type,
+				"minutes":      types.Int64Type,
+				"mode":         types.StringType,
+				"notify_slack": types.StringType,
+				"rps":          types.Int64Type,
+				"type":         types.StringType,
+				"value":        types.StringType,
+			},
+		})
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetBlockIp()) > 0 {
+		data.WafConfig.BlockIp, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockIp())
+	} else {
+		data.WafConfig.BlockIp = emptyStringList
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetBlockUa()) > 0 {
+		data.WafConfig.BlockUa, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockUa())
+	} else {
+		data.WafConfig.BlockUa = emptyStringList
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetBlockReferer()) > 0 {
+		data.WafConfig.BlockReferer, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockReferer())
+	} else {
+		data.WafConfig.BlockReferer = emptyStringList
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetNotifyEmail()) > 0 {
+		data.WafConfig.NotifyEmail, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetNotifyEmail())
+	} else {
+		data.WafConfig.NotifyEmail = emptyStringList
+	}
+
+	// Set notification config
+	if api.GetActionConfig().NotifyConfig != nil {
+		if len(api.GetActionConfig().NotifyConfig.GetOriginStatusCodes()) > 0 {
+			data.NotifyConfig.OriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().NotifyConfig.GetOriginStatusCodes())
+		} else {
+			data.NotifyConfig.OriginStatusCodes = emptyStringList
+		}
+		data.NotifyConfig.Period = types.StringValue(api.GetActionConfig().NotifyConfig.GetPeriod())
+		data.NotifyConfig.SlackWebhook = types.StringValue(api.GetActionConfig().NotifyConfig.GetSlackWebhook())
+	} else {
+		data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{}
+		data.NotifyConfig.OriginStatusCodes = emptyStringList
+		data.NotifyConfig.Period = types.StringNull()
+		data.NotifyConfig.SlackWebhook = types.StringNull()
+	}
+
+	// Set failover config
+	if api.GetActionConfig().FailoverMode != nil {
+		data.Failover.FailoverMode = types.StringValue(fmt.Sprintf("%v", *api.GetActionConfig().FailoverMode))
+		data.Failover.FailoverLifetime = types.StringValue(*api.GetActionConfig().FailoverLifetime)
+		if len(api.GetActionConfig().FailoverOriginStatusCodes) > 0 {
+			data.Failover.FailoverOriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().FailoverOriginStatusCodes)
+		} else {
+			data.Failover.FailoverOriginStatusCodes = emptyStringList
+		}
+	} else {
+		data.Failover = resource_rule_proxy.FailoverValue{}
+		data.Failover.FailoverMode = types.StringNull()
+		data.Failover.FailoverLifetime = types.StringNull()
+		data.Failover.FailoverOriginStatusCodes = emptyStringList
+	}
+
+	// Initialize empty lists for optional fields
+	data.Failover = resource_rule_proxy.FailoverValue{
+		FailoverMode:              types.StringValue("false"),
+		FailoverLifetime:          types.StringValue(""),
+		FailoverOriginStatusCodes: types.ListValueMust(types.StringType, []attr.Value{}),
+	}
+
+	data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{
+		OriginStatusCodes: types.ListValueMust(types.StringType, []attr.Value{}),
+		Period:            types.StringValue(""),
+		SlackWebhook:      types.StringValue(""),
+	}
+
+	thresholdObjType := types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"cooldown":     types.Int64Type,
+			"hits":         types.Int64Type,
+			"minutes":      types.Int64Type,
+			"mode":         types.StringType,
+			"notify_slack": types.StringType,
+			"rps":          types.Int64Type,
+			"type":         types.StringType,
+			"value":        types.StringType,
+		},
+	}
+	data.WafConfig.Thresholds = types.ListValueMust(thresholdObjType, []attr.Value{})
 
 	return
 }
@@ -532,6 +740,13 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
+	// After successful update, read the resource to ensure state is consistent
+	readDiags := callRuleProxyReadAPI(ctx, r, data)
+	if readDiags.HasError() {
+		diags.Append(readDiags...)
+		return
+	}
+
 	return
 }
 
@@ -575,191 +790,215 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		return
 	}
 
-	data.Name = types.StringValue(api.GetName())
+	// Set required fields from API response
 	data.Uuid = types.StringValue(api.GetUuid())
-	domains, d := types.ListValueFrom(ctx, types.StringType, api.GetDomain())
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	data.Domain = domains
-	urls, d := types.ListValueFrom(ctx, types.StringType, api.GetUrl())
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	data.Url = urls
-	data.Ip = types.StringValue(api.GetIp())
-	ips, d := types.ListValueFrom(ctx, types.StringType, api.GetIpIs())
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	data.IpIs = types.List(ips)
-	ipIsNot, d := types.ListValueFrom(ctx, types.StringType, api.GetIpIsNot())
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	data.IpIsNot = types.List(ipIsNot)
-	data.Country = types.StringValue(api.GetCountry())
-	countries, d := types.ListValueFrom(ctx, types.StringType, api.GetCountryIs())
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	data.CountryIs = types.List(countries)
-	countriesNot, d := types.ListValueFrom(ctx, types.StringType, api.GetCountryIsNot())
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	data.CountryIsNot = types.List(countriesNot)
+	data.RuleId = types.StringValue(api.GetRuleId())
+	data.Organization = types.StringValue(r.client.Organization)
+	data.Action = types.StringValue("proxy")
+	data.Weight = types.Int64Value(0)
+	data.Name = types.StringValue(api.GetName())
+	data.CookieName = types.StringValue(api.GetOnlyWithCookie())
+	data.Rule = types.StringNull()
 
-	data.Method = types.StringValue(api.GetMethod())
-	methods, d := types.ListValueFrom(ctx, types.StringType, api.GetMethodIs())
-	if d.HasError() {
-		diags.Append(d...)
+	// Convert API domain list to types.List
+	domainList, diag := types.ListValueFrom(ctx, types.StringType, api.Domain)
+	if diag.HasError() {
+		diags.Append(diag...)
 		return
 	}
-	data.MethodIs = types.List(methods)
-	methodIsNot, d := types.ListValueFrom(ctx, types.StringType, api.GetMethodIsNot())
-	if d.HasError() {
-		diags.Append(d...)
+	data.Domain = domainList
+
+	// Convert API URL list to types.List
+	urlList, diag := types.ListValueFrom(ctx, types.StringType, api.Url)
+	if diag.HasError() {
+		diags.Append(diag...)
 		return
 	}
-	data.MethodIsNot = types.List(methodIsNot)
+	data.Url = urlList
 
-	// Rule specific fields.
-	actionConfig, ok := api.GetActionConfigOk()
+	// Initialize empty lists for optional fields
+	emptyStringList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
 
-	if ok {
-		data.Proxy.AuthPass = types.StringValue(actionConfig.GetAuthPass())
-		data.Proxy.AuthUser = types.StringValue(actionConfig.GetAuthUser())
-		if actionConfig.CacheLifetime != nil {
-			data.Proxy.CacheLifetime = types.Int64Value(int64(actionConfig.GetCacheLifetime()))
+	// Handle Method fields
+	if api.Method != nil && *api.Method != "" {
+		data.Method = types.StringValue(*api.Method)
+		if len(api.MethodIs) > 0 {
+			data.MethodIs, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIs)
+		} else {
+			data.MethodIs = emptyStringList
 		}
-		data.Proxy.DisableSslVerify = types.BoolValue(actionConfig.GetDisableSslVerify())
-		data.Failover.FailoverMode = types.StringValue(fmt.Sprintf("%v", actionConfig.GetFailoverMode()))
-		if actionConfig.FailoverLifetime != nil {
-			data.Failover.FailoverLifetime = types.StringValue(actionConfig.GetFailoverLifetime())
+		if len(api.MethodIsNot) > 0 {
+			data.MethodIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIsNot)
+		} else {
+			data.MethodIsNot = emptyStringList
 		}
-		failoverCodes, d := types.ListValueFrom(ctx, types.StringType, actionConfig.GetFailoverOriginStatusCodes())
-		if d.HasError() {
-			diags.Append(d...)
-			return
-		}
-		data.Failover.FailoverOriginStatusCodes = failoverCodes
-		data.Failover.FailoverOriginTtfb = types.StringValue(actionConfig.GetFailoverOriginTtfb())
-		data.Proxy.Host = types.StringValue(actionConfig.GetHost())
-		data.Proxy.OnlyProxy404 = types.BoolValue(actionConfig.GetOnlyProxy404())
-		data.Proxy.To = types.StringValue(actionConfig.GetTo())
-
-		proxyStripHeaders, d := types.ListValueFrom(ctx, types.StringType, actionConfig.GetProxyStripHeaders())
-		data.Proxy.ProxyStripHeaders = proxyStripHeaders
-		injectHeaders, d := types.MapValueFrom(ctx, types.StringType, actionConfig.GetInjectHeaders())
-		data.Proxy.InjectHeaders = injectHeaders
-		proxyStripRequestHeaders, d := types.ListValueFrom(ctx, types.StringType, actionConfig.GetProxyStripRequestHeaders())
-		data.Proxy.ProxyStripRequestHeaders = proxyStripRequestHeaders
-
-		// WafConfig specific read.
-		wafconfig, ok := actionConfig.GetWafConfigOk()
-		if !ok {
-			diags.AddError("Failed to read WafConfig", "WafConfig is missing")
-			return
-		}
-		if ok {
-			if len(wafconfig.AllowRules) > 0 {
-				allowRules, _ := types.ListValueFrom(ctx, types.StringType, wafconfig.GetAllowRules())
-				data.WafConfig.AllowRules = allowRules
-			} else {
-				data.WafConfig.AllowRules = types.ListNull(types.StringType)
-			}
-			if len(wafconfig.AllowIp) > 0 {
-				allowIp, _ := types.ListValueFrom(ctx, types.StringType, wafconfig.GetAllowIp())
-				data.WafConfig.AllowIp = allowIp
-			} else {
-				data.WafConfig.AllowIp = types.ListNull(types.StringType)
-			}
-			if len(wafconfig.BlockIp) > 0 {
-				blockIp, _ := types.ListValueFrom(ctx, types.StringType, wafconfig.GetBlockIp())
-				data.WafConfig.BlockIp = blockIp
-			} else {
-				data.WafConfig.BlockIp = types.ListNull(types.StringType)
-			}
-			if len(wafconfig.BlockReferer) > 0 {
-				blockReferer, _ := types.ListValueFrom(ctx, types.StringType, wafconfig.GetBlockReferer())
-				data.WafConfig.BlockReferer = blockReferer
-			} else {
-				data.WafConfig.BlockReferer = types.ListNull(types.StringType)
-			}
-			if len(wafconfig.BlockUa) > 0 {
-				blockUa, _ := types.ListValueFrom(ctx, types.StringType, wafconfig.GetBlockUa())
-				data.WafConfig.BlockUa = blockUa
-			} else {
-				data.WafConfig.BlockUa = types.ListNull(types.StringType)
-			}
-
-			// httpbl, ok := wafconfig.GetHttpblOk()
-			// if ok {
-			// 	rule.WafConfig.Httpbl.ApiKey = types.StringValue(httpbl.GetApiKey())
-			// 	rule.WafConfig.Httpbl.BlockHarvester = types.BoolValue(httpbl.GetBlockHarvester())
-			// 	rule.WafConfig.Httpbl.BlockSearchEngine = types.BoolValue(httpbl.GetBlockSearchEngine())
-			// 	rule.WafConfig.Httpbl.BlockSpam = types.BoolValue(httpbl.GetBlockSpam())
-			// 	rule.WafConfig.Httpbl.BlockSuspicious = types.BoolValue(httpbl.GetBlockSuspicious())
-			// 	rule.WafConfig.Httpbl.Enabled = types.BoolValue(httpbl.GetHttpblEnabled())
-			// } else {
-			// 	rule.WafConfig.Httpbl.Enabled = types.BoolValue(false)
-			// 	rule.WafConfig.Httpbl.ApiKey = types.StringValue("")
-			// 	rule.WafConfig.Httpbl.BlockHarvester = types.BoolValue(false)
-			// 	rule.WafConfig.Httpbl.BlockSearchEngine = types.BoolValue(false)
-			// 	rule.WafConfig.Httpbl.BlockSpam = types.BoolValue(false)
-			// 	rule.WafConfig.Httpbl.BlockSuspicious = types.BoolValue(false)
-			// }
-			data.WafConfig.IpRatelimitMode = types.StringValue(wafconfig.GetIpRatelimitMode())
-			if wafconfig.IpRatelimitCooldown != nil {
-				data.WafConfig.IpRatelimitCooldown = types.Int64Value(int64(wafconfig.GetIpRatelimitCooldown()))
-			}
-			if wafconfig.IpRatelimitRps != nil {
-				data.WafConfig.IpRatelimitRps = types.Int64Value(int64(wafconfig.GetIpRatelimitRps()))
-			}
-			data.WafConfig.Mode = types.StringValue(wafconfig.GetMode())
-
-			// NotifyEmail is a list of strings, so we need to convert it.
-			if len(wafconfig.NotifyEmail) > 0 {
-				notifyEmail, _ := types.ListValueFrom(ctx, types.StringType, wafconfig.GetNotifyEmail())
-				data.WafConfig.NotifyEmail = notifyEmail
-			} else {
-				data.WafConfig.NotifyEmail = types.ListNull(types.StringType)
-			}
-
-			data.WafConfig.NotifySlack = types.StringValue(wafconfig.GetNotifySlack())
-			if wafconfig.NotifySlackHitsRpm != nil {
-				data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(wafconfig.GetNotifySlackHitsRpm()))
-			}
-			if wafconfig.NotifySlackRpm != nil {
-				data.WafConfig.NotifySlackRpm = types.Int64Value(int64(wafconfig.GetNotifySlackRpm()))
-			}
-			if wafconfig.ParanoiaLevel != nil {
-				data.WafConfig.ParanoiaLevel = types.Int64Value(int64(wafconfig.GetParanoiaLevel()))
-			}
-
-			if wafconfig.RequestHeaderRatelimitCooldown != nil {
-				data.WafConfig.RequestHeaderRatelimitCooldown = types.Int64Value(int64(wafconfig.GetRequestHeaderRatelimitCooldown()))
-			}
-			if wafconfig.RequestHeaderRatelimitRps != nil {
-				data.WafConfig.RequestHeaderRatelimitRps = types.Int64Value(int64(wafconfig.GetRequestHeaderRatelimitRps()))
-			}
-			if wafconfig.WafRatelimitCooldown != nil {
-				data.WafConfig.WafRatelimitCooldown = types.Int64Value(int64(wafconfig.GetWafRatelimitCooldown()))
-			}
-			if wafconfig.WafRatelimitRps != nil {
-				data.WafConfig.WafRatelimitRps = types.Int64Value(int64(wafconfig.GetWafRatelimitRps()))
-			}
-			data.WafConfig.RequestHeaderName = types.StringValue(wafconfig.GetRequestHeaderName())
-			data.WafConfig.RequestHeaderRatelimitMode = types.StringValue(wafconfig.GetRequestHeaderRatelimitMode())
-			data.WafConfig.WafRatelimitMode = types.StringValue(wafconfig.GetWafRatelimitMode())
-		}
+	} else {
+		data.Method = types.StringNull()
+		data.MethodIs = emptyStringList
+		data.MethodIsNot = emptyStringList
 	}
+
+	// Handle Country fields
+	if api.Country != nil && *api.Country != "" {
+		data.Country = types.StringValue(*api.Country)
+		if len(api.CountryIs) > 0 {
+			data.CountryIs, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIs)
+		} else {
+			data.CountryIs = emptyStringList
+		}
+		if len(api.CountryIsNot) > 0 {
+			data.CountryIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIsNot)
+		} else {
+			data.CountryIsNot = emptyStringList
+		}
+	} else {
+		data.Country = types.StringNull()
+		data.CountryIs = emptyStringList
+		data.CountryIsNot = emptyStringList
+	}
+
+	// Handle IP fields
+	if api.Ip != nil && *api.Ip != "" {
+		data.Ip = types.StringValue(*api.Ip)
+		if len(api.IpIs) > 0 {
+			data.IpIs, _ = types.ListValueFrom(ctx, types.StringType, api.IpIs)
+		} else {
+			data.IpIs = emptyStringList
+		}
+		if len(api.IpIsNot) > 0 {
+			data.IpIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.IpIsNot)
+		} else {
+			data.IpIsNot = emptyStringList
+		}
+	} else {
+		data.Ip = types.StringNull()
+		data.IpIs = emptyStringList
+		data.IpIsNot = emptyStringList
+	}
+
+	// Set proxy configuration
+	data.Proxy.AuthUser = types.StringValue(api.ActionConfig.GetAuthUser())
+	data.Proxy.AuthPass = types.StringValue(api.ActionConfig.GetAuthPass())
+	data.Proxy.CacheLifetime = types.Int64Value(int64(api.ActionConfig.GetCacheLifetime()))
+	data.Proxy.DisableSslVerify = types.BoolValue(api.ActionConfig.GetDisableSslVerify())
+	data.Proxy.OnlyProxy404 = types.BoolValue(api.ActionConfig.GetOnlyProxy404())
+
+	// Set WAF configuration
+	data.WafConfig.NotifySlack = types.StringValue(api.GetActionConfig().WafConfig.GetNotifySlack())
+	data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(api.GetActionConfig().WafConfig.GetNotifySlackHitsRpm()))
+	data.WafConfig.NotifySlackRpm = types.Int64Value(int64(api.GetActionConfig().WafConfig.GetNotifySlackRpm()))
+	data.WafConfig.RequestHeaderName = types.StringValue(api.GetActionConfig().WafConfig.GetRequestHeaderName())
+
+	if len(api.GetActionConfig().WafConfig.GetThresholds()) > 0 {
+		thresholdObjType := types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"cooldown":     types.Int64Type,
+				"hits":         types.Int64Type,
+				"minutes":      types.Int64Type,
+				"mode":         types.StringType,
+				"notify_slack": types.StringType,
+				"rps":          types.Int64Type,
+				"type":         types.StringType,
+				"value":        types.StringType,
+			},
+		}
+		data.WafConfig.Thresholds, _ = types.ListValueFrom(ctx, thresholdObjType, api.GetActionConfig().WafConfig.GetThresholds())
+	} else {
+		data.WafConfig.Thresholds = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"cooldown":     types.Int64Type,
+				"hits":         types.Int64Type,
+				"minutes":      types.Int64Type,
+				"mode":         types.StringType,
+				"notify_slack": types.StringType,
+				"rps":          types.Int64Type,
+				"type":         types.StringType,
+				"value":        types.StringType,
+			},
+		})
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetBlockIp()) > 0 {
+		data.WafConfig.BlockIp, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockIp())
+	} else {
+		data.WafConfig.BlockIp = emptyStringList
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetBlockUa()) > 0 {
+		data.WafConfig.BlockUa, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockUa())
+	} else {
+		data.WafConfig.BlockUa = emptyStringList
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetBlockReferer()) > 0 {
+		data.WafConfig.BlockReferer, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockReferer())
+	} else {
+		data.WafConfig.BlockReferer = emptyStringList
+	}
+
+	if len(api.GetActionConfig().WafConfig.GetNotifyEmail()) > 0 {
+		data.WafConfig.NotifyEmail, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetNotifyEmail())
+	} else {
+		data.WafConfig.NotifyEmail = emptyStringList
+	}
+
+	// Set notification config
+	if api.GetActionConfig().NotifyConfig != nil {
+		if len(api.GetActionConfig().NotifyConfig.GetOriginStatusCodes()) > 0 {
+			data.NotifyConfig.OriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().NotifyConfig.GetOriginStatusCodes())
+		} else {
+			data.NotifyConfig.OriginStatusCodes = emptyStringList
+		}
+		data.NotifyConfig.Period = types.StringValue(api.GetActionConfig().NotifyConfig.GetPeriod())
+		data.NotifyConfig.SlackWebhook = types.StringValue(api.GetActionConfig().NotifyConfig.GetSlackWebhook())
+	} else {
+		data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{}
+		data.NotifyConfig.OriginStatusCodes = emptyStringList
+		data.NotifyConfig.Period = types.StringNull()
+		data.NotifyConfig.SlackWebhook = types.StringNull()
+	}
+
+	// Set failover config
+	if api.GetActionConfig().FailoverMode != nil {
+		data.Failover.FailoverMode = types.StringValue(fmt.Sprintf("%v", *api.GetActionConfig().FailoverMode))
+		data.Failover.FailoverLifetime = types.StringValue(*api.GetActionConfig().FailoverLifetime)
+		if len(api.GetActionConfig().FailoverOriginStatusCodes) > 0 {
+			data.Failover.FailoverOriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().FailoverOriginStatusCodes)
+		} else {
+			data.Failover.FailoverOriginStatusCodes = emptyStringList
+		}
+	} else {
+		data.Failover = resource_rule_proxy.FailoverValue{}
+		data.Failover.FailoverMode = types.StringNull()
+		data.Failover.FailoverLifetime = types.StringNull()
+		data.Failover.FailoverOriginStatusCodes = emptyStringList
+	}
+
+	// Initialize empty lists for optional fields
+	data.Failover = resource_rule_proxy.FailoverValue{
+		FailoverMode:              types.StringValue("false"),
+		FailoverLifetime:          types.StringValue(""),
+		FailoverOriginStatusCodes: types.ListValueMust(types.StringType, []attr.Value{}),
+	}
+
+	data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{
+		OriginStatusCodes: types.ListValueMust(types.StringType, []attr.Value{}),
+		Period:            types.StringValue(""),
+		SlackWebhook:      types.StringValue(""),
+	}
+
+	thresholdObjType := types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"cooldown":     types.Int64Type,
+			"hits":         types.Int64Type,
+			"minutes":      types.Int64Type,
+			"mode":         types.StringType,
+			"notify_slack": types.StringType,
+			"rps":          types.Int64Type,
+			"type":         types.StringType,
+			"value":        types.StringType,
+		},
+	}
+	data.WafConfig.Thresholds = types.ListValueMust(thresholdObjType, []attr.Value{})
 	return
 }

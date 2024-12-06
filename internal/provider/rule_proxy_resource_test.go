@@ -2,8 +2,11 @@ package provider_test
 
 import (
 	"fmt"
+	"terraform-provider-quant/internal/provider"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
@@ -16,7 +19,7 @@ const mockRuleProxyResponse = `{
 	"host": "backend.example.com",
 	"waf_enabled": true,
 	"waf_config": {
-		"mode": "detection",
+		"mode": "report",
 		"paranoia_level": 1,
 		"allow_rules": [],
 		"block_ip": [],
@@ -28,6 +31,10 @@ const mockRuleProxyResponse = `{
 		}
 	}
 }`
+
+var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
+	"quant": providerserver.NewProtocol6WithError(provider.New()()),
+}
 
 func testAccPreCheck(t *testing.T) {
 	// You can add any additional setup here
@@ -65,7 +72,7 @@ resource "quant_rule_proxy" "test" {
   
   waf_enabled = true
   waf_config {
-    mode           = "detection"
+    mode           = "report"
     paranoia_level = 1
     allow_rules    = []
     block_ip       = []

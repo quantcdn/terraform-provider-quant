@@ -6,7 +6,6 @@ Manages a Quant custom headers.
 
 ```hcl
 resource "quant_header" "test" {
-  name = "test-header"
   project = "default"
   headers = {
     "X-Quant-Header" = "test"
@@ -16,6 +15,5 @@ resource "quant_header" "test" {
 
 ## Argument Reference
 
-- `name` - (Required) The name of the header.
-- `project` - (Required) The name of the project.
+- `project` - (Required) The machine name of the project.
 - `headers` - (Required) The headers to set.

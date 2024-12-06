@@ -3,16 +3,13 @@ package provider
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/resource_rule_redirect"
 	"terraform-provider-quant/internal/utils"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	openapi "github.com/quantcdn/quant-admin-go"
 )
@@ -32,52 +29,12 @@ type ruleRedirectResource struct {
 	client *client.Client
 }
 
-type ruleRedirectResourceModel struct {
-	Project        types.String `tfsdk:"project"`
-	Organization   types.String `tfsdk:"organization"`
-	Name           types.String `tfsdk:"name"`
-	Uuid           types.String `tfsdk:"uuid"`
-	RuleId         types.String `tfsdk:"rule_id"`
-	Url            types.List   `tfsdk:"url"`
-	Domain         types.List   `tfsdk:"domain"`
-	Disabled       types.Bool   `tfsdk:"disabled"`
-	OnlyWithCookie types.Bool   `tfsdk:"only_with_cookie"`
-	Method         types.String `tfsdk:"method"`
-	MethodIs       types.List   `tfsdk:"method_is"`
-	MethodIsNot    types.List   `tfsdk:"method_is_not"`
-	Ip             types.String `tfsdk:"ip"`
-	IpIs           types.List   `tfsdk:"ip_is"`
-	IpIsNot        types.List   `tfsdk:"ip_is_not"`
-	Country        types.String `tfsdk:"country"`
-	CountryIs      types.List   `tfsdk:"country_is"`
-	CountryIsNot   types.List   `tfsdk:"country_is_not"`
-
-	// Rule specific details.
-	RedirectTo   types.String `tfsdk:"redirect_to"`
-	RedirectCode types.String `tfsdk:"redirect_code"`
-}
-
 func (r *ruleRedirectResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_rule_redirect"
 }
 
 func (r *ruleRedirectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	attributes := RuleBaseAttributes(ctx)
-	attributes["redirect_to"] = schema.StringAttribute{
-		Required: true,
-		Validators: []validator.String{
-			stringvalidator.RegexMatches(regexp.MustCompile(`^(https?|ftp)://[^\s/$.?#].[^\s]*$`), "Must be a valid URL"),
-		},
-	}
-	attributes["redirect_code"] = schema.StringAttribute{
-		Required: true,
-		Validators: []validator.String{
-			stringvalidator.OneOf("301", "302", "303"),
-		},
-	}
-
-	// Set the attributes for this rule.
-	resp.Schema = schema.Schema{Attributes: attributes}
+	resp.Schema = resource_rule_redirect.RuleRedirectResourceSchema(ctx)
 }
 
 func (r *ruleRedirectResource) ConfigValidators(ctx context.Context) []resource.ConfigValidator {
@@ -99,7 +56,7 @@ func (r *ruleRedirectResource) Configure(_ context.Context, req resource.Configu
 }
 
 func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data ruleRedirectResourceModel
+	var data resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -120,7 +77,7 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data ruleRedirectResourceModel
+	var data resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -137,7 +94,7 @@ func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan ruleRedirectResourceModel
+	var plan resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -146,7 +103,7 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	var state ruleRedirectResourceModel
+	var state resource_rule_redirect.RuleRedirectModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	plan.RuleId = state.RuleId
 
@@ -164,7 +121,7 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data ruleRedirectResourceModel
+	var data resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -178,7 +135,7 @@ func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRe
 }
 
 func (r *ruleRedirectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	var data ruleRedirectResourceModel
+	var data resource_rule_redirect.RuleRedirectModel
 	var err error
 	data.Project, data.RuleId, err = utils.GetRuleImportId(req.ID)
 
@@ -202,7 +159,7 @@ func (r *ruleRedirectResource) ImportState(ctx context.Context, req resource.Imp
 
 // callRuleRedirectCreateAPI calls the API endpoint to create a rule
 // resource in Quant.
-func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rule *ruleRedirectResourceModel) (diags diag.Diagnostics) {
+func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rule *resource_rule_redirect.RuleRedirectModel) (diags diag.Diagnostics) {
 	req := *openapi.NewRuleRedirectRequestWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
@@ -242,7 +199,7 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		}
 	}
 
-	if (!rule.Ip.IsNull()) {
+	if !rule.Ip.IsNull() {
 		req.SetIp(rule.Ip.ValueString())
 		var iplist []string
 		if rule.Ip.ValueString() == "ip_is" {
@@ -262,8 +219,7 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		}
 	}
 
-
-	if (!rule.Method.IsNull()) {
+	if !rule.Method.IsNull() {
 		req.SetMethod(rule.Method.ValueString())
 		var methodList []string
 		if rule.Method.ValueString() == "method_is" {
@@ -295,13 +251,45 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 
 	rule.Uuid = types.StringValue(res.GetUuid())
 	rule.RuleId = types.StringValue(res.GetRuleId())
+	rule.Organization = types.StringValue(r.client.Organization)
+	rule.Weight = types.Int64Value(0) // Hardcoded for now
+	rule.Action = types.StringValue("redirect")
+	rule.CookieName = types.StringNull()
+	rule.Rule = types.StringValue("")
+
+	domainList, diag := types.ListValueFrom(ctx, types.StringType, domains)
+	if diag.HasError() {
+		diags.Append(diag...)
+		return
+	}
+	rule.Domain = domainList
+
+	if rule.Method.IsNull() || rule.Method.IsUnknown() {
+		rule.Method = types.StringNull()
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		rule.MethodIs = emptyList
+		rule.MethodIsNot = emptyList
+	}
+
+	if rule.Country.IsNull() || rule.Country.IsUnknown() {
+		rule.Country = types.StringNull()
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		rule.CountryIs = emptyList
+		rule.CountryIsNot = emptyList
+	}
+
+	if rule.Ip.IsNull() || rule.Ip.IsUnknown() {
+		rule.Ip = types.StringNull()
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		rule.IpIs = emptyList
+		rule.IpIsNot = emptyList
+	}
 
 	return
 }
 
-
 // callRuleRedirectReadAPI
-func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule *ruleRedirectResourceModel) (diags diag.Diagnostics) {
+func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule *resource_rule_redirect.RuleRedirectModel) (diags diag.Diagnostics) {
 	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
@@ -319,62 +307,99 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 		return
 	}
 
+	// Set required fields
 	rule.Name = types.StringValue(*api.Name)
 	rule.Uuid = types.StringValue(api.Uuid)
-	domains, d := types.ListValueFrom(ctx, types.StringType, api.Domain)
-	if d.HasError() {
-		diags.Append(d...)
+	rule.RuleId = types.StringValue(api.GetRuleId())
+	rule.Organization = types.StringValue(r.client.Organization)
+	rule.Weight = types.Int64Value(0)
+	rule.Action = types.StringValue("redirect")
+
+	// Set cookie_name to null if not present
+	rule.CookieName = types.StringNull()
+
+	// Set rule to empty string if not present (or appropriate default value)
+	rule.Rule = types.StringValue("")
+
+	// Initialize empty lists for all optional fields
+	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+
+	domainList, diag := types.ListValueFrom(ctx, types.StringType, api.Domain)
+	if diag.HasError() {
+		diags.Append(diag...)
 		return
 	}
+	rule.Domain = domainList
+
+	// Handle Method fields
+	if api.Method != nil && *api.Method != "" {
+		rule.Method = types.StringValue(*api.Method)
+		if len(api.MethodIs) > 0 {
+			rule.MethodIs, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIs)
+		} else {
+			rule.MethodIs = emptyList
+		}
+		if len(api.MethodIsNot) > 0 {
+			rule.MethodIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIsNot)
+		} else {
+			rule.MethodIsNot = emptyList
+		}
+	} else {
+		rule.Method = types.StringNull()
+		rule.MethodIs = emptyList
+		rule.MethodIsNot = emptyList
+	}
+
+	// Handle Country fields
+	if api.Country != nil && *api.Country != "" {
+		rule.Country = types.StringValue(*api.Country)
+		if len(api.CountryIs) > 0 {
+			rule.CountryIs, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIs)
+		} else {
+			rule.CountryIs = emptyList
+		}
+		if len(api.CountryIsNot) > 0 {
+			rule.CountryIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIsNot)
+		} else {
+			rule.CountryIsNot = emptyList
+		}
+	} else {
+		rule.Country = types.StringNull()
+		rule.CountryIs = emptyList
+		rule.CountryIsNot = emptyList
+	}
+
+	// Handle IP fields
+	if api.Ip != nil && *api.Ip != "" {
+		rule.Ip = types.StringValue(*api.Ip)
+		if len(api.IpIs) > 0 {
+			rule.IpIs, _ = types.ListValueFrom(ctx, types.StringType, api.IpIs)
+		} else {
+			rule.IpIs = emptyList
+		}
+		if len(api.IpIsNot) > 0 {
+			rule.IpIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.IpIsNot)
+		} else {
+			rule.IpIsNot = emptyList
+		}
+	} else {
+		rule.Ip = types.StringNull()
+		rule.IpIs = emptyList
+		rule.IpIsNot = emptyList
+	}
+
+	// Handle boolean fields
+	rule.Disabled = types.BoolValue(api.GetDisabled())
+	rule.OnlyWithCookie = types.BoolValue(false)
+
+	// Handle required fields
+	domains, _ := types.ListValueFrom(ctx, types.StringType, api.Domain)
 	rule.Domain = domains
-	urls, d := types.ListValueFrom(ctx, types.StringType, api.Url)
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
+
+	urls, _ := types.ListValueFrom(ctx, types.StringType, api.Url)
 	rule.Url = urls
-	rule.Ip = types.StringValue(*api.Ip)
-	ips, d := types.ListValueFrom(ctx, types.StringType, api.IpIs)
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	rule.IpIs = types.List(ips)
-	ipIsNot, d := types.ListValueFrom(ctx, types.StringType, api.IpIsNot)
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	rule.IpIsNot = types.List(ipIsNot)
-	rule.Country = types.StringValue(*api.Country)
-	countries, d := types.ListValueFrom(ctx, types.StringType, api.CountryIs)
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	rule.CountryIs = types.List(countries)
-	rule.CountryIsNot, d = types.ListValueFrom(ctx, types.StringType, api.CountryIsNot)
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	rule.CountryIsNot = types.List(rule.CountryIsNot)
 
-	rule.Method = types.StringValue(*api.Method)
-	methods, d := types.ListValueFrom(ctx, types.StringType, api.MethodIs)
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	rule.MethodIs = types.List(methods)
-	methodIsNot, d := types.ListValueFrom(ctx, types.StringType, api.MethodIsNot)
-	if d.HasError() {
-		diags.Append(d...)
-		return
-	}
-	rule.MethodIsNot = types.List(methodIsNot)
-
-	// Rule specific fields.
+	// Handle redirect specific fields
 	rule.RedirectCode = types.StringValue(api.ActionConfig.StatusCode)
 	rule.RedirectTo = types.StringValue(api.ActionConfig.To)
 
@@ -382,7 +407,7 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 }
 
 // callRuleRedirectUpdateAPI
-func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rule *ruleRedirectResourceModel) (diags diag.Diagnostics) {
+func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rule *resource_rule_redirect.RuleRedirectModel) (diags diag.Diagnostics) {
 	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
@@ -459,7 +484,6 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	}
 	req.SetMethodIsNot(methodList)
 
-
 	req.SetRedirectCode(rule.RedirectCode.ValueString())
 	req.SetRedirectTo(rule.RedirectTo.ValueString())
 
@@ -475,7 +499,7 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 }
 
 // callRuleRedirectDeleteAPI calls the delete API endpoint with for a given resource.
-func callRuleRedirectDeleteAPI(ctx context.Context, r *ruleRedirectResource, rule *ruleRedirectResourceModel) (diags diag.Diagnostics) {
+func callRuleRedirectDeleteAPI(ctx context.Context, r *ruleRedirectResource, rule *resource_rule_redirect.RuleRedirectModel) (diags diag.Diagnostics) {
 	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),

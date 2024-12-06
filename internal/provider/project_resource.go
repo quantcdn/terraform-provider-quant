@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_project"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	openapiclient "github.com/quantcdn/quant-admin-go"
 )
 
@@ -207,6 +209,27 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	project.MachineName = types.StringValue(res.GetMachineName())
+
+	createStateConf := retry.StateChangeConf{
+		Pending: []string{"pending", "creating"},
+		Target:  []string{"ready"},
+		Refresh: func() (interface{}, string, error) {
+			project, resp, _ := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).Execute()
+			if resp.StatusCode == 404 {
+				return nil, "pending", nil
+			}
+			return project, "ready", nil
+		},
+		Timeout:    10 * time.Minute,
+		Delay:      10 * time.Second,
+		MinTimeout: 10 * time.Second,
+	}
+
+	_, err = createStateConf.WaitForStateContext(ctx)
+	if err != nil {
+		diags.AddError("Unable to create project", fmt.Sprintf("Error: %s", err.Error()))
+	}
+
 	return
 }
 
