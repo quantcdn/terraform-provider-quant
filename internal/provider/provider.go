@@ -24,7 +24,7 @@ func New() func() provider.Provider {
 type quantProvider struct{}
 
 type quantProviderModel struct {
-	Bearer types.String `tfsdk:"bearer"`
+	Bearer       types.String `tfsdk:"bearer"`
 	Organization types.String `tfsdk:"organization"`
 }
 
@@ -32,12 +32,13 @@ func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"bearer": schema.StringAttribute{
-				MarkdownDescription: "The API Bearer token",
-				Optional: true,
+				MarkdownDescription: "The QuantCDN API Bearer token used to authenticate requests",
+				Required:            true,
+				Sensitive:           true,
 			},
 			"organization": schema.StringAttribute{
-				MarkdownDescription: "Organization machine name",
-				Optional: true,
+				MarkdownDescription: "The QuantCDN organization machine name",
+				Required:            true,
 			},
 		},
 	}
@@ -88,8 +89,8 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 			path.Root("bearer"),
 			"Missing QuantCDN API bearer token",
 			"The provider cannot create the HashiCups API client as there is a missing or empty value for the QuantCDN API bearer token. "+
-							"Set the host value in the configuration or use the QUANTCDN_API_TOKEN environment variable. "+
-							"If either is already set, ensure the value is not empty.",
+				"Set the host value in the configuration or use the QUANTCDN_API_TOKEN environment variable. "+
+				"If either is already set, ensure the value is not empty.",
 		)
 	}
 	if organization == "" {
@@ -97,8 +98,8 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 			path.Root("organization"),
 			"Missing QuantCDN organization",
 			"The provider cannot create the HashiCups API client as there is a missing or empty value for the QuantCDN API organization. "+
-							"Set the host value in the configuration or use the QUANTCDN_ORGANIZATION environment variable. "+
-							"If either is already set, ensure the value is not empty.",
+				"Set the host value in the configuration or use the QUANTCDN_ORGANIZATION environment variable. "+
+				"If either is already set, ensure the value is not empty.",
 		)
 	}
 
