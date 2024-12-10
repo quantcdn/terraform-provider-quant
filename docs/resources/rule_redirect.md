@@ -6,11 +6,12 @@ Manages a Quant redirect rule.
 
 ```hcl
 resource "quant_rule_redirect" "test" {
-  name = "test-rule"
-  project = "default"
-  domain = ["example.com"]
-  to = "https://example.com"
-  status_code = 301
+  name = "test-redirect"
+  project = quant_project.test.machine_name
+  domain = ["any"]
+  url = ["/redirect"]
+  redirect_to = "https://backend.example.com"
+  redirect_code = 301
 }
 ```
 
