@@ -6,21 +6,24 @@ Manages a Quant proxy rule.
 
 ```hcl
 resource "quant_rule_proxy" "test" {
-  name = "test-rule"
-  project = "default"
-  domain = ["example.com"]
-  to = "https://backend.example.com"
-  host = "backend.example.com"
+  name    = "test-proxy"
+  project = quant_project.test.machine_name
+  domain  = ["any"]
+  url     = ["/proxy"]
+  proxy = {
+    to      = "https://backend.example.com"
+    host    = "backend.example.com"
+  }
   waf_enabled = true
-  waf_config {
-    mode = "report"
+  waf_config = {
+    mode           = "report"
     paranoia_level = 1
-    allow_rules = []
-    block_ip = []
-    block_ua = []
-    block_referer = []
-    notify_email = []
-    httpbl {
+    allow_rules    = []
+    block_ip       = []
+    block_ua       = []
+    block_referer  = []
+    notify_email   = []
+    httpbl = {
       enabled = false
     }
   }
