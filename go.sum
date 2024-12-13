@@ -156,6 +156,8 @@ github.com/quantcdn/quant-admin-go v0.0.0-20241213014220-d9bb395a27b6 h1:lWQyzMi
 github.com/quantcdn/quant-admin-go v0.0.0-20241213014220-d9bb395a27b6/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
 github.com/quantcdn/quant-admin-go v0.0.0-20241213023303-ad9791a191a1 h1:RQtT4/S4AHBl7OEDajYj+uuUHpmT5RyUVdS3y7l9b0Y=
 github.com/quantcdn/quant-admin-go v0.0.0-20241213023303-ad9791a191a1/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
+github.com/quantcdn/quant-admin-go v0.0.0-20241213052824-c4a71d2f4cb1 h1:D79X5OQtyKUOR18GGQkVvUSV3MvnLIgdaDnWWeTnN0E=
+github.com/quantcdn/quant-admin-go v0.0.0-20241213052824-c4a71d2f4cb1/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
 github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 h1:n661drycOFuPLCN3Uc8sB6B/s6Z4t2xvBgU1htSHuq8=
 github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3/go.mod h1:A0bzQcvG0E7Rwjx0REVgAGH58e96+X0MeOfepqsbeW4=
 github.com/skeema/knownhosts v1.2.2 h1:Iug2P4fLmDw9f41PB6thxUkNUkJzB5i+1/exaj40L3A=

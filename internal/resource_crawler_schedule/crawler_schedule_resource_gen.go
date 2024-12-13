@@ -35,6 +35,10 @@ func CrawlerScheduleResourceSchema(ctx context.Context) schema.Schema {
 			"id": schema.Int64Attribute{
 				Computed: true,
 			},
+			"name": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
 			"organization": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -64,6 +68,7 @@ type CrawlerScheduleModel struct {
 	CreatedAt          types.String `tfsdk:"created_at"`
 	DeletedAt          types.String `tfsdk:"deleted_at"`
 	Id                 types.Int64  `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
 	Organization       types.String `tfsdk:"organization"`
 	Project            types.String `tfsdk:"project"`
 	ProjectId          types.Int64  `tfsdk:"project_id"`

@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.25.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.35.0
 	github.com/hashicorp/terraform-plugin-testing v1.11.0
-	github.com/quantcdn/quant-admin-go v0.0.0-20241213023303-ad9791a191a1
+	github.com/quantcdn/quant-admin-go v0.0.0-20241213052824-c4a71d2f4cb1
 	github.com/stretchr/testify v1.9.0
 )
 

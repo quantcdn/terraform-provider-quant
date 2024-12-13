@@ -8,6 +8,7 @@ Manages a Quant crawler schedule.
 resource "quant_crawler_schedule" "crawler_schedule" {
     project = quant_project.test.machine_name
     crawler = quant_crawler.crawler.uuid
+    name = "test-crawler-schedule"
     schedule_cron_string = "0 0 * * *"
 }
 ```

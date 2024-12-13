@@ -130,8 +130,9 @@ func callCrawlerScheduleCreateAPI(ctx context.Context, r *crawlerScheduleResourc
 	req := *openapi.NewCrawlerScheduleRequestWithDefaults()
 
 	req.SetScheduleCronString(schedule.ScheduleCronString.ValueString())
+	req.SetName(schedule.Name.ValueString())
 
-	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesCreate(r.client.AuthContext, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString()).CrawlerScheduleRequest(req).Execute()
+	_, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesCreate(r.client.AuthContext, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString()).CrawlerScheduleRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -141,13 +142,7 @@ func callCrawlerScheduleCreateAPI(ctx context.Context, r *crawlerScheduleResourc
 		return diags
 	}
 
-	schedule.Id = types.Int64Value(int64(api.GetId()))
-	schedule.CrawlerConfigId = types.Int64Value(int64(api.GetCrawlerConfigId()))
-	schedule.ProjectId = types.Int64Value(int64(api.GetProjectId()))
-	schedule.CrawlerLastRunId = types.Int64Value(int64(api.GetCrawlerLastRunId()))
-	schedule.CreatedAt = types.StringValue(api.GetCreatedAt())
-
-	return diags
+	return callCrawlerScheduleReadAPI(ctx, r, schedule)
 }
 
 func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource, schedule *resource_crawler_schedule.CrawlerScheduleModel) (diags diag.Diagnostics) {
@@ -157,7 +152,7 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 			"Missing schedule.id attribute",
 			"To read schedule information, id must be provided.",
 		)
-		return
+		return diags
 	}
 
 	if schedule.Project.IsNull() || schedule.Project.IsUnknown() {
@@ -178,7 +173,7 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesRead(ctx, org, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).Execute()
 	if err != nil {
 		diags.AddError("Unable to load crawler schedule", fmt.Sprintf("Error: %s", err.Error()))
-		return
+		return diags
 	}
 
 	schedule.CrawlerConfigId = types.Int64Value(int64(api.GetCrawlerConfigId()))
@@ -187,7 +182,7 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	schedule.ScheduleCronString = types.StringValue(api.GetScheduleCronString())
 	schedule.CreatedAt = types.StringValue(api.GetCreatedAt())
 
-	return
+	return diags
 }
 
 func callCrawlerScheduleDeleteAPI(ctx context.Context, r *crawlerScheduleResource, schedule *resource_crawler_schedule.CrawlerScheduleModel) (diags diag.Diagnostics) {
