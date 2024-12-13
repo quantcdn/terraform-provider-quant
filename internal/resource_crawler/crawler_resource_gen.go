@@ -4,6 +4,7 @@ package resource_crawler
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -16,6 +17,7 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			"browser_mode": schema.BoolAttribute{
 				Optional: true,
 				Computed: true,
+				Default:  booldefault.StaticBool(false),
 			},
 			"config": schema.StringAttribute{
 				Computed: true,
@@ -37,9 +39,15 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				Computed: true,
 				Default:  int64default.StaticInt64(0),
 			},
+			"exclude": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
 			"headers": schema.MapAttribute{
 				ElementType: types.StringType,
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 			},
 			"id": schema.Int64Attribute{
 				Computed: true,
@@ -62,9 +70,10 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			"updated_at": schema.StringAttribute{
 				Computed: true,
 			},
-			"url_list": schema.ListAttribute{
+			"urls": schema.ListAttribute{
 				ElementType: types.StringType,
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
 			},
 			"urls_list": schema.StringAttribute{
 				Computed: true,
@@ -84,6 +93,7 @@ type CrawlerModel struct {
 	DeletedAt      types.String `tfsdk:"deleted_at"`
 	Domain         types.String `tfsdk:"domain"`
 	DomainVerified types.Int64  `tfsdk:"domain_verified"`
+	Exclude        types.List   `tfsdk:"exclude"`
 	Headers        types.Map    `tfsdk:"headers"`
 	Id             types.Int64  `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
@@ -91,7 +101,7 @@ type CrawlerModel struct {
 	Project        types.String `tfsdk:"project"`
 	ProjectId      types.Int64  `tfsdk:"project_id"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
-	UrlList        types.List   `tfsdk:"url_list"`
+	Urls           types.List   `tfsdk:"urls"`
 	UrlsList       types.String `tfsdk:"urls_list"`
 	Uuid           types.String `tfsdk:"uuid"`
 }

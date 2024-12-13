@@ -371,7 +371,7 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	org := r.client.Organization
-	_, _, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	_, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError(

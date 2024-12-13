@@ -6,10 +6,13 @@ import (
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_crawler"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"gopkg.in/yaml.v3"
 
 	openapi "github.com/quantcdn/quant-admin-go"
 )
@@ -131,13 +134,23 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	req.SetDomain(crawler.Domain.ValueString())
 	req.SetName(crawler.Name.ValueString())
 
-	urls := make([]string, 0, len(crawler.UrlList.Elements()))
-	diags.Append(crawler.UrlList.ElementsAs(ctx, &urls, false)...)
+	if !crawler.Urls.IsNull() {
+		urls := make([]string, 0, len(crawler.Urls.Elements()))
+		diags.Append(crawler.Urls.ElementsAs(ctx, &urls, false)...)
+		req.SetUrls(urls)
+	}
 
-	req.SetUrlList(urls)
+	if !crawler.Exclude.IsNull() {
+		exclude := make([]string, 0, len(crawler.Exclude.Elements()))
+		diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
+		req.SetExclude(exclude)
+	}
 
-	// @todo: Support custom headers.
-	// @todo: API to support crawler config overrides.
+	if !crawler.Headers.IsNull() {
+		headers := make(map[string]string, len(crawler.Headers.Elements()))
+		diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
+		req.SetHeaders(headers)
+	}
 
 	api, _, err := r.client.Instance.CrawlersAPI.CrawlersCreate(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).CrawlerRequest(req).Execute()
 
@@ -149,9 +162,9 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return diags
 	}
 
-	crawler.Uuid = types.StringValue(api.Uuid)
+	crawler.Uuid = types.StringValue(api.GetUuid())
 
-	return diags
+	return callCrawlerReadAPI(ctx, r, crawler)
 }
 
 func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
@@ -161,7 +174,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			"Missing crawler.uuid attribute",
 			"To read crawler information, uuid must be provided.",
 		)
-		return
+		return diags
 	}
 
 	if crawler.Project.IsNull() || crawler.Project.IsUnknown() {
@@ -170,7 +183,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			"Missing crawler.project attribute",
 			"To read crawler information, project must be provided.",
 		)
-		return
+		return diags
 	}
 
 	org := r.client.Organization
@@ -181,17 +194,47 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
 	if err != nil {
 		diags.AddError("Unable to load crawler", fmt.Sprintf("Error: %s", err.Error()))
-		return
+		return diags
 	}
 
-	// @todo API to support browser mode.
-	// crawler.BrowserMode = types.BoolValue(api.GetBrowserMode())
+	var config map[string]interface{}
 
-	crawler.CreatedAt = types.StringValue(api.GetCreatedAt())
+	if api.Config != "" {
+		crawler.Config = types.StringValue(api.GetConfig())
+		if err := yaml.Unmarshal([]byte(api.GetConfig()), &config); err != nil {
+			// Continue...
+		}
+	}
+
+	crawler.Uuid = types.StringValue(api.GetUuid())
+	crawler.Name = types.StringValue(api.GetName())
 	crawler.Domain = types.StringValue(api.GetDomain())
 	crawler.DomainVerified = types.Int64Value(int64(api.GetDomainVerified()))
+	crawler.BrowserMode = types.BoolValue(config["browser_mode"].(bool))
+	crawler.CreatedAt = types.StringValue(api.GetCreatedAt())
+	crawler.UpdatedAt = types.StringValue(api.GetUpdatedAt())
 
-	return
+	if config["exclude"] != nil {
+		excludeStrs := config["exclude"].([]interface{})
+		excludeVals := make([]attr.Value, len(excludeStrs))
+		for i, v := range excludeStrs {
+			excludeVals[i] = types.StringValue(v.(string))
+		}
+		crawler.Exclude = types.ListValueMust(types.StringType, excludeVals)
+	}
+
+	if config["headers"] != nil {
+		headers := config["headers"].(map[string]interface{})
+		headersMap := make(map[string]attr.Value)
+		for k, v := range headers {
+			headersMap[k] = types.StringValue(v.(string))
+		}
+		crawler.Headers = types.MapValueMust(types.StringType, headersMap)
+	}
+
+	crawler.UrlsList = types.StringNull()
+
+	return diags
 }
 
 func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
@@ -254,18 +297,24 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	req.SetDomain(crawler.Domain.ValueString())
 	req.SetBrowserMode(crawler.BrowserMode.ValueBool())
 
-	urls := make([]string, 0, len(crawler.UrlList.Elements()))
-	diags.Append(crawler.UrlList.ElementsAs(ctx, &urls, false)...)
+	urls := make([]string, 0, len(crawler.Urls.Elements()))
+	diags.Append(crawler.Urls.ElementsAs(ctx, &urls, false)...)
 
-	req.SetUrlList(urls)
+	req.SetUrls(urls)
 
-	api, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequestUpdate(req).Execute()
+	exclude := make([]string, 0, len(crawler.Exclude.Elements()))
+	diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
+	req.SetExclude(exclude)
+
+	headers := make(map[string]string, len(crawler.Headers.Elements()))
+	diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
+	req.SetHeaders(headers)
+
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequestUpdate(req).Execute()
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
 		return
 	}
 
-	crawler.UpdatedAt = types.StringValue(api.GetUpdatedAt())
-
-	return diags
+	return callCrawlerReadAPI(ctx, r, crawler)
 }
