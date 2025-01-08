@@ -62,10 +62,6 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 			"id": schema.Int64Attribute{
 				Computed: true,
 			},
-			"kind": schema.StringAttribute{
-				Computed: true,
-				Default:  stringdefault.StaticString("project"),
-			},
 			"machine_name": schema.StringAttribute{
 				Computed: true,
 			},
@@ -122,7 +118,6 @@ type ProjectModel struct {
 	FastlyMigrated        types.Int64  `tfsdk:"fastly_migrated"`
 	GitUrl                types.String `tfsdk:"git_url"`
 	Id                    types.Int64  `tfsdk:"id"`
-	Kind                  types.String `tfsdk:"kind"`
 	MachineName           types.String `tfsdk:"machine_name"`
 	Name                  types.String `tfsdk:"name"`
 	Organization          types.String `tfsdk:"organization"`

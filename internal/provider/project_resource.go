@@ -329,7 +329,6 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 	project.CreatedAt = types.StringValue(api.GetCreatedAt())
 	project.UpdatedAt = types.StringValue(api.GetUpdatedAt())
 	project.Uuid = types.StringValue(api.GetUuid())
-	project.Kind = types.StringValue("project")
 
 	project.SecurityScore = types.StringValue(api.GetSecurityScore())
 	project.GitUrl = types.StringValue(api.GetGitUrl())
