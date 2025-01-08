@@ -18,6 +18,10 @@ type Client struct {
 // with provider configuration.
 func New(bearer string, organization string) *Client {
 	cfg := openapi.NewConfiguration()
+	
+	// Add default headers to the configuration
+	cfg.AddDefaultHeader("Authorization", "Bearer "+bearer)
+	
 	client := openapi.NewAPIClient(cfg)
 	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
 

@@ -22,10 +22,6 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			"config": schema.StringAttribute{
 				Computed: true,
 			},
-			"crawler": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
 			"created_at": schema.StringAttribute{
 				Computed: true,
 			},
@@ -88,7 +84,6 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 type CrawlerModel struct {
 	BrowserMode    types.Bool   `tfsdk:"browser_mode"`
 	Config         types.String `tfsdk:"config"`
-	Crawler        types.String `tfsdk:"crawler"`
 	CreatedAt      types.String `tfsdk:"created_at"`
 	DeletedAt      types.String `tfsdk:"deleted_at"`
 	Domain         types.String `tfsdk:"domain"`
