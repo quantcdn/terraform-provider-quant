@@ -21,6 +21,7 @@ import (
 var (
 	_ resource.Resource              = (*crawlerResource)(nil)
 	_ resource.ResourceWithConfigure = (*crawlerResource)(nil)
+	_ resource.ResourceWithModifyPlan = (*crawlerResource)(nil)
 )
 
 func NewCrawlerResource() resource.Resource {
@@ -404,4 +405,25 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	}
 
 	return callCrawlerReadAPI(ctx, r, crawler)
+}
+
+func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// If there's no state (resource is being created), return early
+	if req.State.Raw.IsNull() {
+		return
+	}
+
+	// Get the plan and state
+	var plan, state resource_crawler.CrawlerModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Keep the domain_verified value from the state
+	plan.DomainVerified = state.DomainVerified
+
+	// Set the modified plan
+	resp.Plan.Set(ctx, &plan)
 }
