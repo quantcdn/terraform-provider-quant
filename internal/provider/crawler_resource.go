@@ -97,6 +97,13 @@ func (r *crawlerResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
+	// Read the current state to get the UUID
+	var state resource_crawler.CrawlerModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	// Preserve the UUID from the current state
+	data.Uuid = state.Uuid
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -379,7 +386,6 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	urls := make([]string, 0, len(crawler.Urls.Elements()))
 	diags.Append(crawler.Urls.ElementsAs(ctx, &urls, false)...)
-
 	req.SetUrls(urls)
 
 	exclude := make([]string, 0, len(crawler.Exclude.Elements()))
@@ -391,6 +397,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	req.SetHeaders(headers)
 
 	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequestUpdate(req).Execute()
+
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
 		return
