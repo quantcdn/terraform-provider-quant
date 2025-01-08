@@ -346,12 +346,7 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-	org := r.client.Organization
-	if !crawler.Organization.IsNull() {
-		org = crawler.Organization.ValueString()
-	}
-
-	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
 	if err != nil {
 		diags.AddError("Unable to delete crawler", fmt.Sprintf("Error: %s", err.Error()))
 	}
@@ -377,11 +372,6 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-	org := r.client.Organization
-	if !crawler.Organization.IsNull() {
-		org = crawler.Organization.ValueString()
-	}
-
 	req := *openapi.NewCrawlerRequestUpdateWithDefaults()
 
 	req.SetDomain(crawler.Domain.ValueString())
@@ -400,7 +390,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
 	req.SetHeaders(headers)
 
-	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, org, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequestUpdate(req).Execute()
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequestUpdate(req).Execute()
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
 		return
