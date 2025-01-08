@@ -30,9 +30,6 @@ func DomainResourceSchema(ctx context.Context) schema.Schema {
 			"in_section": schema.Int64Attribute{
 				Computed: true,
 			},
-			"kind": schema.StringAttribute{
-				Computed: true,
-			},
 			"name": schema.StringAttribute{
 				Required: true,
 			},
@@ -64,7 +61,6 @@ type DomainModel struct {
 	Domain         types.String `tfsdk:"domain"`
 	Id             types.Int64  `tfsdk:"id"`
 	InSection      types.Int64  `tfsdk:"in_section"`
-	Kind           types.String `tfsdk:"kind"`
 	Name           types.String `tfsdk:"name"`
 	Organization   types.String `tfsdk:"organization"`
 	Project        types.String `tfsdk:"project"`

@@ -4,6 +4,7 @@ package resource_project
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -51,6 +52,11 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"deleted_at": schema.StringAttribute{
 				Computed: true,
+			},
+			"disable_revisions": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(true),
 			},
 			"fastly_migrated": schema.Int64Attribute{
 				Computed: true,
@@ -115,6 +121,7 @@ type ProjectModel struct {
 	CustomS3SyncRegion    types.String `tfsdk:"custom_s3_sync_region"`
 	CustomS3SyncSecretKey types.String `tfsdk:"custom_s3_sync_secret_key"`
 	DeletedAt             types.String `tfsdk:"deleted_at"`
+	DisableRevisions      types.Bool   `tfsdk:"disable_revisions"`
 	FastlyMigrated        types.Int64  `tfsdk:"fastly_migrated"`
 	GitUrl                types.String `tfsdk:"git_url"`
 	Id                    types.Int64  `tfsdk:"id"`
