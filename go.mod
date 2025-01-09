@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.25.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.35.0
 	github.com/hashicorp/terraform-plugin-testing v1.11.0
-	github.com/quantcdn/quant-admin-go v0.0.0-20241115034118-d5bee8cc24e8
+	github.com/quantcdn/quant-admin-go v0.0.0-20250108230810-0f7f9a18d2cd
 	github.com/stretchr/testify v1.9.0
 )
 
@@ -66,5 +66,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
 	google.golang.org/grpc v1.67.1 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

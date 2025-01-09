@@ -198,12 +198,38 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 
 	req.SetRegion(project.Region.ValueString())
 
-	res, _, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).ProjectRequest(req).Execute()
+	res, resp, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).ProjectRequest(req).Execute()
 
 	if err != nil {
+		if resp != nil {
+			// Check for authentication/authorization errors (401/403)
+			if resp.StatusCode == 401 {
+				diags.AddError(
+					"Authentication Failed",
+					"Failed to authenticate with the Quant API. Please check your API token is valid.",
+				)
+				return
+			}
+			if resp.StatusCode == 403 {
+				diags.AddError(
+					"Authorization Failed",
+					"Your API token does not have sufficient permissions to create projects.",
+				)
+				return
+			}
+			// Handle conflict (409) which likely means project already exists
+			if resp.StatusCode == 409 {
+				diags.AddError(
+					"Project Already Exists",
+					"A project with this name already exists in your organization.",
+				)
+				return
+			}
+		}
+		// Generic error fallback
 		diags.AddError(
-			"Unable to add the project",
-			fmt.Sprintf("Error: project exists with this name"),
+			"Unable to Create Project",
+			fmt.Sprintf("An unexpected error occurred: %s", err.Error()),
 		)
 		return
 	}
@@ -371,7 +397,7 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	org := r.client.Organization
-	_, _, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	_, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError(

@@ -238,24 +238,15 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		req.SetMethodIsNot(methodList)
 	}
 
-	// The proxy location.
-	req.SetTo(data.Proxy.To.ValueString())
-	req.SetHost(data.Proxy.Host.ValueString())
-	req.SetCacheLifetime(int32(data.Proxy.CacheLifetime.ValueInt64()))
+	proxy := openapi.NewProxyConfigWithDefaults()
+	proxy.SetTo(data.Proxy.To.ValueString())
+	proxy.SetHost(data.Proxy.Host.ValueString())
+	proxy.SetCacheLifetime(int32(data.Proxy.CacheLifetime.ValueInt64()))
 
 	if data.Proxy.AuthUser.ValueString() != "" && data.Proxy.AuthPass.ValueString() != "" {
 		// Only set basic auth details if we have both.
-		req.SetAuthUser(data.Proxy.AuthUser.ValueString())
-		req.SetAuthPass(data.Proxy.AuthPass.ValueString())
-	}
-
-	req.SetDisableSslVerify(data.Proxy.DisableSslVerify.ValueBool())
-	req.SetOnlyProxy404(data.Proxy.OnlyProxy404.ValueBool())
-
-	if data.Failover.FailoverMode.ValueString() == "true" {
-		req.SetFailoverMode("true")
-	} else {
-		req.SetFailoverMode("false")
+		proxy.SetAuthUser(data.Proxy.AuthUser.ValueString())
+		proxy.SetAuthPass(data.Proxy.AuthPass.ValueString())
 	}
 
 	// Set strip headers.
@@ -263,7 +254,26 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	for _, header := range data.Proxy.ProxyStripHeaders.Elements() {
 		stripHeaders = append(stripHeaders, header.String())
 	}
-	req.SetProxyStripHeaders(stripHeaders)
+	proxy.SetProxyStripHeaders(stripHeaders)
+
+	proxy.SetDisableSslVerify(data.Proxy.DisableSslVerify.ValueBool())
+	proxy.SetOnlyProxy404(data.Proxy.OnlyProxy404.ValueBool())
+
+	req.SetProxy(*proxy)
+
+	failover := openapi.NewFailoverConfigWithDefaults()
+	failover.SetFailoverMode(data.Failover.FailoverMode.ValueString())
+	failover.SetFailoverOriginTtfb(data.Failover.FailoverOriginTtfb.ValueString())
+
+	var statusCodes []string
+	for _, code := range data.Failover.FailoverOriginStatusCodes.Elements() {
+		if strVal, ok := code.(types.String); ok {
+			statusCodes = append(statusCodes, strVal.ValueString())
+		}
+	}
+	failover.SetFailoverOriginStatusCodes(statusCodes)
+
+	req.SetFailover(*failover)
 
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 
@@ -313,16 +323,6 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 	wafConfig.SetBlockReferer(blockReferer)
 
-	// httpbl dictionary support.
-	// httpbl := openapi.NewWAFConfigHttpblWithDefaults()
-	// httpbl.SetApiKey(data.WafConfig.Httpbl.ApiKey.ValueString())
-	// httpbl.SetBlockHarvester(data.WafConfig.Httpbl.BlockHarvester.ValueBool())
-	// httpbl.SetBlockSearchEngine(data.WafConfig.Httpbl.BlockSearchEngine.ValueBool())
-	// httpbl.SetBlockSpam(data.WafConfig.Httpbl.BlockSpam.ValueBool())
-	// httpbl.SetBlockSuspicious(data.WafConfig.Httpbl.BlockSuspicious.ValueBool())
-	// httpbl.SetHttpblEnabled(data.WafConfig.Httpbl.Enabled.ValueBool())
-	// wafConfig.SetHttpbl(*httpbl)
-
 	var emails []string
 	for _, email := range data.WafConfig.NotifyEmail.Elements() {
 		if e, ok := email.(types.String); ok {
@@ -340,216 +340,13 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
-	// Set required fields from API response
 	data.Uuid = types.StringValue(api.GetUuid())
-	data.RuleId = types.StringValue(api.GetRuleId())
-	data.Organization = types.StringValue(r.client.Organization)
-	data.Action = types.StringValue("proxy")
-	data.Weight = types.Int64Value(0)
-	data.Name = types.StringValue(api.GetName())
-	data.CookieName = types.StringValue(api.GetOnlyWithCookie())
-	data.Rule = types.StringNull()
 
-	// Convert API domain list to types.List
-	domainList, diag := types.ListValueFrom(ctx, types.StringType, api.Domain)
-	if diag.HasError() {
-		diags.Append(diag...)
+	readDiags := callRuleProxyReadAPI(ctx, r, data)
+	if readDiags.HasError() {
+		diags.Append(readDiags...)
 		return
 	}
-	data.Domain = domainList
-
-	// Convert API URL list to types.List
-	urlList, diag := types.ListValueFrom(ctx, types.StringType, api.Url)
-	if diag.HasError() {
-		diags.Append(diag...)
-		return
-	}
-	data.Url = urlList
-
-	// Initialize empty lists for optional fields
-	emptyStringList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
-
-	// Handle Method fields
-	if api.Method != nil && *api.Method != "" {
-		data.Method = types.StringValue(*api.Method)
-		if len(api.MethodIs) > 0 {
-			data.MethodIs, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIs)
-		} else {
-			data.MethodIs = emptyStringList
-		}
-		if len(api.MethodIsNot) > 0 {
-			data.MethodIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIsNot)
-		} else {
-			data.MethodIsNot = emptyStringList
-		}
-	} else {
-		data.Method = types.StringNull()
-		data.MethodIs = emptyStringList
-		data.MethodIsNot = emptyStringList
-	}
-
-	// Handle Country fields
-	if api.Country != nil && *api.Country != "" {
-		data.Country = types.StringValue(*api.Country)
-		if len(api.CountryIs) > 0 {
-			data.CountryIs, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIs)
-		} else {
-			data.CountryIs = emptyStringList
-		}
-		if len(api.CountryIsNot) > 0 {
-			data.CountryIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIsNot)
-		} else {
-			data.CountryIsNot = emptyStringList
-		}
-	} else {
-		data.Country = types.StringNull()
-		data.CountryIs = emptyStringList
-		data.CountryIsNot = emptyStringList
-	}
-
-	// Handle IP fields
-	if api.Ip != nil && *api.Ip != "" {
-		data.Ip = types.StringValue(*api.Ip)
-		if len(api.IpIs) > 0 {
-			data.IpIs, _ = types.ListValueFrom(ctx, types.StringType, api.IpIs)
-		} else {
-			data.IpIs = emptyStringList
-		}
-		if len(api.IpIsNot) > 0 {
-			data.IpIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.IpIsNot)
-		} else {
-			data.IpIsNot = emptyStringList
-		}
-	} else {
-		data.Ip = types.StringNull()
-		data.IpIs = emptyStringList
-		data.IpIsNot = emptyStringList
-	}
-
-	// Set proxy configuration
-	data.Proxy.AuthUser = types.StringValue(api.ActionConfig.GetAuthUser())
-	data.Proxy.AuthPass = types.StringValue(api.ActionConfig.GetAuthPass())
-	data.Proxy.CacheLifetime = types.Int64Value(int64(api.ActionConfig.GetCacheLifetime()))
-	data.Proxy.DisableSslVerify = types.BoolValue(api.ActionConfig.GetDisableSslVerify())
-	data.Proxy.OnlyProxy404 = types.BoolValue(api.ActionConfig.GetOnlyProxy404())
-
-	// Set WAF configuration
-	data.WafConfig.NotifySlack = types.StringValue(api.GetActionConfig().WafConfig.GetNotifySlack())
-	data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(api.GetActionConfig().WafConfig.GetNotifySlackHitsRpm()))
-	data.WafConfig.NotifySlackRpm = types.Int64Value(int64(api.GetActionConfig().WafConfig.GetNotifySlackRpm()))
-	data.WafConfig.RequestHeaderName = types.StringValue(api.GetActionConfig().WafConfig.GetRequestHeaderName())
-
-	if len(api.GetActionConfig().WafConfig.GetThresholds()) > 0 {
-		thresholdObjType := types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"cooldown":     types.Int64Type,
-				"hits":         types.Int64Type,
-				"minutes":      types.Int64Type,
-				"mode":         types.StringType,
-				"notify_slack": types.StringType,
-				"rps":          types.Int64Type,
-				"type":         types.StringType,
-				"value":        types.StringType,
-			},
-		}
-		data.WafConfig.Thresholds, _ = types.ListValueFrom(ctx, thresholdObjType, api.GetActionConfig().WafConfig.GetThresholds())
-	} else {
-		data.WafConfig.Thresholds = types.ListNull(types.ObjectType{
-			AttrTypes: map[string]attr.Type{
-				"cooldown":     types.Int64Type,
-				"hits":         types.Int64Type,
-				"minutes":      types.Int64Type,
-				"mode":         types.StringType,
-				"notify_slack": types.StringType,
-				"rps":          types.Int64Type,
-				"type":         types.StringType,
-				"value":        types.StringType,
-			},
-		})
-	}
-
-	if len(api.GetActionConfig().WafConfig.GetBlockIp()) > 0 {
-		data.WafConfig.BlockIp, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockIp())
-	} else {
-		data.WafConfig.BlockIp = emptyStringList
-	}
-
-	if len(api.GetActionConfig().WafConfig.GetBlockUa()) > 0 {
-		data.WafConfig.BlockUa, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockUa())
-	} else {
-		data.WafConfig.BlockUa = emptyStringList
-	}
-
-	if len(api.GetActionConfig().WafConfig.GetBlockReferer()) > 0 {
-		data.WafConfig.BlockReferer, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockReferer())
-	} else {
-		data.WafConfig.BlockReferer = emptyStringList
-	}
-
-	if len(api.GetActionConfig().WafConfig.GetNotifyEmail()) > 0 {
-		data.WafConfig.NotifyEmail, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetNotifyEmail())
-	} else {
-		data.WafConfig.NotifyEmail = emptyStringList
-	}
-
-	// Set notification config
-	if api.GetActionConfig().NotifyConfig != nil {
-		if len(api.GetActionConfig().NotifyConfig.GetOriginStatusCodes()) > 0 {
-			data.NotifyConfig.OriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().NotifyConfig.GetOriginStatusCodes())
-		} else {
-			data.NotifyConfig.OriginStatusCodes = emptyStringList
-		}
-		data.NotifyConfig.Period = types.StringValue(api.GetActionConfig().NotifyConfig.GetPeriod())
-		data.NotifyConfig.SlackWebhook = types.StringValue(api.GetActionConfig().NotifyConfig.GetSlackWebhook())
-	} else {
-		data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{}
-		data.NotifyConfig.OriginStatusCodes = emptyStringList
-		data.NotifyConfig.Period = types.StringNull()
-		data.NotifyConfig.SlackWebhook = types.StringNull()
-	}
-
-	// Set failover config
-	if api.GetActionConfig().FailoverMode != nil {
-		data.Failover.FailoverMode = types.StringValue(fmt.Sprintf("%v", *api.GetActionConfig().FailoverMode))
-		data.Failover.FailoverLifetime = types.StringValue(*api.GetActionConfig().FailoverLifetime)
-		if len(api.GetActionConfig().FailoverOriginStatusCodes) > 0 {
-			data.Failover.FailoverOriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().FailoverOriginStatusCodes)
-		} else {
-			data.Failover.FailoverOriginStatusCodes = emptyStringList
-		}
-	} else {
-		data.Failover = resource_rule_proxy.FailoverValue{}
-		data.Failover.FailoverMode = types.StringNull()
-		data.Failover.FailoverLifetime = types.StringNull()
-		data.Failover.FailoverOriginStatusCodes = emptyStringList
-	}
-
-	// Initialize empty lists for optional fields
-	data.Failover = resource_rule_proxy.FailoverValue{
-		FailoverMode:              types.StringValue("false"),
-		FailoverLifetime:          types.StringValue(""),
-		FailoverOriginStatusCodes: types.ListValueMust(types.StringType, []attr.Value{}),
-	}
-
-	data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{
-		OriginStatusCodes: types.ListValueMust(types.StringType, []attr.Value{}),
-		Period:            types.StringValue(""),
-		SlackWebhook:      types.StringValue(""),
-	}
-
-	thresholdObjType := types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"cooldown":     types.Int64Type,
-			"hits":         types.Int64Type,
-			"minutes":      types.Int64Type,
-			"mode":         types.StringType,
-			"notify_slack": types.StringType,
-			"rps":          types.Int64Type,
-			"type":         types.StringType,
-			"value":        types.StringType,
-		},
-	}
-	data.WafConfig.Thresholds = types.ListValueMust(thresholdObjType, []attr.Value{})
 
 	return
 }
@@ -640,31 +437,32 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	// The proxy location.
-	req.SetTo(data.Proxy.To.ValueString())
-	req.SetHost(data.Proxy.Host.ValueString())
-	req.SetCacheLifetime(int32(data.Proxy.CacheLifetime.ValueInt64()))
+	proxy := openapi.NewProxyConfigUpdateWithDefaults()
+	proxy.SetTo(data.Proxy.To.ValueString())
+	proxy.SetHost(data.Proxy.Host.ValueString())
+	proxy.SetCacheLifetime(int32(data.Proxy.CacheLifetime.ValueInt64()))
 
 	if data.Proxy.AuthUser.ValueString() != "" && data.Proxy.AuthPass.ValueString() != "" {
 		// Only set basic auth details if we have both.
-		req.SetAuthUser(data.Proxy.AuthUser.ValueString())
-		req.SetAuthPass(data.Proxy.AuthPass.ValueString())
+		proxy.SetAuthUser(data.Proxy.AuthUser.ValueString())
+		proxy.SetAuthPass(data.Proxy.AuthPass.ValueString())
 	}
 
-	req.SetDisableSslVerify(data.Proxy.DisableSslVerify.ValueBool())
-	req.SetOnlyProxy404(data.Proxy.OnlyProxy404.ValueBool())
+	proxy.SetDisableSslVerify(data.Proxy.DisableSslVerify.ValueBool())
+	proxy.SetOnlyProxy404(data.Proxy.OnlyProxy404.ValueBool())
 
-	if data.Failover.FailoverMode.ValueString() == "true" {
-		req.SetFailoverMode("true")
-	} else {
-		req.SetFailoverMode("false")
-	}
+	req.SetProxy(*proxy)
 
+	failover := openapi.NewFailoverConfigWithDefaults()
+	failover.SetFailoverMode(data.Failover.FailoverMode.ValueString())
+	failover.SetFailoverOriginTtfb(data.Failover.FailoverOriginTtfb.ValueString())
 	// Set strip headers.
 	var stripHeaders []string
 	for _, header := range data.Proxy.ProxyStripHeaders.Elements() {
 		stripHeaders = append(stripHeaders, header.String())
 	}
-	req.SetProxyStripHeaders(stripHeaders)
+	proxy.SetProxyStripHeaders(stripHeaders)
+	req.SetFailover(*failover)
 
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 
@@ -714,16 +512,6 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 	wafConfig.SetBlockReferer(blockReferer)
 
-	// httpbl dictionary support.
-	// httpbl := openapi.NewWAFConfigUpdateHttpblWithDefaults()
-	// httpbl.SetApiKey(data.WafConfig.Httpbl.ApiKey.ValueString())
-	// httpbl.SetBlockHarvester(data.WafConfig.Httpbl.BlockHarvester.ValueBool())
-	// httpbl.SetBlockSearchEngine(data.WafConfig.Httpbl.BlockSearchEngine.ValueBool())
-	// httpbl.SetBlockSpam(data.WafConfig.Httpbl.BlockSpam.ValueBool())
-	// httpbl.SetBlockSuspicious(data.WafConfig.Httpbl.BlockSuspicious.ValueBool())
-	// httpbl.SetHttpblEnabled(data.WafConfig.Httpbl.Enabled.ValueBool())
-	// wafConfig.SetHttpbl(*httpbl)
-
 	var emails []string
 	for _, email := range data.WafConfig.NotifyEmail.Elements() {
 		if e, ok := email.(types.String); ok {
@@ -761,7 +549,7 @@ func callRuleProxyDeleteAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	org := r.client.Organization
-	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyDelete(r.client.AuthContext, org, data.Project.ValueString(), data.RuleId.ValueString()).Execute()
+	_, err := r.client.Instance.RulesProxyAPI.RulesProxyDelete(r.client.AuthContext, org, data.Project.ValueString(), data.RuleId.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to delete rule proxy", err.Error())
@@ -877,11 +665,13 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	}
 
 	// Set proxy configuration
-	data.Proxy.AuthUser = types.StringValue(api.ActionConfig.GetAuthUser())
-	data.Proxy.AuthPass = types.StringValue(api.ActionConfig.GetAuthPass())
-	data.Proxy.CacheLifetime = types.Int64Value(int64(api.ActionConfig.GetCacheLifetime()))
-	data.Proxy.DisableSslVerify = types.BoolValue(api.ActionConfig.GetDisableSslVerify())
-	data.Proxy.OnlyProxy404 = types.BoolValue(api.ActionConfig.GetOnlyProxy404())
+	actionConfig := api.GetActionConfig()
+	proxy := actionConfig.Proxy
+	data.Proxy.AuthUser = types.StringValue(proxy.GetAuthUser())
+	data.Proxy.AuthPass = types.StringValue(proxy.GetAuthPass())
+	data.Proxy.CacheLifetime = types.Int64Value(int64(proxy.GetCacheLifetime()))
+	data.Proxy.DisableSslVerify = types.BoolValue(proxy.GetDisableSslVerify())
+	data.Proxy.OnlyProxy404 = types.BoolValue(proxy.GetOnlyProxy404())
 
 	// Set WAF configuration
 	data.WafConfig.NotifySlack = types.StringValue(api.GetActionConfig().WafConfig.GetNotifySlack())
@@ -918,39 +708,39 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		})
 	}
 
-	if len(api.GetActionConfig().WafConfig.GetBlockIp()) > 0 {
-		data.WafConfig.BlockIp, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockIp())
+	if len(actionConfig.WafConfig.GetBlockIp()) > 0 {
+		data.WafConfig.BlockIp, _ = types.ListValueFrom(ctx, types.StringType, actionConfig.WafConfig.GetBlockIp())
 	} else {
 		data.WafConfig.BlockIp = emptyStringList
 	}
 
-	if len(api.GetActionConfig().WafConfig.GetBlockUa()) > 0 {
-		data.WafConfig.BlockUa, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockUa())
+	if len(actionConfig.WafConfig.GetBlockUa()) > 0 {
+		data.WafConfig.BlockUa, _ = types.ListValueFrom(ctx, types.StringType, actionConfig.WafConfig.GetBlockUa())
 	} else {
 		data.WafConfig.BlockUa = emptyStringList
 	}
 
-	if len(api.GetActionConfig().WafConfig.GetBlockReferer()) > 0 {
-		data.WafConfig.BlockReferer, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetBlockReferer())
+	if len(actionConfig.WafConfig.GetBlockReferer()) > 0 {
+		data.WafConfig.BlockReferer, _ = types.ListValueFrom(ctx, types.StringType, actionConfig.WafConfig.GetBlockReferer())
 	} else {
 		data.WafConfig.BlockReferer = emptyStringList
 	}
 
-	if len(api.GetActionConfig().WafConfig.GetNotifyEmail()) > 0 {
-		data.WafConfig.NotifyEmail, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().WafConfig.GetNotifyEmail())
+	if len(actionConfig.WafConfig.GetNotifyEmail()) > 0 {
+		data.WafConfig.NotifyEmail, _ = types.ListValueFrom(ctx, types.StringType, actionConfig.WafConfig.GetNotifyEmail())
 	} else {
 		data.WafConfig.NotifyEmail = emptyStringList
 	}
 
 	// Set notification config
-	if api.GetActionConfig().NotifyConfig != nil {
-		if len(api.GetActionConfig().NotifyConfig.GetOriginStatusCodes()) > 0 {
-			data.NotifyConfig.OriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().NotifyConfig.GetOriginStatusCodes())
+	if actionConfig.NotifyConfig != nil {
+		if len(actionConfig.NotifyConfig.GetOriginStatusCodes()) > 0 {
+			data.NotifyConfig.OriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, actionConfig.NotifyConfig.GetOriginStatusCodes())
 		} else {
 			data.NotifyConfig.OriginStatusCodes = emptyStringList
 		}
-		data.NotifyConfig.Period = types.StringValue(api.GetActionConfig().NotifyConfig.GetPeriod())
-		data.NotifyConfig.SlackWebhook = types.StringValue(api.GetActionConfig().NotifyConfig.GetSlackWebhook())
+		data.NotifyConfig.Period = types.StringValue(actionConfig.NotifyConfig.GetPeriod())
+		data.NotifyConfig.SlackWebhook = types.StringValue(actionConfig.NotifyConfig.GetSlackWebhook())
 	} else {
 		data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{}
 		data.NotifyConfig.OriginStatusCodes = emptyStringList
@@ -959,18 +749,13 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	}
 
 	// Set failover config
-	if api.GetActionConfig().FailoverMode != nil {
-		data.Failover.FailoverMode = types.StringValue(fmt.Sprintf("%v", *api.GetActionConfig().FailoverMode))
-		data.Failover.FailoverLifetime = types.StringValue(*api.GetActionConfig().FailoverLifetime)
-		if len(api.GetActionConfig().FailoverOriginStatusCodes) > 0 {
-			data.Failover.FailoverOriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().FailoverOriginStatusCodes)
-		} else {
-			data.Failover.FailoverOriginStatusCodes = emptyStringList
-		}
+	failover := actionConfig.GetFailover()
+
+	data.Failover.FailoverMode = types.StringValue(fmt.Sprintf("%v", *failover.FailoverMode))
+	data.Failover.FailoverLifetime = types.StringValue(*failover.FailoverLifetime)
+	if len(failover.FailoverOriginStatusCodes) > 0 {
+		data.Failover.FailoverOriginStatusCodes, _ = types.ListValueFrom(ctx, types.StringType, failover.FailoverOriginStatusCodes)
 	} else {
-		data.Failover = resource_rule_proxy.FailoverValue{}
-		data.Failover.FailoverMode = types.StringNull()
-		data.Failover.FailoverLifetime = types.StringNull()
 		data.Failover.FailoverOriginStatusCodes = emptyStringList
 	}
 
