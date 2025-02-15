@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 
 	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
@@ -62,7 +61,8 @@ func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	// Create API call logic
-	resp.Diagnostics.Append(callDomainCreateAPI(ctx, r, &data)...)
+	diags := callDomainCreateAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -87,7 +87,8 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
+	diags := callDomainReadAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -106,7 +107,8 @@ func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	resp.Diagnostics.Append(callDomainUpdateAPI(ctx, r, &data)...)
+	diags := callDomainUpdateAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -131,7 +133,8 @@ func (r *domainResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	resp.Diagnostics.Append(callDomainDeleteAPI(ctx, r, &data)...)
+	diags := callDomainDeleteAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
