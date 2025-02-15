@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
-	openapiclient "github.com/quantcdn/quant-admin-go"
+	quantadmingoclient "github.com/quantcdn/quant-admin-go"
 )
 
 var (
@@ -159,7 +159,7 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // Create project request.
 func callProjectCreateAPI(ctx context.Context, r *projectResource, project *resource_project.ProjectModel) (diags diag.Diagnostics) {
-	req := *openapiclient.NewProjectRequestWithDefaults()
+	req := *quantadmingoclient.NewProjectRequestWithDefaults()
 
 	if project.Name.IsNull() || project.Name.IsUnknown() {
 		diags.AddAttributeError(
@@ -270,7 +270,7 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	org := r.client.Organization
-	req := *openapiclient.NewProjectRequestUpdateWithDefaults()
+	req := *quantadmingoclient.NewProjectRequestUpdateWithDefaults()
 
 	if project.BasicAuthUsername.IsNull() && !project.BasicAuthPassword.IsNull() {
 		diags.AddError(

@@ -5,15 +5,15 @@ import (
 	"os"
 	"testing"
 
-	openapi "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestListDomains(t *testing.T) {
 	bearer := os.Getenv("QUANT_BEARER")
-	cfg := openapi.NewConfiguration()
-	client := openapi.NewAPIClient(cfg)
-	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
+	cfg := quantadmingo.NewConfiguration()
+	client := quantadmingo.NewAPIClient(cfg)
+	ctx := context.WithValue(context.Background(), quantadmingo.ContextAccessToken, bearer)
 
 	domains, _, err := client.DomainsAPI.DomainsList(ctx, "quant", "api-test").Execute()
 

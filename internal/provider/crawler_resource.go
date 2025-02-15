@@ -14,7 +14,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	openapi "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -137,7 +137,7 @@ func (r *crawlerResource) Delete(ctx context.Context, req resource.DeleteRequest
 }
 
 func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	req := *openapi.NewCrawlerRequestWithDefaults()
+	req := *quantadmingo.NewCrawlerRequestWithDefaults()
 
 	req.SetBrowserMode(crawler.BrowserMode.ValueBool())
 	req.SetDomain(crawler.Domain.ValueString())
@@ -380,7 +380,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-	req := *openapi.NewCrawlerRequestUpdateWithDefaults()
+	req := *quantadmingo.NewCrawlerRequestUpdateWithDefaults()
 
 	req.SetDomain(crawler.Domain.ValueString())
 	req.SetBrowserMode(crawler.BrowserMode.ValueBool())

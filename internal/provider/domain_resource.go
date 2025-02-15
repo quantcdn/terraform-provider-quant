@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	openapi "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
 var (
@@ -124,7 +124,7 @@ func (r *domainResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	req := *openapi.NewDomainRequestWithDefaults()
+	req := *quantadmingo.NewDomainRequestWithDefaults()
 
 	req.Domain = domain.Domain.ValueString()
 
