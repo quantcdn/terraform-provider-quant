@@ -26,7 +26,17 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"action": schema.StringAttribute{
 				Computed: true,
 			},
-			"cookie_name": schema.StringAttribute{
+			"auth_pass": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  stringdefault.StaticString(""),
+			},
+			"auth_user": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  stringdefault.StaticString(""),
+			},
+			"cache_lifetime": schema.Int64Attribute{
 				Optional: true,
 				Computed: true,
 			},
@@ -37,6 +47,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					stringvalidator.OneOf(
 						"country_is",
 						"country_is_not",
+						"any",
 					),
 				},
 			},
@@ -49,6 +60,11 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				ElementType: types.StringType,
 				Optional:    true,
 				Computed:    true,
+			},
+			"disable_ssl_verify": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
 			},
 			"disabled": schema.BoolAttribute{
 				Optional: true,
@@ -66,9 +82,10 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						Computed: true,
 						Default:  stringdefault.StaticString("300"),
 					},
-					"failover_mode": schema.StringAttribute{
+					"failover_mode": schema.BoolAttribute{
 						Optional: true,
 						Computed: true,
+						Default:  booldefault.StaticBool(false),
 					},
 					"failover_origin_status_codes": schema.ListAttribute{
 						ElementType: types.StringType,
@@ -89,6 +106,15 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
+			"host": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"inject_headers": schema.MapAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
 			"ip": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -96,6 +122,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					stringvalidator.OneOf(
 						"ip_is",
 						"ip_is_not",
+						"any",
 					),
 				},
 			},
@@ -116,6 +143,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					stringvalidator.OneOf(
 						"method_is",
 						"method_is_not",
+						"any",
 					),
 				},
 			},
@@ -170,10 +198,13 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"only_with_cookie": schema.BoolAttribute{
+			"only_proxy_404": schema.BoolAttribute{
 				Optional: true,
 				Computed: true,
 				Default:  booldefault.StaticBool(false),
+			},
+			"only_with_cookie": schema.StringAttribute{
+				Computed: true,
 			},
 			"organization": schema.StringAttribute{
 				Optional: true,
@@ -183,57 +214,15 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"proxy": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{
-					"auth_pass": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
-					},
-					"auth_user": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
-					},
-					"cache_lifetime": schema.Int64Attribute{
-						Optional: true,
-						Computed: true,
-					},
-					"disable_ssl_verify": schema.BoolAttribute{
-						Optional: true,
-						Computed: true,
-					},
-					"host": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
-					},
-					"inject_headers": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
-						Computed:    true,
-					},
-					"only_proxy_404": schema.BoolAttribute{
-						Optional: true,
-						Computed: true,
-					},
-					"proxy_strip_headers": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
-						Computed:    true,
-					},
-					"proxy_strip_request_headers": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
-						Computed:    true,
-					},
-					"to": schema.StringAttribute{
-						Required: true,
-					},
-				},
-				CustomType: ProxyType{
-					ObjectType: types.ObjectType{
-						AttrTypes: ProxyValue{}.AttributeTypes(ctx),
-					},
-				},
-				Required: true,
+			"proxy_strip_headers": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
+			"proxy_strip_request_headers": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
 			},
 			"rule": schema.StringAttribute{
 				Optional: true,
@@ -241,6 +230,9 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"rule_id": schema.StringAttribute{
 				Computed: true,
+			},
+			"to": schema.StringAttribute{
+				Required: true,
 			},
 			"url": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -326,10 +318,6 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						Optional: true,
 						Computed: true,
 					},
-					"notify_slack_rpm": schema.Int64Attribute{
-						Optional: true,
-						Computed: true,
-					},
 					"paranoia_level": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
@@ -360,52 +348,6 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						Optional: true,
 						Computed: true,
 						Default:  int64default.StaticInt64(5),
-					},
-					"thresholds": schema.ListNestedAttribute{
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"cooldown": schema.Int64Attribute{
-									Optional: true,
-									Computed: true,
-								},
-								"hits": schema.Int64Attribute{
-									Optional: true,
-									Computed: true,
-								},
-								"minutes": schema.Int64Attribute{
-									Optional: true,
-									Computed: true,
-								},
-								"mode": schema.StringAttribute{
-									Optional: true,
-									Computed: true,
-									Default:  stringdefault.StaticString("disabled"),
-								},
-								"notify_slack": schema.StringAttribute{
-									Optional: true,
-									Computed: true,
-								},
-								"rps": schema.Int64Attribute{
-									Optional: true,
-									Computed: true,
-								},
-								"type": schema.StringAttribute{
-									Optional: true,
-									Computed: true,
-								},
-								"value": schema.StringAttribute{
-									Optional: true,
-									Computed: true,
-								},
-							},
-							CustomType: ThresholdsType{
-								ObjectType: types.ObjectType{
-									AttrTypes: ThresholdsValue{}.AttributeTypes(ctx),
-								},
-							},
-						},
-						Optional: true,
-						Computed: true,
 					},
 					"waf_ratelimit_cooldown": schema.Int64Attribute{
 						Optional: true,
@@ -451,40 +393,49 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"weight": schema.Int64Attribute{
 				Optional: true,
 				Computed: true,
+				Default:  int64default.StaticInt64(0),
 			},
 		},
 	}
 }
 
 type RuleProxyModel struct {
-	Action         types.String      `tfsdk:"action"`
-	CookieName     types.String      `tfsdk:"cookie_name"`
-	Country        types.String      `tfsdk:"country"`
-	CountryIs      types.List        `tfsdk:"country_is"`
-	CountryIsNot   types.List        `tfsdk:"country_is_not"`
-	Disabled       types.Bool        `tfsdk:"disabled"`
-	Domain         types.List        `tfsdk:"domain"`
-	Failover       FailoverValue     `tfsdk:"failover"`
-	Ip             types.String      `tfsdk:"ip"`
-	IpIs           types.List        `tfsdk:"ip_is"`
-	IpIsNot        types.List        `tfsdk:"ip_is_not"`
-	Method         types.String      `tfsdk:"method"`
-	MethodIs       types.List        `tfsdk:"method_is"`
-	MethodIsNot    types.List        `tfsdk:"method_is_not"`
-	Name           types.String      `tfsdk:"name"`
-	Notify         types.String      `tfsdk:"notify"`
-	NotifyConfig   NotifyConfigValue `tfsdk:"notify_config"`
-	OnlyWithCookie types.Bool        `tfsdk:"only_with_cookie"`
-	Organization   types.String      `tfsdk:"organization"`
-	Project        types.String      `tfsdk:"project"`
-	Proxy          ProxyValue        `tfsdk:"proxy"`
-	Rule           types.String      `tfsdk:"rule"`
-	RuleId         types.String      `tfsdk:"rule_id"`
-	Url            types.List        `tfsdk:"url"`
-	Uuid           types.String      `tfsdk:"uuid"`
-	WafConfig      WafConfigValue    `tfsdk:"waf_config"`
-	WafEnabled     types.Bool        `tfsdk:"waf_enabled"`
-	Weight         types.Int64       `tfsdk:"weight"`
+	Action                   types.String      `tfsdk:"action"`
+	AuthPass                 types.String      `tfsdk:"auth_pass"`
+	AuthUser                 types.String      `tfsdk:"auth_user"`
+	CacheLifetime            types.Int64       `tfsdk:"cache_lifetime"`
+	Country                  types.String      `tfsdk:"country"`
+	CountryIs                types.List        `tfsdk:"country_is"`
+	CountryIsNot             types.List        `tfsdk:"country_is_not"`
+	DisableSslVerify         types.Bool        `tfsdk:"disable_ssl_verify"`
+	Disabled                 types.Bool        `tfsdk:"disabled"`
+	Domain                   types.List        `tfsdk:"domain"`
+	Failover                 FailoverValue     `tfsdk:"failover"`
+	Host                     types.String      `tfsdk:"host"`
+	InjectHeaders            types.Map         `tfsdk:"inject_headers"`
+	Ip                       types.String      `tfsdk:"ip"`
+	IpIs                     types.List        `tfsdk:"ip_is"`
+	IpIsNot                  types.List        `tfsdk:"ip_is_not"`
+	Method                   types.String      `tfsdk:"method"`
+	MethodIs                 types.List        `tfsdk:"method_is"`
+	MethodIsNot              types.List        `tfsdk:"method_is_not"`
+	Name                     types.String      `tfsdk:"name"`
+	Notify                   types.String      `tfsdk:"notify"`
+	NotifyConfig             NotifyConfigValue `tfsdk:"notify_config"`
+	OnlyProxy404             types.Bool        `tfsdk:"only_proxy_404"`
+	OnlyWithCookie           types.String      `tfsdk:"only_with_cookie"`
+	Organization             types.String      `tfsdk:"organization"`
+	Project                  types.String      `tfsdk:"project"`
+	ProxyStripHeaders        types.List        `tfsdk:"proxy_strip_headers"`
+	ProxyStripRequestHeaders types.List        `tfsdk:"proxy_strip_request_headers"`
+	Rule                     types.String      `tfsdk:"rule"`
+	RuleId                   types.String      `tfsdk:"rule_id"`
+	To                       types.String      `tfsdk:"to"`
+	Url                      types.List        `tfsdk:"url"`
+	Uuid                     types.String      `tfsdk:"uuid"`
+	WafConfig                WafConfigValue    `tfsdk:"waf_config"`
+	WafEnabled               types.Bool        `tfsdk:"waf_enabled"`
+	Weight                   types.Int64       `tfsdk:"weight"`
 }
 
 var _ basetypes.ObjectTypable = FailoverType{}
@@ -540,12 +491,12 @@ func (t FailoverType) ValueFromObject(ctx context.Context, in basetypes.ObjectVa
 		return nil, diags
 	}
 
-	failoverModeVal, ok := failoverModeAttribute.(basetypes.StringValue)
+	failoverModeVal, ok := failoverModeAttribute.(basetypes.BoolValue)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_mode expected to be basetypes.StringValue, was: %T`, failoverModeAttribute))
+			fmt.Sprintf(`failover_mode expected to be basetypes.BoolValue, was: %T`, failoverModeAttribute))
 	}
 
 	failoverOriginStatusCodesAttribute, ok := attributes["failover_origin_status_codes"]
@@ -688,12 +639,12 @@ func NewFailoverValue(attributeTypes map[string]attr.Type, attributes map[string
 		return NewFailoverValueUnknown(), diags
 	}
 
-	failoverModeVal, ok := failoverModeAttribute.(basetypes.StringValue)
+	failoverModeVal, ok := failoverModeAttribute.(basetypes.BoolValue)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_mode expected to be basetypes.StringValue, was: %T`, failoverModeAttribute))
+			fmt.Sprintf(`failover_mode expected to be basetypes.BoolValue, was: %T`, failoverModeAttribute))
 	}
 
 	failoverOriginStatusCodesAttribute, ok := attributes["failover_origin_status_codes"]
@@ -814,7 +765,7 @@ var _ basetypes.ObjectValuable = FailoverValue{}
 
 type FailoverValue struct {
 	FailoverLifetime          basetypes.StringValue `tfsdk:"failover_lifetime"`
-	FailoverMode              basetypes.StringValue `tfsdk:"failover_mode"`
+	FailoverMode              basetypes.BoolValue   `tfsdk:"failover_mode"`
 	FailoverOriginStatusCodes basetypes.ListValue   `tfsdk:"failover_origin_status_codes"`
 	FailoverOriginTtfb        basetypes.StringValue `tfsdk:"failover_origin_ttfb"`
 	state                     attr.ValueState
@@ -827,7 +778,7 @@ func (v FailoverValue) ToTerraformValue(ctx context.Context) (tftypes.Value, err
 	var err error
 
 	attrTypes["failover_lifetime"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["failover_mode"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["failover_mode"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["failover_origin_status_codes"] = basetypes.ListType{
 		ElemType: types.StringType,
 	}.TerraformType(ctx)
@@ -907,7 +858,7 @@ func (v FailoverValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue
 	if d.HasError() {
 		return types.ObjectUnknown(map[string]attr.Type{
 			"failover_lifetime": basetypes.StringType{},
-			"failover_mode":     basetypes.StringType{},
+			"failover_mode":     basetypes.BoolType{},
 			"failover_origin_status_codes": basetypes.ListType{
 				ElemType: types.StringType,
 			},
@@ -918,7 +869,7 @@ func (v FailoverValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue
 	objVal, diags := types.ObjectValue(
 		map[string]attr.Type{
 			"failover_lifetime": basetypes.StringType{},
-			"failover_mode":     basetypes.StringType{},
+			"failover_mode":     basetypes.BoolType{},
 			"failover_origin_status_codes": basetypes.ListType{
 				ElemType: types.StringType,
 			},
@@ -979,7 +930,7 @@ func (v FailoverValue) Type(ctx context.Context) attr.Type {
 func (v FailoverValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
 		"failover_lifetime": basetypes.StringType{},
-		"failover_mode":     basetypes.StringType{},
+		"failover_mode":     basetypes.BoolType{},
 		"failover_origin_status_codes": basetypes.ListType{
 			ElemType: types.StringType,
 		},
@@ -1431,908 +1382,6 @@ func (v NotifyConfigValue) AttributeTypes(ctx context.Context) map[string]attr.T
 	}
 }
 
-var _ basetypes.ObjectTypable = ProxyType{}
-
-type ProxyType struct {
-	basetypes.ObjectType
-}
-
-func (t ProxyType) Equal(o attr.Type) bool {
-	other, ok := o.(ProxyType)
-
-	if !ok {
-		return false
-	}
-
-	return t.ObjectType.Equal(other.ObjectType)
-}
-
-func (t ProxyType) String() string {
-	return "ProxyType"
-}
-
-func (t ProxyType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	attributes := in.Attributes()
-
-	authPassAttribute, ok := attributes["auth_pass"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`auth_pass is missing from object`)
-
-		return nil, diags
-	}
-
-	authPassVal, ok := authPassAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`auth_pass expected to be basetypes.StringValue, was: %T`, authPassAttribute))
-	}
-
-	authUserAttribute, ok := attributes["auth_user"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`auth_user is missing from object`)
-
-		return nil, diags
-	}
-
-	authUserVal, ok := authUserAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`auth_user expected to be basetypes.StringValue, was: %T`, authUserAttribute))
-	}
-
-	cacheLifetimeAttribute, ok := attributes["cache_lifetime"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`cache_lifetime is missing from object`)
-
-		return nil, diags
-	}
-
-	cacheLifetimeVal, ok := cacheLifetimeAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`cache_lifetime expected to be basetypes.Int64Value, was: %T`, cacheLifetimeAttribute))
-	}
-
-	disableSslVerifyAttribute, ok := attributes["disable_ssl_verify"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`disable_ssl_verify is missing from object`)
-
-		return nil, diags
-	}
-
-	disableSslVerifyVal, ok := disableSslVerifyAttribute.(basetypes.BoolValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`disable_ssl_verify expected to be basetypes.BoolValue, was: %T`, disableSslVerifyAttribute))
-	}
-
-	hostAttribute, ok := attributes["host"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`host is missing from object`)
-
-		return nil, diags
-	}
-
-	hostVal, ok := hostAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`host expected to be basetypes.StringValue, was: %T`, hostAttribute))
-	}
-
-	injectHeadersAttribute, ok := attributes["inject_headers"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`inject_headers is missing from object`)
-
-		return nil, diags
-	}
-
-	injectHeadersVal, ok := injectHeadersAttribute.(basetypes.MapValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`inject_headers expected to be basetypes.MapValue, was: %T`, injectHeadersAttribute))
-	}
-
-	onlyProxy404Attribute, ok := attributes["only_proxy_404"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`only_proxy_404 is missing from object`)
-
-		return nil, diags
-	}
-
-	onlyProxy404Val, ok := onlyProxy404Attribute.(basetypes.BoolValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`only_proxy_404 expected to be basetypes.BoolValue, was: %T`, onlyProxy404Attribute))
-	}
-
-	proxyStripHeadersAttribute, ok := attributes["proxy_strip_headers"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`proxy_strip_headers is missing from object`)
-
-		return nil, diags
-	}
-
-	proxyStripHeadersVal, ok := proxyStripHeadersAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`proxy_strip_headers expected to be basetypes.ListValue, was: %T`, proxyStripHeadersAttribute))
-	}
-
-	proxyStripRequestHeadersAttribute, ok := attributes["proxy_strip_request_headers"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`proxy_strip_request_headers is missing from object`)
-
-		return nil, diags
-	}
-
-	proxyStripRequestHeadersVal, ok := proxyStripRequestHeadersAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`proxy_strip_request_headers expected to be basetypes.ListValue, was: %T`, proxyStripRequestHeadersAttribute))
-	}
-
-	toAttribute, ok := attributes["to"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`to is missing from object`)
-
-		return nil, diags
-	}
-
-	toVal, ok := toAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`to expected to be basetypes.StringValue, was: %T`, toAttribute))
-	}
-
-	if diags.HasError() {
-		return nil, diags
-	}
-
-	return ProxyValue{
-		AuthPass:                 authPassVal,
-		AuthUser:                 authUserVal,
-		CacheLifetime:            cacheLifetimeVal,
-		DisableSslVerify:         disableSslVerifyVal,
-		Host:                     hostVal,
-		InjectHeaders:            injectHeadersVal,
-		OnlyProxy404:             onlyProxy404Val,
-		ProxyStripHeaders:        proxyStripHeadersVal,
-		ProxyStripRequestHeaders: proxyStripRequestHeadersVal,
-		To:                       toVal,
-		state:                    attr.ValueStateKnown,
-	}, diags
-}
-
-func NewProxyValueNull() ProxyValue {
-	return ProxyValue{
-		state: attr.ValueStateNull,
-	}
-}
-
-func NewProxyValueUnknown() ProxyValue {
-	return ProxyValue{
-		state: attr.ValueStateUnknown,
-	}
-}
-
-func NewProxyValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ProxyValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
-	ctx := context.Background()
-
-	for name, attributeType := range attributeTypes {
-		attribute, ok := attributes[name]
-
-		if !ok {
-			diags.AddError(
-				"Missing ProxyValue Attribute Value",
-				"While creating a ProxyValue value, a missing attribute value was detected. "+
-					"A ProxyValue must contain values for all attributes, even if null or unknown. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("ProxyValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
-			)
-
-			continue
-		}
-
-		if !attributeType.Equal(attribute.Type(ctx)) {
-			diags.AddError(
-				"Invalid ProxyValue Attribute Type",
-				"While creating a ProxyValue value, an invalid attribute value was detected. "+
-					"A ProxyValue must use a matching attribute type for the value. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("ProxyValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
-					fmt.Sprintf("ProxyValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
-			)
-		}
-	}
-
-	for name := range attributes {
-		_, ok := attributeTypes[name]
-
-		if !ok {
-			diags.AddError(
-				"Extra ProxyValue Attribute Value",
-				"While creating a ProxyValue value, an extra attribute value was detected. "+
-					"A ProxyValue must not contain values beyond the expected attribute types. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("Extra ProxyValue Attribute Name: %s", name),
-			)
-		}
-	}
-
-	if diags.HasError() {
-		return NewProxyValueUnknown(), diags
-	}
-
-	authPassAttribute, ok := attributes["auth_pass"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`auth_pass is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	authPassVal, ok := authPassAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`auth_pass expected to be basetypes.StringValue, was: %T`, authPassAttribute))
-	}
-
-	authUserAttribute, ok := attributes["auth_user"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`auth_user is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	authUserVal, ok := authUserAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`auth_user expected to be basetypes.StringValue, was: %T`, authUserAttribute))
-	}
-
-	cacheLifetimeAttribute, ok := attributes["cache_lifetime"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`cache_lifetime is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	cacheLifetimeVal, ok := cacheLifetimeAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`cache_lifetime expected to be basetypes.Int64Value, was: %T`, cacheLifetimeAttribute))
-	}
-
-	disableSslVerifyAttribute, ok := attributes["disable_ssl_verify"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`disable_ssl_verify is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	disableSslVerifyVal, ok := disableSslVerifyAttribute.(basetypes.BoolValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`disable_ssl_verify expected to be basetypes.BoolValue, was: %T`, disableSslVerifyAttribute))
-	}
-
-	hostAttribute, ok := attributes["host"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`host is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	hostVal, ok := hostAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`host expected to be basetypes.StringValue, was: %T`, hostAttribute))
-	}
-
-	injectHeadersAttribute, ok := attributes["inject_headers"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`inject_headers is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	injectHeadersVal, ok := injectHeadersAttribute.(basetypes.MapValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`inject_headers expected to be basetypes.MapValue, was: %T`, injectHeadersAttribute))
-	}
-
-	onlyProxy404Attribute, ok := attributes["only_proxy_404"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`only_proxy_404 is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	onlyProxy404Val, ok := onlyProxy404Attribute.(basetypes.BoolValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`only_proxy_404 expected to be basetypes.BoolValue, was: %T`, onlyProxy404Attribute))
-	}
-
-	proxyStripHeadersAttribute, ok := attributes["proxy_strip_headers"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`proxy_strip_headers is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	proxyStripHeadersVal, ok := proxyStripHeadersAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`proxy_strip_headers expected to be basetypes.ListValue, was: %T`, proxyStripHeadersAttribute))
-	}
-
-	proxyStripRequestHeadersAttribute, ok := attributes["proxy_strip_request_headers"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`proxy_strip_request_headers is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	proxyStripRequestHeadersVal, ok := proxyStripRequestHeadersAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`proxy_strip_request_headers expected to be basetypes.ListValue, was: %T`, proxyStripRequestHeadersAttribute))
-	}
-
-	toAttribute, ok := attributes["to"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`to is missing from object`)
-
-		return NewProxyValueUnknown(), diags
-	}
-
-	toVal, ok := toAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`to expected to be basetypes.StringValue, was: %T`, toAttribute))
-	}
-
-	if diags.HasError() {
-		return NewProxyValueUnknown(), diags
-	}
-
-	return ProxyValue{
-		AuthPass:                 authPassVal,
-		AuthUser:                 authUserVal,
-		CacheLifetime:            cacheLifetimeVal,
-		DisableSslVerify:         disableSslVerifyVal,
-		Host:                     hostVal,
-		InjectHeaders:            injectHeadersVal,
-		OnlyProxy404:             onlyProxy404Val,
-		ProxyStripHeaders:        proxyStripHeadersVal,
-		ProxyStripRequestHeaders: proxyStripRequestHeadersVal,
-		To:                       toVal,
-		state:                    attr.ValueStateKnown,
-	}, diags
-}
-
-func NewProxyValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ProxyValue {
-	object, diags := NewProxyValue(attributeTypes, attributes)
-
-	if diags.HasError() {
-		// This could potentially be added to the diag package.
-		diagsStrings := make([]string, 0, len(diags))
-
-		for _, diagnostic := range diags {
-			diagsStrings = append(diagsStrings, fmt.Sprintf(
-				"%s | %s | %s",
-				diagnostic.Severity(),
-				diagnostic.Summary(),
-				diagnostic.Detail()))
-		}
-
-		panic("NewProxyValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
-	}
-
-	return object
-}
-
-func (t ProxyType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-	if in.Type() == nil {
-		return NewProxyValueNull(), nil
-	}
-
-	if !in.Type().Equal(t.TerraformType(ctx)) {
-		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
-	}
-
-	if !in.IsKnown() {
-		return NewProxyValueUnknown(), nil
-	}
-
-	if in.IsNull() {
-		return NewProxyValueNull(), nil
-	}
-
-	attributes := map[string]attr.Value{}
-
-	val := map[string]tftypes.Value{}
-
-	err := in.As(&val)
-
-	if err != nil {
-		return nil, err
-	}
-
-	for k, v := range val {
-		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
-
-		if err != nil {
-			return nil, err
-		}
-
-		attributes[k] = a
-	}
-
-	return NewProxyValueMust(ProxyValue{}.AttributeTypes(ctx), attributes), nil
-}
-
-func (t ProxyType) ValueType(ctx context.Context) attr.Value {
-	return ProxyValue{}
-}
-
-var _ basetypes.ObjectValuable = ProxyValue{}
-
-type ProxyValue struct {
-	AuthPass                 basetypes.StringValue `tfsdk:"auth_pass"`
-	AuthUser                 basetypes.StringValue `tfsdk:"auth_user"`
-	CacheLifetime            basetypes.Int64Value  `tfsdk:"cache_lifetime"`
-	DisableSslVerify         basetypes.BoolValue   `tfsdk:"disable_ssl_verify"`
-	Host                     basetypes.StringValue `tfsdk:"host"`
-	InjectHeaders            basetypes.MapValue    `tfsdk:"inject_headers"`
-	OnlyProxy404             basetypes.BoolValue   `tfsdk:"only_proxy_404"`
-	ProxyStripHeaders        basetypes.ListValue   `tfsdk:"proxy_strip_headers"`
-	ProxyStripRequestHeaders basetypes.ListValue   `tfsdk:"proxy_strip_request_headers"`
-	To                       basetypes.StringValue `tfsdk:"to"`
-	state                    attr.ValueState
-}
-
-func (v ProxyValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 10)
-
-	var val tftypes.Value
-	var err error
-
-	attrTypes["auth_pass"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["auth_user"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["cache_lifetime"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["disable_ssl_verify"] = basetypes.BoolType{}.TerraformType(ctx)
-	attrTypes["host"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["inject_headers"] = basetypes.MapType{
-		ElemType: types.StringType,
-	}.TerraformType(ctx)
-	attrTypes["only_proxy_404"] = basetypes.BoolType{}.TerraformType(ctx)
-	attrTypes["proxy_strip_headers"] = basetypes.ListType{
-		ElemType: types.StringType,
-	}.TerraformType(ctx)
-	attrTypes["proxy_strip_request_headers"] = basetypes.ListType{
-		ElemType: types.StringType,
-	}.TerraformType(ctx)
-	attrTypes["to"] = basetypes.StringType{}.TerraformType(ctx)
-
-	objectType := tftypes.Object{AttributeTypes: attrTypes}
-
-	switch v.state {
-	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 10)
-
-		val, err = v.AuthPass.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["auth_pass"] = val
-
-		val, err = v.AuthUser.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["auth_user"] = val
-
-		val, err = v.CacheLifetime.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["cache_lifetime"] = val
-
-		val, err = v.DisableSslVerify.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["disable_ssl_verify"] = val
-
-		val, err = v.Host.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["host"] = val
-
-		val, err = v.InjectHeaders.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["inject_headers"] = val
-
-		val, err = v.OnlyProxy404.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["only_proxy_404"] = val
-
-		val, err = v.ProxyStripHeaders.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["proxy_strip_headers"] = val
-
-		val, err = v.ProxyStripRequestHeaders.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["proxy_strip_request_headers"] = val
-
-		val, err = v.To.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["to"] = val
-
-		if err := tftypes.ValidateValue(objectType, vals); err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		return tftypes.NewValue(objectType, vals), nil
-	case attr.ValueStateNull:
-		return tftypes.NewValue(objectType, nil), nil
-	case attr.ValueStateUnknown:
-		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
-	default:
-		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
-	}
-}
-
-func (v ProxyValue) IsNull() bool {
-	return v.state == attr.ValueStateNull
-}
-
-func (v ProxyValue) IsUnknown() bool {
-	return v.state == attr.ValueStateUnknown
-}
-
-func (v ProxyValue) String() string {
-	return "ProxyValue"
-}
-
-func (v ProxyValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	injectHeadersVal, d := types.MapValue(types.StringType, v.InjectHeaders.Elements())
-
-	diags.Append(d...)
-
-	if d.HasError() {
-		return types.ObjectUnknown(map[string]attr.Type{
-			"auth_pass":          basetypes.StringType{},
-			"auth_user":          basetypes.StringType{},
-			"cache_lifetime":     basetypes.Int64Type{},
-			"disable_ssl_verify": basetypes.BoolType{},
-			"host":               basetypes.StringType{},
-			"inject_headers": basetypes.MapType{
-				ElemType: types.StringType,
-			},
-			"only_proxy_404": basetypes.BoolType{},
-			"proxy_strip_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"proxy_strip_request_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"to": basetypes.StringType{},
-		}), diags
-	}
-
-	proxyStripHeadersVal, d := types.ListValue(types.StringType, v.ProxyStripHeaders.Elements())
-
-	diags.Append(d...)
-
-	if d.HasError() {
-		return types.ObjectUnknown(map[string]attr.Type{
-			"auth_pass":          basetypes.StringType{},
-			"auth_user":          basetypes.StringType{},
-			"cache_lifetime":     basetypes.Int64Type{},
-			"disable_ssl_verify": basetypes.BoolType{},
-			"host":               basetypes.StringType{},
-			"inject_headers": basetypes.MapType{
-				ElemType: types.StringType,
-			},
-			"only_proxy_404": basetypes.BoolType{},
-			"proxy_strip_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"proxy_strip_request_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"to": basetypes.StringType{},
-		}), diags
-	}
-
-	proxyStripRequestHeadersVal, d := types.ListValue(types.StringType, v.ProxyStripRequestHeaders.Elements())
-
-	diags.Append(d...)
-
-	if d.HasError() {
-		return types.ObjectUnknown(map[string]attr.Type{
-			"auth_pass":          basetypes.StringType{},
-			"auth_user":          basetypes.StringType{},
-			"cache_lifetime":     basetypes.Int64Type{},
-			"disable_ssl_verify": basetypes.BoolType{},
-			"host":               basetypes.StringType{},
-			"inject_headers": basetypes.MapType{
-				ElemType: types.StringType,
-			},
-			"only_proxy_404": basetypes.BoolType{},
-			"proxy_strip_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"proxy_strip_request_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"to": basetypes.StringType{},
-		}), diags
-	}
-
-	objVal, diags := types.ObjectValue(
-		map[string]attr.Type{
-			"auth_pass":          basetypes.StringType{},
-			"auth_user":          basetypes.StringType{},
-			"cache_lifetime":     basetypes.Int64Type{},
-			"disable_ssl_verify": basetypes.BoolType{},
-			"host":               basetypes.StringType{},
-			"inject_headers": basetypes.MapType{
-				ElemType: types.StringType,
-			},
-			"only_proxy_404": basetypes.BoolType{},
-			"proxy_strip_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"proxy_strip_request_headers": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"to": basetypes.StringType{},
-		},
-		map[string]attr.Value{
-			"auth_pass":                   v.AuthPass,
-			"auth_user":                   v.AuthUser,
-			"cache_lifetime":              v.CacheLifetime,
-			"disable_ssl_verify":          v.DisableSslVerify,
-			"host":                        v.Host,
-			"inject_headers":              injectHeadersVal,
-			"only_proxy_404":              v.OnlyProxy404,
-			"proxy_strip_headers":         proxyStripHeadersVal,
-			"proxy_strip_request_headers": proxyStripRequestHeadersVal,
-			"to":                          v.To,
-		})
-
-	return objVal, diags
-}
-
-func (v ProxyValue) Equal(o attr.Value) bool {
-	other, ok := o.(ProxyValue)
-
-	if !ok {
-		return false
-	}
-
-	if v.state != other.state {
-		return false
-	}
-
-	if v.state != attr.ValueStateKnown {
-		return true
-	}
-
-	if !v.AuthPass.Equal(other.AuthPass) {
-		return false
-	}
-
-	if !v.AuthUser.Equal(other.AuthUser) {
-		return false
-	}
-
-	if !v.CacheLifetime.Equal(other.CacheLifetime) {
-		return false
-	}
-
-	if !v.DisableSslVerify.Equal(other.DisableSslVerify) {
-		return false
-	}
-
-	if !v.Host.Equal(other.Host) {
-		return false
-	}
-
-	if !v.InjectHeaders.Equal(other.InjectHeaders) {
-		return false
-	}
-
-	if !v.OnlyProxy404.Equal(other.OnlyProxy404) {
-		return false
-	}
-
-	if !v.ProxyStripHeaders.Equal(other.ProxyStripHeaders) {
-		return false
-	}
-
-	if !v.ProxyStripRequestHeaders.Equal(other.ProxyStripRequestHeaders) {
-		return false
-	}
-
-	if !v.To.Equal(other.To) {
-		return false
-	}
-
-	return true
-}
-
-func (v ProxyValue) Type(ctx context.Context) attr.Type {
-	return ProxyType{
-		basetypes.ObjectType{
-			AttrTypes: v.AttributeTypes(ctx),
-		},
-	}
-}
-
-func (v ProxyValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
-	return map[string]attr.Type{
-		"auth_pass":          basetypes.StringType{},
-		"auth_user":          basetypes.StringType{},
-		"cache_lifetime":     basetypes.Int64Type{},
-		"disable_ssl_verify": basetypes.BoolType{},
-		"host":               basetypes.StringType{},
-		"inject_headers": basetypes.MapType{
-			ElemType: types.StringType,
-		},
-		"only_proxy_404": basetypes.BoolType{},
-		"proxy_strip_headers": basetypes.ListType{
-			ElemType: types.StringType,
-		},
-		"proxy_strip_request_headers": basetypes.ListType{
-			ElemType: types.StringType,
-		},
-		"to": basetypes.StringType{},
-	}
-}
-
 var _ basetypes.ObjectTypable = WafConfigType{}
 
 type WafConfigType struct {
@@ -2592,24 +1641,6 @@ func (t WafConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectV
 			fmt.Sprintf(`notify_slack_hits_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackHitsRpmAttribute))
 	}
 
-	notifySlackRpmAttribute, ok := attributes["notify_slack_rpm"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`notify_slack_rpm is missing from object`)
-
-		return nil, diags
-	}
-
-	notifySlackRpmVal, ok := notifySlackRpmAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`notify_slack_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackRpmAttribute))
-	}
-
 	paranoiaLevelAttribute, ok := attributes["paranoia_level"]
 
 	if !ok {
@@ -2698,24 +1729,6 @@ func (t WafConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectV
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`request_header_ratelimit_rps expected to be basetypes.Int64Value, was: %T`, requestHeaderRatelimitRpsAttribute))
-	}
-
-	thresholdsAttribute, ok := attributes["thresholds"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`thresholds is missing from object`)
-
-		return nil, diags
-	}
-
-	thresholdsVal, ok := thresholdsAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`thresholds expected to be basetypes.ListValue, was: %T`, thresholdsAttribute))
 	}
 
 	wafRatelimitCooldownAttribute, ok := attributes["waf_ratelimit_cooldown"]
@@ -2808,13 +1821,11 @@ func (t WafConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectV
 		NotifyEmail:                    notifyEmailVal,
 		NotifySlack:                    notifySlackVal,
 		NotifySlackHitsRpm:             notifySlackHitsRpmVal,
-		NotifySlackRpm:                 notifySlackRpmVal,
 		ParanoiaLevel:                  paranoiaLevelVal,
 		RequestHeaderName:              requestHeaderNameVal,
 		RequestHeaderRatelimitCooldown: requestHeaderRatelimitCooldownVal,
 		RequestHeaderRatelimitMode:     requestHeaderRatelimitModeVal,
 		RequestHeaderRatelimitRps:      requestHeaderRatelimitRpsVal,
-		Thresholds:                     thresholdsVal,
 		WafRatelimitCooldown:           wafRatelimitCooldownVal,
 		WafRatelimitHits:               wafRatelimitHitsVal,
 		WafRatelimitMode:               wafRatelimitModeVal,
@@ -3120,24 +2131,6 @@ func NewWafConfigValue(attributeTypes map[string]attr.Type, attributes map[strin
 			fmt.Sprintf(`notify_slack_hits_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackHitsRpmAttribute))
 	}
 
-	notifySlackRpmAttribute, ok := attributes["notify_slack_rpm"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`notify_slack_rpm is missing from object`)
-
-		return NewWafConfigValueUnknown(), diags
-	}
-
-	notifySlackRpmVal, ok := notifySlackRpmAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`notify_slack_rpm expected to be basetypes.Int64Value, was: %T`, notifySlackRpmAttribute))
-	}
-
 	paranoiaLevelAttribute, ok := attributes["paranoia_level"]
 
 	if !ok {
@@ -3226,24 +2219,6 @@ func NewWafConfigValue(attributeTypes map[string]attr.Type, attributes map[strin
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`request_header_ratelimit_rps expected to be basetypes.Int64Value, was: %T`, requestHeaderRatelimitRpsAttribute))
-	}
-
-	thresholdsAttribute, ok := attributes["thresholds"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`thresholds is missing from object`)
-
-		return NewWafConfigValueUnknown(), diags
-	}
-
-	thresholdsVal, ok := thresholdsAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`thresholds expected to be basetypes.ListValue, was: %T`, thresholdsAttribute))
 	}
 
 	wafRatelimitCooldownAttribute, ok := attributes["waf_ratelimit_cooldown"]
@@ -3336,13 +2311,11 @@ func NewWafConfigValue(attributeTypes map[string]attr.Type, attributes map[strin
 		NotifyEmail:                    notifyEmailVal,
 		NotifySlack:                    notifySlackVal,
 		NotifySlackHitsRpm:             notifySlackHitsRpmVal,
-		NotifySlackRpm:                 notifySlackRpmVal,
 		ParanoiaLevel:                  paranoiaLevelVal,
 		RequestHeaderName:              requestHeaderNameVal,
 		RequestHeaderRatelimitCooldown: requestHeaderRatelimitCooldownVal,
 		RequestHeaderRatelimitMode:     requestHeaderRatelimitModeVal,
 		RequestHeaderRatelimitRps:      requestHeaderRatelimitRpsVal,
-		Thresholds:                     thresholdsVal,
 		WafRatelimitCooldown:           wafRatelimitCooldownVal,
 		WafRatelimitHits:               wafRatelimitHitsVal,
 		WafRatelimitMode:               wafRatelimitModeVal,
@@ -3432,13 +2405,11 @@ type WafConfigValue struct {
 	NotifyEmail                    basetypes.ListValue   `tfsdk:"notify_email"`
 	NotifySlack                    basetypes.StringValue `tfsdk:"notify_slack"`
 	NotifySlackHitsRpm             basetypes.Int64Value  `tfsdk:"notify_slack_hits_rpm"`
-	NotifySlackRpm                 basetypes.Int64Value  `tfsdk:"notify_slack_rpm"`
 	ParanoiaLevel                  basetypes.Int64Value  `tfsdk:"paranoia_level"`
 	RequestHeaderName              basetypes.StringValue `tfsdk:"request_header_name"`
 	RequestHeaderRatelimitCooldown basetypes.Int64Value  `tfsdk:"request_header_ratelimit_cooldown"`
 	RequestHeaderRatelimitMode     basetypes.StringValue `tfsdk:"request_header_ratelimit_mode"`
 	RequestHeaderRatelimitRps      basetypes.Int64Value  `tfsdk:"request_header_ratelimit_rps"`
-	Thresholds                     basetypes.ListValue   `tfsdk:"thresholds"`
 	WafRatelimitCooldown           basetypes.Int64Value  `tfsdk:"waf_ratelimit_cooldown"`
 	WafRatelimitHits               basetypes.Int64Value  `tfsdk:"waf_ratelimit_hits"`
 	WafRatelimitMode               basetypes.StringValue `tfsdk:"waf_ratelimit_mode"`
@@ -3447,7 +2418,7 @@ type WafConfigValue struct {
 }
 
 func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 24)
+	attrTypes := make(map[string]tftypes.Type, 22)
 
 	var val tftypes.Value
 	var err error
@@ -3479,15 +2450,11 @@ func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, er
 	}.TerraformType(ctx)
 	attrTypes["notify_slack"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["notify_slack_hits_rpm"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["notify_slack_rpm"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["paranoia_level"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["request_header_name"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["request_header_ratelimit_cooldown"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["request_header_ratelimit_mode"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["request_header_ratelimit_rps"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["thresholds"] = basetypes.ListType{
-		ElemType: ThresholdsValue{}.Type(ctx),
-	}.TerraformType(ctx)
 	attrTypes["waf_ratelimit_cooldown"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["waf_ratelimit_hits"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["waf_ratelimit_mode"] = basetypes.StringType{}.TerraformType(ctx)
@@ -3497,7 +2464,7 @@ func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, er
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 24)
+		vals := make(map[string]tftypes.Value, 22)
 
 		val, err = v.AllowIp.ToTerraformValue(ctx)
 
@@ -3603,14 +2570,6 @@ func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, er
 
 		vals["notify_slack_hits_rpm"] = val
 
-		val, err = v.NotifySlackRpm.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["notify_slack_rpm"] = val
-
 		val, err = v.ParanoiaLevel.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -3650,14 +2609,6 @@ func (v WafConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, er
 		}
 
 		vals["request_header_ratelimit_rps"] = val
-
-		val, err = v.Thresholds.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["thresholds"] = val
 
 		val, err = v.WafRatelimitCooldown.ToTerraformValue(ctx)
 
@@ -3720,35 +2671,6 @@ func (v WafConfigValue) String() string {
 func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	thresholds := types.ListValueMust(
-		ThresholdsType{
-			basetypes.ObjectType{
-				AttrTypes: ThresholdsValue{}.AttributeTypes(ctx),
-			},
-		},
-		v.Thresholds.Elements(),
-	)
-
-	if v.Thresholds.IsNull() {
-		thresholds = types.ListNull(
-			ThresholdsType{
-				basetypes.ObjectType{
-					AttrTypes: ThresholdsValue{}.AttributeTypes(ctx),
-				},
-			},
-		)
-	}
-
-	if v.Thresholds.IsUnknown() {
-		thresholds = types.ListUnknown(
-			ThresholdsType{
-				basetypes.ObjectType{
-					AttrTypes: ThresholdsValue{}.AttributeTypes(ctx),
-				},
-			},
-		)
-	}
-
 	allowIpVal, d := types.ListValue(types.StringType, v.AllowIp.Elements())
 
 	diags.Append(d...)
@@ -3782,19 +2704,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		}), diags
 	}
 
@@ -3831,19 +2749,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		}), diags
 	}
 
@@ -3880,19 +2794,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		}), diags
 	}
 
@@ -3929,19 +2839,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		}), diags
 	}
 
@@ -3978,19 +2884,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		}), diags
 	}
 
@@ -4027,19 +2929,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		}), diags
 	}
 
@@ -4076,19 +2974,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		}), diags
 	}
 
@@ -4121,19 +3015,15 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			},
 			"notify_slack":                      basetypes.StringType{},
 			"notify_slack_hits_rpm":             basetypes.Int64Type{},
-			"notify_slack_rpm":                  basetypes.Int64Type{},
 			"paranoia_level":                    basetypes.Int64Type{},
 			"request_header_name":               basetypes.StringType{},
 			"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 			"request_header_ratelimit_mode":     basetypes.StringType{},
 			"request_header_ratelimit_rps":      basetypes.Int64Type{},
-			"thresholds": basetypes.ListType{
-				ElemType: ThresholdsValue{}.Type(ctx),
-			},
-			"waf_ratelimit_cooldown": basetypes.Int64Type{},
-			"waf_ratelimit_hits":     basetypes.Int64Type{},
-			"waf_ratelimit_mode":     basetypes.StringType{},
-			"waf_ratelimit_rps":      basetypes.Int64Type{},
+			"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+			"waf_ratelimit_hits":                basetypes.Int64Type{},
+			"waf_ratelimit_mode":                basetypes.StringType{},
+			"waf_ratelimit_rps":                 basetypes.Int64Type{},
 		},
 		map[string]attr.Value{
 			"allow_ip":                          allowIpVal,
@@ -4149,13 +3039,11 @@ func (v WafConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValu
 			"notify_email":                      notifyEmailVal,
 			"notify_slack":                      v.NotifySlack,
 			"notify_slack_hits_rpm":             v.NotifySlackHitsRpm,
-			"notify_slack_rpm":                  v.NotifySlackRpm,
 			"paranoia_level":                    v.ParanoiaLevel,
 			"request_header_name":               v.RequestHeaderName,
 			"request_header_ratelimit_cooldown": v.RequestHeaderRatelimitCooldown,
 			"request_header_ratelimit_mode":     v.RequestHeaderRatelimitMode,
 			"request_header_ratelimit_rps":      v.RequestHeaderRatelimitRps,
-			"thresholds":                        thresholds,
 			"waf_ratelimit_cooldown":            v.WafRatelimitCooldown,
 			"waf_ratelimit_hits":                v.WafRatelimitHits,
 			"waf_ratelimit_mode":                v.WafRatelimitMode,
@@ -4232,10 +3120,6 @@ func (v WafConfigValue) Equal(o attr.Value) bool {
 		return false
 	}
 
-	if !v.NotifySlackRpm.Equal(other.NotifySlackRpm) {
-		return false
-	}
-
 	if !v.ParanoiaLevel.Equal(other.ParanoiaLevel) {
 		return false
 	}
@@ -4253,10 +3137,6 @@ func (v WafConfigValue) Equal(o attr.Value) bool {
 	}
 
 	if !v.RequestHeaderRatelimitRps.Equal(other.RequestHeaderRatelimitRps) {
-		return false
-	}
-
-	if !v.Thresholds.Equal(other.Thresholds) {
 		return false
 	}
 
@@ -4316,717 +3196,14 @@ func (v WafConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type
 		},
 		"notify_slack":                      basetypes.StringType{},
 		"notify_slack_hits_rpm":             basetypes.Int64Type{},
-		"notify_slack_rpm":                  basetypes.Int64Type{},
 		"paranoia_level":                    basetypes.Int64Type{},
 		"request_header_name":               basetypes.StringType{},
 		"request_header_ratelimit_cooldown": basetypes.Int64Type{},
 		"request_header_ratelimit_mode":     basetypes.StringType{},
 		"request_header_ratelimit_rps":      basetypes.Int64Type{},
-		"thresholds": basetypes.ListType{
-			ElemType: ThresholdsValue{}.Type(ctx),
-		},
-		"waf_ratelimit_cooldown": basetypes.Int64Type{},
-		"waf_ratelimit_hits":     basetypes.Int64Type{},
-		"waf_ratelimit_mode":     basetypes.StringType{},
-		"waf_ratelimit_rps":      basetypes.Int64Type{},
-	}
-}
-
-var _ basetypes.ObjectTypable = ThresholdsType{}
-
-type ThresholdsType struct {
-	basetypes.ObjectType
-}
-
-func (t ThresholdsType) Equal(o attr.Type) bool {
-	other, ok := o.(ThresholdsType)
-
-	if !ok {
-		return false
-	}
-
-	return t.ObjectType.Equal(other.ObjectType)
-}
-
-func (t ThresholdsType) String() string {
-	return "ThresholdsType"
-}
-
-func (t ThresholdsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	attributes := in.Attributes()
-
-	cooldownAttribute, ok := attributes["cooldown"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`cooldown is missing from object`)
-
-		return nil, diags
-	}
-
-	cooldownVal, ok := cooldownAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`cooldown expected to be basetypes.Int64Value, was: %T`, cooldownAttribute))
-	}
-
-	hitsAttribute, ok := attributes["hits"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`hits is missing from object`)
-
-		return nil, diags
-	}
-
-	hitsVal, ok := hitsAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`hits expected to be basetypes.Int64Value, was: %T`, hitsAttribute))
-	}
-
-	minutesAttribute, ok := attributes["minutes"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`minutes is missing from object`)
-
-		return nil, diags
-	}
-
-	minutesVal, ok := minutesAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`minutes expected to be basetypes.Int64Value, was: %T`, minutesAttribute))
-	}
-
-	modeAttribute, ok := attributes["mode"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`mode is missing from object`)
-
-		return nil, diags
-	}
-
-	modeVal, ok := modeAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`mode expected to be basetypes.StringValue, was: %T`, modeAttribute))
-	}
-
-	notifySlackAttribute, ok := attributes["notify_slack"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`notify_slack is missing from object`)
-
-		return nil, diags
-	}
-
-	notifySlackVal, ok := notifySlackAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`notify_slack expected to be basetypes.StringValue, was: %T`, notifySlackAttribute))
-	}
-
-	rpsAttribute, ok := attributes["rps"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`rps is missing from object`)
-
-		return nil, diags
-	}
-
-	rpsVal, ok := rpsAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`rps expected to be basetypes.Int64Value, was: %T`, rpsAttribute))
-	}
-
-	typeAttribute, ok := attributes["type"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`type is missing from object`)
-
-		return nil, diags
-	}
-
-	typeVal, ok := typeAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`type expected to be basetypes.StringValue, was: %T`, typeAttribute))
-	}
-
-	valueAttribute, ok := attributes["value"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`value is missing from object`)
-
-		return nil, diags
-	}
-
-	valueVal, ok := valueAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`value expected to be basetypes.StringValue, was: %T`, valueAttribute))
-	}
-
-	if diags.HasError() {
-		return nil, diags
-	}
-
-	return ThresholdsValue{
-		Cooldown:       cooldownVal,
-		Hits:           hitsVal,
-		Minutes:        minutesVal,
-		Mode:           modeVal,
-		NotifySlack:    notifySlackVal,
-		Rps:            rpsVal,
-		ThresholdsType: typeVal,
-		Value:          valueVal,
-		state:          attr.ValueStateKnown,
-	}, diags
-}
-
-func NewThresholdsValueNull() ThresholdsValue {
-	return ThresholdsValue{
-		state: attr.ValueStateNull,
-	}
-}
-
-func NewThresholdsValueUnknown() ThresholdsValue {
-	return ThresholdsValue{
-		state: attr.ValueStateUnknown,
-	}
-}
-
-func NewThresholdsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ThresholdsValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
-	ctx := context.Background()
-
-	for name, attributeType := range attributeTypes {
-		attribute, ok := attributes[name]
-
-		if !ok {
-			diags.AddError(
-				"Missing ThresholdsValue Attribute Value",
-				"While creating a ThresholdsValue value, a missing attribute value was detected. "+
-					"A ThresholdsValue must contain values for all attributes, even if null or unknown. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("ThresholdsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
-			)
-
-			continue
-		}
-
-		if !attributeType.Equal(attribute.Type(ctx)) {
-			diags.AddError(
-				"Invalid ThresholdsValue Attribute Type",
-				"While creating a ThresholdsValue value, an invalid attribute value was detected. "+
-					"A ThresholdsValue must use a matching attribute type for the value. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("ThresholdsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
-					fmt.Sprintf("ThresholdsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
-			)
-		}
-	}
-
-	for name := range attributes {
-		_, ok := attributeTypes[name]
-
-		if !ok {
-			diags.AddError(
-				"Extra ThresholdsValue Attribute Value",
-				"While creating a ThresholdsValue value, an extra attribute value was detected. "+
-					"A ThresholdsValue must not contain values beyond the expected attribute types. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("Extra ThresholdsValue Attribute Name: %s", name),
-			)
-		}
-	}
-
-	if diags.HasError() {
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	cooldownAttribute, ok := attributes["cooldown"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`cooldown is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	cooldownVal, ok := cooldownAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`cooldown expected to be basetypes.Int64Value, was: %T`, cooldownAttribute))
-	}
-
-	hitsAttribute, ok := attributes["hits"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`hits is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	hitsVal, ok := hitsAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`hits expected to be basetypes.Int64Value, was: %T`, hitsAttribute))
-	}
-
-	minutesAttribute, ok := attributes["minutes"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`minutes is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	minutesVal, ok := minutesAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`minutes expected to be basetypes.Int64Value, was: %T`, minutesAttribute))
-	}
-
-	modeAttribute, ok := attributes["mode"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`mode is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	modeVal, ok := modeAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`mode expected to be basetypes.StringValue, was: %T`, modeAttribute))
-	}
-
-	notifySlackAttribute, ok := attributes["notify_slack"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`notify_slack is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	notifySlackVal, ok := notifySlackAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`notify_slack expected to be basetypes.StringValue, was: %T`, notifySlackAttribute))
-	}
-
-	rpsAttribute, ok := attributes["rps"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`rps is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	rpsVal, ok := rpsAttribute.(basetypes.Int64Value)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`rps expected to be basetypes.Int64Value, was: %T`, rpsAttribute))
-	}
-
-	typeAttribute, ok := attributes["type"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`type is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	typeVal, ok := typeAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`type expected to be basetypes.StringValue, was: %T`, typeAttribute))
-	}
-
-	valueAttribute, ok := attributes["value"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`value is missing from object`)
-
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	valueVal, ok := valueAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`value expected to be basetypes.StringValue, was: %T`, valueAttribute))
-	}
-
-	if diags.HasError() {
-		return NewThresholdsValueUnknown(), diags
-	}
-
-	return ThresholdsValue{
-		Cooldown:       cooldownVal,
-		Hits:           hitsVal,
-		Minutes:        minutesVal,
-		Mode:           modeVal,
-		NotifySlack:    notifySlackVal,
-		Rps:            rpsVal,
-		ThresholdsType: typeVal,
-		Value:          valueVal,
-		state:          attr.ValueStateKnown,
-	}, diags
-}
-
-func NewThresholdsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ThresholdsValue {
-	object, diags := NewThresholdsValue(attributeTypes, attributes)
-
-	if diags.HasError() {
-		// This could potentially be added to the diag package.
-		diagsStrings := make([]string, 0, len(diags))
-
-		for _, diagnostic := range diags {
-			diagsStrings = append(diagsStrings, fmt.Sprintf(
-				"%s | %s | %s",
-				diagnostic.Severity(),
-				diagnostic.Summary(),
-				diagnostic.Detail()))
-		}
-
-		panic("NewThresholdsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
-	}
-
-	return object
-}
-
-func (t ThresholdsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-	if in.Type() == nil {
-		return NewThresholdsValueNull(), nil
-	}
-
-	if !in.Type().Equal(t.TerraformType(ctx)) {
-		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
-	}
-
-	if !in.IsKnown() {
-		return NewThresholdsValueUnknown(), nil
-	}
-
-	if in.IsNull() {
-		return NewThresholdsValueNull(), nil
-	}
-
-	attributes := map[string]attr.Value{}
-
-	val := map[string]tftypes.Value{}
-
-	err := in.As(&val)
-
-	if err != nil {
-		return nil, err
-	}
-
-	for k, v := range val {
-		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
-
-		if err != nil {
-			return nil, err
-		}
-
-		attributes[k] = a
-	}
-
-	return NewThresholdsValueMust(ThresholdsValue{}.AttributeTypes(ctx), attributes), nil
-}
-
-func (t ThresholdsType) ValueType(ctx context.Context) attr.Value {
-	return ThresholdsValue{}
-}
-
-var _ basetypes.ObjectValuable = ThresholdsValue{}
-
-type ThresholdsValue struct {
-	Cooldown       basetypes.Int64Value  `tfsdk:"cooldown"`
-	Hits           basetypes.Int64Value  `tfsdk:"hits"`
-	Minutes        basetypes.Int64Value  `tfsdk:"minutes"`
-	Mode           basetypes.StringValue `tfsdk:"mode"`
-	NotifySlack    basetypes.StringValue `tfsdk:"notify_slack"`
-	Rps            basetypes.Int64Value  `tfsdk:"rps"`
-	ThresholdsType basetypes.StringValue `tfsdk:"type"`
-	Value          basetypes.StringValue `tfsdk:"value"`
-	state          attr.ValueState
-}
-
-func (v ThresholdsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 8)
-
-	var val tftypes.Value
-	var err error
-
-	attrTypes["cooldown"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["hits"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["minutes"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["mode"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["notify_slack"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["rps"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["type"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["value"] = basetypes.StringType{}.TerraformType(ctx)
-
-	objectType := tftypes.Object{AttributeTypes: attrTypes}
-
-	switch v.state {
-	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 8)
-
-		val, err = v.Cooldown.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["cooldown"] = val
-
-		val, err = v.Hits.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["hits"] = val
-
-		val, err = v.Minutes.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["minutes"] = val
-
-		val, err = v.Mode.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["mode"] = val
-
-		val, err = v.NotifySlack.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["notify_slack"] = val
-
-		val, err = v.Rps.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["rps"] = val
-
-		val, err = v.ThresholdsType.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["type"] = val
-
-		val, err = v.Value.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["value"] = val
-
-		if err := tftypes.ValidateValue(objectType, vals); err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		return tftypes.NewValue(objectType, vals), nil
-	case attr.ValueStateNull:
-		return tftypes.NewValue(objectType, nil), nil
-	case attr.ValueStateUnknown:
-		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
-	default:
-		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
-	}
-}
-
-func (v ThresholdsValue) IsNull() bool {
-	return v.state == attr.ValueStateNull
-}
-
-func (v ThresholdsValue) IsUnknown() bool {
-	return v.state == attr.ValueStateUnknown
-}
-
-func (v ThresholdsValue) String() string {
-	return "ThresholdsValue"
-}
-
-func (v ThresholdsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	objVal, diags := types.ObjectValue(
-		map[string]attr.Type{
-			"cooldown":     basetypes.Int64Type{},
-			"hits":         basetypes.Int64Type{},
-			"minutes":      basetypes.Int64Type{},
-			"mode":         basetypes.StringType{},
-			"notify_slack": basetypes.StringType{},
-			"rps":          basetypes.Int64Type{},
-			"type":         basetypes.StringType{},
-			"value":        basetypes.StringType{},
-		},
-		map[string]attr.Value{
-			"cooldown":     v.Cooldown,
-			"hits":         v.Hits,
-			"minutes":      v.Minutes,
-			"mode":         v.Mode,
-			"notify_slack": v.NotifySlack,
-			"rps":          v.Rps,
-			"type":         v.ThresholdsType,
-			"value":        v.Value,
-		})
-
-	return objVal, diags
-}
-
-func (v ThresholdsValue) Equal(o attr.Value) bool {
-	other, ok := o.(ThresholdsValue)
-
-	if !ok {
-		return false
-	}
-
-	if v.state != other.state {
-		return false
-	}
-
-	if v.state != attr.ValueStateKnown {
-		return true
-	}
-
-	if !v.Cooldown.Equal(other.Cooldown) {
-		return false
-	}
-
-	if !v.Hits.Equal(other.Hits) {
-		return false
-	}
-
-	if !v.Minutes.Equal(other.Minutes) {
-		return false
-	}
-
-	if !v.Mode.Equal(other.Mode) {
-		return false
-	}
-
-	if !v.NotifySlack.Equal(other.NotifySlack) {
-		return false
-	}
-
-	if !v.Rps.Equal(other.Rps) {
-		return false
-	}
-
-	if !v.ThresholdsType.Equal(other.ThresholdsType) {
-		return false
-	}
-
-	if !v.Value.Equal(other.Value) {
-		return false
-	}
-
-	return true
-}
-
-func (v ThresholdsValue) Type(ctx context.Context) attr.Type {
-	return ThresholdsType{
-		basetypes.ObjectType{
-			AttrTypes: v.AttributeTypes(ctx),
-		},
-	}
-}
-
-func (v ThresholdsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
-	return map[string]attr.Type{
-		"cooldown":     basetypes.Int64Type{},
-		"hits":         basetypes.Int64Type{},
-		"minutes":      basetypes.Int64Type{},
-		"mode":         basetypes.StringType{},
-		"notify_slack": basetypes.StringType{},
-		"rps":          basetypes.Int64Type{},
-		"type":         basetypes.StringType{},
-		"value":        basetypes.StringType{},
+		"waf_ratelimit_cooldown":            basetypes.Int64Type{},
+		"waf_ratelimit_hits":                basetypes.Int64Type{},
+		"waf_ratelimit_mode":                basetypes.StringType{},
+		"waf_ratelimit_rps":                 basetypes.Int64Type{},
 	}
 }

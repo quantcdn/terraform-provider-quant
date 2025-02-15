@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	openapi "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
 var (
@@ -176,7 +176,7 @@ func generateID(headers map[string]string) string {
 
 // Create headers with the API.
 func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *openapi.NewHeadersCreateRequestWithDefaults()
+	req := *quantadmingo.NewHeadersCreateRequestWithDefaults()
 
 	if req.Headers == nil {
 		req.Headers = make(map[string]string)
@@ -231,7 +231,7 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 
 // To delete headers we remove just update with an empty map.
 func callHeaderDeleteAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *openapi.NewHeadersDeleteRequestWithDefaults()
+	req := *quantadmingo.NewHeadersDeleteRequestWithDefaults()
 	req.Headers = []string{}
 	for k := range resource.Headers.Elements() {
 		req.Headers = append(req.Headers, k)

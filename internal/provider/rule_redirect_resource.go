@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	openapi "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
 var (
@@ -160,7 +160,7 @@ func (r *ruleRedirectResource) ImportState(ctx context.Context, req resource.Imp
 // callRuleRedirectCreateAPI calls the API endpoint to create a rule
 // resource in Quant.
 func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rule *resource_rule_redirect.RuleRedirectModel) (diags diag.Diagnostics) {
-	req := *openapi.NewRuleRedirectRequestWithDefaults()
+	req := *quantadmingo.NewRuleRedirectRequestWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
@@ -254,7 +254,6 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	rule.Organization = types.StringValue(r.client.Organization)
 	rule.Weight = types.Int64Value(0) // Hardcoded for now
 	rule.Action = types.StringValue("redirect")
-	rule.CookieName = types.StringNull()
 	rule.Rule = types.StringValue("")
 
 	domainList, diag := types.ListValueFrom(ctx, types.StringType, domains)
@@ -315,10 +314,7 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 	rule.Weight = types.Int64Value(0)
 	rule.Action = types.StringValue("redirect")
 
-	// Set cookie_name to null if not present
-	rule.CookieName = types.StringNull()
-
-	// Set rule to empty string if not present (or appropriate default value)
+	// Values for fields that are not present in the API response
 	rule.Rule = types.StringValue("")
 
 	// Initialize empty lists for all optional fields
@@ -390,7 +386,7 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 
 	// Handle boolean fields
 	rule.Disabled = types.BoolValue(api.GetDisabled())
-	rule.OnlyWithCookie = types.BoolValue(false)
+	rule.OnlyWithCookie = types.StringNull()
 
 	// Handle required fields
 	domains, _ := types.ListValueFrom(ctx, types.StringType, api.Domain)
@@ -417,7 +413,7 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		return
 	}
 
-	req := *openapi.NewRuleRedirectRequestUpdateWithDefaults()
+	req := *quantadmingo.NewRuleRedirectRequestUpdateWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string

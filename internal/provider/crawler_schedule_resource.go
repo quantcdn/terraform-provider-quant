@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	openapi "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
 var (
@@ -127,7 +127,7 @@ func (r *crawlerScheduleResource) Delete(ctx context.Context, req resource.Delet
 }
 
 func callCrawlerScheduleCreateAPI(ctx context.Context, r *crawlerScheduleResource, schedule *resource_crawler_schedule.CrawlerScheduleModel) (diags diag.Diagnostics) {
-	req := *openapi.NewCrawlerScheduleRequest(schedule.ScheduleCronString.ValueString())
+	req := *quantadmingo.NewCrawlerScheduleRequest(schedule.ScheduleCronString.ValueString())
 	req.SetName(schedule.Name.ValueString())
 
 	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesCreate(r.client.AuthContext, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString()).CrawlerScheduleRequest(req).Execute()
@@ -240,7 +240,7 @@ func callCrawlerScheduleUpdateAPI(ctx context.Context, r *crawlerScheduleResourc
 		return
 	}
 
-	req := *openapi.NewCrawlerScheduleRequestUpdateWithDefaults()
+	req := *quantadmingo.NewCrawlerScheduleRequestUpdateWithDefaults()
 	req.SetScheduleCronString(schedule.ScheduleCronString.ValueString())
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)

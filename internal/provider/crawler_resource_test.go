@@ -7,15 +7,15 @@ import (
 	"testing"
 	"time"
 
-	openapi "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 	// "github.com/stretchr/testify/assert"
 )
 
 func TestListCrawlers(t *testing.T) {
 	bearer := os.Getenv("QUANT_BEARER")
-	cfg := openapi.NewConfiguration()
-	client := openapi.NewAPIClient(cfg)
-	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
+	cfg := quantadmingo.NewConfiguration()
+	client := quantadmingo.NewAPIClient(cfg)
+	ctx := context.WithValue(context.Background(), quantadmingo.ContextAccessToken, bearer)
 
 	crawlers, _, err := client.CrawlersAPI.CrawlersList(ctx, "quant", "api-test").Execute()
 
@@ -29,11 +29,11 @@ func TestListCrawlers(t *testing.T) {
 
 func TestCreateCrawler(t *testing.T) {
 	bearer := os.Getenv("QUANT_BEARER")
-	cfg := openapi.NewConfiguration()
-	client := openapi.NewAPIClient(cfg)
-	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
+	cfg := quantadmingo.NewConfiguration()
+	client := quantadmingo.NewAPIClient(cfg)
+	ctx := context.WithValue(context.Background(), quantadmingo.ContextAccessToken, bearer)
 
-	req := *openapi.NewCrawlerRequestWithDefaults()
+	req := *quantadmingo.NewCrawlerRequestWithDefaults()
 
 	req.SetDomain("https://www.quantcdn.io")
 	req.SetBrowserMode(true)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -19,10 +20,6 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 			"action": schema.StringAttribute{
 				Computed: true,
 			},
-			"cookie_name": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
 			"country": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -30,6 +27,7 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 					stringvalidator.OneOf(
 						"country_is",
 						"country_is_not",
+						"any",
 					),
 				},
 			},
@@ -59,6 +57,7 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 					stringvalidator.OneOf(
 						"ip_is",
 						"ip_is_not",
+						"any",
 					),
 				},
 			},
@@ -79,6 +78,7 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 					stringvalidator.OneOf(
 						"method_is",
 						"method_is_not",
+						"any",
 					),
 				},
 			},
@@ -96,10 +96,8 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"only_with_cookie": schema.BoolAttribute{
-				Optional: true,
+			"only_with_cookie": schema.StringAttribute{
 				Computed: true,
-				Default:  booldefault.StaticBool(false),
 			},
 			"organization": schema.StringAttribute{
 				Optional: true,
@@ -135,6 +133,7 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 			"weight": schema.Int64Attribute{
 				Optional: true,
 				Computed: true,
+				Default:  int64default.StaticInt64(0),
 			},
 		},
 	}
@@ -142,7 +141,6 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 
 type RuleRedirectModel struct {
 	Action         types.String `tfsdk:"action"`
-	CookieName     types.String `tfsdk:"cookie_name"`
 	Country        types.String `tfsdk:"country"`
 	CountryIs      types.List   `tfsdk:"country_is"`
 	CountryIsNot   types.List   `tfsdk:"country_is_not"`
@@ -155,7 +153,7 @@ type RuleRedirectModel struct {
 	MethodIs       types.List   `tfsdk:"method_is"`
 	MethodIsNot    types.List   `tfsdk:"method_is_not"`
 	Name           types.String `tfsdk:"name"`
-	OnlyWithCookie types.Bool   `tfsdk:"only_with_cookie"`
+	OnlyWithCookie types.String `tfsdk:"only_with_cookie"`
 	Organization   types.String `tfsdk:"organization"`
 	Project        types.String `tfsdk:"project"`
 	RedirectCode   types.String `tfsdk:"redirect_code"`
