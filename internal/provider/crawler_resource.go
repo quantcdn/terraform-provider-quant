@@ -274,7 +274,10 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	if api.Config != "" {
 		crawler.Config = types.StringValue(api.GetConfig())
 		if err := yaml.Unmarshal([]byte(api.GetConfig()), &config); err != nil {
-			// Continue...
+			diags.AddWarning(
+				"Unable to parse crawler config",
+				fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()),
+			)
 		}
 	}
 

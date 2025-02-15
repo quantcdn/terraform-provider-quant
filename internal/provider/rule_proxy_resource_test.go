@@ -11,52 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-// Mock API responses
-const mockRuleProxyResponse = `{
-    "uuid": "test-uuid",
-    "rule_id": "test-rule-id",
-    "name": "test-rule",
-    "domain": ["example.com"],
-    "url": ["/api/*"],
-    "action": "proxy",
-    "action_config": {
-        "proxy": {
-            "to": "https://backend.example.com",
-            "host": "backend.example.com",
-            "cache_lifetime": 3600,
-            "disable_ssl_verify": false,
-            "only_proxy_404": false,
-            "proxy_strip_headers": ["X-Custom-Header"]
-        },
-        "failover": {
-            "failover_mode": "false",
-            "failover_origin_ttfb": "5s",
-            "failover_origin_status_codes": ["500", "502", "503", "504"]
-        },
-        "waf_config": {
-            "mode": "report",
-            "paranoia_level": 1,
-            "allow_rules": ["rule1"],
-            "allow_ip": ["1.1.1.1"],
-            "block_ip": ["2.2.2.2"],
-            "block_ua": ["bad-bot"],
-            "block_referer": ["spam.com"],
-            "notify_email": ["admin@example.com"],
-            "notify_slack": "slack-webhook",
-            "notify_slack_hits_rpm": 100,
-            "notify_slack_rpm": 1000,
-            "request_header_name": "X-WAF-Header"
-        }
-    },
-    "country": "country_is",
-    "country_is": ["US", "CA"],
-    "ip": "ip_is",
-    "ip_is": ["192.168.1.1"],
-    "method": "method_is",
-    "method_is": ["GET", "POST"],
-    "waf_enabled": true
-}`
-
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
 	"quant": providerserver.NewProtocol6WithError(provider.New()()),
 }

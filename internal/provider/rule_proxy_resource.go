@@ -814,7 +814,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 
     // Handle WAF configuration
     data.WafEnabled = types.BoolValue(api.GetActionConfig().WafEnabled)
-    if data.WafEnabled.ValueBool() == true {
+    if data.WafEnabled.ValueBool() {
         wafConfig := api.GetActionConfig().WafConfig
         data.WafConfig.Mode = types.StringValue(wafConfig.GetMode())
         data.WafConfig.ParanoiaLevel = types.Int64Value(int64(wafConfig.GetParanoiaLevel()))

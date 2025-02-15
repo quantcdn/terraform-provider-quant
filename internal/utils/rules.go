@@ -5,20 +5,17 @@ import (
 )
 
 func GetRuleAny() *string {
-	var s string
-	s = "any"
+	s := "any"
 	return &s
 }
 
 func GetFilterIs(filter string) (*string) {
-	var s string
-	s = fmt.Sprintf("%s_is", filter)
+	s := fmt.Sprintf("%s_is", filter)
 	return &s
 }
 
 func GetFilterIsNot(filter string) (*string) {
-	var s string
-	s = fmt.Sprintf("%s_is_not", filter)
+	s := fmt.Sprintf("%s_is_not", filter)
 	return &s
 }
 

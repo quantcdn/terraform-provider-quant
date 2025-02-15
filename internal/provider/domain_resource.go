@@ -65,6 +65,12 @@ func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	diags = callDomainReadAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -79,7 +85,7 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	resp.Diagnostics.Append(callDomainCreateAPI(ctx, r, &data)...)
+	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -99,6 +105,12 @@ func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	resp.Diagnostics.Append(callDomainUpdateAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	diags = callDomainReadAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
