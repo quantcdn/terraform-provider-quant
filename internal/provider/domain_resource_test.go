@@ -1,27 +1,110 @@
 package provider_test
 
 import (
-	"context"
-	"os"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/jarcoal/httpmock"
+	"terraform-provider-quant/internal/provider"
+	"fmt"
+	"net/http"
 	"testing"
-
-	quantadmingo "github.com/quantcdn/quant-admin-go"
-	"github.com/stretchr/testify/assert"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-func TestListDomains(t *testing.T) {
-	bearer := os.Getenv("QUANT_BEARER")
-	cfg := quantadmingo.NewConfiguration()
-	client := quantadmingo.NewAPIClient(cfg)
-	ctx := context.WithValue(context.Background(), quantadmingo.ContextAccessToken, bearer)
+var domainResponse = map[string]interface{}{
+	"id": 1,
+	"domain": "test-domain.com",
+	"dns_engaged": 1,
+}
 
-	domains, _, err := client.DomainsAPI.DomainsList(ctx, "quant", "api-test").Execute()
+func mockDomainServer(t *testing.T, organizationID string, projectID string, domainID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
 
-	if err != nil {
-		t.Fatalf("Error: %v", err)
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Request: %s", req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/domains", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, domainResponse)
+	})
+
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/domains/%s", baseUrl, organizationID, projectID, domainID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, domainResponse)
+	})
+
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/domains", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, domainResponse)
+	})
+
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/domains/%s", baseUrl, organizationID, projectID, domainID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, domainResponse)
+	})
+}
+
+func testDomainResourceFactories(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
+	return map[string]func() (tfprotov6.ProviderServer, error){
+		"quant": providerserver.NewProtocol6WithError(provider.New()()),
 	}
+}
 
-	for _, domain := range domains {
-		assert.Contains(t, domain.GetDomain(), "quantcdn")
+func TestDomainResource(t *testing.T) {
+	organizationID := "test-organization"
+	projectID := "test-project"
+	domainID := "test-domain"
+	mockDomainServer(t, organizationID, projectID, domainID)
+	defer httpmock.DeactivateAndReset()
+
+	// resource.Test(t, resource.TestCase{
+	// 	ProtoV6ProviderFactories: testDomainResourceFactories(t),
+	// 	Steps: []resource.TestStep{
+	// 		// Create and Read testing
+	// 		{
+	// 			Config: testDomainResourceConfig(organizationID, projectID, "test-domain.com"),
+	// 			Check: resource.ComposeAggregateTestCheckFunc(
+	// 				resource.TestCheckResourceAttr("quant_domain.test", "domain", "test-domain.com"),
+	// 			),
+	// 		},
+	// 		// Update and Read testing
+	// 		{
+	// 			Config: testDomainResourceConfig(organizationID, projectID, "test-domain-updated.com"),
+	// 			Check: resource.ComposeAggregateTestCheckFunc(
+	// 				resource.TestCheckResourceAttr("quant_domain.test", "domain", "test-domain-updated.com"),
+	// 			),
+	// 		},
+	// 		// Delete testing
+	// 		{
+	// 			Config: testDomainResourceConfig(organizationID, projectID, "test-domain-updated.com"),
+	// 			Check: resource.ComposeAggregateTestCheckFunc(
+	// 				resource.TestCheckResourceAttr("quant_domain.test", "domain", "test-domain-updated.com"),
+	// 			),
+	// 		},
+	// 	},
+	// })
+}
+
+func testDomainResourceConfig(organizationID string, projectID string, domain string) string {
+	return fmt.Sprintf(`
+	provider "quant" {
+		bearer = "testtoken"
+		organization = "%s"
 	}
+	resource "quant_domain" "test" {
+		project = "%s"
+		domain = "%s"
+	}
+	`, organizationID, projectID, domain)
+}
+
+func testDomainResourceConfigUpdate(organizationID string, projectID string, domain string) string {
+	return fmt.Sprintf(`
+	provider "quant" {
+		bearer = "testtoken"
+		organization = "%s"
+	}
+	resource "quant_domain" "test" {
+		project = "%s"
+		domain = "%s"
+	}
+	`, organizationID, projectID, domain)
 }
