@@ -15,7 +15,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	quantadmingo "github.com/quantcdn/quant-admin-go"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
@@ -152,6 +151,7 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	}
 	req.SetExclude(exclude)  // Always set exclude, even if empty
 
+	// Set headers if provided
 	if !crawler.Headers.IsNull() {
 		headers := make(map[string]string, len(crawler.Headers.Elements()))
 		diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
@@ -174,18 +174,12 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 }
 
 func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	// Add debug logging for client configuration
-	bearerPreview := "not_set"
-	if len(r.client.Bearer) > 10 {
-		bearerPreview = r.client.Bearer[:10] + "..."
-	}
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
 
-	tflog.Debug(ctx, "Checking client configuration", map[string]interface{}{
-		"has_auth_context": r.client.AuthContext != nil,
-		"organization":     r.client.Organization,
-		"has_bearer":      r.client.Bearer != "",
-		"bearer_preview":  bearerPreview,
-	})
+	if err != nil {
+		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))
+		return diags
+	}
 
 	if crawler.Uuid.IsUnknown() || crawler.Uuid.IsNull() {
 		diags.AddAttributeError(
@@ -201,50 +195,6 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			path.Root("project"),
 			"Missing crawler.project attribute",
 			"To read crawler information, project must be provided.",
-		)
-		return diags
-	}
-
-	tflog.Debug(ctx, "Reading crawler", map[string]interface{}{
-		"organization": r.client.Organization,
-		"project":      crawler.Project.ValueString(),
-		"uuid":         crawler.Uuid.ValueString(),
-	})
-
-	// Create the request and execute it
-	api, resp, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
-
-	if resp != nil {
-		// Create a map of headers for logging
-		headers := make(map[string]string)
-		for k, v := range resp.Request.Header {
-			if len(v) > 0 {
-				headers[k] = v[0]
-				// Redact most of the token value for security
-				if k == "Authorization" {
-					if len(v[0]) > 10 {
-						headers[k] = v[0][:10] + "..."
-					}
-				}
-			}
-		}
-
-		tflog.Debug(ctx, "Crawler read API response", map[string]interface{}{
-			"url":         resp.Request.URL.String(),
-			"method":      resp.Request.Method,
-			"status_code": resp.StatusCode,
-			"headers":     headers,
-		})
-	}
-
-	if err != nil {
-		diags.AddError(
-			"Unable to load crawler", 
-			fmt.Sprintf("Error: %s\nURL: %s\nStatus: %d", 
-				err.Error(), 
-				resp.Request.URL.String(), 
-				resp.StatusCode,
-			),
 		)
 		return diags
 	}
