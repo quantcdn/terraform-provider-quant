@@ -3,11 +3,8 @@ package provider_test
 import (
 	"fmt"
 	"testing"
-	"terraform-provider-quant/internal/provider"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/jarcoal/httpmock"
 	"net/http"
 )
@@ -37,11 +34,7 @@ var redirectRuleResponse = map[string]interface{}{
 	"only_with_cookie": "",
 }
 
-var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"quant": providerserver.NewProtocol6WithError(provider.New()()),
-}
-
-func testAccPreCheck(t *testing.T) {
+func testRedirectPreCheck(t *testing.T) {
 	// You can add any additional setup here
 }
 
@@ -79,7 +72,7 @@ func TestAccRuleRedirectResourceMock(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testRedirectPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
