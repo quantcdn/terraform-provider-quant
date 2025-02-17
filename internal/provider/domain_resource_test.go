@@ -42,12 +42,6 @@ func mockDomainServer(t *testing.T, organizationID string, projectID string, dom
 	})
 }
 
-func testDomainResourceFactories(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
-	return map[string]func() (tfprotov6.ProviderServer, error){
-		"quant": providerserver.NewProtocol6WithError(provider.New()()),
-	}
-}
-
 func TestDomainResource(t *testing.T) {
 	organizationID := "test-organization"
 	projectID := "test-project"
@@ -83,28 +77,28 @@ func TestDomainResource(t *testing.T) {
 	// })
 }
 
-func testDomainResourceConfig(organizationID string, projectID string, domain string) string {
-	return fmt.Sprintf(`
-	provider "quant" {
-		bearer = "testtoken"
-		organization = "%s"
-	}
-	resource "quant_domain" "test" {
-		project = "%s"
-		domain = "%s"
-	}
-	`, organizationID, projectID, domain)
-}
+// func testDomainResourceConfig(organizationID string, projectID string, domain string) string {
+// 	return fmt.Sprintf(`
+// 	provider "quant" {
+// 		bearer = "testtoken"
+// 		organization = "%s"
+// 	}
+// 	resource "quant_domain" "test" {
+// 		project = "%s"
+// 		domain = "%s"
+// 	}
+// 	`, organizationID, projectID, domain)
+// }
 
-func testDomainResourceConfigUpdate(organizationID string, projectID string, domain string) string {
-	return fmt.Sprintf(`
-	provider "quant" {
-		bearer = "testtoken"
-		organization = "%s"
-	}
-	resource "quant_domain" "test" {
-		project = "%s"
-		domain = "%s"
-	}
-	`, organizationID, projectID, domain)
-}
+// func testDomainResourceConfigUpdate(organizationID string, projectID string, domain string) string {
+// 	return fmt.Sprintf(`
+// 	provider "quant" {
+// 		bearer = "testtoken"
+// 		organization = "%s"
+// 	}
+// 	resource "quant_domain" "test" {
+// 		project = "%s"
+// 		domain = "%s"
+// 	}
+// 	`, organizationID, projectID, domain)
+// }
