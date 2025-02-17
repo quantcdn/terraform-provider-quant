@@ -1,13 +1,10 @@
 package provider_test
 
 import (
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/jarcoal/httpmock"
-	"terraform-provider-quant/internal/provider"
 	"fmt"
 	"net/http"
 	"testing"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
 var domainResponse = map[string]interface{}{
