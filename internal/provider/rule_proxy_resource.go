@@ -299,21 +299,18 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 
     // Failover configuration
-    failover := quantadmingo.NewFailoverConfigWithDefaults()
-    failover.SetFailoverMode(data.Failover.FailoverMode.ValueBool())
-    failover.SetFailoverOriginTtfb(data.Failover.FailoverOriginTtfb.ValueString())
-
-	if !data.Failover.FailoverOriginStatusCodes.IsNull() {
+	req.SetFailoverMode(data.FailoverMode.ValueBool())
+	req.SetFailoverOriginTtfb(data.FailoverOriginTtfb.ValueString())
+	if !data.FailoverOriginStatusCodes.IsNull() {
 		var statusCodes []string
-		if !data.Failover.FailoverOriginStatusCodes.IsUnknown() {
-			diags.Append(data.Failover.FailoverOriginStatusCodes.ElementsAs(ctx, &statusCodes, false)...)
+		if !data.FailoverOriginStatusCodes.IsUnknown() {
+			diags.Append(data.FailoverOriginStatusCodes.ElementsAs(ctx, &statusCodes, false)...)
 			if diags.HasError() {
 				return
 			}
 		}
-		failover.SetFailoverOriginStatusCodes(statusCodes)
+		req.SetFailoverOriginStatusCodes(statusCodes)
 	}
-    req.SetFailover(*failover)
 
     // WAF configuration
     req.SetWafEnabled(data.WafEnabled.ValueBool())
@@ -551,21 +548,18 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 
     // Failover configuration
-    failover := quantadmingo.NewFailoverConfigWithDefaults()
-    failover.SetFailoverMode(data.Failover.FailoverMode.ValueBool())
-    failover.SetFailoverOriginTtfb(data.Failover.FailoverOriginTtfb.ValueString())
-
-	if !data.Failover.FailoverOriginStatusCodes.IsNull() {
+	req.SetFailoverMode(data.FailoverMode.ValueBool())
+	req.SetFailoverOriginTtfb(data.FailoverOriginTtfb.ValueString())
+	if !data.FailoverOriginStatusCodes.IsNull() {
 		var statusCodes []string
-		if !data.Failover.FailoverOriginStatusCodes.IsUnknown() {
-			diags.Append(data.Failover.FailoverOriginStatusCodes.ElementsAs(ctx, &statusCodes, false)...)
+		if !data.FailoverOriginStatusCodes.IsUnknown() {
+			diags.Append(data.FailoverOriginStatusCodes.ElementsAs(ctx, &statusCodes, false)...)
 			if diags.HasError() {
 				return
 			}
 		}
-		failover.SetFailoverOriginStatusCodes(statusCodes)
+		req.SetFailoverOriginStatusCodes(statusCodes)
 	}
-    req.SetFailover(*failover)
 
     // WAF configuration
     req.SetWafEnabled(data.WafEnabled.ValueBool())
@@ -692,6 +686,9 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
         return
     }
 
+	// Get the rules action config
+	actionConfig := api.GetActionConfig()
+
     // Set basic fields
     data.Uuid = types.StringValue(api.GetUuid())
     data.RuleId = types.StringValue(api.GetRuleId())
@@ -720,15 +717,11 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
     data.Url = urlList
 
     // Handle proxy configuration
-    data.To = types.StringValue(api.GetActionConfig().To)
-    data.Host = types.StringValue(*api.GetActionConfig().Host)
-	if lifetime := api.GetActionConfig().CacheLifetime; lifetime != nil {
-		data.CacheLifetime = types.Int64Value(int64(*lifetime))
-	} else {
-		data.CacheLifetime = types.Int64Null()
-	}
-    data.DisableSslVerify = types.BoolValue(*api.GetActionConfig().DisableSslVerify)
-    data.OnlyProxy404 = types.BoolValue(*api.GetActionConfig().OnlyProxy404)
+    data.To = types.StringValue(actionConfig.GetTo())
+    data.Host = types.StringValue(actionConfig.GetHost())
+	data.CacheLifetime = types.Int64Value(int64(actionConfig.GetCacheLifetime()))
+    data.DisableSslVerify = types.BoolValue(actionConfig.GetDisableSslVerify())
+    data.OnlyProxy404 = types.BoolValue(actionConfig.GetOnlyProxy404())
 
 	data.Country = types.StringValue(api.GetCountry())
     if api.GetCountry() == "country_is" {
@@ -799,13 +792,13 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 
 	data.Rule = types.StringNull() // Obsolete field
 
-    stripHeadersList, diag := types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().ProxyStripHeaders)
+    stripHeadersList, diag := types.ListValueFrom(ctx, types.StringType, actionConfig.GetProxyStripHeaders())
     if diag.HasError() {
         diags.Append(diag...)
         return
     }
     data.ProxyStripHeaders = stripHeadersList
-	proxyStripRequestHeadersList, diag := types.ListValueFrom(ctx, types.StringType, api.GetActionConfig().ProxyStripRequestHeaders)
+	proxyStripRequestHeadersList, diag := types.ListValueFrom(ctx, types.StringType, actionConfig.GetProxyStripRequestHeaders())
 	if diag.HasError() {
 		diags.Append(diag...)
 		return
@@ -813,9 +806,9 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.ProxyStripRequestHeaders = proxyStripRequestHeadersList
 
     // Handle WAF configuration
-    data.WafEnabled = types.BoolValue(api.GetActionConfig().WafEnabled)
+    data.WafEnabled = types.BoolValue(actionConfig.GetWafEnabled())
     if data.WafEnabled.ValueBool() {
-        wafConfig := api.GetActionConfig().WafConfig
+        wafConfig := actionConfig.GetWafConfig()
         data.WafConfig.Mode = types.StringValue(wafConfig.GetMode())
         data.WafConfig.ParanoiaLevel = types.Int64Value(int64(wafConfig.GetParanoiaLevel()))
 
@@ -849,21 +842,18 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		// data.WafConfig.Thresholds = types.ListNull(resource_rule_proxy.ThresholdsValue. []attr.Value{})
     }
 
-	failover := api.GetActionConfig().Failover
-
-	data.Failover = resource_rule_proxy.FailoverValue{
-		FailoverMode: types.BoolValue(failover.GetFailoverMode()),
-		FailoverOriginTtfb: types.StringValue(failover.GetFailoverOriginTtfb()),
-	}
-	statusCodesList, diag := types.ListValueFrom(ctx, types.StringType, failover.GetFailoverOriginStatusCodes())
+	// Handle failover configuration
+	data.FailoverMode = types.BoolValue(actionConfig.GetFailoverMode())
+	data.FailoverOriginTtfb = types.StringValue(actionConfig.GetFailoverOriginTtfb())
+	statusCodesList, diag := types.ListValueFrom(ctx, types.StringType, actionConfig.GetFailoverOriginStatusCodes())
 	if diag.HasError() {
 		diags.Append(diag...)
 		return
 	}
-	data.Failover.FailoverOriginStatusCodes = statusCodesList
+	data.FailoverOriginStatusCodes = statusCodesList
 
-	notifycfg := api.GetActionConfig().NotifyConfig
-	data.Notify = types.StringValue(*api.GetActionConfig().Notify)
+	notifycfg := actionConfig.GetNotifyConfig()
+	data.Notify = types.StringValue(*actionConfig.Notify)
 
 	originStatusCodesList, diag := types.ListValueFrom(ctx, types.StringType, notifycfg.GetOriginStatusCodes())
 	if diag.HasError() {
