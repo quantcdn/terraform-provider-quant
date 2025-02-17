@@ -142,6 +142,7 @@ func (r *headerResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 func (r *headerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data headerResourceModel
+
 	data.Project = types.StringValue(req.ID)
 
 	// Read API call logic

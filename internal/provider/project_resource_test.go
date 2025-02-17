@@ -1,69 +1,154 @@
 package provider_test
 
 import (
-	"os"
-	"testing"
-
+	"encoding/json"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/jarcoal/httpmock"
+	"io"
+	"net/http"
+	"terraform-provider-quant/internal/provider"
+	"testing"
 )
 
-func TestProjectResource(t *testing.T) {
-	bearer := os.Getenv("QUANT_BEARER")
-	if bearer == "" {
-		t.Skip("QUANT_BEARER not set")
+var projectResponse = map[string]interface{}{
+	"name":               "test-project",
+	"allow_query_params": false,
+	"region":             "au",
+	"uuid":               "123",
+	"machine_name":       "test-project",
+	"disable_revisions":  true,
+	"fastly_migrated":    1,
+	"project_type":       "normal",
+	"organization":       "test-organization",
+	"parent_project_id":  0,
+}
+
+func mockProjectServer(t *testing.T, organizationID string, projectID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Request: %s", req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects", baseUrl, organizationID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, projectResponse)
+	})
+
+	httpmock.RegisterResponder("GET", 
+		fmt.Sprintf("%s/organizations/%s/projects/%s", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, projectResponse)
+	})
+
+	httpmock.RegisterResponder("GET", 
+		fmt.Sprintf("%s/organizations/%s/projects/0", baseUrl, organizationID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, projectResponse)
+	})
+
+
+	httpmock.RegisterResponder("POST",
+		fmt.Sprintf("%s/organizations/%s/projects", baseUrl, organizationID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, projectResponse)
+		})
+
+	httpmock.RegisterResponder("PATCH",
+		fmt.Sprintf("%s/organizations/%s/projects/%s", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return httpmock.NewStringResponse(400, "Failed to read request body"), nil
+			}
+
+			var requestBody struct {
+				Name             string `json:"name"`
+				AllowQueryParams bool   `json:"allow_query_params"`
+				Region           string `json:"region"`
+			}
+
+			if err := json.Unmarshal(body, &requestBody); err != nil {
+				return httpmock.NewStringResponse(400, "Invalid JSON"), nil
+			}
+
+			projectResponse["name"] = requestBody.Name
+			projectResponse["allow_query_params"] = requestBody.AllowQueryParams
+			projectResponse["region"] = requestBody.Region
+			return httpmock.NewJsonResponse(200, projectResponse)
+		})
+
+	httpmock.RegisterResponder("DELETE",
+		fmt.Sprintf("%s/organizations/%s/projects/%s", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, projectResponse)
+		})
+}
+
+func testProjectResourceFactories(t *testing.T) map[string]func() (tfprotov6.ProviderServer, error) {
+	return map[string]func() (tfprotov6.ProviderServer, error){
+		"quant": providerserver.NewProtocol6WithError(provider.New()()),
 	}
+}
+
+func TestProjectResource(t *testing.T) {
+	organizationID := "test-organization"
+	projectID := "test-project"
+	mockProjectServer(t, organizationID, projectID)
+	defer httpmock.DeactivateAndReset()
 
 	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		ProtoV6ProviderFactories: testProjectResourceFactories(t),
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testProjectResourceConfig("test-project", false),
+				Config: testProjectResourceConfig(organizationID, projectID, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_project.test", "name", "test-project"),
 					resource.TestCheckResourceAttr("quant_project.test", "allow_query_params", "false"),
 					resource.TestCheckResourceAttr("quant_project.test", "region", "au"),
-				),
-			},
-			// Update and Read testing
-			{
-				Config: testProjectResourceConfig("test-project-updated", true),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("quant_project.test", "name", "test-project-updated"),
-					resource.TestCheckResourceAttr("quant_project.test", "allow_query_params", "true"),
-					resource.TestCheckResourceAttr("quant_project.test", "region", "au"),
+					resource.TestCheckResourceAttr("quant_project.test", "uuid", "123"),
+					resource.TestCheckResourceAttr("quant_project.test", "machine_name", "test-project"),
 				),
 			},
 			// Import testing
 			{
 				ResourceName:      "quant_project.test",
 				ImportState:       true,
-				ImportStateVerify: true,
-				// Ignore auth fields as they're not returned by the API
 				ImportStateVerifyIgnore: []string{
 					"basic_auth_username",
 					"basic_auth_password",
 					"basic_auth_preview_only",
 				},
 			},
+			// Update and Read testing
+			{
+				Config: testProjectResourceConfig(organizationID, fmt.Sprintf("%s-updated", projectID), true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_project.test", "name", "test-project-updated"),
+					resource.TestCheckResourceAttr("quant_project.test", "allow_query_params", "true"),
+					resource.TestCheckResourceAttr("quant_project.test", "region", "au"),
+					resource.TestCheckResourceAttr("quant_project.test", "uuid", "123"),
+					resource.TestCheckResourceAttr("quant_project.test", "machine_name", "test-project"),
+				),
+			},
+
 			// Delete testing automatically occurs in TestCase
 		},
 	})
 }
 
-func testProjectResourceConfig(name string, allowQueryParams bool) string {
-	return `
-resource "quant_project" "test" {
-  name = "` + name + `"
-  allow_query_params = ` + boolToString(allowQueryParams) + `
-  region = "au"
-}
-`
+func testProjectResourceConfig(organization string, name string, allowQueryParams bool) string {
+	return fmt.Sprintf(`
+provider "quant" {
+	organization = %[1]q
+	bearer = "testtoken"
 }
 
-func boolToString(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
+resource "quant_project" "test" {
+  name = %[2]q
+  allow_query_params = %[3]t
+  region = "au"
+}
+`, organization, name, allowQueryParams)
 }

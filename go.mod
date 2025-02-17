@@ -11,7 +11,8 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.36.0
 	github.com/hashicorp/terraform-plugin-testing v1.11.0
-	github.com/quantcdn/quant-admin-go v0.0.0-20250214000445-0af62cfbfb4b
+	github.com/jarcoal/httpmock v1.3.1
+	github.com/quantcdn/quant-admin-go v0.0.0-20250217011330-11769c0e7bd5
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
 )

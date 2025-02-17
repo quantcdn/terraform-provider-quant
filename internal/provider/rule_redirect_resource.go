@@ -66,11 +66,18 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	// Create API call logic
-	resp.Diagnostics.Append(callRuleRedirectCreateAPI(ctx, r, &data)...)
+	diags := callRuleRedirectCreateAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	diags = callRuleRedirectReadAPI(ctx, r, &data)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(diags...)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -87,7 +94,8 @@ func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	// Read API call logic
-	resp.Diagnostics.Append(callRuleRedirectReadAPI(ctx, r, &data)...)
+	diags := callRuleRedirectReadAPI(ctx, r, &data)
+	resp.Diagnostics.Append(diags...)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -108,13 +116,18 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 	plan.RuleId = state.RuleId
 
 	// Update API call logic
-	resp.Diagnostics.Append(callRuleRedirectUpdateAPI(ctx, r, &plan)...)
+	diags := callRuleRedirectUpdateAPI(ctx, r, &plan)
+	resp.Diagnostics.Append(diags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	resp.Diagnostics.Append(callRuleRedirectReadAPI(ctx, r, &plan)...)
+	diags = callRuleRedirectReadAPI(ctx, r, &plan)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(diags...)
 
 	// Save updated plan into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -313,6 +326,7 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 	rule.Organization = types.StringValue(r.client.Organization)
 	rule.Weight = types.Int64Value(0)
 	rule.Action = types.StringValue("redirect")
+	rule.OnlyWithCookie = types.StringValue(api.GetOnlyWithCookie())
 
 	// Values for fields that are not present in the API response
 	rule.Rule = types.StringValue("")
@@ -386,7 +400,6 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 
 	// Handle boolean fields
 	rule.Disabled = types.BoolValue(api.GetDisabled())
-	rule.OnlyWithCookie = types.StringNull()
 
 	// Handle required fields
 	domains, _ := types.ListValueFrom(ctx, types.StringType, api.Domain)

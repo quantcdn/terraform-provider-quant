@@ -75,36 +75,25 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				ElementType: types.StringType,
 				Required:    true,
 			},
-			"failover": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{
-					"failover_lifetime": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
-						Default:  stringdefault.StaticString("300"),
-					},
-					"failover_mode": schema.BoolAttribute{
-						Optional: true,
-						Computed: true,
-						Default:  booldefault.StaticBool(false),
-					},
-					"failover_origin_status_codes": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
-						Computed:    true,
-					},
-					"failover_origin_ttfb": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
-						Default:  stringdefault.StaticString("2000"),
-					},
-				},
-				CustomType: FailoverType{
-					ObjectType: types.ObjectType{
-						AttrTypes: FailoverValue{}.AttributeTypes(ctx),
-					},
-				},
+			"failover_lifetime": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				Default:  stringdefault.StaticString("300"),
+			},
+			"failover_mode": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
+			"failover_origin_status_codes": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
+			"failover_origin_ttfb": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  stringdefault.StaticString("2000"),
 			},
 			"host": schema.StringAttribute{
 				Optional: true,
@@ -400,542 +389,45 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type RuleProxyModel struct {
-	Action                   types.String      `tfsdk:"action"`
-	AuthPass                 types.String      `tfsdk:"auth_pass"`
-	AuthUser                 types.String      `tfsdk:"auth_user"`
-	CacheLifetime            types.Int64       `tfsdk:"cache_lifetime"`
-	Country                  types.String      `tfsdk:"country"`
-	CountryIs                types.List        `tfsdk:"country_is"`
-	CountryIsNot             types.List        `tfsdk:"country_is_not"`
-	DisableSslVerify         types.Bool        `tfsdk:"disable_ssl_verify"`
-	Disabled                 types.Bool        `tfsdk:"disabled"`
-	Domain                   types.List        `tfsdk:"domain"`
-	Failover                 FailoverValue     `tfsdk:"failover"`
-	Host                     types.String      `tfsdk:"host"`
-	InjectHeaders            types.Map         `tfsdk:"inject_headers"`
-	Ip                       types.String      `tfsdk:"ip"`
-	IpIs                     types.List        `tfsdk:"ip_is"`
-	IpIsNot                  types.List        `tfsdk:"ip_is_not"`
-	Method                   types.String      `tfsdk:"method"`
-	MethodIs                 types.List        `tfsdk:"method_is"`
-	MethodIsNot              types.List        `tfsdk:"method_is_not"`
-	Name                     types.String      `tfsdk:"name"`
-	Notify                   types.String      `tfsdk:"notify"`
-	NotifyConfig             NotifyConfigValue `tfsdk:"notify_config"`
-	OnlyProxy404             types.Bool        `tfsdk:"only_proxy_404"`
-	OnlyWithCookie           types.String      `tfsdk:"only_with_cookie"`
-	Organization             types.String      `tfsdk:"organization"`
-	Project                  types.String      `tfsdk:"project"`
-	ProxyStripHeaders        types.List        `tfsdk:"proxy_strip_headers"`
-	ProxyStripRequestHeaders types.List        `tfsdk:"proxy_strip_request_headers"`
-	Rule                     types.String      `tfsdk:"rule"`
-	RuleId                   types.String      `tfsdk:"rule_id"`
-	To                       types.String      `tfsdk:"to"`
-	Url                      types.List        `tfsdk:"url"`
-	Uuid                     types.String      `tfsdk:"uuid"`
-	WafConfig                WafConfigValue    `tfsdk:"waf_config"`
-	WafEnabled               types.Bool        `tfsdk:"waf_enabled"`
-	Weight                   types.Int64       `tfsdk:"weight"`
-}
-
-var _ basetypes.ObjectTypable = FailoverType{}
-
-type FailoverType struct {
-	basetypes.ObjectType
-}
-
-func (t FailoverType) Equal(o attr.Type) bool {
-	other, ok := o.(FailoverType)
-
-	if !ok {
-		return false
-	}
-
-	return t.ObjectType.Equal(other.ObjectType)
-}
-
-func (t FailoverType) String() string {
-	return "FailoverType"
-}
-
-func (t FailoverType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	attributes := in.Attributes()
-
-	failoverLifetimeAttribute, ok := attributes["failover_lifetime"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_lifetime is missing from object`)
-
-		return nil, diags
-	}
-
-	failoverLifetimeVal, ok := failoverLifetimeAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_lifetime expected to be basetypes.StringValue, was: %T`, failoverLifetimeAttribute))
-	}
-
-	failoverModeAttribute, ok := attributes["failover_mode"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_mode is missing from object`)
-
-		return nil, diags
-	}
-
-	failoverModeVal, ok := failoverModeAttribute.(basetypes.BoolValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_mode expected to be basetypes.BoolValue, was: %T`, failoverModeAttribute))
-	}
-
-	failoverOriginStatusCodesAttribute, ok := attributes["failover_origin_status_codes"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_origin_status_codes is missing from object`)
-
-		return nil, diags
-	}
-
-	failoverOriginStatusCodesVal, ok := failoverOriginStatusCodesAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_origin_status_codes expected to be basetypes.ListValue, was: %T`, failoverOriginStatusCodesAttribute))
-	}
-
-	failoverOriginTtfbAttribute, ok := attributes["failover_origin_ttfb"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_origin_ttfb is missing from object`)
-
-		return nil, diags
-	}
-
-	failoverOriginTtfbVal, ok := failoverOriginTtfbAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_origin_ttfb expected to be basetypes.StringValue, was: %T`, failoverOriginTtfbAttribute))
-	}
-
-	if diags.HasError() {
-		return nil, diags
-	}
-
-	return FailoverValue{
-		FailoverLifetime:          failoverLifetimeVal,
-		FailoverMode:              failoverModeVal,
-		FailoverOriginStatusCodes: failoverOriginStatusCodesVal,
-		FailoverOriginTtfb:        failoverOriginTtfbVal,
-		state:                     attr.ValueStateKnown,
-	}, diags
-}
-
-func NewFailoverValueNull() FailoverValue {
-	return FailoverValue{
-		state: attr.ValueStateNull,
-	}
-}
-
-func NewFailoverValueUnknown() FailoverValue {
-	return FailoverValue{
-		state: attr.ValueStateUnknown,
-	}
-}
-
-func NewFailoverValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (FailoverValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
-	ctx := context.Background()
-
-	for name, attributeType := range attributeTypes {
-		attribute, ok := attributes[name]
-
-		if !ok {
-			diags.AddError(
-				"Missing FailoverValue Attribute Value",
-				"While creating a FailoverValue value, a missing attribute value was detected. "+
-					"A FailoverValue must contain values for all attributes, even if null or unknown. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("FailoverValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
-			)
-
-			continue
-		}
-
-		if !attributeType.Equal(attribute.Type(ctx)) {
-			diags.AddError(
-				"Invalid FailoverValue Attribute Type",
-				"While creating a FailoverValue value, an invalid attribute value was detected. "+
-					"A FailoverValue must use a matching attribute type for the value. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("FailoverValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
-					fmt.Sprintf("FailoverValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
-			)
-		}
-	}
-
-	for name := range attributes {
-		_, ok := attributeTypes[name]
-
-		if !ok {
-			diags.AddError(
-				"Extra FailoverValue Attribute Value",
-				"While creating a FailoverValue value, an extra attribute value was detected. "+
-					"A FailoverValue must not contain values beyond the expected attribute types. "+
-					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
-					fmt.Sprintf("Extra FailoverValue Attribute Name: %s", name),
-			)
-		}
-	}
-
-	if diags.HasError() {
-		return NewFailoverValueUnknown(), diags
-	}
-
-	failoverLifetimeAttribute, ok := attributes["failover_lifetime"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_lifetime is missing from object`)
-
-		return NewFailoverValueUnknown(), diags
-	}
-
-	failoverLifetimeVal, ok := failoverLifetimeAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_lifetime expected to be basetypes.StringValue, was: %T`, failoverLifetimeAttribute))
-	}
-
-	failoverModeAttribute, ok := attributes["failover_mode"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_mode is missing from object`)
-
-		return NewFailoverValueUnknown(), diags
-	}
-
-	failoverModeVal, ok := failoverModeAttribute.(basetypes.BoolValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_mode expected to be basetypes.BoolValue, was: %T`, failoverModeAttribute))
-	}
-
-	failoverOriginStatusCodesAttribute, ok := attributes["failover_origin_status_codes"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_origin_status_codes is missing from object`)
-
-		return NewFailoverValueUnknown(), diags
-	}
-
-	failoverOriginStatusCodesVal, ok := failoverOriginStatusCodesAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_origin_status_codes expected to be basetypes.ListValue, was: %T`, failoverOriginStatusCodesAttribute))
-	}
-
-	failoverOriginTtfbAttribute, ok := attributes["failover_origin_ttfb"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`failover_origin_ttfb is missing from object`)
-
-		return NewFailoverValueUnknown(), diags
-	}
-
-	failoverOriginTtfbVal, ok := failoverOriginTtfbAttribute.(basetypes.StringValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`failover_origin_ttfb expected to be basetypes.StringValue, was: %T`, failoverOriginTtfbAttribute))
-	}
-
-	if diags.HasError() {
-		return NewFailoverValueUnknown(), diags
-	}
-
-	return FailoverValue{
-		FailoverLifetime:          failoverLifetimeVal,
-		FailoverMode:              failoverModeVal,
-		FailoverOriginStatusCodes: failoverOriginStatusCodesVal,
-		FailoverOriginTtfb:        failoverOriginTtfbVal,
-		state:                     attr.ValueStateKnown,
-	}, diags
-}
-
-func NewFailoverValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) FailoverValue {
-	object, diags := NewFailoverValue(attributeTypes, attributes)
-
-	if diags.HasError() {
-		// This could potentially be added to the diag package.
-		diagsStrings := make([]string, 0, len(diags))
-
-		for _, diagnostic := range diags {
-			diagsStrings = append(diagsStrings, fmt.Sprintf(
-				"%s | %s | %s",
-				diagnostic.Severity(),
-				diagnostic.Summary(),
-				diagnostic.Detail()))
-		}
-
-		panic("NewFailoverValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
-	}
-
-	return object
-}
-
-func (t FailoverType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
-	if in.Type() == nil {
-		return NewFailoverValueNull(), nil
-	}
-
-	if !in.Type().Equal(t.TerraformType(ctx)) {
-		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
-	}
-
-	if !in.IsKnown() {
-		return NewFailoverValueUnknown(), nil
-	}
-
-	if in.IsNull() {
-		return NewFailoverValueNull(), nil
-	}
-
-	attributes := map[string]attr.Value{}
-
-	val := map[string]tftypes.Value{}
-
-	err := in.As(&val)
-
-	if err != nil {
-		return nil, err
-	}
-
-	for k, v := range val {
-		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
-
-		if err != nil {
-			return nil, err
-		}
-
-		attributes[k] = a
-	}
-
-	return NewFailoverValueMust(FailoverValue{}.AttributeTypes(ctx), attributes), nil
-}
-
-func (t FailoverType) ValueType(ctx context.Context) attr.Value {
-	return FailoverValue{}
-}
-
-var _ basetypes.ObjectValuable = FailoverValue{}
-
-type FailoverValue struct {
-	FailoverLifetime          basetypes.StringValue `tfsdk:"failover_lifetime"`
-	FailoverMode              basetypes.BoolValue   `tfsdk:"failover_mode"`
-	FailoverOriginStatusCodes basetypes.ListValue   `tfsdk:"failover_origin_status_codes"`
-	FailoverOriginTtfb        basetypes.StringValue `tfsdk:"failover_origin_ttfb"`
-	state                     attr.ValueState
-}
-
-func (v FailoverValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 4)
-
-	var val tftypes.Value
-	var err error
-
-	attrTypes["failover_lifetime"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["failover_mode"] = basetypes.BoolType{}.TerraformType(ctx)
-	attrTypes["failover_origin_status_codes"] = basetypes.ListType{
-		ElemType: types.StringType,
-	}.TerraformType(ctx)
-	attrTypes["failover_origin_ttfb"] = basetypes.StringType{}.TerraformType(ctx)
-
-	objectType := tftypes.Object{AttributeTypes: attrTypes}
-
-	switch v.state {
-	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 4)
-
-		val, err = v.FailoverLifetime.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["failover_lifetime"] = val
-
-		val, err = v.FailoverMode.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["failover_mode"] = val
-
-		val, err = v.FailoverOriginStatusCodes.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["failover_origin_status_codes"] = val
-
-		val, err = v.FailoverOriginTtfb.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["failover_origin_ttfb"] = val
-
-		if err := tftypes.ValidateValue(objectType, vals); err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		return tftypes.NewValue(objectType, vals), nil
-	case attr.ValueStateNull:
-		return tftypes.NewValue(objectType, nil), nil
-	case attr.ValueStateUnknown:
-		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
-	default:
-		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
-	}
-}
-
-func (v FailoverValue) IsNull() bool {
-	return v.state == attr.ValueStateNull
-}
-
-func (v FailoverValue) IsUnknown() bool {
-	return v.state == attr.ValueStateUnknown
-}
-
-func (v FailoverValue) String() string {
-	return "FailoverValue"
-}
-
-func (v FailoverValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	failoverOriginStatusCodesVal, d := types.ListValue(types.StringType, v.FailoverOriginStatusCodes.Elements())
-
-	diags.Append(d...)
-
-	if d.HasError() {
-		return types.ObjectUnknown(map[string]attr.Type{
-			"failover_lifetime": basetypes.StringType{},
-			"failover_mode":     basetypes.BoolType{},
-			"failover_origin_status_codes": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"failover_origin_ttfb": basetypes.StringType{},
-		}), diags
-	}
-
-	objVal, diags := types.ObjectValue(
-		map[string]attr.Type{
-			"failover_lifetime": basetypes.StringType{},
-			"failover_mode":     basetypes.BoolType{},
-			"failover_origin_status_codes": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"failover_origin_ttfb": basetypes.StringType{},
-		},
-		map[string]attr.Value{
-			"failover_lifetime":            v.FailoverLifetime,
-			"failover_mode":                v.FailoverMode,
-			"failover_origin_status_codes": failoverOriginStatusCodesVal,
-			"failover_origin_ttfb":         v.FailoverOriginTtfb,
-		})
-
-	return objVal, diags
-}
-
-func (v FailoverValue) Equal(o attr.Value) bool {
-	other, ok := o.(FailoverValue)
-
-	if !ok {
-		return false
-	}
-
-	if v.state != other.state {
-		return false
-	}
-
-	if v.state != attr.ValueStateKnown {
-		return true
-	}
-
-	if !v.FailoverLifetime.Equal(other.FailoverLifetime) {
-		return false
-	}
-
-	if !v.FailoverMode.Equal(other.FailoverMode) {
-		return false
-	}
-
-	if !v.FailoverOriginStatusCodes.Equal(other.FailoverOriginStatusCodes) {
-		return false
-	}
-
-	if !v.FailoverOriginTtfb.Equal(other.FailoverOriginTtfb) {
-		return false
-	}
-
-	return true
-}
-
-func (v FailoverValue) Type(ctx context.Context) attr.Type {
-	return FailoverType{
-		basetypes.ObjectType{
-			AttrTypes: v.AttributeTypes(ctx),
-		},
-	}
-}
-
-func (v FailoverValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
-	return map[string]attr.Type{
-		"failover_lifetime": basetypes.StringType{},
-		"failover_mode":     basetypes.BoolType{},
-		"failover_origin_status_codes": basetypes.ListType{
-			ElemType: types.StringType,
-		},
-		"failover_origin_ttfb": basetypes.StringType{},
-	}
+	Action                    types.String      `tfsdk:"action"`
+	AuthPass                  types.String      `tfsdk:"auth_pass"`
+	AuthUser                  types.String      `tfsdk:"auth_user"`
+	CacheLifetime             types.Int64       `tfsdk:"cache_lifetime"`
+	Country                   types.String      `tfsdk:"country"`
+	CountryIs                 types.List        `tfsdk:"country_is"`
+	CountryIsNot              types.List        `tfsdk:"country_is_not"`
+	DisableSslVerify          types.Bool        `tfsdk:"disable_ssl_verify"`
+	Disabled                  types.Bool        `tfsdk:"disabled"`
+	Domain                    types.List        `tfsdk:"domain"`
+	FailoverLifetime          types.String      `tfsdk:"failover_lifetime"`
+	FailoverMode              types.Bool        `tfsdk:"failover_mode"`
+	FailoverOriginStatusCodes types.List        `tfsdk:"failover_origin_status_codes"`
+	FailoverOriginTtfb        types.String      `tfsdk:"failover_origin_ttfb"`
+	Host                      types.String      `tfsdk:"host"`
+	InjectHeaders             types.Map         `tfsdk:"inject_headers"`
+	Ip                        types.String      `tfsdk:"ip"`
+	IpIs                      types.List        `tfsdk:"ip_is"`
+	IpIsNot                   types.List        `tfsdk:"ip_is_not"`
+	Method                    types.String      `tfsdk:"method"`
+	MethodIs                  types.List        `tfsdk:"method_is"`
+	MethodIsNot               types.List        `tfsdk:"method_is_not"`
+	Name                      types.String      `tfsdk:"name"`
+	Notify                    types.String      `tfsdk:"notify"`
+	NotifyConfig              NotifyConfigValue `tfsdk:"notify_config"`
+	OnlyProxy404              types.Bool        `tfsdk:"only_proxy_404"`
+	OnlyWithCookie            types.String      `tfsdk:"only_with_cookie"`
+	Organization              types.String      `tfsdk:"organization"`
+	Project                   types.String      `tfsdk:"project"`
+	ProxyStripHeaders         types.List        `tfsdk:"proxy_strip_headers"`
+	ProxyStripRequestHeaders  types.List        `tfsdk:"proxy_strip_request_headers"`
+	Rule                      types.String      `tfsdk:"rule"`
+	RuleId                    types.String      `tfsdk:"rule_id"`
+	To                        types.String      `tfsdk:"to"`
+	Url                       types.List        `tfsdk:"url"`
+	Uuid                      types.String      `tfsdk:"uuid"`
+	WafConfig                 WafConfigValue    `tfsdk:"waf_config"`
+	WafEnabled                types.Bool        `tfsdk:"waf_enabled"`
+	Weight                    types.Int64       `tfsdk:"weight"`
 }
 
 var _ basetypes.ObjectTypable = NotifyConfigType{}
