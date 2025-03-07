@@ -4,18 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jarcoal/httpmock"
 	"net/http"
-	"terraform-provider-quant/internal/provider"
 )
-
-var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"quant": providerserver.NewProtocol6WithError(provider.New()()),
-}
 
 func testAccPreCheck(t *testing.T) {
 	// You can add any additional setup here
