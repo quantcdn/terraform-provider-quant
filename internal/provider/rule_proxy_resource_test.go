@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-func testAccPreCheck(t *testing.T) {
+func testAccRuleProxyPreCheck(t *testing.T) {
 	// You can add any additional setup here
 }
 
@@ -138,7 +138,7 @@ func TestAccRuleProxyResourceMock(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
     resource.Test(t, resource.TestCase{
-        PreCheck:                 func() { testAccPreCheck(t) },
+        PreCheck:                 func() { testAccRuleProxyPreCheck(t) },
         ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
         Steps: []resource.TestStep{
             {

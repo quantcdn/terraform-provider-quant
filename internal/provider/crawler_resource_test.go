@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-func testAccPreCheck(t *testing.T) {
+func testAccCrawlerPreCheck(t *testing.T) {
 	// You can add any additional setup here
 }
 
@@ -106,7 +106,7 @@ func TestAccCrawlerResourceMock(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
