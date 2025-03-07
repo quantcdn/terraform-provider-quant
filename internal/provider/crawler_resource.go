@@ -277,7 +277,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			crawler.BrowserMode = types.BoolValue(parsedConfig.Config.BrowserMode)
 			
 			// Handle exclude list - preserve values from plan if API returns empty
-			if parsedConfig.Config.Exclude != nil && len(parsedConfig.Config.Exclude) > 0 {
+			if len(parsedConfig.Config.Exclude) > 0 {
 				excludeVals := make([]attr.Value, len(parsedConfig.Config.Exclude))
 				for i, v := range parsedConfig.Config.Exclude {
 					excludeVals[i] = types.StringValue(v)
@@ -285,14 +285,13 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.Exclude = types.ListValueMust(types.StringType, excludeVals)
 			} else if !crawler.Exclude.IsNull() && !crawler.Exclude.IsUnknown() {
 				// If API returned empty but we had values in config, preserve them
-				// This is the key fix - don't overwrite existing values with empty ones
 				// Keep the existing values from the plan
 			} else {
 				crawler.Exclude = types.ListValueMust(types.StringType, []attr.Value{})
 			}
 			
 			// Handle headers
-			if parsedConfig.Config.Headers != nil && len(parsedConfig.Config.Headers) > 0 {
+			if len(parsedConfig.Config.Headers) > 0 {
 				headersMap := make(map[string]attr.Value)
 				for k, v := range parsedConfig.Config.Headers {
 					headersMap[k] = types.StringValue(v)
@@ -303,7 +302,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			}
 
 			// Initialize urls from start_url in config
-			if parsedConfig.Config.StartUrl != nil && len(parsedConfig.Config.StartUrl) > 0 {
+			if len(parsedConfig.Config.StartUrl) > 0 {
 				urlVals := make([]attr.Value, len(parsedConfig.Config.StartUrl))
 				for i, v := range parsedConfig.Config.StartUrl {
 					urlVals[i] = types.StringValue(v)
