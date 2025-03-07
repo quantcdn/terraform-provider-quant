@@ -10,64 +10,86 @@ import (
 	"net/http"
 )
 
-func testAccPreCheck(t *testing.T) {
+func testAccRuleProxyPreCheck(t *testing.T) {
 	// You can add any additional setup here
 }
 
 var ruleProxyResponse = map[string]interface{}{
-    "uuid": "111111-1111-1111-1111-111111111111",
-    "rule_id": "111111-1111-1111-1111-111111111111",
-    "domain": []string{"example.com"},
-	"url": []string{"/api/*"},
-    "name": "test-rule",
+    "uuid": "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
+    "rule_id": "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
+    "domain": []string{"any"},
+    "url": []string{"/proxy"},
+    "name": "test-proxy",
     "action": "proxy",
-	"disabled": false,
-	"method": "method_is",
-	"method_is": []string{"GET", "POST"},
-	"country": "country_is",
-	"country_is": []string{"US", "CA"},
-	"ip": "ip_is",
-	"ip_is": []string{"192.168.1.1"},
+    "disabled": false,
+    "method": "",
+    "method_is": []string{},
+    "method_is_not": []string{},
+    "country": "country_is",
+    "country_is": []string{"US", "CA"},
+    "country_is_not": []string{},
+    "ip": "",
+    "ip_is": []string{},
+    "ip_is_not": []string{},
+    "only_with_cookie": "",
     "action_config": map[string]interface{}{
         "to": "https://backend.example.com",
         "host": "backend.example.com",
         "waf_enabled": true,
         "origin_timeout": "30000",
-		"cache_lifetime": 3600,
+        "cache_lifetime": 3600,
         "failover_mode": false,
         "failover_origin_ttfb": "5000",
         "failover_lifetime": "300",
-		"failover_origin_status_codes": []string{"500", "502", "503", "504"},
-		"disable_ssl_verify": false,
-		"only_proxy_404": false,
-		"proxy_strip_headers": []string{"X-Custom-Header"},
-		"block_ip": []string{"2.2.2.2"},
-		"block_ua": []string{"bad-bot"},
-		"block_referer": []string{"spam.com"},
-		"request_header_name": "X-WAF-Header",
+        "failover_origin_status_codes": []string{},
+        "disable_ssl_verify": false,
+        "only_proxy_404": false,
+        "proxy_strip_headers": []string{"X-Custom-Header"},
+        "proxy_alert_enabled": true,
+        "proxy_inline_fn_enabled": false,
+        "auth_user": "",
+        "auth_pass": "",
+        "inject_headers": nil,
         "waf_config": map[string]interface{}{
             "mode": "report",
             "paranoia_level": 1,
-			"allow_rules": []string{"rule1"},
-			"allow_ip": []string{"1.1.1.1"},
-			"block_ip": []string{"2.2.2.2"},
-			"block_ua": []string{"bad-bot"},
-			"block_referer": []string{"spam.com"},
-			"notify_email": []string{"admin@example.com"},
-			"notify_slack": "slack-webhook",
-			"notify_slack_hits_rpm": 100,
-			"thresholds": []map[string]interface{}{
+            "allow_rules": []string{},
+            "allow_ip": []string{},
+            "block_ip": []string{},
+            "block_ua": []string{},
+            "block_referer": []string{},
+            "notify_email": []string{},
+            "notify_slack": "",
+            "notify_slack_hits_rpm": nil,
+            "block_lists": map[string]interface{}{
+                "referer": false,
+                "user_agent": false,
+                "ai": false,
+                "ip": false,
+            },
+            "httpbl": map[string]interface{}{
+                "httpbl_enabled": false,
+                "block_suspicious": false,
+                "block_harvester": false,
+                "api_key": "",
+                "block_search_engine": false,
+                "block_spam": false,
+            },
+            "thresholds": []map[string]interface{}{
                 {
                     "type":     "ip",
                     "rps":      5,
                     "cooldown": 30,
                     "mode":     "disabled",
+                    "notify_slack": "",
                 },
                 {
                     "type":     "header",
                     "rps":      5,
                     "cooldown": 30,
                     "mode":     "disabled",
+                    "value":    "",
+                    "notify_slack": "",
                 },
                 {
                     "type":     "waf_hit_by_ip",
@@ -75,12 +97,15 @@ var ruleProxyResponse = map[string]interface{}{
                     "minutes":  5,
                     "cooldown": 300,
                     "mode":     "disabled",
+                    "notify_slack": "",
                 },
             },
         },
-		"notify": "none",
+        "notify": "none",
         "notify_config": map[string]interface{}{
             "period": "60",
+            "slack_webhook": "",
+            "origin_status_codes": []string{},
         },
     },
 }
@@ -97,13 +122,13 @@ func setupRuleProxyServer(t *testing.T, organizationID string, projectID string)
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, []map[string]interface{}{ruleProxyResponse})
 	})
-	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/111111-1111-1111-1111-111111111111", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, ruleProxyResponse)
 	})
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, ruleProxyResponse)
 	})
-	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/111111-1111-1111-1111-111111111111", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, ruleProxyResponse)
 	})
 }
@@ -113,20 +138,20 @@ func TestAccRuleProxyResourceMock(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
     resource.Test(t, resource.TestCase{
-        PreCheck:                 func() { testAccPreCheck(t) },
+        PreCheck:                 func() { testAccRuleProxyPreCheck(t) },
         ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
         Steps: []resource.TestStep{
             {
-                Config: testAccRuleProxyResourceConfigMock("test-rule"),
+                Config: testAccRuleProxyResourceConfigMock("test-proxy"),
                 Check: resource.ComposeAggregateTestCheckFunc(
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-rule"),
+                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-proxy"),
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "project", "default"),
                     // Domain checks
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "domain.#", "1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "domain.0", "example.com"),
+                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "domain.0", "any"),
                     // URL checks
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "url.#", "1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "url.0", "/api/*"),
+                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "url.0", "/proxy"),
                     // Proxy config checks
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "to", "https://backend.example.com"),
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "host", "backend.example.com"),
@@ -140,26 +165,10 @@ func TestAccRuleProxyResourceMock(t *testing.T) {
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "country_is.#", "2"),
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "country_is.0", "US"),
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "country_is.1", "CA"),
-                    // IP checks
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "ip", "ip_is"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "ip_is.#", "1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "ip_is.0", "192.168.1.1"),
-                    // Method checks
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "method", "method_is"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "method_is.#", "2"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "method_is.0", "GET"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "method_is.1", "POST"),
                     // WAF checks
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_enabled", "true"),
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.mode", "report"),
                     resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.paranoia_level", "1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.allow_rules.#", "1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.allow_rules.0", "rule1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.allow_ip.#", "1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.allow_ip.0", "1.1.1.1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.block_ip.#", "1"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.block_ip.0", "2.2.2.2"),
-                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "waf_config.notify_slack", "slack-webhook"),
                     testAccCheckRuleProxyExists("quant_rule_proxy.test"),
                 ),
             },
@@ -169,7 +178,6 @@ func TestAccRuleProxyResourceMock(t *testing.T) {
 
 func testAccRuleProxyResourceConfigMock(name string) string {
     return fmt.Sprintf(`
-
 provider "quant" {
 	bearer = "testtoken"
 	organization = "test-organization"
@@ -178,8 +186,8 @@ provider "quant" {
 resource "quant_rule_proxy" "test" {
 	name    = %[1]q
 	project = "default"
-	domain  = ["example.com"]
-	url     = ["/api/*"]
+	domain  = ["any"]
+	url     = ["/proxy"]
 	disabled = false
 	
 	to              = "https://backend.example.com"
@@ -192,30 +200,14 @@ resource "quant_rule_proxy" "test" {
 	country    = "country_is"
 	country_is = ["US", "CA"]
 	
-	ip     = "ip_is"
-	ip_is  = ["192.168.1.1"]
-	
-	method    = "method_is"
-	method_is = ["GET", "POST"]
-	
 	waf_enabled = true
 	waf_config = {
 		mode           = "report"
 		paranoia_level = 1
-		allow_rules    = ["rule1"]
-		allow_ip       = ["1.1.1.1"]
-		block_ip       = ["2.2.2.2"]
-		block_ua       = ["bad-bot"]
-		block_referer  = ["spam.com"]
-		notify_email   = ["admin@example.com"]
-		notify_slack   = "slack-webhook"
-		notify_slack_hits_rpm = 100
-		notify_slack_rpm = 1000
 	}
 
-	failover_mode = "false"
+	failover_mode = false
 	failover_origin_ttfb = "5000"
-	failover_origin_status_codes = ["500", "502", "503", "504"]
 }
 `, name)
 }

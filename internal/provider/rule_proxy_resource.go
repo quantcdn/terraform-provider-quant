@@ -671,14 +671,64 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
         return
     }
 
-    api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyRead(
+    // Add detailed logging
+    fmt.Printf("Reading rule proxy with ID: %s for project: %s\n", 
+        data.RuleId.ValueString(), data.Project.ValueString())
+
+    api, resp, err := r.client.Instance.RulesProxyAPI.RulesProxyRead(
         r.client.AuthContext,
         r.client.Organization,
         data.Project.ValueString(),
         data.RuleId.ValueString(),
     ).Execute()
 
+    // Enhanced error handling
     if err != nil {
+        // Log detailed error information
+        fmt.Printf("Error response: %+v\n", resp)
+        
+        // Check if it's a 404 error, which might indicate the rule was deleted
+        if resp != nil && resp.StatusCode == 404 {
+            diags.AddError(
+                "Rule proxy not found",
+                fmt.Sprintf("The rule proxy with ID %s no longer exists. It may have been deleted outside of Terraform.", 
+                    data.RuleId.ValueString()),
+            )
+            return
+        }
+        
+        // For 500 errors, try to get more information
+        if resp != nil && resp.StatusCode == 500 {
+            // Try to list all rules to see if there's a general API issue
+            allRules, _, listErr := r.client.Instance.RulesProxyAPI.RulesProxyList(
+                r.client.AuthContext,
+                r.client.Organization,
+                data.Project.ValueString(),
+            ).Execute()
+            
+            if listErr == nil {
+                fmt.Printf("Successfully listed %d proxy rules\n", len(allRules))
+                // Check if our rule exists in the list
+                ruleFound := false
+                for _, rule := range allRules {
+                    if rule.GetRuleId() == data.RuleId.ValueString() {
+                        ruleFound = true
+                        break
+                    }
+                }
+                
+                if ruleFound {
+                    fmt.Printf("Rule with ID %s exists in the list but can't be read directly\n", 
+                        data.RuleId.ValueString())
+                } else {
+                    fmt.Printf("Rule with ID %s does not exist in the list\n", 
+                        data.RuleId.ValueString())
+                }
+            } else {
+                fmt.Printf("Error listing rules: %v\n", listErr)
+            }
+        }
+        
         diags.AddError(
             "Error reading rule proxy",
             fmt.Sprintf("Could not read rule proxy, unexpected error: %s", err.Error()),
@@ -805,6 +855,12 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	}
 	data.ProxyStripRequestHeaders = proxyStripRequestHeadersList
 
+    // Get the current state/plan values to preserve them if needed
+    var planData resource_rule_proxy.RuleProxyModel
+    if !data.FailoverOriginStatusCodes.IsNull() {
+        planData = *data
+    }
+
     // Handle WAF configuration
     data.WafEnabled = types.BoolValue(actionConfig.GetWafEnabled())
     if data.WafEnabled.ValueBool() {
@@ -834,23 +890,38 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
         }
         data.WafConfig.BlockIp = blockIpList
 
-        // Set other WAF fields
-        data.WafConfig.NotifySlack = types.StringValue(wafConfig.GetNotifySlack())
-		data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(wafConfig.GetNotifySlackHitsRpm()))
+        // Preserve values from plan if API returns empty
+        if wafConfig.GetNotifySlack() == "" && !planData.WafConfig.NotifySlack.IsNull() && !planData.WafConfig.NotifySlack.IsUnknown() {
+            data.WafConfig.NotifySlack = planData.WafConfig.NotifySlack
+        } else {
+            data.WafConfig.NotifySlack = types.StringValue(wafConfig.GetNotifySlack())
+        }
+
+        if wafConfig.GetNotifySlackHitsRpm() == 0 && !planData.WafConfig.NotifySlackHitsRpm.IsNull() && !planData.WafConfig.NotifySlackHitsRpm.IsUnknown() {
+            data.WafConfig.NotifySlackHitsRpm = planData.WafConfig.NotifySlackHitsRpm
+        } else {
+            data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(wafConfig.GetNotifySlackHitsRpm()))
+        }
+
         data.WafConfig.RequestHeaderName = types.StringValue(wafConfig.GetRequestHeaderName())
-		// @todo support thresholds.
-		// data.WafConfig.Thresholds = types.ListNull(resource_rule_proxy.ThresholdsValue. []attr.Value{})
     }
 
-	// Handle failover configuration
-	data.FailoverMode = types.BoolValue(actionConfig.GetFailoverMode())
-	data.FailoverOriginTtfb = types.StringValue(actionConfig.GetFailoverOriginTtfb())
-	statusCodesList, diag := types.ListValueFrom(ctx, types.StringType, actionConfig.GetFailoverOriginStatusCodes())
-	if diag.HasError() {
-		diags.Append(diag...)
-		return
-	}
-	data.FailoverOriginStatusCodes = statusCodesList
+    // Handle failover configuration
+    data.FailoverMode = types.BoolValue(actionConfig.GetFailoverMode())
+    data.FailoverOriginTtfb = types.StringValue(actionConfig.GetFailoverOriginTtfb())
+
+    // Preserve failover status codes if API returns empty but we had values
+    failoverStatusCodes := actionConfig.GetFailoverOriginStatusCodes()
+    if len(failoverStatusCodes) == 0 && !planData.FailoverOriginStatusCodes.IsNull() && !planData.FailoverOriginStatusCodes.IsUnknown() {
+        data.FailoverOriginStatusCodes = planData.FailoverOriginStatusCodes
+    } else {
+        statusCodesList, diag := types.ListValueFrom(ctx, types.StringType, failoverStatusCodes)
+        if diag.HasError() {
+            diags.Append(diag...)
+            return
+        }
+        data.FailoverOriginStatusCodes = statusCodesList
+    }
 
 	notifycfg := actionConfig.GetNotifyConfig()
 	data.Notify = types.StringValue(*actionConfig.Notify)
