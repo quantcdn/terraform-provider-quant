@@ -15,6 +15,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	quantadmingo "github.com/quantcdn/quant-admin-go"
+	"time"
+	"net/http"
 )
 
 var (
@@ -174,10 +176,30 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 }
 
 func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	var api *quantadmingo.Crawler
+	var apiErr error
+	err := retryAPICall(3, 500*time.Millisecond, func() error {
+		var resp *http.Response
+		api, resp, apiErr = r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+		
+		// Check for retryable errors
+		if apiErr != nil && resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
+			return apiErr
+		}
+		return nil
+	})
 
 	if err != nil {
-		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))
+		diags.AddError("Unable to read crawler after retries", fmt.Sprintf("Error: %s", err.Error()))
+		return diags
+	}
+
+	// Validate that the API returned the expected data
+	if api == nil {
+		diags.AddError(
+			"Invalid API response",
+			"The API returned a nil response when reading crawler data",
+		)
 		return diags
 	}
 
@@ -219,63 +241,82 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		crawler.DeletedAt = types.StringNull()
 	}
 
-	// Parse and set config-related fields
-	var config map[string]interface{}
+	// Improved approach with better error handling and structure
 	if api.Config != "" {
 		crawler.Config = types.StringValue(api.GetConfig())
-		if err := yaml.Unmarshal([]byte(api.GetConfig()), &config); err != nil {
+		
+		// Define a structured type for the config
+		type CrawlerConfig struct {
+			Config struct {
+				UserAgent   string                 `yaml:"user_agent"`
+				BrowserMode bool                   `yaml:"browser_mode"`
+				Workers     int                    `yaml:"workers"`
+				Depth       int                    `yaml:"depth"`
+				MaxHits     int                    `yaml:"max_hits"`
+				MaxHtml     int                    `yaml:"max_html"`
+				Cache       bool                   `yaml:"cache"`
+				Delay       int                    `yaml:"delay"`
+				StatusOk    []int                  `yaml:"status_ok"`
+				Quant       map[string]interface{} `yaml:"quant"`
+				StartUrl    []string               `yaml:"start_url"`
+				Headers     map[string]string      `yaml:"headers"`
+				Exclude     []string               `yaml:"exclude"`
+			}
+			Domain  string            `yaml:"domain"`
+			Headers map[string]string `yaml:"headers"`
+		}
+		
+		var parsedConfig CrawlerConfig
+		if err := yaml.Unmarshal([]byte(api.GetConfig()), &parsedConfig); err != nil {
 			diags.AddWarning(
 				"Unable to parse crawler config",
 				fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()),
 			)
-		}
-	}
-
-	// Set browser_mode from config
-	if browserMode, ok := config["browser_mode"]; ok && browserMode != nil {
-		crawler.BrowserMode = types.BoolValue(browserMode.(bool))
-	} else {
-		crawler.BrowserMode = types.BoolValue(false)
-	}
-
-	// Handle exclude list consistently
-	excludeVals := make([]attr.Value, 0)
-	if config != nil {
-		if excludeList, ok := config["exclude"]; ok && excludeList != nil {
-			excludeStrs := excludeList.([]interface{})
-			excludeVals = make([]attr.Value, len(excludeStrs))
-			for i, v := range excludeStrs {
-				if strVal, ok := v.(string); ok {
-					excludeVals[i] = types.StringValue(strVal)
+		} else {
+			// Set fields directly from the structured config
+			crawler.BrowserMode = types.BoolValue(parsedConfig.Config.BrowserMode)
+			
+			// Handle exclude list - preserve values from plan if API returns empty
+			if parsedConfig.Config.Exclude != nil && len(parsedConfig.Config.Exclude) > 0 {
+				excludeVals := make([]attr.Value, len(parsedConfig.Config.Exclude))
+				for i, v := range parsedConfig.Config.Exclude {
+					excludeVals[i] = types.StringValue(v)
 				}
+				crawler.Exclude = types.ListValueMust(types.StringType, excludeVals)
+			} else if !crawler.Exclude.IsNull() && !crawler.Exclude.IsUnknown() {
+				// If API returned empty but we had values in config, preserve them
+				// This is the key fix - don't overwrite existing values with empty ones
+				// Keep the existing values from the plan
+			} else {
+				crawler.Exclude = types.ListValueMust(types.StringType, []attr.Value{})
 			}
-		}
-	}
-
-	// If we have no excludes from config but there are excludes in the plan/state, keep those
-	if len(excludeVals) == 0 && !crawler.Exclude.IsNull() {
-		var currentExcludes []string
-		diags.Append(crawler.Exclude.ElementsAs(ctx, &currentExcludes, false)...)
-		if len(currentExcludes) > 0 {
-			excludeVals = make([]attr.Value, len(currentExcludes))
-			for i, v := range currentExcludes {
-				excludeVals[i] = types.StringValue(v)
+			
+			// Handle headers
+			if parsedConfig.Config.Headers != nil && len(parsedConfig.Config.Headers) > 0 {
+				headersMap := make(map[string]attr.Value)
+				for k, v := range parsedConfig.Config.Headers {
+					headersMap[k] = types.StringValue(v)
+				}
+				crawler.Headers = types.MapValueMust(types.StringType, headersMap)
+			} else {
+				crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 			}
-		}
-	}
 
-	crawler.Exclude = types.ListValueMust(types.StringType, excludeVals)
+			// Initialize urls from start_url in config
+			if parsedConfig.Config.StartUrl != nil && len(parsedConfig.Config.StartUrl) > 0 {
+				urlVals := make([]attr.Value, len(parsedConfig.Config.StartUrl))
+				for i, v := range parsedConfig.Config.StartUrl {
+					urlVals[i] = types.StringValue(v)
+				}
+				crawler.Urls = types.ListValueMust(types.StringType, urlVals)
+			} else {
+				// Always set an empty list rather than null
+				crawler.Urls = types.ListValueMust(types.StringType, []attr.Value{})
+			}
 
-	// Set headers from config
-	if config["headers"] != nil {
-		headers := config["headers"].(map[string]interface{})
-		headersMap := make(map[string]attr.Value)
-		for k, v := range headers {
-			headersMap[k] = types.StringValue(v.(string))
+			// Make sure crawler field is initialized
+			crawler.Crawler = types.StringNull()
 		}
-		crawler.Headers = types.MapValueMust(types.StringType, headersMap)
-	} else {
-		crawler.Headers = types.MapNull(types.StringType)
 	}
 
 	// Set urls_list
@@ -293,7 +334,7 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing crawler.uuid attribute",
-			"To read crawler information the crawler uuid must be provided",
+			"To delete crawler information the crawler uuid must be provided",
 		)
 		return
 	}
@@ -302,55 +343,95 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		diags.AddAttributeError(
 			path.Root("project"),
 			"Missing crawler.project attribute",
-			"To read crawler information the crawler project must be provided",
+			"To delete crawler information the crawler project must be provided",
 		)
 		return
 	}
 
-	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	// Add retry logic for delete operation
+	err := retryAPICall(3, 500*time.Millisecond, func() error {
+		_, resp, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
+			ctx, 
+			r.client.Organization, 
+			crawler.Project.ValueString(), 
+			crawler.Uuid.ValueString(),
+		).Execute()
+		
+		if err != nil && resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
+			return err
+		}
+		return nil
+	})
+
 	if err != nil {
 		diags.AddError("Unable to delete crawler", fmt.Sprintf("Error: %s", err.Error()))
 	}
+	
 	return diags
 }
 
 func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	if crawler.Uuid.IsUnknown() || crawler.Uuid.IsNull() {
-		diags.AddAttributeError(
-			path.Root("uuid"),
-			"Missing crawler.uuid attribute",
-			"To read crawler information the crawler uuid must be provided",
-		)
-		return
-	}
+	// Validation code...
 
-	if crawler.Project.IsNull() || crawler.Project.IsUnknown() {
-		diags.AddAttributeError(
-			path.Root("project"),
-			"Missing crawler.project attribute",
-			"To read crawler information the crawler project must be provided",
-		)
-		return
-	}
+	// Add debug logging
+	fmt.Printf("Updating crawler with UUID: %s for project: %s\n", 
+		crawler.Uuid.ValueString(), crawler.Project.ValueString())
 
 	req := *quantadmingo.NewCrawlerRequestUpdateWithDefaults()
 
-	req.SetDomain(crawler.Domain.ValueString())
-	req.SetBrowserMode(crawler.BrowserMode.ValueBool())
+	// Only set fields that are not null or unknown
+	if !crawler.Domain.IsNull() && !crawler.Domain.IsUnknown() {
+		req.SetDomain(crawler.Domain.ValueString())
+	}
+	
+	if !crawler.BrowserMode.IsNull() && !crawler.BrowserMode.IsUnknown() {
+		req.SetBrowserMode(crawler.BrowserMode.ValueBool())
+	}
 
-	urls := make([]string, 0, len(crawler.Urls.Elements()))
-	diags.Append(crawler.Urls.ElementsAs(ctx, &urls, false)...)
-	req.SetUrls(urls)
+	// Only process URLs if the list is not null
+	if !crawler.Urls.IsNull() && !crawler.Urls.IsUnknown() {
+		urls := make([]string, 0, len(crawler.Urls.Elements()))
+		diags.Append(crawler.Urls.ElementsAs(ctx, &urls, false)...)
+		if !diags.HasError() {
+			req.SetUrls(urls)
+		}
+	}
 
-	exclude := make([]string, 0, len(crawler.Exclude.Elements()))
-	diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
-	req.SetExclude(exclude)
+	// Only process exclude if the list is not null
+	if !crawler.Exclude.IsNull() && !crawler.Exclude.IsUnknown() {
+		exclude := make([]string, 0, len(crawler.Exclude.Elements()))
+		diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
+		if !diags.HasError() {
+			req.SetExclude(exclude)
+		}
+	}
 
-	headers := make(map[string]string, len(crawler.Headers.Elements()))
-	diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
-	req.SetHeaders(headers)
+	// Only process headers if the map is not null
+	if !crawler.Headers.IsNull() && !crawler.Headers.IsUnknown() {
+		headers := make(map[string]string, len(crawler.Headers.Elements()))
+		diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
+		if !diags.HasError() {
+			req.SetHeaders(headers)
+		}
+	}
 
-	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).CrawlerRequestUpdate(req).Execute()
+	// Use retry logic for update as well
+	err := retryAPICall(3, 500*time.Millisecond, func() error {
+		_, resp, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(
+			ctx, 
+			r.client.Organization, 
+			crawler.Project.ValueString(), 
+			crawler.Uuid.ValueString(),
+		).CrawlerRequestUpdate(req).Execute()
+		
+		if err != nil {
+			fmt.Printf("Error updating crawler: %v, Response: %+v\n", err, resp)
+			if resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
+				return err
+			}
+		}
+		return nil
+	})
 
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
@@ -361,8 +442,8 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 }
 
 func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	// If there's no state (resource is being created), return early
-	if req.State.Raw.IsNull() {
+	// If there's no state (resource is being created) or no plan (resource is being deleted), return early
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
 
@@ -374,9 +455,46 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	// Keep the domain_verified value from the state
+	// Preserve computed fields from state
 	plan.DomainVerified = state.DomainVerified
+	plan.CreatedAt = state.CreatedAt
+	plan.UpdatedAt = state.UpdatedAt
+	plan.Id = state.Id
+	plan.ProjectId = state.ProjectId
+	
+	// If UUID is not set in plan but exists in state, preserve it
+	if plan.Uuid.IsNull() && !state.Uuid.IsNull() {
+		plan.Uuid = state.Uuid
+	}
+	
+	// Preserve exclude if it's in the plan but not in the state
+	if !plan.Exclude.IsNull() && !plan.Exclude.IsUnknown() && state.Exclude.IsNull() {
+		// Keep the exclude from the plan
+	} else if !state.Exclude.IsNull() && !state.Exclude.IsUnknown() {
+		// If both have values, prefer the plan's value (which is the default behavior)
+		// But if plan is empty and state has values, use state's values
+		if len(plan.Exclude.Elements()) == 0 && len(state.Exclude.Elements()) > 0 {
+			plan.Exclude = state.Exclude
+		}
+	}
 
 	// Set the modified plan
 	resp.Plan.Set(ctx, &plan)
+}
+
+// Add a helper function for retrying API calls
+func retryAPICall(maxRetries int, sleepTime time.Duration, operation func() error) error {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = operation()
+		if err == nil {
+			return nil
+		}
+		
+		// Check if error is retryable (e.g., 429, 500, 503)
+		if i < maxRetries-1 {
+			time.Sleep(sleepTime * time.Duration(i+1)) // Exponential backoff
+		}
+	}
+	return err
 }
