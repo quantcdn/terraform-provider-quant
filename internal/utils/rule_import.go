@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -20,4 +21,18 @@ func GetRuleImportId(s string) (types.String, types.String, error) {
 	}
 
 	return types.StringValue(parts[0]), types.StringValue(parts[1]), nil
+}
+
+func GetDomainImportId(s string) (types.String, types.Int64, error) {
+	parts := strings.Split(s, "/")
+	if len(parts) != 2 {
+		return types.StringNull(), types.Int64Null(), errors.New("The ID must follow the pattern project/uuid to import")
+	}
+
+	id, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return types.StringNull(), types.Int64Null(), errors.New("Invalid domain ID format")
+	}
+
+	return types.StringValue(parts[0]), types.Int64Value(id), nil
 }

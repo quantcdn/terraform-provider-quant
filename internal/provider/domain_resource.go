@@ -6,18 +6,21 @@ import (
 	"strconv"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_domain"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-
-	quantadmingo "github.com/quantcdn/quant-admin-go"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
+	quantadmingoclient "github.com/quantcdn/quant-admin-go"
+	"terraform-provider-quant/internal/utils"
 )
 
 var (
-	_ resource.Resource              = (*domainResource)(nil)
-	_ resource.ResourceWithConfigure = (*domainResource)(nil)
+	_ resource.Resource                = (*domainResource)(nil)
+	_ resource.ResourceWithConfigure   = (*domainResource)(nil)
+	_ resource.ResourceWithImportState = (*domainResource)(nil)
 )
 
 func NewDomainResource() resource.Resource {
@@ -40,13 +43,15 @@ func (r *domainResource) Configure(_ context.Context, req resource.ConfigureRequ
 	if req.ProviderData == nil {
 		return
 	}
+
 	client, ok := req.ProviderData.(*client.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unepxected resource configure type",
+			"Unexpected resource configure type",
 			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
 		)
 	}
+
 	r.client = client
 }
 
@@ -60,18 +65,14 @@ func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// Create API call logic
-	diags := callDomainCreateAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callDomainCreateAPI(ctx, r, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	diags = callDomainReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// Read the API results back into the model for Terraform state.
+	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -87,8 +88,9 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	diags := callDomainReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	// Read API call logic
+	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -107,14 +109,15 @@ func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	diags := callDomainUpdateAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	// Update API call logic
+	resp.Diagnostics.Append(callDomainUpdateAPI(ctx, r, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	diags = callDomainReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -133,145 +136,198 @@ func (r *domainResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	diags := callDomainDeleteAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// Delete API call logic
+	resp.Diagnostics.Append(callDomainDeleteAPI(ctx, r, &data)...)
 }
 
-func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewDomainRequestWithDefaults()
+// Import state for a given domain ID.
+func (r *domainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	var data resource_domain.DomainModel
+	var err error
 
-	req.Domain = domain.Domain.ValueString()
+	data.Project, data.Id, err = utils.GetDomainImportId(req.ID)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			fmt.Sprintf("Could not parse import ID. Error: %s", err.Error()),
+		)
+	}
+
+	diags := callDomainReadAPI(ctx, r, &data)
+
+	if diags.HasError() {
+		resp.Diagnostics.AddError(
+			"Error reading domain",
+			fmt.Sprintf("Could not read domain. Error: %s", diags.Errors()),
+		)
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// Create domain request.
+func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
+	req := *quantadmingoclient.NewDomainRequestWithDefaults()
+
+	if domain.Domain.IsNull() || domain.Domain.IsUnknown() {
+		diags.AddAttributeError(
+			path.Root("domain"),
+			"Missing domain.domain attribute",
+			"Cannot create a domain without a domain.",
+		)
+		return
+	}
+
+	req.SetDomain(domain.Domain.ValueString())
 
 	org := r.client.Organization
-	if !domain.Organization.IsNull() {
-		org = domain.Organization.ValueString()
-	}
-
-	api, _, err := r.client.Instance.DomainsAPI.DomainsCreate(r.client.AuthContext, org, domain.Project.ValueString()).DomainRequest(req).Execute()
+	project := domain.Project.ValueString()
+	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsCreate(r.client.AuthContext, org, project).DomainRequest(req).Execute()
 	if err != nil {
-		diags.AddError("Unable to add domain", fmt.Sprintf("Error: %s", err.Error()))
+		diags.AddError(
+			"Error creating domain",
+			"Could not create domain, unexpected error: "+err.Error(),
+		)
+		return
 	}
 
-	domain.Id = types.Int64Value(int64(api.GetId()))
-	domain.CreatedAt = types.StringValue(api.GetCreatedAt())
-	domain.DnsEngaged = types.Int64Value(int64(api.GetDnsEngaged()))
+	domain.Id = types.Int64Value(int64(apiResp.GetId()))
+
+	createStateConf := retry.StateChangeConf{
+		Pending: []string{"pending", "creating"},
+		Target:  []string{"ready"},
+		Refresh: func() (interface{}, string, error) {
+			apiResp, resp, _ := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, project, strconv.FormatInt(int64(apiResp.GetId()), 10)).Execute()
+			if resp.StatusCode == 404 {
+				return nil, "pending", nil
+			}
+			return apiResp, "ready", nil
+		},
+		Timeout:    10 * time.Minute,
+		Delay:      10 * time.Second,
+		MinTimeout: 10 * time.Second,
+	}
+
+	_, err = createStateConf.WaitForStateContext(ctx)
+	if err != nil {
+		diags.AddError("Unable to create domain", fmt.Sprintf("Error: %s", err.Error()))
+	}
 
 	return
 }
 
 func callDomainUpdateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	if domain.Id.IsNull() {
+	if domain.Id.IsNull() || domain.Id.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("id"),
-			"Missing ID attribute",
-			"Unable to update the domain because of missing ID",
-		)
-		return
-	}
-
-	if domain.Project.IsNull() {
-		diags.AddAttributeError(
-			path.Root("project"),
-			"Missing project attribute",
-			"Unable to update the domain because of a missing project",
+			"Missing domain.id attribute",
+			"To update domain information the domain ID needs to be known, please import the terraform state.",
 		)
 		return
 	}
 
 	org := r.client.Organization
-	if !domain.Organization.IsNull() {
-		org = domain.Organization.ValueString()
-	}
+	req := *quantadmingoclient.NewDomainRequestUpdateWithDefaults()
 
-	id := strconv.Itoa(int(domain.Id.ValueInt64()))
-	api, _, err := r.client.Instance.DomainsAPI.DomainsUpdate(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
-
+	project := domain.Project.ValueString()
+	_, _, err := r.client.Instance.DomainsAPI.DomainsUpdate(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).DomainRequestUpdate(req).Execute()
 	if err != nil {
-		diags.AddError("Unable to update domain", fmt.Sprintf("Error: %s", err.Error()))
+		diags.AddError(
+			"Error updating domain",
+			"Could not update domain, unexpected error: "+err.Error(),
+		)
 		return
 	}
-
-	domain.UpdatedAt = types.StringValue(api.GetUpdatedAt())
 
 	return
 }
 
 func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	if domain.Id.IsNull() {
+	if domain.Id.IsNull() || domain.Id.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("id"),
-			"Missing ID attribute",
-			"Unable to update the domain because of missing ID",
-		)
-		return
-	}
-
-	if domain.Project.IsNull() {
-		diags.AddAttributeError(
-			path.Root("project"),
-			"Missing project attribute",
-			"Unable to update the domain because of a missing project",
+			"Missing domain.id attribute",
+			"To read domain information the domain ID needs to be known, please import the terraform state.",
 		)
 		return
 	}
 
 	org := r.client.Organization
-	if !domain.Organization.IsNull() {
-		org = domain.Organization.ValueString()
-	}
-
-	id := strconv.Itoa(int(domain.Id.ValueInt64()))
-
-	api, _, err := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
+	project := domain.Project.ValueString()
+	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).Execute()
 	if err != nil {
-		diags.AddError("Unable to read domain", fmt.Sprintf("Error: %s", err.Error()))
+		diags.AddError(
+			"Error reading domain",
+			"Could not read domain, unexpected error: "+err.Error(),
+		)
+		return
 	}
 
-	domain.Id = types.Int64Value(int64(api.GetId()))
-	domain.Domain = types.StringValue(api.GetDomain())
-	domain.CreatedAt = types.StringValue(api.GetCreatedAt())
-	domain.UpdatedAt = types.StringValue(api.GetUpdatedAt())
+	domain.Id = types.Int64Value(int64(apiResp.GetId()))
+	domain.Domain = types.StringValue(apiResp.GetDomain())
+	domain.CreatedAt = types.StringValue(apiResp.GetCreatedAt())
+	domain.UpdatedAt = types.StringValue(apiResp.GetUpdatedAt())
+	domain.DeletedAt = types.StringValue(apiResp.GetDeletedAt())
+	domain.DnsEngaged = types.Int64Value(int64(apiResp.GetDnsEngaged()))
+	domain.InSection = types.Int64Value(int64(apiResp.GetInSection()))
+	domain.ProjectId = types.Int64Value(int64(apiResp.GetProjectId()))
+	domain.SectionMessage = types.StringValue(apiResp.GetSectionMessage())
+	domain.Organization = types.StringValue(org)
 
-	domain.DnsEngaged = types.Int64Value(int64(api.GetDnsEngaged()))
-
-	return
+	return diags
 }
 
 func callDomainDeleteAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	if domain.Id.IsNull() {
-		diags.AddAttributeError(
-			path.Root("id"),
-			"Missing ID attribute",
-			"Unable to update the domain because of missing ID",
-		)
-		return
-	}
-
-	if domain.Project.IsNull() {
-		diags.AddAttributeError(
-			path.Root("project"),
-			"Missing project attribute",
-			"Unable to update the domain because of a missing project",
+	if domain.Domain.IsNull() || domain.Domain.IsUnknown() {
+		diags.AddError(
+			"Unable to delete domain",
+			"Domain name is required to delete domain information",
 		)
 		return
 	}
 
 	org := r.client.Organization
-	if !domain.Organization.IsNull() {
-		org = domain.Organization.ValueString()
-	}
-
-	id := strconv.Itoa(int(domain.Id.ValueInt64()))
-
-	_, _, err := r.client.Instance.DomainsAPI.DomainsDelete(r.client.AuthContext, org, domain.Project.ValueString(), id).Execute()
-
+	project := domain.Project.ValueString()
+	_, _, err := r.client.Instance.DomainsAPI.DomainsDelete(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).Execute()
 	if err != nil {
-		diags.AddError("Unable to delete project", fmt.Sprintf("Error: %s", err.Error()))
+		diags.AddError(
+			"Error deleting domain",
+			"Could not delete domain, unexpected error: "+err.Error(),
+		)
 		return
 	}
 
-	return
+	return diags
+}
+
+func callDomainListAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
+	org := r.client.Organization
+	project := domain.Project.ValueString()
+	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsList(r.client.AuthContext, org, project).Execute()
+	if err != nil {
+		diags.AddError(
+			"Error listing domains",
+			"Could not list domains, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// Convert API response to domain model
+	for _, d := range apiResp {
+		if d.GetDomain() == domain.Domain.ValueString() {
+			domain.Id = types.Int64Value(int64(d.GetId()))
+			domain.CreatedAt = types.StringValue(d.GetCreatedAt())
+			domain.UpdatedAt = types.StringValue(d.GetUpdatedAt())
+			domain.DeletedAt = types.StringValue(d.GetDeletedAt())
+			domain.DnsEngaged = types.Int64Value(int64(d.GetDnsEngaged()))
+			domain.InSection = types.Int64Value(int64(d.GetInSection()))
+			domain.ProjectId = types.Int64Value(int64(d.GetProjectId()))
+			domain.SectionMessage = types.StringValue(d.GetSectionMessage())
+			domain.Organization = types.StringValue(org)
+			break
+		}
+	}
+
+	return diags
 }
