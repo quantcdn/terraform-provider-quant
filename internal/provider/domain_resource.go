@@ -300,34 +300,3 @@ func callDomainDeleteAPI(ctx context.Context, r *domainResource, domain *resourc
 
 	return diags
 }
-
-func callDomainListAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	org := r.client.Organization
-	project := domain.Project.ValueString()
-	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsList(r.client.AuthContext, org, project).Execute()
-	if err != nil {
-		diags.AddError(
-			"Error listing domains",
-			"Could not list domains, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	// Convert API response to domain model
-	for _, d := range apiResp {
-		if d.GetDomain() == domain.Domain.ValueString() {
-			domain.Id = types.Int64Value(int64(d.GetId()))
-			domain.CreatedAt = types.StringValue(d.GetCreatedAt())
-			domain.UpdatedAt = types.StringValue(d.GetUpdatedAt())
-			domain.DeletedAt = types.StringValue(d.GetDeletedAt())
-			domain.DnsEngaged = types.Int64Value(int64(d.GetDnsEngaged()))
-			domain.InSection = types.Int64Value(int64(d.GetInSection()))
-			domain.ProjectId = types.Int64Value(int64(d.GetProjectId()))
-			domain.SectionMessage = types.StringValue(d.GetSectionMessage())
-			domain.Organization = types.StringValue(org)
-			break
-		}
-	}
-
-	return diags
-}
