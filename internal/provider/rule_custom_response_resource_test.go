@@ -2,17 +2,24 @@ package provider
 
 import (
 	"encoding/json"
-	"terraform-provider-quant/internal/provider"
-
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/jarcoal/httpmock"
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/jarcoal/httpmock"
 )
+
+// testAccProtoV6ProviderFactories are used to instantiate a provider during
+// acceptance testing. The factory function will be invoked for every Terraform
+// CLI command executed to create a new provider server to which the CLI can
+// reattach.
+var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
+	"quant": providerserver.NewProtocol6WithError(New()()),
+}
 
 var customResponseResponse = map[string]interface{}{
 	"uuid": "96e4f4f6-211a-4f4b-b7fb-03985df56dad",
@@ -88,7 +95,6 @@ func mockCustomResponseServer(t *testing.T, organizationID string, ruleID string
 			return httpmock.NewStringResponse(204, ""), nil
 		})
 }
-
 
 func TestAccRuleCustomResponseResource(t *testing.T) {
 	organizationID := "test-organization"
