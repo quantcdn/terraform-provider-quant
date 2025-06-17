@@ -85,7 +85,11 @@ func NewRateLimitedRoundTripper(transport http.RoundTripper, config *RateLimitCo
 	}
 
 	// Create rate limiter channel
-	rateLimiter := make(chan struct{}, int(config.RequestsPerSecond))
+	rateLimiterCapacity := int(math.Ceil(config.RequestsPerSecond))
+	if rateLimiterCapacity < 1 {
+		rateLimiterCapacity = 1
+	}
+	rateLimiter := make(chan struct{}, rateLimiterCapacity)
 	
 	// Fill the initial bucket
 	for i := 0; i < cap(rateLimiter); i++ {
