@@ -66,7 +66,7 @@ func TestRateLimitedHTTPClient(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer server.Close()
 	
@@ -121,7 +121,7 @@ func TestRateLimitedHTTPClientRetry(t *testing.T) {
 		}
 		// Success on 3rd attempt
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Success"))
+		_, _ = w.Write([]byte("Success"))
 	}))
 	defer server.Close()
 	
