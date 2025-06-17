@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_crawler"
 
@@ -15,14 +16,13 @@ import (
 	"gopkg.in/yaml.v3"
 
 	quantadmingo "github.com/quantcdn/quant-admin-go"
-	"time"
-	"net/http"
 )
 
 var (
-	_ resource.Resource              = (*crawlerResource)(nil)
-	_ resource.ResourceWithConfigure = (*crawlerResource)(nil)
+	_ resource.Resource                = (*crawlerResource)(nil)
+	_ resource.ResourceWithConfigure   = (*crawlerResource)(nil)
 	_ resource.ResourceWithModifyPlan = (*crawlerResource)(nil)
+	_ resource.ResourceWithImportState = (*crawlerResource)(nil)
 )
 
 func NewCrawlerResource() resource.Resource {
@@ -99,12 +99,13 @@ func (r *crawlerResource) Update(ctx context.Context, req resource.UpdateRequest
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
-	// Read the current state to get the UUID
+	// Read the current state to get the UUID and other identifiers
 	var state resource_crawler.CrawlerModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	// Preserve the UUID from the current state
+	// Preserve the UUID and ID from the current state
 	data.Uuid = state.Uuid
+	data.Id = state.Id
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -170,39 +171,15 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return diags
 	}
 
+	// Set the UUID and ID from the API response
 	crawler.Uuid = types.StringValue(api.GetUuid())
+	crawler.Id = types.Int64Value(int64(api.GetId()))
 
 	return callCrawlerReadAPI(ctx, r, crawler)
 }
 
 func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	var api *quantadmingo.Crawler
-	var apiErr error
-	err := retryAPICall(3, 500*time.Millisecond, func() error {
-		var resp *http.Response
-		api, resp, apiErr = r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
-		
-		// Check for retryable errors
-		if apiErr != nil && resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
-			return apiErr
-		}
-		return nil
-	})
-
-	if err != nil {
-		diags.AddError("Unable to read crawler after retries", fmt.Sprintf("Error: %s", err.Error()))
-		return diags
-	}
-
-	// Validate that the API returned the expected data
-	if api == nil {
-		diags.AddError(
-			"Invalid API response",
-			"The API returned a nil response when reading crawler data",
-		)
-		return diags
-	}
-
+	// Validate required fields
 	if crawler.Uuid.IsUnknown() || crawler.Uuid.IsNull() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
@@ -217,6 +194,23 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			path.Root("project"),
 			"Missing crawler.project attribute",
 			"To read crawler information, project must be provided.",
+		)
+		return diags
+	}
+
+	// API call with built-in rate limiting and retry logic
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	
+	if err != nil {
+		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))
+		return diags
+	}
+
+	// Validate that the API returned the expected data
+	if api == nil {
+		diags.AddError(
+			"Invalid API response",
+			"The API returned a nil response when reading crawler data",
 		)
 		return diags
 	}
@@ -329,6 +323,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 }
 
 func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
+	// Validate required fields for deletion
 	if crawler.Uuid.IsUnknown() || crawler.Uuid.IsNull() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
@@ -347,20 +342,15 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-	// Add retry logic for delete operation
-	err := retryAPICall(3, 500*time.Millisecond, func() error {
-		_, resp, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
-			ctx, 
-			r.client.Organization, 
-			crawler.Project.ValueString(), 
-			crawler.Uuid.ValueString(),
-		).Execute()
-		
-		if err != nil && resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
-			return err
-		}
-		return nil
-	})
+
+
+	// Delete API call with built-in rate limiting and retry logic
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
+		ctx, 
+		r.client.Organization, 
+		crawler.Project.ValueString(), 
+		crawler.Uuid.ValueString(),
+	).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to delete crawler", fmt.Sprintf("Error: %s", err.Error()))
@@ -370,11 +360,6 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 }
 
 func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	// Validation code...
-
-	// Add debug logging
-	fmt.Printf("Updating crawler with UUID: %s for project: %s\n", 
-		crawler.Uuid.ValueString(), crawler.Project.ValueString())
 
 	req := *quantadmingo.NewCrawlerRequestUpdateWithDefaults()
 
@@ -414,23 +399,13 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		}
 	}
 
-	// Use retry logic for update as well
-	err := retryAPICall(3, 500*time.Millisecond, func() error {
-		_, resp, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(
-			ctx, 
-			r.client.Organization, 
-			crawler.Project.ValueString(), 
-			crawler.Uuid.ValueString(),
-		).CrawlerRequestUpdate(req).Execute()
-		
-		if err != nil {
-			fmt.Printf("Error updating crawler: %v, Response: %+v\n", err, resp)
-			if resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
-				return err
-			}
-		}
-		return nil
-	})
+	// Update API call with built-in rate limiting and retry logic
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(
+		ctx, 
+		r.client.Organization, 
+		crawler.Project.ValueString(), 
+		crawler.Uuid.ValueString(),
+	).CrawlerRequestUpdate(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
@@ -481,19 +456,39 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	resp.Plan.Set(ctx, &plan)
 }
 
-// Add a helper function for retrying API calls
-func retryAPICall(maxRetries int, sleepTime time.Duration, operation func() error) error {
-	var err error
-	for i := 0; i < maxRetries; i++ {
-		err = operation()
-		if err == nil {
-			return nil
-		}
-		
-		// Check if error is retryable (e.g., 429, 500, 503)
-		if i < maxRetries-1 {
-			time.Sleep(sleepTime * time.Duration(i+1)) // Exponential backoff
-		}
+// ImportState allows importing existing crawlers by UUID and project
+func (r *crawlerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	// Expected format: "project:uuid" or just "uuid" (assuming default project)
+	parts := strings.Split(req.ID, ":")
+	var project, uuid string
+	
+	if len(parts) == 2 {
+		project = parts[0]
+		uuid = parts[1]
+	} else if len(parts) == 1 {
+		project = "default" // assume default project if not specified
+		uuid = parts[0]
+	} else {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			"Import ID should be in format 'project:uuid' or just 'uuid' for default project",
+		)
+		return
 	}
-	return err
+
+	var data resource_crawler.CrawlerModel
+	data.Project = types.StringValue(project)
+	data.Uuid = types.StringValue(uuid)
+
+	// Read the crawler to populate all fields
+	diags := callCrawlerReadAPI(ctx, r, &data)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
+	// Set the state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
+
+
