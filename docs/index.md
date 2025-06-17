@@ -107,3 +107,56 @@ The provider includes sophisticated rate limiting and retry mechanisms:
 4. **Leverage provider aliases**: Use different rate limiting profiles for different types of operations
 5. **Test configurations**: Verify rate limiting settings in development environments before production use
 6. **Respect API limits**: Don't exceed your API plan's rate limits with the `requests_per_second` setting
+
+## Resources and Data Sources
+
+### Data Sources
+
+#### quant_project
+
+Fetches details for a specific Quant project, including the write token for use in other providers.
+
+```hcl
+data "quant_project" "example" {
+  machine_name = "my-project"
+  with_token   = true  # Default is true
+}
+
+# Use the write token in other providers
+resource "github_actions_secret" "quant_token" {
+  repository      = "my-org/my-repo"
+  secret_name     = "QUANT_TOKEN"
+  plaintext_value = data.quant_project.example.write_token
+}
+```
+
+**Schema:**
+
+- `machine_name` (String, Required) - The machine name of the project to fetch
+- `with_token` (Boolean, Optional) - Whether to include the write token in the response. Default: `true`
+
+**Attributes:**
+
+- `id` (Number) - Numeric project ID
+- `name` (String) - Project display name
+- `uuid` (String) - Project UUID
+- `machine_name` (String) - Project machine name
+- `region` (String) - Deployment region
+- `organization_id` (Number) - Organization ID
+- `security_score` (String) - Project security score
+- `git_url` (String) - Associated Git repository URL
+- `write_token` (String, Sensitive) - Project write token (only when `with_token = true`)
+- `created_at` (String) - Creation timestamp
+- `updated_at` (String) - Last update timestamp
+
+#### quant_projects
+
+Lists all projects in the organisation.
+
+```hcl
+data "quant_projects" "all" {}
+
+output "project_names" {
+  value = [for project in data.quant_projects.all.projects : project.name]
+}
+```

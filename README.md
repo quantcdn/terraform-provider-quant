@@ -162,6 +162,93 @@ resource "quant_crawler" "critical" {
 - **Timeout errors**: Increase `max_delay_ms` for better resilience in unstable networks
 - **Thundering herd**: Ensure `enable_jitter` is set to `true` when running multiple providers
 
+## Resources and Data Sources
+
+### Resources
+
+- `quant_project` - Manage Quant projects
+- `quant_domain` - Manage domains within projects  
+- `quant_crawler` - Manage crawlers for content discovery
+- `quant_header` - Manage HTTP headers for domains
+- `quant_rule_proxy` - Manage proxy rules for URL routing
+- `quant_rule_redirect` - Manage redirect rules  
+- `quant_rule_custom_response` - Manage custom response rules
+
+### Data Sources
+
+- `quant_projects` - List all projects in an organisation
+- `quant_project` - Fetch details for a specific project, including write tokens
+
+## Using Project Write Tokens in Other Providers
+
+The `quant_project` data source allows you to fetch project write tokens for use in other providers, such as setting GitHub Actions secrets or AWS SSM parameters.
+
+### Example: GitHub Actions Integration
+
+```hcl
+# Fetch project details including write token
+data "quant_project" "main" {
+  machine_name = "my-project"
+  with_token   = true  # Default is true for data sources
+}
+
+# Set GitHub Actions secret with the write token
+resource "github_actions_secret" "quant_token" {
+  repository      = "my-org/my-repo"
+  secret_name     = "QUANT_TOKEN"
+  plaintext_value = data.quant_project.main.write_token
+}
+```
+
+### Example: Module Pattern
+
+Create a reusable module for fetching Quant credentials:
+
+```hcl
+# Module: quant-credentials/main.tf
+data "quant_project" "project" {
+  machine_name = var.project
+  with_token   = true
+}
+
+output "token" {
+  value     = data.quant_project.project.write_token
+  sensitive = true
+}
+
+# Usage in main configuration
+module "quant_credentials" {
+  source = "./quant-credentials"
+  count  = local.include_quant ? 1 : 0
+
+  project = var.quant_project
+}
+
+resource "github_actions_secret" "quant_token" {
+  count = local.include_quant ? 1 : 0
+
+  repository      = var.repository
+  secret_name     = "QUANT_TOKEN"
+  plaintext_value = module.quant_credentials[0].token
+}
+```
+
+### Available Project Data
+
+The `quant_project` data source provides the following attributes:
+
+- `id` - Numeric project ID
+- `name` - Project display name
+- `uuid` - Project UUID
+- `machine_name` - Project machine name
+- `region` - Deployment region
+- `organization_id` - Organization ID
+- `security_score` - Project security score
+- `git_url` - Associated Git repository URL
+- `write_token` - Project write token (when `with_token = true`)
+- `created_at` - Creation timestamp
+- `updated_at` - Last update timestamp
+
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0

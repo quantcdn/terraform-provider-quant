@@ -240,11 +240,18 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 		Pending: []string{"pending", "creating"},
 		Target:  []string{"ready"},
 		Refresh: func() (interface{}, string, error) {
-			project, resp, _ := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).Execute()
-			if resp.StatusCode == 404 {
-				return nil, "pending", nil
+			withToken := false
+			if !project.WithToken.IsNull() {
+				withToken = project.WithToken.ValueBool()
 			}
-			return project, "ready", nil
+			projectResult, resp, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).WithToken(withToken).Execute()
+			if err != nil {
+				if resp != nil && resp.StatusCode == 404 {
+					return nil, "pending", nil
+				}
+				return nil, "", err
+			}
+			return projectResult, "ready", nil
 		},
 		Timeout:    10 * time.Minute,
 		Delay:      10 * time.Second,
@@ -314,7 +321,11 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 	}
 
 	org := r.client.Organization
-	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	withToken := false
+	if !project.WithToken.IsNull() {
+		withToken = project.WithToken.ValueBool()
+	}
+	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, org, project.MachineName.ValueString()).WithToken(withToken).Execute()
 
 	if err != nil {
 		diags.Append(diag.NewErrorDiagnostic(
@@ -333,6 +344,12 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 	project.SecurityScore = types.StringValue(api.GetSecurityScore())
 	project.GitUrl = types.StringValue(api.GetGitUrl())
 	project.OrganizationId = types.Int64Value(int64(api.GetOrganizationId()))
+	// Only set write_token if with_token is true
+	if !project.WithToken.IsNull() && project.WithToken.ValueBool() {
+		project.WriteToken = types.StringValue(api.GetWriteToken())
+	} else {
+		project.WriteToken = types.StringNull()
+	}
 
 	// API doesn't currently return these values
 	if project.AllowQueryParams.IsNull() || project.AllowQueryParams.IsUnknown() {

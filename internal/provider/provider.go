@@ -194,6 +194,7 @@ func (p *quantProvider) Metadata(ctx context.Context, req provider.MetadataReque
 func (p *quantProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewProjectsDataSource,
+		NewProjectDataSource,
 	}
 }
 

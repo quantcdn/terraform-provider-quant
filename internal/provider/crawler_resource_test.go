@@ -91,13 +91,12 @@ func setupCrawlerServer(t *testing.T, organizationID string, projectID string) {
 			return httpmock.NewJsonResponse(200, crawlerResponseWithExclude)
 		})
 
-	// Delete crawler
+	// Delete crawler - using UUID as shown in the OpenAPI spec
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
 		func(req *http.Request) (*http.Response, error) {
 			t.Logf("Delete crawler request received")
-			return httpmock.NewJsonResponse(200, map[string]interface{}{
-				"message": "Crawler deleted successfully",
-			})
+			// Return the crawler object as per OpenAPI spec (delete returns the deleted crawler)
+			return httpmock.NewJsonResponse(200, crawlerResponse)
 		})
 }
 
@@ -188,8 +187,14 @@ func testAccCheckCrawlerExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("Not found: %s", n)
 		}
 
-		if rs.Primary.ID == "" {
-			return fmt.Errorf("No Crawler ID is set")
+		// In Plugin Framework v6, check for the UUID attribute instead of the generic ID
+		if rs.Primary.Attributes["uuid"] == "" {
+			return fmt.Errorf("No Crawler UUID is set")
+		}
+
+		// Also verify we have the basic required attributes
+		if rs.Primary.Attributes["project"] == "" {
+			return fmt.Errorf("No Crawler project is set")
 		}
 
 		// Here you would typically make an API call to verify the resource exists
