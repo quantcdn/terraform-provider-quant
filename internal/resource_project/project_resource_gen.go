@@ -106,6 +106,14 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 			"uuid": schema.StringAttribute{
 				Computed: true,
 			},
+			"with_token": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
+			"write_token": schema.StringAttribute{
+				Computed: true,
+			},
 		},
 	}
 }
@@ -136,4 +144,6 @@ type ProjectModel struct {
 	SecurityScore         types.String `tfsdk:"security_score"`
 	UpdatedAt             types.String `tfsdk:"updated_at"`
 	Uuid                  types.String `tfsdk:"uuid"`
+	WithToken             types.Bool   `tfsdk:"with_token"`
+	WriteToken            types.String `tfsdk:"write_token"`
 }

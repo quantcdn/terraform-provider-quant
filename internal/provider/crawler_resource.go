@@ -15,8 +15,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	quantadmingo "github.com/quantcdn/quant-admin-go"
-	"time"
-	"net/http"
 )
 
 var (
@@ -176,21 +174,11 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 }
 
 func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	var api *quantadmingo.Crawler
-	var apiErr error
-	err := retryAPICall(3, 500*time.Millisecond, func() error {
-		var resp *http.Response
-		api, resp, apiErr = r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
-		
-		// Check for retryable errors
-		if apiErr != nil && resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
-			return apiErr
-		}
-		return nil
-	})
-
+	// API call with built-in rate limiting and retry logic
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	
 	if err != nil {
-		diags.AddError("Unable to read crawler after retries", fmt.Sprintf("Error: %s", err.Error()))
+		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))
 		return diags
 	}
 
@@ -347,20 +335,13 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-	// Add retry logic for delete operation
-	err := retryAPICall(3, 500*time.Millisecond, func() error {
-		_, resp, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
-			ctx, 
-			r.client.Organization, 
-			crawler.Project.ValueString(), 
-			crawler.Uuid.ValueString(),
-		).Execute()
-		
-		if err != nil && resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
-			return err
-		}
-		return nil
-	})
+	// Delete API call with built-in rate limiting and retry logic
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
+		ctx, 
+		r.client.Organization, 
+		crawler.Project.ValueString(), 
+		crawler.Uuid.ValueString(),
+	).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to delete crawler", fmt.Sprintf("Error: %s", err.Error()))
@@ -414,23 +395,13 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		}
 	}
 
-	// Use retry logic for update as well
-	err := retryAPICall(3, 500*time.Millisecond, func() error {
-		_, resp, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(
-			ctx, 
-			r.client.Organization, 
-			crawler.Project.ValueString(), 
-			crawler.Uuid.ValueString(),
-		).CrawlerRequestUpdate(req).Execute()
-		
-		if err != nil {
-			fmt.Printf("Error updating crawler: %v, Response: %+v\n", err, resp)
-			if resp != nil && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
-				return err
-			}
-		}
-		return nil
-	})
+	// Update API call with built-in rate limiting and retry logic
+	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(
+		ctx, 
+		r.client.Organization, 
+		crawler.Project.ValueString(), 
+		crawler.Uuid.ValueString(),
+	).CrawlerRequestUpdate(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))
@@ -481,19 +452,4 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	resp.Plan.Set(ctx, &plan)
 }
 
-// Add a helper function for retrying API calls
-func retryAPICall(maxRetries int, sleepTime time.Duration, operation func() error) error {
-	var err error
-	for i := 0; i < maxRetries; i++ {
-		err = operation()
-		if err == nil {
-			return nil
-		}
-		
-		// Check if error is retryable (e.g., 429, 500, 503)
-		if i < maxRetries-1 {
-			time.Sleep(sleepTime * time.Duration(i+1)) // Exponential backoff
-		}
-	}
-	return err
-}
+

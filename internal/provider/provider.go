@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"os"
+	"strconv"
 	"terraform-provider-quant/internal/client"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -24,8 +26,13 @@ func New() func() provider.Provider {
 type quantProvider struct{}
 
 type quantProviderModel struct {
-	Bearer       types.String `tfsdk:"bearer"`
-	Organization types.String `tfsdk:"organization"`
+	Bearer                types.String `tfsdk:"bearer"`
+	Organization          types.String `tfsdk:"organization"`
+	RequestsPerSecond     types.Float64 `tfsdk:"requests_per_second"`
+	MaxRetries           types.Int64   `tfsdk:"max_retries"`
+	BaseDelayMs          types.Int64   `tfsdk:"base_delay_ms"`
+	MaxDelayMs           types.Int64   `tfsdk:"max_delay_ms"`
+	EnableJitter         types.Bool    `tfsdk:"enable_jitter"`
 }
 
 func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
@@ -39,6 +46,26 @@ func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			"organization": schema.StringAttribute{
 				MarkdownDescription: "The QuantCDN organization machine name",
 				Required:            true,
+			},
+			"requests_per_second": schema.Float64Attribute{
+				MarkdownDescription: "Maximum number of requests per second to send to the API. Defaults to 10.0",
+				Optional:            true,
+			},
+			"max_retries": schema.Int64Attribute{
+				MarkdownDescription: "Maximum number of retry attempts for failed requests. Defaults to 3",
+				Optional:            true,
+			},
+			"base_delay_ms": schema.Int64Attribute{
+				MarkdownDescription: "Base delay in milliseconds for exponential backoff. Defaults to 500",
+				Optional:            true,
+			},
+			"max_delay_ms": schema.Int64Attribute{
+				MarkdownDescription: "Maximum delay in milliseconds for exponential backoff. Defaults to 30000 (30 seconds)",
+				Optional:            true,
+			},
+			"enable_jitter": schema.BoolAttribute{
+				MarkdownDescription: "Whether to add random jitter to retry delays to avoid thundering herd. Defaults to true",
+				Optional:            true,
 			},
 		},
 	}
@@ -107,7 +134,52 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		return
 	}
 
-	c := client.New(bearer, organization)
+	// Build rate limiting configuration
+	rateLimitConfig := client.DefaultRateLimitConfig()
+	
+	// Apply configuration overrides with environment variable fallbacks
+	if !config.RequestsPerSecond.IsNull() {
+		rateLimitConfig.RequestsPerSecond = config.RequestsPerSecond.ValueFloat64()
+	} else if envVal := os.Getenv("QUANTCDN_REQUESTS_PER_SECOND"); envVal != "" {
+		if val, err := strconv.ParseFloat(envVal, 64); err == nil {
+			rateLimitConfig.RequestsPerSecond = val
+		}
+	}
+
+	if !config.MaxRetries.IsNull() {
+		rateLimitConfig.MaxRetries = int(config.MaxRetries.ValueInt64())
+	} else if envVal := os.Getenv("QUANTCDN_MAX_RETRIES"); envVal != "" {
+		if val, err := strconv.Atoi(envVal); err == nil {
+			rateLimitConfig.MaxRetries = val
+		}
+	}
+
+	if !config.BaseDelayMs.IsNull() {
+		rateLimitConfig.BaseDelay = time.Duration(config.BaseDelayMs.ValueInt64()) * time.Millisecond
+	} else if envVal := os.Getenv("QUANTCDN_BASE_DELAY_MS"); envVal != "" {
+		if val, err := strconv.ParseInt(envVal, 10, 64); err == nil {
+			rateLimitConfig.BaseDelay = time.Duration(val) * time.Millisecond
+		}
+	}
+
+	if !config.MaxDelayMs.IsNull() {
+		rateLimitConfig.MaxDelay = time.Duration(config.MaxDelayMs.ValueInt64()) * time.Millisecond
+	} else if envVal := os.Getenv("QUANTCDN_MAX_DELAY_MS"); envVal != "" {
+		if val, err := strconv.ParseInt(envVal, 10, 64); err == nil {
+			rateLimitConfig.MaxDelay = time.Duration(val) * time.Millisecond
+		}
+	}
+
+	if !config.EnableJitter.IsNull() {
+		rateLimitConfig.EnableJitter = config.EnableJitter.ValueBool()
+	} else if envVal := os.Getenv("QUANTCDN_ENABLE_JITTER"); envVal != "" {
+		if val, err := strconv.ParseBool(envVal); err == nil {
+			rateLimitConfig.EnableJitter = val
+		}
+	}
+
+	// Create client with rate limiting configuration
+	c := client.NewWithRateLimit(bearer, organization, rateLimitConfig)
 
 	// Make the SDK client available during DataSource and Resource
 	// type Configure methods.

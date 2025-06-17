@@ -140,6 +140,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/quantcdn/quant-admin-go v0.0.0-20250604033611-82e3ba8e176e h1:jNNLpUjMRcQ0MgFGoQ+1Bcy97s0TkTj/usmy8QRMgPA=
 github.com/quantcdn/quant-admin-go v0.0.0-20250604033611-82e3ba8e176e/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
+github.com/quantcdn/quant-admin-go v0.0.0-20250617055747-57956e72519a h1:6c+0fsYs26x0oZBxchKLpNnXpkPTqgnIiLpZjFmPFXc=
+github.com/quantcdn/quant-admin-go v0.0.0-20250617055747-57956e72519a/go.mod h1:JDPQsgcOJGMBj3RnIbqWGHh9w5qZ+/zqrI3S3de9FWY=
 github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 h1:n661drycOFuPLCN3Uc8sB6B/s6Z4t2xvBgU1htSHuq8=
 github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3/go.mod h1:A0bzQcvG0E7Rwjx0REVgAGH58e96+X0MeOfepqsbeW4=
 github.com/skeema/knownhosts v1.3.1 h1:X2osQ+RAjK76shCbvhHHHVl3ZlgDm8apHEHFqRjnBY8=
