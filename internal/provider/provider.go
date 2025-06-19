@@ -39,13 +39,13 @@ func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"bearer": schema.StringAttribute{
-				MarkdownDescription: "The QuantCDN API Bearer token used to authenticate requests",
-				Required:            true,
+				MarkdownDescription: "The QuantCDN API Bearer token used to authenticate requests. Can also be set via QUANTCDN_API_TOKEN environment variable.",
+				Optional:            true,
 				Sensitive:           true,
 			},
 			"organization": schema.StringAttribute{
-				MarkdownDescription: "The QuantCDN organization machine name",
-				Required:            true,
+				MarkdownDescription: "The QuantCDN organization machine name. Can also be set via QUANTCDN_ORGANIZATION environment variable.",
+				Optional:            true,
 			},
 			"requests_per_second": schema.Float64Attribute{
 				MarkdownDescription: "Maximum number of requests per second to send to the API. Defaults to 10.0",
@@ -80,19 +80,19 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	}
 
 	// If configuration values have been provided they must be known.
-	if config.Bearer.IsUnknown() {
+	if !config.Bearer.IsNull() && config.Bearer.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("bearer"),
 			"Unknown QuantCDN API bearer token",
-			"The provider cannot create the QuantCDN API Client as there is an unnknown configuration value for the bearer token."+
+			"The provider cannot create the QuantCDN API Client as there is an unknown configuration value for the bearer token."+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the QUANTCDN_API_TOKEN environment variable.",
 		)
 	}
-	if config.Organization.IsUnknown() {
+	if !config.Organization.IsNull() && config.Organization.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("organization"),
 			"Unknown QuantCDN organization",
-			"The provider cannot create the QuantCDN API Client as there is an unnknown configuration value for the organization."+
+			"The provider cannot create the QuantCDN API Client as there is an unknown configuration value for the organization."+
 				"Either target apply the source of the value first, set the value statically in the configuration, or use the QUANTCDN_ORGANIZATION environment variable.",
 		)
 	}
