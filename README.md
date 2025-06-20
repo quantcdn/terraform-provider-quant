@@ -1,5 +1,15 @@
 # Terraform Provider Quant
 
+[![Tests](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/test.yml/badge.svg)](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/test.yml)
+[![Release](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/release.yml/badge.svg)](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/quantcdn/terraform-provider-quant/branch/main/graph/badge.svg)](https://codecov.io/gh/quantcdn/terraform-provider-quant)
+[![Go Report Card](https://goreportcard.com/badge/github.com/quantcdn/terraform-provider-quant)](https://goreportcard.com/report/github.com/quantcdn/terraform-provider-quant)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/quantcdn/terraform-provider-quant)](https://go.dev/)
+[![Terraform Version](https://img.shields.io/badge/terraform-%3E%3D1.0-blue.svg)](https://www.terraform.io/downloads.html)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+The QuantCDN Terraform provider allows you to manage resources in your Quant CDN environment with built-in API rate limiting and intelligent retry mechanisms.
+
 ## Quickstarts
 
 - [Getting started with QuantCDN and terraform](https://docs.quantcdn.io/terraform/getting-started)
@@ -42,6 +52,7 @@ Configuration can also be set via environment variables:
 ```bash
 export QUANTCDN_API_TOKEN="your-token"
 export QUANTCDN_ORGANIZATION="your-org"
+export QUANTCDN_BASE_URL="https://custom-api.example.com/api/v2"  # Optional custom base URL
 export QUANTCDN_REQUESTS_PER_SECOND="15.0"
 export QUANTCDN_MAX_RETRIES="5"
 export QUANTCDN_BASE_DELAY_MS="1000"
@@ -95,15 +106,15 @@ Use aliases for different rate limiting profiles:
 ```hcl
 # Default provider for most resources
 provider "quant" {
-  bearer       = var.quantcdn_api_token
-  organization = var.quantcdn_organization
+  bearer       = var.quant_bearer_token
+  organization = var.quant_organization
 }
 
 # High-throughput provider for bulk operations
 provider "quant" {
   alias               = "bulk"
-  bearer              = var.quantcdn_api_token
-  organization        = var.quantcdn_organization
+  bearer              = var.quant_bearer_token
+  organization        = var.quant_organization
   requests_per_second = 25.0
   max_retries        = 2
 }
@@ -111,11 +122,19 @@ provider "quant" {
 # Conservative provider for critical resources
 provider "quant" {
   alias               = "critical"
-  bearer              = var.quantcdn_api_token
-  organization        = var.quantcdn_organization
+  bearer              = var.quant_bearer_token
+  organization        = var.quant_organization
   requests_per_second = 1.0
   max_retries        = 15
   max_delay_ms       = 300000  # 5 minutes
+}
+
+# Staging environment with custom base URL
+provider "quant" {
+  alias        = "staging"
+  bearer       = var.staging_bearer_token
+  organization = var.staging_organization
+  base_url     = "https://staging-dashboard.quantcdn.io/api/v2"
 }
 
 # Use different providers for different resources
@@ -133,6 +152,11 @@ resource "quant_crawler" "critical" {
   provider = quant.critical
   name     = "Mission Critical Crawler"
   domain   = "https://critical.example.com"
+}
+
+resource "quant_project" "staging_project" {
+  provider = quant.staging
+  name     = "Staging Project"
 }
 ```
 
@@ -161,6 +185,23 @@ resource "quant_crawler" "critical" {
 - **Slow deployments**: Increase `requests_per_second` if within your API limits
 - **Timeout errors**: Increase `max_delay_ms` for better resilience in unstable networks
 - **Thundering herd**: Ensure `enable_jitter` is set to `true` when running multiple providers
+
+### Advanced Configuration with Rate Limiting
+
+```hcl
+provider "quant" {
+  bearer              = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  organization        = "quant"
+  base_url            = "https://custom-api.example.com/api/v2"  # Optional custom base URL
+  
+  # Rate limiting configuration
+  requests_per_second = 15.0    # Allow 15 requests per second
+  max_retries        = 5        # Retry failed requests up to 5 times
+  base_delay_ms      = 1000     # Start with 1 second delay for retries
+  max_delay_ms       = 60000    # Maximum 60 second delay between retries
+  enable_jitter      = true     # Add randomisation to prevent thundering herd
+}
+```
 
 ## Resources and Data Sources
 
@@ -254,12 +295,72 @@ The `quant_project` data source provides the following attributes:
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 - [Go](https://golang.org/doc/install) >= 1.22
 
+## Development Status
+
+This provider is actively maintained and supports the latest QuantCDN API features. Current status:
+
+- ✅ **Production Ready**: Used in production environments
+- ✅ **Full API Coverage**: All major QuantCDN resources supported
+- ✅ **Rate Limiting**: Built-in API rate limiting with exponential backoff
+- ✅ **Multi-Environment**: Support for custom base URLs for different environments
+- ✅ **Comprehensive Testing**: Full test coverage with mocked HTTP responses
+- ✅ **Documentation**: Complete documentation with examples
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Quick Start for Contributors
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and add tests
+4. Run tests: `make testacc`
+5. Commit your changes: `git commit -m 'Add amazing feature'`
+6. Push to the branch: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+### Testing
+
+```bash
+# Run unit tests
+make test
+
+# Run acceptance tests (requires QuantCDN API access)
+make testacc
+
+# Run acceptance tests with shorter timeout
+make testacc-short
+
+# Run specific test
+TF_ACC=1 go test ./internal/provider/ -v -run TestAccProjectResource
+```
+
+### Code Coverage
+
+We maintain high test coverage. To view coverage locally:
+
+```bash
+make coverage
+```
+
+Or manually:
+```bash
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
 ## Building The Provider
 
 1. Clone the repository
 1. Enter the repository directory
-1. Build the provider using the Go `install` command:
+1. Build the provider using the Makefile:
 
+```shell
+make build
+```
+
+Or manually:
 ```shell
 go install
 ```
@@ -310,4 +411,9 @@ In order to run the full suite of Acceptance tests, run `make testacc`.
 
 ```shell
 make testacc
+```
+
+Or with shorter timeout:
+```shell
+make testacc-short
 ```

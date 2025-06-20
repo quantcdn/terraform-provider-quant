@@ -19,6 +19,7 @@ provider "quant" {
 provider "quant" {
   bearer              = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   organization        = "quant"
+  base_url            = "https://custom-api.example.com/api/v2"  # Optional custom base URL
   
   # Rate limiting configuration
   requests_per_second = 15.0    # Allow 15 requests per second
@@ -67,6 +68,7 @@ provider "quant" {
 
 ### Optional Arguments
 
+- `base_url` (String) - The base URL for the QuantCDN API. Useful for pointing to staging, development, or custom API endpoints. Can also be set via QUANTCDN_BASE_URL environment variable.
 - `requests_per_second` (Number) - Maximum number of requests per second to send to the API. Controls the rate limiting behaviour. Default: `10.0`
 - `max_retries` (Number) - Maximum number of retry attempts for failed requests. The provider will retry requests that fail due to rate limiting (429), server errors (5xx), or network errors. Default: `3`
 - `base_delay_ms` (Number) - Base delay in milliseconds for exponential backoff retry logic. Each retry attempt increases the delay exponentially from this base value. Default: `500`
@@ -79,6 +81,7 @@ All configuration options can be set via environment variables as an alternative
 
 - `QUANTCDN_API_TOKEN` - Bearer token (alternative to `bearer`)
 - `QUANTCDN_ORGANIZATION` - Organization name (alternative to `organization`)
+- `QUANTCDN_BASE_URL` - Base URL for the API (alternative to `base_url`)
 - `QUANTCDN_REQUESTS_PER_SECOND` - Requests per second limit
 - `QUANTCDN_MAX_RETRIES` - Maximum retry attempts
 - `QUANTCDN_BASE_DELAY_MS` - Base retry delay in milliseconds
