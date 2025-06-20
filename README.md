@@ -1,5 +1,15 @@
 # Terraform Provider Quant
 
+[![Tests](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/test.yml/badge.svg)](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/test.yml)
+[![Release](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/release.yml/badge.svg)](https://github.com/quantcdn/terraform-provider-quant/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/quantcdn/terraform-provider-quant/branch/main/graph/badge.svg)](https://codecov.io/gh/quantcdn/terraform-provider-quant)
+[![Go Report Card](https://goreportcard.com/badge/github.com/quantcdn/terraform-provider-quant)](https://goreportcard.com/report/github.com/quantcdn/terraform-provider-quant)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/quantcdn/terraform-provider-quant)](https://go.dev/)
+[![Terraform Version](https://img.shields.io/badge/terraform-%3E%3D1.0-blue.svg)](https://www.terraform.io/downloads.html)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+The QuantCDN Terraform provider allows you to manage resources in your Quant CDN environment with built-in API rate limiting and intelligent retry mechanisms.
+
 ## Quickstarts
 
 - [Getting started with QuantCDN and terraform](https://docs.quantcdn.io/terraform/getting-started)
@@ -285,12 +295,72 @@ The `quant_project` data source provides the following attributes:
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 - [Go](https://golang.org/doc/install) >= 1.22
 
+## Development Status
+
+This provider is actively maintained and supports the latest QuantCDN API features. Current status:
+
+- ✅ **Production Ready**: Used in production environments
+- ✅ **Full API Coverage**: All major QuantCDN resources supported
+- ✅ **Rate Limiting**: Built-in API rate limiting with exponential backoff
+- ✅ **Multi-Environment**: Support for custom base URLs for different environments
+- ✅ **Comprehensive Testing**: Full test coverage with mocked HTTP responses
+- ✅ **Documentation**: Complete documentation with examples
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Quick Start for Contributors
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and add tests
+4. Run tests: `make testacc`
+5. Commit your changes: `git commit -m 'Add amazing feature'`
+6. Push to the branch: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+### Testing
+
+```bash
+# Run unit tests
+make test
+
+# Run acceptance tests (requires QuantCDN API access)
+make testacc
+
+# Run acceptance tests with shorter timeout
+make testacc-short
+
+# Run specific test
+TF_ACC=1 go test ./internal/provider/ -v -run TestAccProjectResource
+```
+
+### Code Coverage
+
+We maintain high test coverage. To view coverage locally:
+
+```bash
+make coverage
+```
+
+Or manually:
+```bash
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
 ## Building The Provider
 
 1. Clone the repository
 1. Enter the repository directory
-1. Build the provider using the Go `install` command:
+1. Build the provider using the Makefile:
 
+```shell
+make build
+```
+
+Or manually:
 ```shell
 go install
 ```
@@ -341,4 +411,9 @@ In order to run the full suite of Acceptance tests, run `make testacc`.
 
 ```shell
 make testacc
+```
+
+Or with shorter timeout:
+```shell
+make testacc-short
 ```
