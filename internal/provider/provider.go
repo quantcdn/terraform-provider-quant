@@ -26,14 +26,14 @@ func New() func() provider.Provider {
 type quantProvider struct{}
 
 type quantProviderModel struct {
-	Bearer                types.String `tfsdk:"bearer"`
-	Organization          types.String `tfsdk:"organization"`
-	BaseURL              types.String `tfsdk:"base_url"`
-	RequestsPerSecond     types.Float64 `tfsdk:"requests_per_second"`
-	MaxRetries           types.Int64   `tfsdk:"max_retries"`
-	BaseDelayMs          types.Int64   `tfsdk:"base_delay_ms"`
-	MaxDelayMs           types.Int64   `tfsdk:"max_delay_ms"`
-	EnableJitter         types.Bool    `tfsdk:"enable_jitter"`
+	Bearer            types.String  `tfsdk:"bearer"`
+	Organization      types.String  `tfsdk:"organization"`
+	BaseURL           types.String  `tfsdk:"base_url"`
+	RequestsPerSecond types.Float64 `tfsdk:"requests_per_second"`
+	MaxRetries        types.Int64   `tfsdk:"max_retries"`
+	BaseDelayMs       types.Int64   `tfsdk:"base_delay_ms"`
+	MaxDelayMs        types.Int64   `tfsdk:"max_delay_ms"`
+	EnableJitter      types.Bool    `tfsdk:"enable_jitter"`
 }
 
 func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
@@ -145,7 +145,7 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 
 	// Build rate limiting configuration
 	rateLimitConfig := client.DefaultRateLimitConfig()
-	
+
 	// Apply configuration overrides with environment variable fallbacks
 	if !config.RequestsPerSecond.IsNull() {
 		rateLimitConfig.RequestsPerSecond = config.RequestsPerSecond.ValueFloat64()

@@ -29,16 +29,16 @@ type projectDataSourceModel struct {
 	WithToken   types.Bool   `tfsdk:"with_token"`
 
 	// Computed attributes
-	Id               types.Int64  `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	Uuid             types.String `tfsdk:"uuid"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
-	Region           types.String `tfsdk:"region"`
-	OrganizationId   types.Int64  `tfsdk:"organization_id"`
-	SecurityScore    types.String `tfsdk:"security_score"`
-	GitUrl           types.String `tfsdk:"git_url"`
-	WriteToken       types.String `tfsdk:"write_token"`
+	Id             types.Int64  `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Uuid           types.String `tfsdk:"uuid"`
+	CreatedAt      types.String `tfsdk:"created_at"`
+	UpdatedAt      types.String `tfsdk:"updated_at"`
+	Region         types.String `tfsdk:"region"`
+	OrganizationId types.Int64  `tfsdk:"organization_id"`
+	SecurityScore  types.String `tfsdk:"security_score"`
+	GitUrl         types.String `tfsdk:"git_url"`
+	WriteToken     types.String `tfsdk:"write_token"`
 }
 
 func (d *projectDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -161,4 +161,4 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-} 
+}

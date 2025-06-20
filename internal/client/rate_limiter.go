@@ -90,7 +90,7 @@ func NewRateLimitedRoundTripper(transport http.RoundTripper, config *RateLimitCo
 		rateLimiterCapacity = 1
 	}
 	rateLimiter := make(chan struct{}, rateLimiterCapacity)
-	
+
 	// Fill the initial bucket
 	for i := 0; i < cap(rateLimiter); i++ {
 		rateLimiter <- struct{}{}
@@ -107,7 +107,7 @@ func NewRateLimitedRoundTripper(transport http.RoundTripper, config *RateLimitCo
 	if config.RequestsPerSecond > 0 {
 		interval := time.Duration(float64(time.Second) / config.RequestsPerSecond)
 		rt.ticker = time.NewTicker(interval)
-		
+
 		go func() {
 			for {
 				select {
@@ -145,15 +145,15 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 
 		// Make the request
 		resp, err := rt.transport.RoundTrip(req)
-		
+
 		// Check if we should retry
 		if attempt < rt.config.MaxRetries && rt.config.RetryCondition(resp, err) {
 			lastResp = resp
 			lastErr = err
-			
+
 			// Calculate delay with exponential backoff
 			delay := rt.calculateDelay(attempt, resp)
-			
+
 			// Wait before retrying, but respect context cancellation
 			select {
 			case <-time.After(delay):
@@ -164,12 +164,12 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 				}
 				return nil, req.Context().Err()
 			}
-			
+
 			// Close the response body before retrying
 			if resp != nil {
 				resp.Body.Close()
 			}
-			
+
 			continue
 		}
 
@@ -198,7 +198,7 @@ func (rt *RateLimitedRoundTripper) calculateDelay(attempt int, resp *http.Respon
 
 	// Exponential backoff: baseDelay * 2^attempt
 	delay := time.Duration(float64(rt.config.BaseDelay) * math.Pow(2, float64(attempt)))
-	
+
 	// Cap at maximum delay
 	if delay > rt.config.MaxDelay {
 		delay = rt.config.MaxDelay
@@ -264,4 +264,4 @@ func (c *RateLimitedHTTPClient) Close() {
 // WithContext creates a new request with context for better cancellation handling
 func WithContext(ctx context.Context, req *http.Request) *http.Request {
 	return req.WithContext(ctx)
-} 
+}

@@ -182,7 +182,7 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	schedule.CreatedAt = types.StringValue(api.GetCreatedAt())
 	schedule.UpdatedAt = types.StringValue(api.GetUpdatedAt())
 	schedule.Organization = types.StringValue(r.client.Organization)
-	schedule.CrawlerSchedule = types.StringValue(api.GetScheduleCronString())  // This might need a different value
+	schedule.CrawlerSchedule = types.StringValue(api.GetScheduleCronString()) // This might need a different value
 
 	// Set deleted_at (null if not deleted)
 	if api.DeletedAt != nil {

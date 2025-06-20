@@ -22,26 +22,26 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 }
 
 var customResponseResponse = map[string]interface{}{
-	"uuid": "96e4f4f6-211a-4f4b-b7fb-03985df56dad",
-	"rule_id": "96e4f4f6-211a-4f4b-b7fb-03985df56dad",
-	"domain": []string{"any"},
-	"country": "country_is",
-	"country_is": []string{"AF"},
-	"country_is_not": []string{},
-	"method": "any",
-	"method_is": []string{},
-	"method_is_not": []string{},
-	"ip": "any",
-	"ip_is": []string{},
-	"ip_is_not": []string{},
+	"uuid":             "96e4f4f6-211a-4f4b-b7fb-03985df56dad",
+	"rule_id":          "96e4f4f6-211a-4f4b-b7fb-03985df56dad",
+	"domain":           []string{"any"},
+	"country":          "country_is",
+	"country_is":       []string{"AF"},
+	"country_is_not":   []string{},
+	"method":           "any",
+	"method_is":        []string{},
+	"method_is_not":    []string{},
+	"ip":               "any",
+	"ip_is":            []string{},
+	"ip_is_not":        []string{},
 	"only_with_cookie": "",
-	"url": []string{"/test"},
-	"name": "custom response",
-	"disabled": false,
-	"action": "custom_response",
+	"url":              []string{"/test"},
+	"name":             "custom response",
+	"disabled":         false,
+	"action":           "custom_response",
 	"action_config": map[string]interface{}{
 		"custom_response_status_code": 200,
-		"custom_response_body": "<h1>test</h1>",
+		"custom_response_body":        "<h1>test</h1>",
 	},
 }
 
@@ -74,7 +74,7 @@ func mockCustomResponseServer(t *testing.T, organizationID string, ruleID string
 
 			var requestBody struct {
 				CustomResponseStatusCode int32  `json:"custom_response_status_code"`
-				CustomResponseBody      string `json:"custom_response_body"`
+				CustomResponseBody       string `json:"custom_response_body"`
 			}
 
 			if err := json.Unmarshal(body, &requestBody); err != nil {
@@ -149,10 +149,10 @@ func TestAccRuleCustomResponseResource(t *testing.T) {
 				),
 			},
 			{
-				ResourceName:            "quant_rule_custom_response.test",
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateId:           fmt.Sprintf("%s/%s", organizationID, ruleID),
+				ResourceName:                         "quant_rule_custom_response.test",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateId:                        fmt.Sprintf("%s/%s", organizationID, ruleID),
 				ImportStateVerifyIdentifierAttribute: "uuid",
 			},
 		},
@@ -184,4 +184,4 @@ func TestAccRuleCustomResponseResource_Update(t *testing.T) {
 			},
 		},
 	})
-} 
+}

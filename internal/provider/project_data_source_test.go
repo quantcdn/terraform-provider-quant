@@ -6,38 +6,38 @@ import (
 	"terraform-provider-quant/internal/provider"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jarcoal/httpmock"
 )
 
 var projectDataSourceResponse = map[string]interface{}{
-	"id":               123,
-	"name":             "test-project",
-	"uuid":             "test-uuid-123",
-	"machine_name":     "default",
-	"created_at":       "2024-01-01T00:00:00Z",
-	"updated_at":       "2024-01-01T00:00:00Z",
-	"region":           "au",
-	"organization_id":  456,
-	"security_score":   "A",
-	"git_url":          "https://github.com/test/repo.git",
-	"write_token":      "test-write-token-123",
+	"id":              123,
+	"name":            "test-project",
+	"uuid":            "test-uuid-123",
+	"machine_name":    "default",
+	"created_at":      "2024-01-01T00:00:00Z",
+	"updated_at":      "2024-01-01T00:00:00Z",
+	"region":          "au",
+	"organization_id": 456,
+	"security_score":  "A",
+	"git_url":         "https://github.com/test/repo.git",
+	"write_token":     "test-write-token-123",
 }
 
 var projectDataSourceResponseWithoutToken = map[string]interface{}{
-	"id":               123,
-	"name":             "test-project",
-	"uuid":             "test-uuid-123",
-	"machine_name":     "default",
-	"created_at":       "2024-01-01T00:00:00Z",
-	"updated_at":       "2024-01-01T00:00:00Z",
-	"region":           "au",
-	"organization_id":  456,
-	"security_score":   "A",
-	"git_url":          "https://github.com/test/repo.git",
-	"write_token":      "",
+	"id":              123,
+	"name":            "test-project",
+	"uuid":            "test-uuid-123",
+	"machine_name":    "default",
+	"created_at":      "2024-01-01T00:00:00Z",
+	"updated_at":      "2024-01-01T00:00:00Z",
+	"region":          "au",
+	"organization_id": 456,
+	"security_score":  "A",
+	"git_url":         "https://github.com/test/repo.git",
+	"write_token":     "",
 }
 
 func mockProjectDataSourceServer(t *testing.T, organizationID string, projectID string) {
@@ -54,7 +54,7 @@ func mockProjectDataSourceServer(t *testing.T, organizationID string, projectID 
 		func(req *http.Request) (*http.Response, error) {
 			withToken := req.URL.Query().Get("with_token")
 			t.Logf("Project data source request received with with_token=%s", withToken)
-			
+
 			if withToken == "true" {
 				return httpmock.NewJsonResponse(200, projectDataSourceResponse)
 			}
@@ -130,4 +130,4 @@ data "quant_project" "test" {
   with_token   = %[3]t
 }
 `, organization, projectName, withToken)
-} 
+}

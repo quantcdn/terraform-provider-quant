@@ -10,27 +10,27 @@ import (
 )
 
 var redirectRuleResponse = map[string]interface{}{
-	"uuid": "111111-1111-1111-1111-111111111111",
+	"uuid":    "111111-1111-1111-1111-111111111111",
 	"rule_id": "111111-1111-1111-1111-111111111111",
-	"name": "test-redirect",
-	"domain": []string{"example.com"},
-	"url": []string{"/old"},
-	"action": "redirect",
+	"name":    "test-redirect",
+	"domain":  []string{"example.com"},
+	"url":     []string{"/old"},
+	"action":  "redirect",
 	"action_config": map[string]interface{}{
-		"to": "https://example.com/new",
+		"to":          "https://example.com/new",
 		"status_code": "301",
 	},
-	"method_is": []string{},
-	"method_is_not": []string{},
-	"ip_is": []string{},
-	"ip_is_not": []string{},
-	"country_is": []string{"AU"},
+	"method_is":      []string{},
+	"method_is_not":  []string{},
+	"ip_is":          []string{},
+	"ip_is_not":      []string{},
+	"country_is":     []string{"AU"},
 	"country_is_not": []string{},
 
-	"disabled": false,
-	"ip": "any",
-	"method": "any",
-	"country": "country_is",
+	"disabled":         false,
+	"ip":               "any",
+	"method":           "any",
+	"country":          "country_is",
 	"only_with_cookie": "",
 }
 
@@ -50,20 +50,19 @@ func setupRedirectRuleServer(t *testing.T, organizationID string, projectID stri
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/redirect", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, []map[string]interface{}{redirectRuleResponse})
 	})
-	
+
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/redirect/111111-1111-1111-1111-111111111111", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, redirectRuleResponse)
 	})
-	
+
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/redirect", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, redirectRuleResponse)
 	})
-	
+
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/redirect/111111-1111-1111-1111-111111111111", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, redirectRuleResponse)
 	})
 }
-
 
 func TestAccRuleRedirectResourceMock(t *testing.T) {
 	organizationID := "test-organization"

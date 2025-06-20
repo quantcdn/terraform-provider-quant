@@ -480,4 +480,4 @@ func callRuleCustomResponseDeleteAPI(ctx context.Context, r *ruleCustomResponseR
 	}
 
 	return
-} 
+}
