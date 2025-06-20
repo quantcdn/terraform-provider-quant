@@ -20,18 +20,25 @@ type Client struct {
 type ClientOptions struct {
 	RateLimitConfig *RateLimitConfig
 	HTTPClient      *http.Client
+	BaseURL         string
 }
 
 // NewWithOptions creates a new client with custom options
 func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Client {
 	var rateLimitConfig *RateLimitConfig
 	var httpClient *RateLimitedHTTPClient
+	var baseURL string
 
 	// Use provided rate limit config or default
 	if opts != nil && opts.RateLimitConfig != nil {
 		rateLimitConfig = opts.RateLimitConfig
 	} else {
 		rateLimitConfig = DefaultRateLimitConfig()
+	}
+
+	// Use provided base URL or default
+	if opts != nil && opts.BaseURL != "" {
+		baseURL = opts.BaseURL
 	}
 
 	// Create rate-limited HTTP client
@@ -52,6 +59,15 @@ func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Cl
 	// Configure OpenAPI client
 	cfg := openapi.NewConfiguration()
 	cfg.HTTPClient = httpClient.Client
+	
+	// Set custom base URL if provided
+	if baseURL != "" {
+		cfg.Servers = []openapi.ServerConfiguration{
+			{
+				URL: baseURL,
+			},
+		}
+	}
 	
 	// Add default headers to the configuration
 	cfg.AddDefaultHeader("Authorization", "Bearer "+bearer)
@@ -80,6 +96,21 @@ func New(bearer string, organization string) *Client {
 func NewWithRateLimit(bearer string, organization string, config *RateLimitConfig) *Client {
 	return NewWithOptions(bearer, organization, &ClientOptions{
 		RateLimitConfig: config,
+	})
+}
+
+// NewWithBaseURL creates a new client with custom base URL
+func NewWithBaseURL(bearer string, organization string, baseURL string) *Client {
+	return NewWithOptions(bearer, organization, &ClientOptions{
+		BaseURL: baseURL,
+	})
+}
+
+// NewWithRateLimitAndBaseURL creates a new client with both rate limiting and base URL configuration
+func NewWithRateLimitAndBaseURL(bearer string, organization string, config *RateLimitConfig, baseURL string) *Client {
+	return NewWithOptions(bearer, organization, &ClientOptions{
+		RateLimitConfig: config,
+		BaseURL:         baseURL,
 	})
 }
 

@@ -42,6 +42,7 @@ Configuration can also be set via environment variables:
 ```bash
 export QUANTCDN_API_TOKEN="your-token"
 export QUANTCDN_ORGANIZATION="your-org"
+export QUANTCDN_BASE_URL="https://custom-api.example.com/api/v2"  # Optional custom base URL
 export QUANTCDN_REQUESTS_PER_SECOND="15.0"
 export QUANTCDN_MAX_RETRIES="5"
 export QUANTCDN_BASE_DELAY_MS="1000"
@@ -95,15 +96,15 @@ Use aliases for different rate limiting profiles:
 ```hcl
 # Default provider for most resources
 provider "quant" {
-  bearer       = var.quantcdn_api_token
-  organization = var.quantcdn_organization
+  bearer       = var.quant_bearer_token
+  organization = var.quant_organization
 }
 
 # High-throughput provider for bulk operations
 provider "quant" {
   alias               = "bulk"
-  bearer              = var.quantcdn_api_token
-  organization        = var.quantcdn_organization
+  bearer              = var.quant_bearer_token
+  organization        = var.quant_organization
   requests_per_second = 25.0
   max_retries        = 2
 }
@@ -111,11 +112,19 @@ provider "quant" {
 # Conservative provider for critical resources
 provider "quant" {
   alias               = "critical"
-  bearer              = var.quantcdn_api_token
-  organization        = var.quantcdn_organization
+  bearer              = var.quant_bearer_token
+  organization        = var.quant_organization
   requests_per_second = 1.0
   max_retries        = 15
   max_delay_ms       = 300000  # 5 minutes
+}
+
+# Staging environment with custom base URL
+provider "quant" {
+  alias        = "staging"
+  bearer       = var.staging_bearer_token
+  organization = var.staging_organization
+  base_url     = "https://staging-dashboard.quantcdn.io/api/v2"
 }
 
 # Use different providers for different resources
@@ -133,6 +142,11 @@ resource "quant_crawler" "critical" {
   provider = quant.critical
   name     = "Mission Critical Crawler"
   domain   = "https://critical.example.com"
+}
+
+resource "quant_project" "staging_project" {
+  provider = quant.staging
+  name     = "Staging Project"
 }
 ```
 
@@ -161,6 +175,23 @@ resource "quant_crawler" "critical" {
 - **Slow deployments**: Increase `requests_per_second` if within your API limits
 - **Timeout errors**: Increase `max_delay_ms` for better resilience in unstable networks
 - **Thundering herd**: Ensure `enable_jitter` is set to `true` when running multiple providers
+
+### Advanced Configuration with Rate Limiting
+
+```hcl
+provider "quant" {
+  bearer              = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  organization        = "quant"
+  base_url            = "https://custom-api.example.com/api/v2"  # Optional custom base URL
+  
+  # Rate limiting configuration
+  requests_per_second = 15.0    # Allow 15 requests per second
+  max_retries        = 5        # Retry failed requests up to 5 times
+  base_delay_ms      = 1000     # Start with 1 second delay for retries
+  max_delay_ms       = 60000    # Maximum 60 second delay between retries
+  enable_jitter      = true     # Add randomisation to prevent thundering herd
+}
+```
 
 ## Resources and Data Sources
 

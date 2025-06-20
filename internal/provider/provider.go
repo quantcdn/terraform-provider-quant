@@ -28,6 +28,7 @@ type quantProvider struct{}
 type quantProviderModel struct {
 	Bearer                types.String `tfsdk:"bearer"`
 	Organization          types.String `tfsdk:"organization"`
+	BaseURL              types.String `tfsdk:"base_url"`
 	RequestsPerSecond     types.Float64 `tfsdk:"requests_per_second"`
 	MaxRetries           types.Int64   `tfsdk:"max_retries"`
 	BaseDelayMs          types.Int64   `tfsdk:"base_delay_ms"`
@@ -45,6 +46,10 @@ func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			},
 			"organization": schema.StringAttribute{
 				MarkdownDescription: "The QuantCDN organization machine name. Can also be set via QUANTCDN_ORGANIZATION environment variable.",
+				Optional:            true,
+			},
+			"base_url": schema.StringAttribute{
+				MarkdownDescription: "The base URL for the QuantCDN API. Can also be set via QUANTCDN_BASE_URL environment variable.",
 				Optional:            true,
 			},
 			"requests_per_second": schema.Float64Attribute{
@@ -103,12 +108,16 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 
 	bearer := os.Getenv("QUANTCDN_API_TOKEN")
 	organization := os.Getenv("QUANTCDN_ORGANIZATION")
+	baseURL := os.Getenv("QUANTCDN_BASE_URL")
 
 	if !config.Bearer.IsNull() {
 		bearer = config.Bearer.ValueString()
 	}
 	if !config.Organization.IsNull() {
 		organization = config.Organization.ValueString()
+	}
+	if !config.BaseURL.IsNull() {
+		baseURL = config.BaseURL.ValueString()
 	}
 
 	if bearer == "" {
@@ -179,7 +188,12 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	}
 
 	// Create client with rate limiting configuration
-	c := client.NewWithRateLimit(bearer, organization, rateLimitConfig)
+	var c *client.Client
+	if baseURL != "" {
+		c = client.NewWithRateLimitAndBaseURL(bearer, organization, rateLimitConfig, baseURL)
+	} else {
+		c = client.NewWithRateLimit(bearer, organization, rateLimitConfig)
+	}
 
 	// Make the SDK client available during DataSource and Resource
 	// type Configure methods.
