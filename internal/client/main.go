@@ -59,7 +59,7 @@ func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Cl
 	// Configure OpenAPI client
 	cfg := openapi.NewConfiguration()
 	cfg.HTTPClient = httpClient.Client
-	
+
 	// Set custom base URL if provided
 	if baseURL != "" {
 		cfg.Servers = []openapi.ServerConfiguration{
@@ -68,10 +68,10 @@ func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Cl
 			},
 		}
 	}
-	
+
 	// Add default headers to the configuration
 	cfg.AddDefaultHeader("Authorization", "Bearer "+bearer)
-	
+
 	client := openapi.NewAPIClient(cfg)
 	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
 
@@ -142,6 +142,6 @@ func (c *Client) UpdateRateLimitConfig(config *RateLimitConfig) {
 	cfg := openapi.NewConfiguration()
 	cfg.HTTPClient = c.httpClient.Client
 	cfg.AddDefaultHeader("Authorization", "Bearer "+c.Bearer)
-	
+
 	c.Instance = openapi.NewAPIClient(cfg)
 }

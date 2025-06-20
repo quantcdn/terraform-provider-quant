@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"encoding/json"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"terraform-provider-quant/internal/provider"
-	"net/http"
-	"io"
-	"encoding/json"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jarcoal/httpmock"
+	"io"
+	"net/http"
+	"terraform-provider-quant/internal/provider"
 )
 
 var customHeaderResponse = map[string]string{}
@@ -25,36 +25,36 @@ func testAccHeaderPreCheck(t *testing.T, org string, project string) {
 	baseUrl := "https://dashboard.quantcdn.io/api/v2"
 
 	// Mock the headers list endpoint
-	httpmock.RegisterResponder("GET", 
+	httpmock.RegisterResponder("GET",
 		fmt.Sprintf("%s/organizations/%s/projects/%s/custom-headers", baseUrl, org, project),
 		func(req *http.Request) (*http.Response, error) {
 			return httpmock.NewJsonResponse(200, customHeaderResponse)
 		})
 
-		httpmock.RegisterResponder("POST", 
-        fmt.Sprintf("%s/organizations/%s/projects/%s/custom-headers", baseUrl, org, project),
-        func(req *http.Request) (*http.Response, error) {
-            // Read the request body
-            body, err := io.ReadAll(req.Body)
-            if err != nil {
-                return httpmock.NewStringResponse(400, "Failed to read request body"), nil
-            }
-            
-            // Parse the JSON body
+	httpmock.RegisterResponder("POST",
+		fmt.Sprintf("%s/organizations/%s/projects/%s/custom-headers", baseUrl, org, project),
+		func(req *http.Request) (*http.Response, error) {
+			// Read the request body
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return httpmock.NewStringResponse(400, "Failed to read request body"), nil
+			}
+
+			// Parse the JSON body
 			var requestBody struct {
-                Headers map[string]string `json:"headers"`
-            }
+				Headers map[string]string `json:"headers"`
+			}
 
-            if err := json.Unmarshal(body, &requestBody); err != nil {
-                return httpmock.NewStringResponse(400, "Invalid JSON"), nil
-            }
+			if err := json.Unmarshal(body, &requestBody); err != nil {
+				return httpmock.NewStringResponse(400, "Invalid JSON"), nil
+			}
 
-            // Update the current headers with exactly what was sent
-            customHeaderResponse = requestBody.Headers
-            return httpmock.NewJsonResponse(200, customHeaderResponse)
-        })
+			// Update the current headers with exactly what was sent
+			customHeaderResponse = requestBody.Headers
+			return httpmock.NewJsonResponse(200, customHeaderResponse)
+		})
 
-	httpmock.RegisterResponder("DELETE", 
+	httpmock.RegisterResponder("DELETE",
 		fmt.Sprintf("%s/organizations/%s/projects/%s/custom-headers", baseUrl, org, project),
 		func(req *http.Request) (*http.Response, error) {
 			return httpmock.NewJsonResponse(200, customHeaderResponse)

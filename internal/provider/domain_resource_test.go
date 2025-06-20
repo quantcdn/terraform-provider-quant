@@ -9,8 +9,8 @@ import (
 	"terraform-provider-quant/internal/provider"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jarcoal/httpmock"
 )
@@ -120,7 +120,7 @@ func TestDomainResource(t *testing.T) {
 				ResourceName:      "quant_domain.test",
 				ImportState:       true,
 				ImportStateVerify: true,
-				ImportStateId:    "default/9555",
+				ImportStateId:     "default/9555",
 			},
 			// Update and Read testing
 			{

@@ -3,8 +3,8 @@ package provider_test
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jarcoal/httpmock"
 	"io"
@@ -39,16 +39,15 @@ func mockProjectServer(t *testing.T, organizationID string, projectID string) {
 		return httpmock.NewJsonResponse(200, projectResponse)
 	})
 
-	httpmock.RegisterResponder("GET", 
+	httpmock.RegisterResponder("GET",
 		fmt.Sprintf("%s/organizations/%s/projects/%s", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, projectResponse)
-	})
+			return httpmock.NewJsonResponse(200, projectResponse)
+		})
 
-	httpmock.RegisterResponder("GET", 
+	httpmock.RegisterResponder("GET",
 		fmt.Sprintf("%s/organizations/%s/projects/0", baseUrl, organizationID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, projectResponse)
-	})
-
+			return httpmock.NewJsonResponse(200, projectResponse)
+		})
 
 	httpmock.RegisterResponder("POST",
 		fmt.Sprintf("%s/organizations/%s/projects", baseUrl, organizationID),
@@ -113,8 +112,8 @@ func TestProjectResource(t *testing.T) {
 			},
 			// Import testing
 			{
-				ResourceName:      "quant_project.test",
-				ImportState:       true,
+				ResourceName: "quant_project.test",
+				ImportState:  true,
 				ImportStateVerifyIgnore: []string{
 					"basic_auth_username",
 					"basic_auth_password",

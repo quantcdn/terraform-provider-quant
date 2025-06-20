@@ -9,19 +9,19 @@ import (
 
 func TestDefaultRateLimitConfig(t *testing.T) {
 	config := DefaultRateLimitConfig()
-	
+
 	if config.RequestsPerSecond != 10.0 {
 		t.Errorf("Expected RequestsPerSecond to be 10.0, got %f", config.RequestsPerSecond)
 	}
-	
+
 	if config.MaxRetries != 3 {
 		t.Errorf("Expected MaxRetries to be 3, got %d", config.MaxRetries)
 	}
-	
+
 	if config.BaseDelay != 500*time.Millisecond {
 		t.Errorf("Expected BaseDelay to be 500ms, got %v", config.BaseDelay)
 	}
-	
+
 	if !config.EnableJitter {
 		t.Error("Expected EnableJitter to be true")
 	}
@@ -44,14 +44,14 @@ func TestDefaultRetryCondition(t *testing.T) {
 		{"404 Not Found", 404, nil, false},
 		{"400 Bad Request", 400, nil, false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var resp *http.Response
 			if tt.statusCode > 0 {
 				resp = &http.Response{StatusCode: tt.statusCode}
 			}
-			
+
 			result := DefaultRetryCondition(resp, tt.err)
 			if result != tt.expected {
 				t.Errorf("Expected %v, got %v for status %d", tt.expected, result, tt.statusCode)
@@ -69,7 +69,7 @@ func TestRateLimitedHTTPClient(t *testing.T) {
 		_, _ = w.Write([]byte("OK"))
 	}))
 	defer server.Close()
-	
+
 	// Create rate-limited client with very low rate limit for testing
 	config := &RateLimitConfig{
 		RequestsPerSecond: 2.0, // 2 requests per second
@@ -79,13 +79,13 @@ func TestRateLimitedHTTPClient(t *testing.T) {
 		EnableJitter:      false, // Disable jitter for predictable testing
 		RetryCondition:    DefaultRetryCondition,
 	}
-	
+
 	client := NewRateLimitedHTTPClient(config)
 	defer client.Close()
-	
+
 	// Make requests and measure timing
 	start := time.Now()
-	
+
 	// Make 3 requests - should take at least 1 second due to rate limiting
 	for i := 0; i < 3; i++ {
 		resp, err := client.Get(server.URL)
@@ -94,14 +94,14 @@ func TestRateLimitedHTTPClient(t *testing.T) {
 		}
 		resp.Body.Close()
 	}
-	
+
 	duration := time.Since(start)
-	
+
 	// Should have made all 3 requests
 	if requestCount != 3 {
 		t.Errorf("Expected 3 requests, got %d", requestCount)
 	}
-	
+
 	// Should take at least 500ms due to rate limiting (2 RPS for 3 requests)
 	// The first request is immediate, second after 500ms, third after another 500ms
 	if duration < 500*time.Millisecond {
@@ -124,7 +124,7 @@ func TestRateLimitedHTTPClientRetry(t *testing.T) {
 		_, _ = w.Write([]byte("Success"))
 	}))
 	defer server.Close()
-	
+
 	config := &RateLimitConfig{
 		RequestsPerSecond: 100.0, // High rate limit to focus on retry logic
 		MaxRetries:        3,
@@ -133,21 +133,21 @@ func TestRateLimitedHTTPClientRetry(t *testing.T) {
 		EnableJitter:      false,
 		RetryCondition:    DefaultRetryCondition,
 	}
-	
+
 	client := NewRateLimitedHTTPClient(config)
 	defer client.Close()
-	
+
 	resp, err := client.Get(server.URL)
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// Should have succeeded after retries
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected 200 OK, got %d", resp.StatusCode)
 	}
-	
+
 	// Should have made 3 attempts (2 failures + 1 success)
 	if attemptCount != 3 {
 		t.Errorf("Expected 3 attempts, got %d", attemptCount)
@@ -157,7 +157,7 @@ func TestRateLimitedHTTPClientRetry(t *testing.T) {
 func TestRateLimitedRoundTripperClose(t *testing.T) {
 	config := DefaultRateLimitConfig()
 	rt := NewRateLimitedRoundTripper(nil, config)
-	
+
 	// Should not panic when closing
 	rt.Close()
 }
@@ -165,7 +165,7 @@ func TestRateLimitedRoundTripperClose(t *testing.T) {
 func TestNewRateLimitedHTTPClientWithNilConfig(t *testing.T) {
 	client := NewRateLimitedHTTPClient(nil)
 	defer client.Close()
-	
+
 	// Should use default configuration
 	if client.rateLimiter.config.RequestsPerSecond != 10.0 {
 		t.Errorf("Expected default RequestsPerSecond of 10.0, got %f", client.rateLimiter.config.RequestsPerSecond)
@@ -182,20 +182,20 @@ func TestClientIntegration(t *testing.T) {
 		EnableJitter:      true,
 		RetryCondition:    DefaultRetryCondition,
 	}
-	
+
 	client := NewWithRateLimit("test-token", "test-org", config)
 	defer client.Close()
-	
+
 	// Verify the client was created with the correct configuration
 	if client.GetRateLimitConfig().RequestsPerSecond != 5.0 {
 		t.Errorf("Expected RequestsPerSecond of 5.0, got %f", client.GetRateLimitConfig().RequestsPerSecond)
 	}
-	
+
 	if client.Bearer != "test-token" {
 		t.Errorf("Expected Bearer token 'test-token', got %s", client.Bearer)
 	}
-	
+
 	if client.Organization != "test-org" {
 		t.Errorf("Expected Organization 'test-org', got %s", client.Organization)
 	}
-} 
+}

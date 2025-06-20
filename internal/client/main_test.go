@@ -73,4 +73,4 @@ func TestNewWithOptionsWithBaseURL(t *testing.T) {
 	if client.Instance == nil {
 		t.Error("Expected OpenAPI client instance to be created")
 	}
-} 
+}

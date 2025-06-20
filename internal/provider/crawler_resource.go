@@ -21,7 +21,7 @@ import (
 var (
 	_ resource.Resource                = (*crawlerResource)(nil)
 	_ resource.ResourceWithConfigure   = (*crawlerResource)(nil)
-	_ resource.ResourceWithModifyPlan = (*crawlerResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*crawlerResource)(nil)
 	_ resource.ResourceWithImportState = (*crawlerResource)(nil)
 )
 
@@ -147,12 +147,12 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	// Initialize exclude with an empty list by default
 	exclude := make([]string, 0)
-	
+
 	// Only set exclude if it's provided
 	if !crawler.Exclude.IsNull() {
 		diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
 	}
-	req.SetExclude(exclude)  // Always set exclude, even if empty
+	req.SetExclude(exclude) // Always set exclude, even if empty
 
 	// Set headers if provided
 	if !crawler.Headers.IsNull() {
@@ -200,7 +200,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 
 	// API call with built-in rate limiting and retry logic
 	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
-	
+
 	if err != nil {
 		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))
 		return diags
@@ -224,10 +224,10 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	crawler.DomainVerified = types.Int64Value(int64(api.GetDomainVerified()))
 	crawler.CreatedAt = types.StringValue(api.GetCreatedAt())
 	crawler.UpdatedAt = types.StringValue(api.GetUpdatedAt())
-	
+
 	// Set organization to the current organization
 	crawler.Organization = types.StringValue(r.client.Organization)
-	
+
 	// Set deleted_at (null if not deleted)
 	if api.DeletedAt != nil {
 		crawler.DeletedAt = types.StringValue(*api.DeletedAt)
@@ -238,7 +238,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	// Improved approach with better error handling and structure
 	if api.Config != "" {
 		crawler.Config = types.StringValue(api.GetConfig())
-		
+
 		// Define a structured type for the config
 		type CrawlerConfig struct {
 			Config struct {
@@ -259,7 +259,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			Domain  string            `yaml:"domain"`
 			Headers map[string]string `yaml:"headers"`
 		}
-		
+
 		var parsedConfig CrawlerConfig
 		if err := yaml.Unmarshal([]byte(api.GetConfig()), &parsedConfig); err != nil {
 			diags.AddWarning(
@@ -269,7 +269,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		} else {
 			// Set fields directly from the structured config
 			crawler.BrowserMode = types.BoolValue(parsedConfig.Config.BrowserMode)
-			
+
 			// Handle exclude list - preserve values from plan if API returns empty
 			if len(parsedConfig.Config.Exclude) > 0 {
 				excludeVals := make([]attr.Value, len(parsedConfig.Config.Exclude))
@@ -283,7 +283,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			} else {
 				crawler.Exclude = types.ListValueMust(types.StringType, []attr.Value{})
 			}
-			
+
 			// Handle headers
 			if len(parsedConfig.Config.Headers) > 0 {
 				headersMap := make(map[string]attr.Value)
@@ -342,20 +342,18 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-
-
 	// Delete API call with built-in rate limiting and retry logic
 	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
-		ctx, 
-		r.client.Organization, 
-		crawler.Project.ValueString(), 
+		ctx,
+		r.client.Organization,
+		crawler.Project.ValueString(),
 		crawler.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to delete crawler", fmt.Sprintf("Error: %s", err.Error()))
 	}
-	
+
 	return diags
 }
 
@@ -367,7 +365,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	if !crawler.Domain.IsNull() && !crawler.Domain.IsUnknown() {
 		req.SetDomain(crawler.Domain.ValueString())
 	}
-	
+
 	if !crawler.BrowserMode.IsNull() && !crawler.BrowserMode.IsUnknown() {
 		req.SetBrowserMode(crawler.BrowserMode.ValueBool())
 	}
@@ -401,9 +399,9 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	// Update API call with built-in rate limiting and retry logic
 	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(
-		ctx, 
-		r.client.Organization, 
-		crawler.Project.ValueString(), 
+		ctx,
+		r.client.Organization,
+		crawler.Project.ValueString(),
 		crawler.Uuid.ValueString(),
 	).CrawlerRequestUpdate(req).Execute()
 
@@ -435,12 +433,12 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	plan.UpdatedAt = state.UpdatedAt
 	plan.Id = state.Id
 	plan.ProjectId = state.ProjectId
-	
+
 	// If UUID is not set in plan but exists in state, preserve it
 	if plan.Uuid.IsNull() && !state.Uuid.IsNull() {
 		plan.Uuid = state.Uuid
 	}
-	
+
 	// Preserve exclude if it's in the plan but not in the state
 	if !plan.Exclude.IsNull() && !plan.Exclude.IsUnknown() && state.Exclude.IsNull() {
 		// Keep the exclude from the plan
@@ -461,7 +459,7 @@ func (r *crawlerResource) ImportState(ctx context.Context, req resource.ImportSt
 	// Expected format: "project:uuid" or just "uuid" (assuming default project)
 	parts := strings.Split(req.ID, ":")
 	var project, uuid string
-	
+
 	if len(parts) == 2 {
 		project = parts[0]
 		uuid = parts[1]
@@ -490,5 +488,3 @@ func (r *crawlerResource) ImportState(ctx context.Context, req resource.ImportSt
 	// Set the state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
-
-
