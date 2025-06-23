@@ -63,14 +63,20 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// Create the project and wait for it to be ready (includes polling)
 	resp.Diagnostics.Append(callProjectCreateAPI(ctx, r, &data)...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Read the API results back into the model for Terraform state.
+	// Read the final API results back into the model for Terraform state
+	// This ensures we have the most up-to-date information after creation is complete
 	resp.Diagnostics.Append(callProjectReadAPI(ctx, r, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -236,31 +242,48 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 
 	project.MachineName = types.StringValue(res.GetMachineName())
 
+	// The API returns 200 with project data for successful creation request,
+	// but the actual project provisioning is asynchronous in the backend.
+	// We need to poll until the project is fully available.
 	createStateConf := retry.StateChangeConf{
-		Pending: []string{"pending", "creating"},
-		Target:  []string{"ready"},
+		Pending: []string{"creating", "pending", "not_found"},
+		Target:  []string{"ready", "active"},
 		Refresh: func() (interface{}, string, error) {
 			withToken := false
 			if !project.WithToken.IsNull() {
 				withToken = project.WithToken.ValueBool()
 			}
+
 			projectResult, resp, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).WithToken(withToken).Execute()
 			if err != nil {
+				// If we get a 404, the project is still being created
 				if resp != nil && resp.StatusCode == 404 {
-					return nil, "pending", nil
+					// Project not found yet, still creating
+					return nil, "not_found", nil
 				}
-				return nil, "", err
+				// For other errors, return the error to stop polling
+				statusCode := 0
+				if resp != nil {
+					statusCode = resp.StatusCode
+				}
+				return nil, "", fmt.Errorf("error checking project status (HTTP %d): %v", statusCode, err)
 			}
+
+			// Project exists and can be read successfully
 			return projectResult, "ready", nil
 		},
-		Timeout:    10 * time.Minute,
-		Delay:      10 * time.Second,
-		MinTimeout: 10 * time.Second,
+		Timeout:      10 * time.Minute,
+		Delay:        5 * time.Second,
+		MinTimeout:   3 * time.Second,
+		PollInterval: 5 * time.Second,
 	}
 
 	_, err = createStateConf.WaitForStateContext(ctx)
 	if err != nil {
-		diags.AddError("Unable to create project", fmt.Sprintf("Error: %s", err.Error()))
+		diags.AddError(
+			"Project creation timeout",
+			fmt.Sprintf("Project was created but did not become ready within the timeout period. This may indicate the project is still being provisioned. Error: %s", err.Error()),
+		)
 	}
 
 	return
@@ -271,9 +294,9 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 		diags.AddAttributeError(
 			path.Root("machine_name"),
 			"Missing project.machine_name attribute",
-			"To read project information the project machine name needs to be known, plese import the terraform state.",
+			"To read project information the project machine name needs to be known, please import the terraform state.",
 		)
-		return
+		return diags
 	}
 
 	org := r.client.Organization
@@ -330,7 +353,7 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 	if err != nil {
 		diags.Append(diag.NewErrorDiagnostic(
 			"Unable to read project data from API",
-			fmt.Sprintf("There was an issue with the request when reqesting project information form the API, please check the error and update your configuration.\nError: %s", err.Error()),
+			fmt.Sprintf("There was an issue with the request when requesting project information from the API, please check the error and update your configuration.\nError: %s", err.Error()),
 		))
 		return diags
 	}
@@ -408,7 +431,7 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 		diags.AddAttributeError(
 			path.Root("machine_name"),
 			"Missing project.machine_name attribute",
-			"To read project information the project machine name needs to be known, plese import the terraform state.",
+			"To delete project information the project machine name needs to be known, please import the terraform state.",
 		)
 		return
 	}
@@ -424,5 +447,6 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 		return
 	}
 
+	// API returns 200 for successful deletion, so no polling needed
 	return
 }
