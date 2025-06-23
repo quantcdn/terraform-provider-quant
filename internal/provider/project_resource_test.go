@@ -30,33 +30,50 @@ func mockProjectServer(t *testing.T, organizationID string, projectID string) {
 	httpmock.Activate()
 	baseUrl := "https://dashboard.quantcdn.io/api/v2"
 
+	// Track deletion state
+	projectDeleted := false
+
 	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
 		t.Logf("Request: %s", req.URL)
 		return httpmock.NewStringResponse(404, "Not Found"), nil
 	})
 
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects", baseUrl, organizationID), func(req *http.Request) (*http.Response, error) {
+		if projectDeleted {
+			return httpmock.NewStringResponse(404, "Not Found"), nil
+		}
 		return httpmock.NewJsonResponse(200, projectResponse)
 	})
 
 	httpmock.RegisterResponder("GET",
 		fmt.Sprintf("%s/organizations/%s/projects/%s", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+			if projectDeleted {
+				return httpmock.NewStringResponse(404, "Not Found"), nil
+			}
 			return httpmock.NewJsonResponse(200, projectResponse)
 		})
 
 	httpmock.RegisterResponder("GET",
 		fmt.Sprintf("%s/organizations/%s/projects/0", baseUrl, organizationID), func(req *http.Request) (*http.Response, error) {
+			if projectDeleted {
+				return httpmock.NewStringResponse(404, "Not Found"), nil
+			}
 			return httpmock.NewJsonResponse(200, projectResponse)
 		})
 
 	httpmock.RegisterResponder("POST",
 		fmt.Sprintf("%s/organizations/%s/projects", baseUrl, organizationID),
 		func(req *http.Request) (*http.Response, error) {
+			projectDeleted = false // Reset deletion state on create
 			return httpmock.NewJsonResponse(200, projectResponse)
 		})
 
 	httpmock.RegisterResponder("PATCH",
 		fmt.Sprintf("%s/organizations/%s/projects/%s", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+			if projectDeleted {
+				return httpmock.NewStringResponse(404, "Not Found"), nil
+			}
+			
 			body, err := io.ReadAll(req.Body)
 			if err != nil {
 				return httpmock.NewStringResponse(400, "Failed to read request body"), nil
@@ -80,6 +97,10 @@ func mockProjectServer(t *testing.T, organizationID string, projectID string) {
 
 	httpmock.RegisterResponder("DELETE",
 		fmt.Sprintf("%s/organizations/%s/projects/%s", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+			if projectDeleted {
+				return httpmock.NewStringResponse(404, "Not Found"), nil
+			}
+			projectDeleted = true // Mark project as deleted
 			return httpmock.NewJsonResponse(200, projectResponse)
 		})
 }
