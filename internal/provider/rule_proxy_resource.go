@@ -303,6 +303,11 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
+	
+	// Proxy alert configuration
+	if !data.ProxyAlertEnabled.IsNull() {
+		req.SetProxyAlertEnabled(data.ProxyAlertEnabled.ValueBool())
+	}
 
 	// Failover configuration
 	req.SetFailoverMode(data.FailoverMode.ValueBool())
@@ -561,6 +566,11 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
+	
+	// Proxy alert configuration
+	if !data.ProxyAlertEnabled.IsNull() {
+		req.SetProxyAlertEnabled(data.ProxyAlertEnabled.ValueBool())
+	}
 
 	// Failover configuration
 	req.SetFailoverMode(data.FailoverMode.ValueBool())
@@ -813,6 +823,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	
 	data.DisableSslVerify = types.BoolValue(actionConfig.GetDisableSslVerify())
 	data.OnlyProxy404 = types.BoolValue(actionConfig.GetOnlyProxy404())
+	data.ProxyAlertEnabled = types.BoolValue(actionConfig.GetProxyAlertEnabled())
 
 	data.Country = types.StringValue(api.GetCountry())
 	if api.GetCountry() == "country_is" {

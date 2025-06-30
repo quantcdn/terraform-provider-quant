@@ -160,6 +160,7 @@ This is particularly useful when updating existing infrastructure where you want
   - **Positive number**: Sets specific cache time in seconds
 * `disable_ssl_verify` - (Optional) Disable SSL verification for backend connections. Defaults to `false`.
 * `only_proxy_404` - (Optional) Only proxy requests that would return 404. Defaults to `false`.
+* `proxy_alert_enabled` - (Optional) Enable proxy alerts for monitoring and notifications. Defaults to `false`.
 * `proxy_strip_headers` - (Optional) List of headers to strip from the response.
 * `proxy_strip_request_headers` - (Optional) List of headers to strip from the request.
 
