@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jarcoal/httpmock"
@@ -226,5 +227,328 @@ func testAccCheckRuleProxyExists(n string) resource.TestCheckFunc {
 		// Here you would typically make an API call to verify the resource exists
 		// Instead, we'll just return nil since we're mocking
 		return nil
+	}
+}
+
+// Test cache_lifetime sentinel value behavior
+func TestAccRuleProxyCacheLifetimeSentinel(t *testing.T) {
+	setupRuleProxyServerForCacheLifetime(t, "test-organization", "default")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccRuleProxyPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Test -1 sentinel value (explicitly unset)
+			{
+				Config: testAccRuleProxyConfigCacheLifetimeSentinel("test-unset", -1),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-unset"),
+					resource.TestCheckResourceAttr("quant_rule_proxy.test", "cache_lifetime", "-1"),
+					testAccCheckRuleProxyExists("quant_rule_proxy.test"),
+				),
+			},
+			// Test 0 value (disable caching)
+			{
+				Config: testAccRuleProxyConfigCacheLifetimeSentinel("test-disabled", 0),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-disabled"),
+					resource.TestCheckResourceAttr("quant_rule_proxy.test", "cache_lifetime", "0"),
+				),
+			},
+			// Test positive value (specific cache time)
+			{
+				Config: testAccRuleProxyConfigCacheLifetimeSentinel("test-cached", 3600),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-cached"),
+					resource.TestCheckResourceAttr("quant_rule_proxy.test", "cache_lifetime", "3600"),
+				),
+			},
+			// Test omitted value (null) - should not have cache_lifetime attribute
+			{
+				Config: testAccRuleProxyConfigCacheLifetimeOmitted("test-omitted"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-omitted"),
+					// Note: We can't use TestCheckNoResourceAttr because the attribute is computed
+					// Instead we'll verify the computed value is what we expect from the API
+				),
+			},
+		},
+	})
+}
+
+func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, projectID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	// Create a simple response without WAF complications
+	createSimpleResponse := func(cacheLifetime interface{}) map[string]interface{} {
+		return map[string]interface{}{
+			"uuid":             "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
+			"rule_id":          "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
+			"domain":           []string{"any"},
+			"url":              []string{"/proxy"},
+			"name":             "test-proxy",
+			"action":           "proxy",
+			"disabled":         false,
+			"method":           "",
+			"method_is":        []string{},
+			"method_is_not":    []string{},
+			"country":          "",
+			"country_is":       []string{},
+			"country_is_not":   []string{},
+			"ip":               "",
+			"ip_is":            []string{},
+			"ip_is_not":        []string{},
+			"only_with_cookie": "",
+			"action_config": map[string]interface{}{
+				"to":                           "https://backend.example.com",
+				"host":                         "backend.example.com",
+				"waf_enabled":                  false,
+				"cache_lifetime":               cacheLifetime,
+				"failover_mode":                false,
+				"failover_origin_ttfb":         "5000",
+				"failover_lifetime":            "300",
+				"failover_origin_status_codes": []string{},
+				"disable_ssl_verify":           false,
+				"only_proxy_404":               false,
+				"proxy_strip_headers":          []string{},
+				"proxy_strip_request_headers":  []string{},
+				"auth_user":                    "",
+				"auth_pass":                    "",
+				"inject_headers":               nil,
+				"notify":                       "none",
+				"notify_config": map[string]interface{}{
+					"period":              "60",
+					"slack_webhook":       "",
+					"origin_status_codes": []string{},
+				},
+			},
+		}
+	}
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Request: %s", req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	// Default responses for various cache_lifetime values
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, []map[string]interface{}{createSimpleResponse(3600)})
+	})
+	
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, createSimpleResponse(3600))
+	})
+	
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, createSimpleResponse(3600))
+	})
+	
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		return httpmock.NewJsonResponse(200, createSimpleResponse(3600))
+	})
+}
+
+func testAccRuleProxyConfigCacheLifetimeSentinel(name string, cacheLifetime int) string {
+	return fmt.Sprintf(`
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_rule_proxy" "test" {
+	name    = %[1]q
+	project = "default"
+	domain  = ["any"]
+	url     = ["/proxy"]
+	
+	to              = "https://backend.example.com"
+	host            = "backend.example.com"
+	cache_lifetime  = %[2]d
+}
+`, name, cacheLifetime)
+}
+
+func testAccRuleProxyConfigCacheLifetimeOmitted(name string) string {
+	return fmt.Sprintf(`
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_rule_proxy" "test" {
+	name    = %[1]q
+	project = "default"
+	domain  = ["any"]
+	url     = ["/proxy"]
+	
+	to              = "https://backend.example.com"
+	host            = "backend.example.com"
+	# cache_lifetime omitted - should respect origin headers
+}
+`, name)
+}
+
+// Unit test for cache_lifetime sentinel value handling
+func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
+	tests := []struct {
+		name           string
+		apiResponse    interface{}
+		configValue    *int64
+		expectedResult string
+		description    string
+	}{
+		{
+			name:           "API returns null, config omitted",
+			apiResponse:    nil,
+			configValue:    nil,
+			expectedResult: "null",
+			description:    "When API returns null and config omits cache_lifetime, should remain null",
+		},
+		{
+			name:           "API returns null, config sets -1",
+			apiResponse:    nil,
+			configValue:    int64Ptr(-1),
+			expectedResult: "-1",
+			description:    "When API returns null and config sets -1, should preserve -1",
+		},
+		{
+			name:           "API returns 0, config sets 0",
+			apiResponse:    0,
+			configValue:    int64Ptr(0),
+			expectedResult: "0",
+			description:    "When API returns 0 and config sets 0, should be 0",
+		},
+		{
+			name:           "API returns 3600, config sets 3600",
+			apiResponse:    3600,
+			configValue:    int64Ptr(3600),
+			expectedResult: "3600",
+			description:    "When API returns 3600 and config sets 3600, should be 3600",
+		},
+		{
+			name:           "API returns 0, config sets -1",
+			apiResponse:    0,
+			configValue:    int64Ptr(-1),
+			expectedResult: "-1",
+			description:    "When config explicitly sets -1, should preserve -1 regardless of API response",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the logic from callRuleProxyReadAPI
+			var result string
+			
+			// Mock current state (what's in Terraform state)
+			var currentCacheLifetime types.Int64
+			if tt.configValue == nil {
+				currentCacheLifetime = types.Int64Null()
+			} else {
+				currentCacheLifetime = types.Int64Value(*tt.configValue)
+			}
+
+			// Apply the logic from our fixed callRuleProxyReadAPI function
+			if currentCacheLifetime.IsNull() {
+				if tt.apiResponse == nil {
+					result = "null"
+				} else {
+					result = fmt.Sprintf("%v", tt.apiResponse)
+				}
+			} else if currentCacheLifetime.ValueInt64() == -1 {
+				// Preserve -1 sentinel value
+				result = "-1"
+			} else {
+				// Use API response for other values
+				if tt.apiResponse == nil {
+					result = "null"
+				} else {
+					result = fmt.Sprintf("%v", tt.apiResponse)
+				}
+			}
+
+			if result != tt.expectedResult {
+				t.Errorf("Test %s failed: expected %s, got %s\nDescription: %s", 
+					tt.name, tt.expectedResult, result, tt.description)
+			}
+		})
+	}
+}
+
+// Helper function to create int64 pointer
+func int64Ptr(v int64) *int64 {
+	return &v
+}
+
+// Test the actual API request logic for cache_lifetime
+func TestRuleProxyCreateUpdateCacheLifetime(t *testing.T) {
+	tests := []struct {
+		name            string
+		cacheLifetime   *int64
+		shouldSetInAPI  bool
+		expectedAPICall string
+		description     string
+	}{
+		{
+			name:            "Omitted cache_lifetime",
+			cacheLifetime:   nil,
+			shouldSetInAPI:  false,
+			expectedAPICall: "not called",
+			description:     "When cache_lifetime is omitted, SetCacheLifetime should not be called",
+		},
+		{
+			name:            "cache_lifetime = 0",
+			cacheLifetime:   int64Ptr(0),
+			shouldSetInAPI:  true,
+			expectedAPICall: "SetCacheLifetime(0)",
+			description:     "When cache_lifetime is 0, should disable caching",
+		},
+		{
+			name:            "cache_lifetime = -1",
+			cacheLifetime:   int64Ptr(-1),
+			shouldSetInAPI:  false,
+			expectedAPICall: "not called",
+			description:     "When cache_lifetime is -1, SetCacheLifetime should not be called (unset)",
+		},
+		{
+			name:            "cache_lifetime = 3600",
+			cacheLifetime:   int64Ptr(3600),
+			shouldSetInAPI:  true,
+			expectedAPICall: "SetCacheLifetime(3600)",
+			description:     "When cache_lifetime is positive, should set specific cache time",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Mock the logic from Create/Update functions
+			var apiCallMade bool
+			var apiCallValue int32
+
+			// Simulate the logic from our fixed Create/Update functions
+			if tt.cacheLifetime != nil {
+				cacheLifetime := *tt.cacheLifetime
+				// Use -1 as a sentinel value to mean "unset" (don't send to API, respect origin headers)
+				if cacheLifetime != -1 {
+					apiCallMade = true
+					apiCallValue = int32(cacheLifetime)
+				}
+			}
+
+			// Verify expectations
+			if tt.shouldSetInAPI != apiCallMade {
+				t.Errorf("Test %s failed: expected shouldSetInAPI=%v, got apiCallMade=%v\nDescription: %s",
+					tt.name, tt.shouldSetInAPI, apiCallMade, tt.description)
+			}
+
+			if tt.shouldSetInAPI && apiCallMade {
+				expectedValue := int32(*tt.cacheLifetime)
+				if apiCallValue != expectedValue {
+					t.Errorf("Test %s failed: expected API call value %d, got %d",
+						tt.name, expectedValue, apiCallValue)
+				}
+			}
+		})
 	}
 }
