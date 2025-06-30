@@ -14,6 +14,7 @@ resource "quant_rule_proxy" "basic" {
   url     = ["/api/*"]
   to      = "https://backend.example.com"
   host    = "backend.example.com"
+  proxy_alert_enabled = true
 }
 ```
 
@@ -79,6 +80,7 @@ resource "quant_rule_proxy" "full_example" {
   to = "https://backend.example.com"
   host = "backend.example.com"
   cache_lifetime = 1800  # 30 minutes
+  proxy_alert_enabled = true  # Enable proxy monitoring alerts
   
   waf_enabled = true
   waf_config = {

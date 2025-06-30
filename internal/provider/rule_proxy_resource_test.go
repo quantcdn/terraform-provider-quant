@@ -1,14 +1,16 @@
 package provider_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jarcoal/httpmock"
-	"net/http"
 )
 
 func testAccRuleProxyPreCheck(t *testing.T) {
@@ -281,14 +283,18 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 	httpmock.Activate()
 	baseUrl := "https://dashboard.quantcdn.io/api/v2"
 
+	// Store the current test state to make responses dynamic
+	var currentName = "test-proxy"
+	var currentCacheLifetime interface{} = 3600
+
 	// Create a simple response without WAF complications
-	createSimpleResponse := func(cacheLifetime interface{}) map[string]interface{} {
+	createSimpleResponse := func(name string, cacheLifetime interface{}) map[string]interface{} {
 		return map[string]interface{}{
 			"uuid":             "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
 			"rule_id":          "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
 			"domain":           []string{"any"},
 			"url":              []string{"/proxy"},
-			"name":             "test-proxy",
+			"name":             name,
 			"action":           "proxy",
 			"disabled":         false,
 			"method":           "",
@@ -305,9 +311,10 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 				"to":                           "https://backend.example.com",
 				"host":                         "backend.example.com",
 				"waf_enabled":                  false,
+				"proxy_alert_enabled":          false,
 				"cache_lifetime":               cacheLifetime,
 				"failover_mode":                false,
-				"failover_origin_ttfb":         "5000",
+				"failover_origin_ttfb":         "2000",
 				"failover_lifetime":            "300",
 				"failover_origin_status_codes": []string{},
 				"disable_ssl_verify":           false,
@@ -323,6 +330,30 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 					"slack_webhook":       "",
 					"origin_status_codes": []string{},
 				},
+				"waf_config": map[string]interface{}{
+					"mode":                                 "report",
+					"paranoia_level":                       1,
+					"allow_rules":                          []string{},
+					"allow_ip":                             []string{},
+					"block_ip":                             []string{},
+					"block_ua":                             []string{},
+					"block_referer":                        []string{},
+					"notify_email":                         []string{},
+					"notify_slack":                         "",
+					"notify_slack_hits_rpm":                nil,
+					"request_header_name":                  "",
+					"httpbl_enabled":                       map[string]interface{}{},
+					"ip_ratelimit_cooldown":                30,
+					"ip_ratelimit_mode":                    "disabled",
+					"ip_ratelimit_rps":                     5,
+					"request_header_ratelimit_cooldown":    30,
+					"request_header_ratelimit_mode":        "disabled",
+					"request_header_ratelimit_rps":         5,
+					"waf_ratelimit_cooldown":               300,
+					"waf_ratelimit_hits":                   10,
+					"waf_ratelimit_mode":                   "disabled",
+					"waf_ratelimit_rps":                    5,
+				},
 			},
 		}
 	}
@@ -332,21 +363,49 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 		return httpmock.NewStringResponse(404, "Not Found"), nil
 	})
 
-	// Default responses for various cache_lifetime values
+	// Dynamic responses that change based on request
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, []map[string]interface{}{createSimpleResponse(3600)})
+		return httpmock.NewJsonResponse(200, []map[string]interface{}{createSimpleResponse(currentName, currentCacheLifetime)})
 	})
 	
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, createSimpleResponse(3600))
+		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
 	})
 	
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, createSimpleResponse(3600))
+		// Parse the request to extract name and cache_lifetime
+		var requestBody map[string]interface{}
+		if req.Body != nil {
+			body, _ := io.ReadAll(req.Body)
+			json.Unmarshal(body, &requestBody)
+			if name, ok := requestBody["name"].(string); ok {
+				currentName = name
+			}
+			if cacheLifetime, ok := requestBody["cache_lifetime"]; ok {
+				currentCacheLifetime = cacheLifetime
+			}
+		}
+		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
+	})
+	
+	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+		// Parse the request to extract name and cache_lifetime
+		var requestBody map[string]interface{}
+		if req.Body != nil {
+			body, _ := io.ReadAll(req.Body)
+			json.Unmarshal(body, &requestBody)
+			if name, ok := requestBody["name"].(string); ok {
+				currentName = name
+			}
+			if cacheLifetime, ok := requestBody["cache_lifetime"]; ok {
+				currentCacheLifetime = cacheLifetime
+			}
+		}
+		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
 	})
 	
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, createSimpleResponse(3600))
+		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
 	})
 }
 
@@ -366,6 +425,12 @@ resource "quant_rule_proxy" "test" {
 	to              = "https://backend.example.com"
 	host            = "backend.example.com"
 	cache_lifetime  = %[2]d
+	waf_enabled     = false
+	
+	# Even when WAF is disabled, we need to provide a waf_config block due to schema requirements
+	waf_config = {
+		mode = "report"
+	}
 }
 `, name, cacheLifetime)
 }
@@ -385,7 +450,13 @@ resource "quant_rule_proxy" "test" {
 	
 	to              = "https://backend.example.com"
 	host            = "backend.example.com"
+	waf_enabled     = false
 	# cache_lifetime omitted - should respect origin headers
+	
+	# Even when WAF is disabled, we need to provide a waf_config block due to schema requirements
+	waf_config = {
+		mode = "report"
+	}
 }
 `, name)
 }

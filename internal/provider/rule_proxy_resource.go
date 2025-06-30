@@ -7,6 +7,7 @@ import (
 	"terraform-provider-quant/internal/resource_rule_proxy"
 	"terraform-provider-quant/internal/utils"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -1012,6 +1013,43 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		}
 
 		data.WafConfig.RequestHeaderName = types.StringValue(wafConfig.GetRequestHeaderName())
+	} else {
+		// WAF is disabled, but if we have a waf_config block in the configuration,
+		// we need to populate it with default/empty values to avoid unknown values
+		if !data.WafConfig.Mode.IsNull() && !data.WafConfig.Mode.IsUnknown() {
+			// Keep the configured mode (likely from test configuration)
+			// Set other fields to appropriate defaults - use empty lists instead of null to match schema expectations
+			emptyStringList, _ := types.ListValue(types.StringType, []attr.Value{})
+			emptyBoolMap, _ := types.MapValue(types.BoolType, map[string]attr.Value{})
+			
+			data.WafConfig.AllowRules = emptyStringList
+			data.WafConfig.AllowIp = emptyStringList
+			data.WafConfig.BlockIp = emptyStringList
+			data.WafConfig.BlockUa = emptyStringList
+			data.WafConfig.BlockReferer = emptyStringList
+			data.WafConfig.NotifyEmail = emptyStringList
+			data.WafConfig.NotifySlack = types.StringValue("")
+			data.WafConfig.NotifySlackHitsRpm = types.Int64Null()
+			data.WafConfig.RequestHeaderName = types.StringValue("")
+			data.WafConfig.HttpblEnabled = emptyBoolMap
+			
+			// Set default values for rate limiting fields
+			data.WafConfig.IpRatelimitCooldown = types.Int64Value(30)
+			data.WafConfig.IpRatelimitMode = types.StringValue("disabled")
+			data.WafConfig.IpRatelimitRps = types.Int64Value(5)
+			data.WafConfig.RequestHeaderRatelimitCooldown = types.Int64Value(30)
+			data.WafConfig.RequestHeaderRatelimitMode = types.StringValue("disabled")
+			data.WafConfig.RequestHeaderRatelimitRps = types.Int64Value(5)
+			data.WafConfig.WafRatelimitCooldown = types.Int64Value(300)
+			data.WafConfig.WafRatelimitHits = types.Int64Value(10)
+			data.WafConfig.WafRatelimitMode = types.StringValue("disabled")
+			data.WafConfig.WafRatelimitRps = types.Int64Value(5)
+			
+			// Keep the paranoia level from configuration or use default
+			if data.WafConfig.ParanoiaLevel.IsNull() || data.WafConfig.ParanoiaLevel.IsUnknown() {
+				data.WafConfig.ParanoiaLevel = types.Int64Value(1)
+			}
+		}
 	}
 
 	// Handle failover configuration
