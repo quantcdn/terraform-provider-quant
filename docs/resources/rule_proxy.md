@@ -4,9 +4,69 @@ Manages a Quant proxy rule.
 
 ## Example Usage
 
+### Basic Proxy Rule
+
 ```hcl
-resource "quant_rule_proxy" "test" {
-  name    = "test-proxy"
+resource "quant_rule_proxy" "basic" {
+  name    = "basic-proxy"
+  project = quant_project.test.machine_name
+  domain  = ["any"]
+  url     = ["/api/*"]
+  to      = "https://backend.example.com"
+  host    = "backend.example.com"
+  proxy_alert_enabled = true
+}
+```
+
+### Cache Lifetime Examples
+
+```hcl
+# Respect origin headers (omit cache_lifetime)
+resource "quant_rule_proxy" "respect_origin" {
+  name    = "respect-origin"
+  project = quant_project.test.machine_name
+  domain  = ["any"]
+  url     = ["/api/*"]
+  to      = "https://backend.example.com"
+  # cache_lifetime omitted - respects origin headers
+}
+
+# Disable caching
+resource "quant_rule_proxy" "no_cache" {
+  name    = "no-cache"
+  project = quant_project.test.machine_name
+  domain  = ["any"]
+  url     = ["/api/*"]
+  to      = "https://backend.example.com"
+  cache_lifetime = 0  # Disables caching
+}
+
+# Explicitly unset caching (useful for updating existing rules)
+resource "quant_rule_proxy" "unset_cache" {
+  name    = "unset-cache"
+  project = quant_project.test.machine_name
+  domain  = ["any"]
+  url     = ["/api/*"]
+  to      = "https://backend.example.com"
+  cache_lifetime = -1  # Explicitly unset - respects origin headers
+}
+
+# Set specific cache time
+resource "quant_rule_proxy" "cached" {
+  name    = "cached"
+  project = quant_project.test.machine_name
+  domain  = ["any"]
+  url     = ["/api/*"]
+  to      = "https://backend.example.com"
+  cache_lifetime = 3600  # Cache for 1 hour
+}
+```
+
+### Full Example with WAF
+
+```hcl
+resource "quant_rule_proxy" "full_example" {
+  name    = "full-proxy"
   project = quant_project.test.machine_name
   domain  = ["any"]
   url     = ["/proxy"]
@@ -17,17 +77,11 @@ resource "quant_rule_proxy" "test" {
   ip = "ip_is"
   ip_is = ["192.168.1.1", "192.168.1.2"]
   
-  # Updated proxy block to match new schema
   to = "https://backend.example.com"
   host = "backend.example.com"
+  cache_lifetime = 1800  # 30 minutes
+  proxy_alert_enabled = true  # Enable proxy monitoring alerts
   
-  failover = {
-    failover_mode = true
-    failover_lifetime = "1h"
-    failover_origin_status_codes = ["200", "201"]
-    failover_origin_ttfb = "2000"
-  }
-
   waf_enabled = true
   waf_config = {
     mode = "report"
@@ -41,7 +95,6 @@ resource "quant_rule_proxy" "test" {
     notify_slack = ""
     notify_slack_hits_rpm = 100
     
-    # New rate limiting configurations
     ip_ratelimit_mode = "disabled"
     ip_ratelimit_rps = 5
     ip_ratelimit_cooldown = 30
@@ -55,19 +108,6 @@ resource "quant_rule_proxy" "test" {
     waf_ratelimit_rps = 5
     waf_ratelimit_hits = 10
     waf_ratelimit_cooldown = 300
-    
-    httpbl_enabled = {}
-    
-    thresholds = [{
-      cooldown = 60
-      hits = 10
-      minutes = 1
-      mode = "block"
-      notify_slack = "https://hooks.slack.com/services/xxx/xxx/xxx"
-      rps = 1000
-      type = "block"
-      value = "192.168.1.1"
-    }]
   }
 
   notify = "slack"
@@ -79,6 +119,34 @@ resource "quant_rule_proxy" "test" {
 }
 ```
 
+### Migrating Existing Rules to Use Origin Headers
+
+If you have existing proxy rules that explicitly set `cache_lifetime = 0` but you want them to respect origin headers instead, you can use the `-1` sentinel value:
+
+```hcl
+# Before: Explicitly disabled caching
+resource "quant_rule_proxy" "example" {
+  name    = "example"
+  project = quant_project.example.machine_name
+  domain  = ["any"]
+  url     = ["/api/*"]
+  to      = "https://backend.example.com"
+  cache_lifetime = 0  # Disables caching
+}
+
+# After: Respect origin headers
+resource "quant_rule_proxy" "example" {
+  name    = "example"
+  project = quant_project.example.machine_name
+  domain  = ["any"]
+  url     = ["/api/*"]
+  to      = "https://backend.example.com"
+  cache_lifetime = -1  # Respects origin headers
+}
+```
+
+This is particularly useful when updating existing infrastructure where you want to change from explicit cache control to origin-based cache control.
+
 ## Argument Reference
 
 * `name` - (Required) The name of the rule.
@@ -87,6 +155,16 @@ resource "quant_rule_proxy" "test" {
 * `url` - (Required) List of URL patterns to match.
 * `to` - (Required) The target URL to proxy requests to.
 * `host` - (Optional) The host header to send to the backend.
+* `cache_lifetime` - (Optional) Cache lifetime in seconds. Different values have different behaviors:
+  - **Omitted**: Respects origin headers (recommended for new resources)
+  - **`0`**: Disables caching entirely  
+  - **`-1`**: Explicitly unset - respects origin headers (useful for migrating existing resources)
+  - **Positive number**: Sets specific cache time in seconds
+* `disable_ssl_verify` - (Optional) Disable SSL verification for backend connections. Defaults to `false`.
+* `only_proxy_404` - (Optional) Only proxy requests that would return 404. Defaults to `false`.
+* `proxy_alert_enabled` - (Optional) Enable proxy alerts for monitoring and notifications. Defaults to `false`.
+* `proxy_strip_headers` - (Optional) List of headers to strip from the response.
+* `proxy_strip_request_headers` - (Optional) List of headers to strip from the request.
 
 ### Rule Selection Criteria
 

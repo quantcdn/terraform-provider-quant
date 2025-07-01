@@ -203,6 +203,10 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
+			"proxy_alert_enabled": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+			},
 			"proxy_strip_headers": schema.ListAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
@@ -418,6 +422,7 @@ type RuleProxyModel struct {
 	OnlyWithCookie            types.String      `tfsdk:"only_with_cookie"`
 	Organization              types.String      `tfsdk:"organization"`
 	Project                   types.String      `tfsdk:"project"`
+	ProxyAlertEnabled         types.Bool        `tfsdk:"proxy_alert_enabled"`
 	ProxyStripHeaders         types.List        `tfsdk:"proxy_strip_headers"`
 	ProxyStripRequestHeaders  types.List        `tfsdk:"proxy_strip_request_headers"`
 	Rule                      types.String      `tfsdk:"rule"`
