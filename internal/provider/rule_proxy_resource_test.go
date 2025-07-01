@@ -377,12 +377,13 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 		var requestBody map[string]interface{}
 		if req.Body != nil {
 			body, _ := io.ReadAll(req.Body)
-			json.Unmarshal(body, &requestBody)
-			if name, ok := requestBody["name"].(string); ok {
-				currentName = name
-			}
-			if cacheLifetime, ok := requestBody["cache_lifetime"]; ok {
-				currentCacheLifetime = cacheLifetime
+			if err := json.Unmarshal(body, &requestBody); err == nil {
+				if name, ok := requestBody["name"].(string); ok {
+					currentName = name
+				}
+				if cacheLifetime, ok := requestBody["cache_lifetime"]; ok {
+					currentCacheLifetime = cacheLifetime
+				}
 			}
 		}
 		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
@@ -393,12 +394,13 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 		var requestBody map[string]interface{}
 		if req.Body != nil {
 			body, _ := io.ReadAll(req.Body)
-			json.Unmarshal(body, &requestBody)
-			if name, ok := requestBody["name"].(string); ok {
-				currentName = name
-			}
-			if cacheLifetime, ok := requestBody["cache_lifetime"]; ok {
-				currentCacheLifetime = cacheLifetime
+			if err := json.Unmarshal(body, &requestBody); err == nil {
+				if name, ok := requestBody["name"].(string); ok {
+					currentName = name
+				}
+				if cacheLifetime, ok := requestBody["cache_lifetime"]; ok {
+					currentCacheLifetime = cacheLifetime
+				}
 			}
 		}
 		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
