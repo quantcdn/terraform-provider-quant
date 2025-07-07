@@ -41,14 +41,14 @@ resource "quant_rule_proxy" "no_cache" {
   cache_lifetime = 0  # Disables caching
 }
 
-# Explicitly unset caching (useful for updating existing rules)
+# Respect origin headers using -1
 resource "quant_rule_proxy" "unset_cache" {
   name    = "unset-cache"
   project = quant_project.test.machine_name
   domain  = ["any"]
   url     = ["/api/*"]
   to      = "https://backend.example.com"
-  cache_lifetime = -1  # Explicitly unset - respects origin headers
+  cache_lifetime = -1  # Backend will respect origin headers
 }
 
 # Set specific cache time
@@ -121,7 +121,7 @@ resource "quant_rule_proxy" "full_example" {
 
 ### Migrating Existing Rules to Use Origin Headers
 
-If you have existing proxy rules that explicitly set `cache_lifetime = 0` but you want them to respect origin headers instead, you can use the `-1` sentinel value:
+If you have existing proxy rules that explicitly set `cache_lifetime = 0` but you want them to respect origin headers instead, you can use `-1`:
 
 ```hcl
 # Before: Explicitly disabled caching
@@ -141,7 +141,7 @@ resource "quant_rule_proxy" "example" {
   domain  = ["any"]
   url     = ["/api/*"]
   to      = "https://backend.example.com"
-  cache_lifetime = -1  # Respects origin headers
+  cache_lifetime = -1  # Backend will respect origin headers
 }
 ```
 
@@ -158,7 +158,7 @@ This is particularly useful when updating existing infrastructure where you want
 * `cache_lifetime` - (Optional) Cache lifetime in seconds. Different values have different behaviors:
   - **Omitted**: Respects origin headers (recommended for new resources)
   - **`0`**: Disables caching entirely  
-  - **`-1`**: Explicitly unset - respects origin headers (useful for migrating existing resources)
+  - **`-1`**: Backend will respect origin headers
   - **Positive number**: Sets specific cache time in seconds
 * `disable_ssl_verify` - (Optional) Disable SSL verification for backend connections. Defaults to `false`.
 * `only_proxy_404` - (Optional) Only proxy requests that would return 404. Defaults to `false`.

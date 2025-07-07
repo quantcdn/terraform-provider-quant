@@ -279,10 +279,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	req.SetHost(data.Host.ValueString())
 	if !data.CacheLifetime.IsNull() {
 		cacheLifetime := data.CacheLifetime.ValueInt64()
-		// Use -1 as a sentinel value to mean "unset" (don't send to API, respect origin headers)
-		if cacheLifetime != -1 {
-			req.SetCacheLifetime(int32(cacheLifetime))
-		}
+		req.SetCacheLifetime(int32(cacheLifetime))
 	}
 
 	if !data.AuthUser.IsNull() && !data.AuthPass.IsNull() {
@@ -542,10 +539,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	req.SetHost(data.Host.ValueString())
 	if !data.CacheLifetime.IsNull() {
 		cacheLifetime := data.CacheLifetime.ValueInt64()
-		// Use -1 as a sentinel value to mean "unset" (don't send to API, respect origin headers)
-		if cacheLifetime != -1 {
-			req.SetCacheLifetime(int32(cacheLifetime))
-		}
+		req.SetCacheLifetime(int32(cacheLifetime))
 	}
 
 	if !data.AuthUser.IsNull() && !data.AuthPass.IsNull() {
@@ -806,19 +800,9 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.To = types.StringValue(actionConfig.GetTo())
 	data.Host = types.StringValue(actionConfig.GetHost())
 	
-	// Handle cache_lifetime with sentinel value support
-	// If current state is null (omitted), keep it null
-	// If current state is -1 (explicitly unset), keep it -1
-	// Otherwise, update with API value
+	// Handle cache_lifetime - always use the API value
 	if !data.CacheLifetime.IsNull() {
-		currentValue := data.CacheLifetime.ValueInt64()
-		if currentValue == -1 {
-			// Keep the sentinel value to indicate "unset"
-			data.CacheLifetime = types.Int64Value(-1)
-		} else {
-			// Update with actual API value
-			data.CacheLifetime = types.Int64Value(int64(actionConfig.GetCacheLifetime()))
-		}
+		data.CacheLifetime = types.Int64Value(int64(actionConfig.GetCacheLifetime()))
 	}
 	// If data.CacheLifetime.IsNull(), leave it null (omitted case)
 	
