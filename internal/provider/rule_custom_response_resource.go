@@ -280,7 +280,11 @@ func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseRes
 	rule.Uuid = types.StringValue(api.Uuid)
 	rule.RuleId = types.StringValue(api.GetRuleId())
 	rule.Organization = types.StringValue(r.client.Organization)
-	rule.Weight = types.Int64Value(0)
+	if api.Weight != nil {
+		rule.Weight = types.Int64Value(int64(*api.Weight))
+	} else {
+		rule.Weight = types.Int64Value(0)
+	}
 	rule.Action = types.StringValue("custom_response")
 	rule.OnlyWithCookie = types.StringValue(api.GetOnlyWithCookie())
 

@@ -469,7 +469,11 @@ func callRuleContentFilterReadAPI(ctx context.Context, r *ruleContentFilterResou
 	data.Organization = types.StringValue(r.client.Organization)
 	data.Action = types.StringValue(api.GetAction())
 	data.OnlyWithCookie = types.StringNull()
-	data.Weight = types.Int64Value(0)
+	if api.Weight != nil {
+		data.Weight = types.Int64Value(int64(*api.Weight))
+	} else {
+		data.Weight = types.Int64Value(0)
+	}
 
 	// Convert API lists to types.List - handle nil values
 	domains := api.GetDomain()
