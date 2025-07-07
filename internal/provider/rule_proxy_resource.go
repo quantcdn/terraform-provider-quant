@@ -769,7 +769,11 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.Action = types.StringValue(api.GetAction())
 	data.InjectHeaders = types.MapNull(types.StringType)
 	data.OnlyWithCookie = types.StringNull()
-	data.Weight = types.Int64Value(0)
+	if api.Weight != nil {
+		data.Weight = types.Int64Value(int64(*api.Weight))
+	} else {
+		data.Weight = types.Int64Value(0)
+	}
 
 	// Convert API lists to types.List - handle nil values
 	domains := api.GetDomain()

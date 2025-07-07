@@ -230,7 +230,13 @@ This is particularly useful when updating existing infrastructure where you want
   * `period` - (Optional) Notification period in seconds. Defaults to `60`.
   * `slack_webhook` - (Optional) Slack webhook URL.
 
-## Attributes Reference
+## Attribute Reference
 
-* `id` - The ID of the rule.
-* `rule_id` - The unique identifier of the rule.
+In addition to all arguments above, the following attributes are exported:
+
+* `uuid` - The UUID of the rule.
+* `rule_id` - The ID of the rule.
+* `organization` - The organization ID this rule belongs to.
+* `weight` - The weight of the rule.
+* `action` - The action type, always set to `proxy`.
+* `only_with_cookie` - The cookie condition for the rule.

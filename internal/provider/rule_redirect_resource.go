@@ -265,7 +265,11 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	rule.Uuid = types.StringValue(res.GetUuid())
 	rule.RuleId = types.StringValue(res.GetRuleId())
 	rule.Organization = types.StringValue(r.client.Organization)
-	rule.Weight = types.Int64Value(0) // Hardcoded for now
+	if res.Weight != nil {
+		rule.Weight = types.Int64Value(int64(*res.Weight))
+	} else {
+		rule.Weight = types.Int64Value(0)
+	}
 	rule.Action = types.StringValue("redirect")
 	rule.Rule = types.StringValue("")
 
@@ -324,7 +328,11 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 	rule.Uuid = types.StringValue(api.Uuid)
 	rule.RuleId = types.StringValue(api.GetRuleId())
 	rule.Organization = types.StringValue(r.client.Organization)
-	rule.Weight = types.Int64Value(0)
+	if api.Weight != nil {
+		rule.Weight = types.Int64Value(int64(*api.Weight))
+	} else {
+		rule.Weight = types.Int64Value(0)
+	}
 	rule.Action = types.StringValue("redirect")
 	rule.OnlyWithCookie = types.StringValue(api.GetOnlyWithCookie())
 
