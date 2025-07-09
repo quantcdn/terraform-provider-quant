@@ -287,6 +287,12 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		req.SetAuthPass(data.AuthPass.ValueString())
 	}
 
+	// Weight handling
+	if !data.Weight.IsNull() && !data.Weight.IsUnknown() {
+		weight := int32(data.Weight.ValueInt64())
+		req.SetWeight(weight)
+	}
+
 	// Strip headers handling
 	if !data.ProxyStripHeaders.IsNull() {
 		var stripHeaders []string
@@ -545,6 +551,12 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	if !data.AuthUser.IsNull() && !data.AuthPass.IsNull() {
 		req.SetAuthUser(data.AuthUser.ValueString())
 		req.SetAuthPass(data.AuthPass.ValueString())
+	}
+
+	// Weight handling
+	if !data.Weight.IsNull() && !data.Weight.IsUnknown() {
+		weight := int32(data.Weight.ValueInt64())
+		req.SetWeight(weight)
 	}
 
 	// Strip headers handling

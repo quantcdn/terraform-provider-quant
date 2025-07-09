@@ -243,6 +243,12 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 	req.SetCustomResponseStatusCode(int32(rule.CustomResponseStatusCode.ValueInt64()))
 	req.SetCustomResponseBody(rule.CustomResponseBody.ValueString())
 
+	// Weight handling
+	if !rule.Weight.IsNull() && !rule.Weight.IsUnknown() {
+		weight := int32(rule.Weight.ValueInt64())
+		req.SetWeight(weight)
+	}
+
 	res, _, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).RuleCustomResponseRequest(req).Execute()
 
 	if err != nil {
@@ -454,6 +460,12 @@ func callRuleCustomResponseUpdateAPI(ctx context.Context, r *ruleCustomResponseR
 
 	req.SetCustomResponseStatusCode(int32(rule.CustomResponseStatusCode.ValueInt64()))
 	req.SetCustomResponseBody(rule.CustomResponseBody.ValueString())
+
+	// Weight handling
+	if !rule.Weight.IsNull() && !rule.Weight.IsUnknown() {
+		weight := int32(rule.Weight.ValueInt64())
+		req.SetWeight(weight)
+	}
 
 	_, res, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).RuleCustomResponseRequestUpdate(req).Execute()
 

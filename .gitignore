@@ -26,3 +26,6 @@ terraform.tfstate*
 
 openapi.yaml
 spec.json
+
+# Compiled binary
+terraform-provider-quant
