@@ -255,6 +255,12 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	req.SetRedirectCode(rule.RedirectCode.ValueString())
 	req.SetRedirectTo(rule.RedirectTo.ValueString())
 
+	// Weight handling
+	if !rule.Weight.IsNull() && !rule.Weight.IsUnknown() {
+		weight := int32(rule.Weight.ValueInt64())
+		req.SetWeight(weight)
+	}
+
 	res, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).RuleRedirectRequest(req).Execute()
 
 	if err != nil {
@@ -503,6 +509,12 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 
 	req.SetRedirectCode(rule.RedirectCode.ValueString())
 	req.SetRedirectTo(rule.RedirectTo.ValueString())
+
+	// Weight handling
+	if !rule.Weight.IsNull() && !rule.Weight.IsUnknown() {
+		weight := int32(rule.Weight.ValueInt64())
+		req.SetWeight(weight)
+	}
 
 	_, res, err := r.client.Instance.RulesRedirectAPI.RulesRedirectUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).RuleRedirectRequestUpdate(req).Execute()
 

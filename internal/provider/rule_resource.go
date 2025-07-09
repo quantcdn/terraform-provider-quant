@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -44,7 +43,6 @@ func RuleBaseAttributes(ctx context.Context) map[string]schema.Attribute {
 		"weight": schema.Int64Attribute{
 			Optional: true,
 			Computed: true,
-			Default:  int64default.StaticInt64(0),
 		},
 		"url": schema.ListAttribute{
 			ElementType: types.StringType,

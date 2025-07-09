@@ -276,6 +276,12 @@ func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterRes
 	req.SetFnUuid(data.FnUuid.ValueString())
 	req.SetDisabled(data.Disabled.ValueBool())
 
+	// Weight handling
+	if !data.Weight.IsNull() && !data.Weight.IsUnknown() {
+		weight := int32(data.Weight.ValueInt64())
+		req.SetWeight(weight)
+	}
+
 	// Make the API call
 	api, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleContentFilterRequest(req).Execute()
 	if err != nil {
@@ -404,6 +410,12 @@ func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterRes
 	// Content filter specific configuration
 	req.SetFnUuid(data.FnUuid.ValueString())
 	req.SetDisabled(data.Disabled.ValueBool())
+
+	// Weight handling
+	if !data.Weight.IsNull() && !data.Weight.IsUnknown() {
+		weight := int32(data.Weight.ValueInt64())
+		req.SetWeight(weight)
+	}
 
 	// Make the API call
 	_, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterUpdate(
