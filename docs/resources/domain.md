@@ -39,8 +39,53 @@ In addition to all arguments above, the following attributes are exported:
 
 ## Import
 
-Domains can be imported using the project and domain ID in the format `project/domain_id`:
+Domain resources can be imported using the following format:
 
 ```bash
-$ terraform import quant_domain.test default/9555
-``` 
+terraform import quant_domain.resource_name "project_name/domain_id"
+```
+
+### Example
+
+```bash
+terraform import quant_domain.test "my-project/9555"
+```
+
+### Import Format
+
+The import ID must follow the pattern `project_name/domain_id` where:
+- `project_name` is the machine name of your project (not the display name)
+- `domain_id` is the numeric ID of the domain
+
+### Finding the Domain ID
+
+To find the domain ID, you can:
+1. Use the QuantCDN dashboard - Look in the domains section for your domain
+2. Use the API directly - Call the domains list endpoint
+3. Check existing Terraform state - If you have other domains already managed
+
+### Step-by-Step Import Process
+
+1. **Add the resource to your Terraform configuration**:
+   ```hcl
+   resource "quant_domain" "test" {
+     domain  = "example.com"
+     project = "my-project"
+   }
+   ```
+
+2. **Run the import command**:
+   ```bash
+   terraform import quant_domain.test "my-project/9555"
+   ```
+
+3. **Verify the import**:
+   ```bash
+   terraform plan
+   ```
+
+### Troubleshooting
+
+- **Invalid Import ID**: Ensure the format is exactly `project_name/domain_id`
+- **Domain not found**: Verify the domain ID exists in the specified project
+- **Project not found**: Ensure the project machine name is correct 

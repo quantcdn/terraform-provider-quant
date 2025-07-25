@@ -230,6 +230,63 @@ This is particularly useful when updating existing infrastructure where you want
   * `period` - (Optional) Notification period in seconds. Defaults to `60`.
   * `slack_webhook` - (Optional) Slack webhook URL.
 
+## Import
+
+Proxy rules can be imported using the following format:
+
+```bash
+terraform import quant_rule_proxy.resource_name "project_name/rule_uuid"
+```
+
+### Example
+
+```bash
+terraform import quant_rule_proxy.my_proxy "my-project/12345678-1234-1234-1234-123456789abc"
+```
+
+### Import Format
+
+The import ID must follow the pattern `project_name/rule_uuid` where:
+- `project_name` is the machine name of your project (not the display name)
+- `rule_uuid` is the UUID of the proxy rule in format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+
+### Finding the Rule UUID
+
+To find the rule UUID, you can:
+1. Use the QuantCDN dashboard - Look in the rules section for your proxy rule
+2. Use the API directly - Call the rules list endpoint
+3. Check existing Terraform state - If you have other rules already managed
+
+### Step-by-Step Import Process
+
+1. **Add the resource to your Terraform configuration**:
+   ```hcl
+   resource "quant_rule_proxy" "my_proxy" {
+     name    = "my-proxy-rule"
+     project = "my-project"
+     # Other required fields will be populated from the import
+   }
+   ```
+
+2. **Run the import command**:
+   ```bash
+   terraform import quant_rule_proxy.my_proxy "my-project/12345678-1234-1234-1234-123456789abc"
+   ```
+
+3. **Verify the import**:
+   ```bash
+   terraform plan
+   ```
+
+### Troubleshooting
+
+If you get an error like "Invalid UUID format", make sure:
+- The UUID is in the correct format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- There are no extra spaces or characters
+- The project name is correct
+
+The import will automatically handle the weight field and all other attributes from the existing rule.
+
 ## Attribute Reference
 
 In addition to all arguments above, the following attributes are exported:

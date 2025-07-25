@@ -118,14 +118,57 @@ In addition to all arguments above, the following attributes are exported:
 
 ## Import
 
-Content filter rules can be imported using their project machine name and rule ID:
+Content filter rules can be imported using the following format:
 
 ```bash
-$ terraform import quant_rule_content_filter.example project_machine_name/rule_id
+terraform import quant_rule_content_filter.resource_name "project_name/rule_uuid"
 ```
 
-For example:
+### Example
 
 ```bash
-$ terraform import quant_rule_content_filter.api_filter my-project/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0
-``` 
+terraform import quant_rule_content_filter.api_filter "my-project/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0"
+```
+
+### Import Format
+
+The import ID must follow the pattern `project_name/rule_uuid` where:
+- `project_name` is the machine name of your project (not the display name)
+- `rule_uuid` is the UUID of the content filter rule in format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+
+### Finding the Rule UUID
+
+To find the rule UUID, you can:
+1. Use the QuantCDN dashboard - Look in the rules section for your content filter rule
+2. Use the API directly - Call the rules list endpoint
+3. Check existing Terraform state - If you have other rules already managed
+
+### Step-by-Step Import Process
+
+1. **Add the resource to your Terraform configuration**:
+   ```hcl
+   resource "quant_rule_content_filter" "api_filter" {
+     name    = "api-content-filter"
+     project = "my-project"
+     # Other required fields will be populated from the import
+   }
+   ```
+
+2. **Run the import command**:
+   ```bash
+   terraform import quant_rule_content_filter.api_filter "my-project/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0"
+   ```
+
+3. **Verify the import**:
+   ```bash
+   terraform plan
+   ```
+
+### Troubleshooting
+
+If you get an error like "Invalid UUID format", make sure:
+- The UUID is in the correct format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+- There are no extra spaces or characters
+- The project name is correct
+
+The import will automatically handle the weight field and all other attributes from the existing rule. 
