@@ -237,7 +237,7 @@ func callHeaderDeleteAPI(ctx context.Context, h *headerResource, resource *heade
 	for k := range resource.Headers.Elements() {
 		req.Headers = append(req.Headers, k)
 	}
-	_, _, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersDeleteRequest(req).Execute()
+	_, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersDeleteRequest(req).Execute()
 	if err != nil {
 		diags.AddError("Error removing custom headers", err.Error())
 		return
