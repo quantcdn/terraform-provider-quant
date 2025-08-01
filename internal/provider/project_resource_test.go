@@ -184,7 +184,7 @@ func TestAccProjectResourceCreateDuplicateNameError(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProjectResourceConfigDuplicateName(),
-				ExpectError: regexp.MustCompile("Project name is not unique in this organisation\\. Try another\\."),
+				ExpectError: regexp.MustCompile(`Project name is not unique in this organisation\. Try another\.`),
 			},
 		},
 	})
