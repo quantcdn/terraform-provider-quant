@@ -284,13 +284,17 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.Exclude = types.ListValueMust(types.StringType, []attr.Value{})
 			}
 
-			// Handle headers
+			// Handle headers - preserve original headers if API doesn't return them
 			if len(parsedConfig.Config.Headers) > 0 {
 				headersMap := make(map[string]attr.Value)
 				for k, v := range parsedConfig.Config.Headers {
 					headersMap[k] = types.StringValue(v)
 				}
 				crawler.Headers = types.MapValueMust(types.StringType, headersMap)
+			} else if !crawler.Headers.IsNull() && !crawler.Headers.IsUnknown() {
+				// If API returned empty but we had headers in config, preserve them
+				// This handles cases where API doesn't return sensitive headers like Authorization
+				// Keep the existing headers from the plan/state
 			} else {
 				crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 			}

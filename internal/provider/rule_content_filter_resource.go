@@ -644,4 +644,4 @@ func callRuleContentFilterDeleteAPI(ctx context.Context, r *ruleContentFilterRes
 	}
 
 	return
-} 
+}
