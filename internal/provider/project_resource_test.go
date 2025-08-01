@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"terraform-provider-quant/internal/provider"
 	"testing"
+	"regexp"
 )
 
 var projectResponse = map[string]interface{}{
@@ -171,4 +172,55 @@ resource "quant_project" "test" {
   region = "au"
 }
 `, organization, name, allowQueryParams)
+}
+
+func TestAccProjectResourceCreateDuplicateNameError(t *testing.T) {
+	setupProjectErrorServer(t, "test-organization")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() {},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectResourceConfigDuplicateName(),
+				ExpectError: regexp.MustCompile("Project name is not unique in this organisation\\. Try another\\."),
+			},
+		},
+	})
+}
+
+func setupProjectErrorServer(t *testing.T, organizationID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	// Log all requests for debugging
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	// Mock project creation endpoint to return 400 error for duplicate name
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects", baseUrl, organizationID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Create project request received - returning duplicate name error")
+			errorResponse := map[string]interface{}{
+				"error":   true,
+				"message": "Project name is not unique in this organisation. Try another.",
+			}
+			return httpmock.NewJsonResponse(400, errorResponse)
+		})
+}
+
+func testAccProjectResourceConfigDuplicateName() string {
+	return `
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_project" "test" {
+	name = "Duplicate Project Name"
+}
+`
 }

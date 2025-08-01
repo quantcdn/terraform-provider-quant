@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_project"
 	"time"
@@ -20,6 +23,40 @@ var (
 	_ resource.ResourceWithConfigure   = (*projectResource)(nil)
 	_ resource.ResourceWithImportState = (*projectResource)(nil)
 )
+
+// APIError represents the structure of API error responses
+type APIError struct {
+	Error   bool   `json:"error"`
+	Message string `json:"message"`
+}
+
+// extractAPIErrorMessage attempts to parse the API error response body
+func extractAPIErrorMessage(resp *http.Response, fallbackErr error) string {
+	if resp == nil || resp.Body == nil {
+		return fallbackErr.Error()
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fallbackErr.Error()
+	}
+
+	// Try to parse as JSON error response
+	var apiErr APIError
+	if err := json.Unmarshal(body, &apiErr); err != nil {
+		// If JSON parsing fails, return the original error
+		return fallbackErr.Error()
+	}
+
+	// If we successfully parsed the JSON and have a message, use it
+	if apiErr.Message != "" {
+		return apiErr.Message
+	}
+
+	// Fallback to original error
+	return fallbackErr.Error()
+}
 
 func NewProjectResource() resource.Resource {
 	return &projectResource{}
@@ -223,11 +260,21 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 				)
 				return
 			}
+			// Handle bad request (400) - usually validation errors
+			if resp.StatusCode == 400 {
+				apiErrorMsg := extractAPIErrorMessage(resp, err)
+				diags.AddError(
+					"Invalid Project Configuration",
+					apiErrorMsg,
+				)
+				return
+			}
 			// Handle conflict (409) which likely means project already exists
 			if resp.StatusCode == 409 {
+				apiErrorMsg := extractAPIErrorMessage(resp, err)
 				diags.AddError(
 					"Project Already Exists",
-					"A project with this name already exists in your organization.",
+					apiErrorMsg,
 				)
 				return
 			}
