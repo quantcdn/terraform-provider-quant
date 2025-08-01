@@ -9,9 +9,9 @@ import (
 	"github.com/jarcoal/httpmock"
 	"io"
 	"net/http"
+	"regexp"
 	"terraform-provider-quant/internal/provider"
 	"testing"
-	"regexp"
 )
 
 var projectResponse = map[string]interface{}{
@@ -74,7 +74,7 @@ func mockProjectServer(t *testing.T, organizationID string, projectID string) {
 			if projectDeleted {
 				return httpmock.NewStringResponse(404, "Not Found"), nil
 			}
-			
+
 			body, err := io.ReadAll(req.Body)
 			if err != nil {
 				return httpmock.NewStringResponse(400, "Failed to read request body"), nil
@@ -183,7 +183,7 @@ func TestAccProjectResourceCreateDuplicateNameError(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccProjectResourceConfigDuplicateName(),
+				Config:      testAccProjectResourceConfigDuplicateName(),
 				ExpectError: regexp.MustCompile(`Project name is not unique in this organisation\. Try another\.`),
 			},
 		},

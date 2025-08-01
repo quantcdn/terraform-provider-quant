@@ -52,11 +52,11 @@ func setupRuleContentFilterServer(t *testing.T, organizationID string, projectID
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, []map[string]interface{}{ruleContentFilterResponse})
 	})
-	
+
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, ruleContentFilterResponse)
 	})
-	
+
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		// Parse the request to verify the sent data
 		var requestBody map[string]interface{}
@@ -64,7 +64,7 @@ func setupRuleContentFilterServer(t *testing.T, organizationID string, projectID
 			body, _ := io.ReadAll(req.Body)
 			if err := json.Unmarshal(body, &requestBody); err == nil {
 				t.Logf("Create request body: %+v", requestBody)
-				
+
 				// Verify required fields are present
 				if fnUuid, ok := requestBody["fn_uuid"].(string); ok && fnUuid != "" {
 					// Update response with the sent data
@@ -87,7 +87,7 @@ func setupRuleContentFilterServer(t *testing.T, organizationID string, projectID
 		}
 		return httpmock.NewJsonResponse(200, ruleContentFilterResponse)
 	})
-	
+
 	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		// Parse the request to verify the sent data
 		var requestBody map[string]interface{}
@@ -95,7 +95,7 @@ func setupRuleContentFilterServer(t *testing.T, organizationID string, projectID
 			body, _ := io.ReadAll(req.Body)
 			if err := json.Unmarshal(body, &requestBody); err == nil {
 				t.Logf("Update request body: %+v", requestBody)
-				
+
 				// Update response with the sent data
 				response := make(map[string]interface{})
 				for k, v := range ruleContentFilterResponse {
@@ -117,7 +117,7 @@ func setupRuleContentFilterServer(t *testing.T, organizationID string, projectID
 		}
 		return httpmock.NewJsonResponse(200, ruleContentFilterResponse)
 	})
-	
+
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewStringResponse(204, ""), nil
 	})
@@ -358,11 +358,11 @@ func setupRuleContentFilterServerForUpdate(t *testing.T, organizationID string, 
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, []map[string]interface{}{createResponse()})
 	})
-	
+
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, createResponse())
 	})
-	
+
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		// Parse the request to extract values
 		var requestBody map[string]interface{}
@@ -382,7 +382,7 @@ func setupRuleContentFilterServerForUpdate(t *testing.T, organizationID string, 
 		}
 		return httpmock.NewJsonResponse(200, createResponse())
 	})
-	
+
 	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		// Parse the request to extract values
 		var requestBody map[string]interface{}
@@ -402,7 +402,7 @@ func setupRuleContentFilterServerForUpdate(t *testing.T, organizationID string, 
 		}
 		return httpmock.NewJsonResponse(200, createResponse())
 	})
-	
+
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewStringResponse(204, ""), nil
 	})
@@ -444,16 +444,16 @@ func setupRuleContentFilterServerForMethodsAndIPs(t *testing.T, organizationID s
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, []map[string]interface{}{responseWithMethodsAndIPs})
 	})
-	
+
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, responseWithMethodsAndIPs)
 	})
-	
+
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, responseWithMethodsAndIPs)
 	})
-	
+
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/content-filter/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewStringResponse(204, ""), nil
 	})
-} 
+}

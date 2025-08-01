@@ -307,7 +307,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
-	
+
 	// Proxy alert configuration
 	if !data.ProxyAlertEnabled.IsNull() {
 		req.SetProxyAlertEnabled(data.ProxyAlertEnabled.ValueBool())
@@ -573,7 +573,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	req.SetDisableSslVerify(data.DisableSslVerify.ValueBool())
 	req.SetOnlyProxy404(data.OnlyProxy404.ValueBool())
-	
+
 	// Proxy alert configuration
 	if !data.ProxyAlertEnabled.IsNull() {
 		req.SetProxyAlertEnabled(data.ProxyAlertEnabled.ValueBool())
@@ -815,13 +815,13 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	// Handle proxy configuration
 	data.To = types.StringValue(actionConfig.GetTo())
 	data.Host = types.StringValue(actionConfig.GetHost())
-	
+
 	// Handle cache_lifetime - always use the API value
 	if !data.CacheLifetime.IsNull() {
 		data.CacheLifetime = types.Int64Value(int64(actionConfig.GetCacheLifetime()))
 	}
 	// If data.CacheLifetime.IsNull(), leave it null (omitted case)
-	
+
 	data.DisableSslVerify = types.BoolValue(actionConfig.GetDisableSslVerify())
 	data.OnlyProxy404 = types.BoolValue(actionConfig.GetOnlyProxy404())
 	data.ProxyAlertEnabled = types.BoolValue(actionConfig.GetProxyAlertEnabled())
@@ -936,7 +936,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		}
 		data.ProxyStripHeaders = stripHeadersList
 	}
-	
+
 	proxyStripRequestHeaders := actionConfig.GetProxyStripRequestHeaders()
 	if proxyStripRequestHeaders == nil {
 		data.ProxyStripRequestHeaders = types.ListNull(types.StringType)
@@ -1021,7 +1021,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			// Set other fields to appropriate defaults - use empty lists instead of null to match schema expectations
 			emptyStringList, _ := types.ListValue(types.StringType, []attr.Value{})
 			emptyBoolMap, _ := types.MapValue(types.BoolType, map[string]attr.Value{})
-			
+
 			data.WafConfig.AllowRules = emptyStringList
 			data.WafConfig.AllowIp = emptyStringList
 			data.WafConfig.BlockIp = emptyStringList
@@ -1032,7 +1032,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.WafConfig.NotifySlackHitsRpm = types.Int64Null()
 			data.WafConfig.RequestHeaderName = types.StringValue("")
 			data.WafConfig.HttpblEnabled = emptyBoolMap
-			
+
 			// Set default values for rate limiting fields
 			data.WafConfig.IpRatelimitCooldown = types.Int64Value(30)
 			data.WafConfig.IpRatelimitMode = types.StringValue("disabled")
@@ -1044,7 +1044,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.WafConfig.WafRatelimitHits = types.Int64Value(10)
 			data.WafConfig.WafRatelimitMode = types.StringValue("disabled")
 			data.WafConfig.WafRatelimitRps = types.Int64Value(5)
-			
+
 			// Keep the paranoia level from configuration or use default
 			if data.WafConfig.ParanoiaLevel.IsNull() || data.WafConfig.ParanoiaLevel.IsUnknown() {
 				data.WafConfig.ParanoiaLevel = types.Int64Value(1)
@@ -1090,7 +1090,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			return
 		}
 	}
-	
+
 	data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{
 		OriginStatusCodes: originStatusCodesList,
 		Period:            types.StringValue(notifycfg.GetPeriod()),

@@ -331,28 +331,28 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 					"origin_status_codes": []string{},
 				},
 				"waf_config": map[string]interface{}{
-					"mode":                                 "report",
-					"paranoia_level":                       1,
-					"allow_rules":                          []string{},
-					"allow_ip":                             []string{},
-					"block_ip":                             []string{},
-					"block_ua":                             []string{},
-					"block_referer":                        []string{},
-					"notify_email":                         []string{},
-					"notify_slack":                         "",
-					"notify_slack_hits_rpm":                nil,
-					"request_header_name":                  "",
-					"httpbl_enabled":                       map[string]interface{}{},
-					"ip_ratelimit_cooldown":                30,
-					"ip_ratelimit_mode":                    "disabled",
-					"ip_ratelimit_rps":                     5,
-					"request_header_ratelimit_cooldown":    30,
-					"request_header_ratelimit_mode":        "disabled",
-					"request_header_ratelimit_rps":         5,
-					"waf_ratelimit_cooldown":               300,
-					"waf_ratelimit_hits":                   10,
-					"waf_ratelimit_mode":                   "disabled",
-					"waf_ratelimit_rps":                    5,
+					"mode":                              "report",
+					"paranoia_level":                    1,
+					"allow_rules":                       []string{},
+					"allow_ip":                          []string{},
+					"block_ip":                          []string{},
+					"block_ua":                          []string{},
+					"block_referer":                     []string{},
+					"notify_email":                      []string{},
+					"notify_slack":                      "",
+					"notify_slack_hits_rpm":             nil,
+					"request_header_name":               "",
+					"httpbl_enabled":                    map[string]interface{}{},
+					"ip_ratelimit_cooldown":             30,
+					"ip_ratelimit_mode":                 "disabled",
+					"ip_ratelimit_rps":                  5,
+					"request_header_ratelimit_cooldown": 30,
+					"request_header_ratelimit_mode":     "disabled",
+					"request_header_ratelimit_rps":      5,
+					"waf_ratelimit_cooldown":            300,
+					"waf_ratelimit_hits":                10,
+					"waf_ratelimit_mode":                "disabled",
+					"waf_ratelimit_rps":                 5,
 				},
 			},
 		}
@@ -367,11 +367,11 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, []map[string]interface{}{createSimpleResponse(currentName, currentCacheLifetime)})
 	})
-	
+
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
 	})
-	
+
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		// Parse the request to extract name and cache_lifetime
 		var requestBody map[string]interface{}
@@ -388,7 +388,7 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 		}
 		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
 	})
-	
+
 	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		// Parse the request to extract name and cache_lifetime
 		var requestBody map[string]interface{}
@@ -405,7 +405,7 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 		}
 		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
 	})
-	
+
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, createSimpleResponse(currentName, currentCacheLifetime))
 	})
@@ -513,7 +513,7 @@ func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Simulate the logic from callRuleProxyReadAPI
 			var result string
-			
+
 			// Mock current state (what's in Terraform state)
 			var currentCacheLifetime types.Int64
 			if tt.configValue == nil {
@@ -542,7 +542,7 @@ func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
 			}
 
 			if result != tt.expectedResult {
-				t.Errorf("Test %s failed: expected %s, got %s\nDescription: %s", 
+				t.Errorf("Test %s failed: expected %s, got %s\nDescription: %s",
 					tt.name, tt.expectedResult, result, tt.description)
 			}
 		})
