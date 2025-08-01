@@ -46,6 +46,23 @@ var crawlerResponseWithExclude = map[string]interface{}{
 	"webhook_extra_vars":  nil,
 }
 
+// Response that simulates API not returning sensitive headers on read
+var crawlerResponseSensitiveHeaders = map[string]interface{}{
+	"id":                  6,
+	"project_id":          17,
+	"uuid":                "sensitive-headers-uuid-123",
+	"name":                "Crawler with sensitive headers",
+	"config":              "config:\n    user_agent: 'Custom-Bot/1.0'\n    browser_mode: true\n    workers: 2\n    depth: -1\n    max_hits: 0\n    max_html: 500\n    cache: false\n    delay: 4\n    status_ok: [200]\n    quant: { options: { enabled: true, max_errors: 100 } }\n    start_url: [/]\n    headers: {}\ndomain: 'https://www.example.com'\nheaders: {}\n", // Note: sensitive headers NOT included in response
+	"urls_list":           "single_url: {}\n",
+	"created_at":          "2024-06-28T04:00:00.000000Z",
+	"updated_at":          "2024-06-28T04:00:00.000000Z",
+	"domain":              "https://www.example.com",
+	"domain_verified":     0,
+	"webhook_url":         nil,
+	"webhook_auth_header": nil,
+	"webhook_extra_vars":  nil,
+}
+
 func setupCrawlerServer(t *testing.T, organizationID string, projectID string) {
 	httpmock.Activate()
 	baseUrl := "https://dashboard.quantcdn.io/api/v2"
@@ -100,6 +117,60 @@ func setupCrawlerServer(t *testing.T, organizationID string, projectID string) {
 		})
 }
 
+func setupCrawlerSensitiveHeadersServer(t *testing.T, organizationID string, projectID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	// Log all requests for debugging
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	// List crawlers
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("List crawlers request received")
+			return httpmock.NewJsonResponse(200, []map[string]interface{}{crawlerResponseSensitiveHeaders})
+		})
+
+	// Get crawler by UUID
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/sensitive-headers-uuid-123", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Get crawler request received")
+			return httpmock.NewJsonResponse(200, crawlerResponseSensitiveHeaders)
+		})
+
+	// Create crawler
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Create crawler request received")
+			return httpmock.NewJsonResponse(200, crawlerResponseSensitiveHeaders)
+		})
+
+	// Update crawler - make sure this exactly matches the URL pattern used by the API
+	httpmock.RegisterResponder("PUT", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/sensitive-headers-uuid-123", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Update crawler request received: %s", req.URL.String())
+			return httpmock.NewJsonResponse(200, crawlerResponseSensitiveHeaders)
+		})
+
+	// Also register with PATCH in case the API uses PATCH instead of PUT
+	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/sensitive-headers-uuid-123", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Patch crawler request received: %s", req.URL.String())
+			return httpmock.NewJsonResponse(200, crawlerResponseWithExclude)
+		})
+
+	// Delete crawler - using UUID as shown in the OpenAPI spec
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/sensitive-headers-uuid-123", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Delete crawler request received")
+			// Return the crawler object as per OpenAPI spec (delete returns the deleted crawler)
+			return httpmock.NewJsonResponse(200, crawlerResponseSensitiveHeaders)
+		})
+}
+
 func TestAccCrawlerResourceMock(t *testing.T) {
 	setupCrawlerServer(t, "test-organization", "default")
 	defer httpmock.DeactivateAndReset()
@@ -131,6 +202,43 @@ func TestAccCrawlerResourceMock(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_crawler.test", "exclude.#", "1"),
 					resource.TestCheckResourceAttr("quant_crawler.test", "exclude.0", "/exclude-path"),
 					testAccCheckCrawlerExists("quant_crawler.test"),
+				),
+			},
+		},
+	})
+}
+
+// Test for sensitive headers that are not returned by the API on read operations
+func TestAccCrawlerResourceSensitiveHeaders(t *testing.T) {
+	setupCrawlerSensitiveHeadersServer(t, "test-organization", "default")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCrawlerResourceConfigSensitiveHeaders(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.test", "name", "Crawler with sensitive headers"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "project", "default"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "domain", "https://www.example.com"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "browser_mode", "true"),
+					// Verify sensitive headers are preserved in state
+					resource.TestCheckResourceAttr("quant_crawler.test", "headers.Authorization", "Bearer secret-token"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "headers.X-API-Key", "api-key-123"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "headers.User-Agent", "Custom-Bot/1.0"),
+					testAccCheckCrawlerExists("quant_crawler.test"),
+				),
+			},
+			// Test that a second apply doesn't cause inconsistency errors
+			{
+				Config: testAccCrawlerResourceConfigSensitiveHeaders(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.test", "name", "Crawler with sensitive headers"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "headers.Authorization", "Bearer secret-token"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "headers.X-API-Key", "api-key-123"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "headers.User-Agent", "Custom-Bot/1.0"),
 				),
 			},
 		},
@@ -176,6 +284,28 @@ resource "quant_crawler" "test" {
 	}
 	urls = ["/start-here"]
 	exclude = ["/exclude-path"]
+}
+`
+}
+
+func testAccCrawlerResourceConfigSensitiveHeaders() string {
+	return `
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_crawler" "test" {
+	name    = "Crawler with sensitive headers"
+	project = "default"
+	domain  = "https://www.example.com"
+	browser_mode = true
+	headers = {
+		"Authorization" = "Bearer secret-token"
+		"X-API-Key" = "api-key-123"
+		"User-Agent" = "Custom-Bot/1.0"
+	}
+	urls = ["/"]
 }
 `
 }
