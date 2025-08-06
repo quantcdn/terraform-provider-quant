@@ -307,7 +307,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// Proxy configuration
 	req.SetTo(data.To.ValueString())
 	req.SetHost(data.Host.ValueString())
-	if !data.CacheLifetime.IsNull() {
+	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
 		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
 		if err != nil {
 			diags.AddError(
@@ -580,7 +580,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// Proxy configuration
 	req.SetTo(data.To.ValueString())
 	req.SetHost(data.Host.ValueString())
-	if !data.CacheLifetime.IsNull() {
+	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
 		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
 		if err != nil {
 			diags.AddError(
