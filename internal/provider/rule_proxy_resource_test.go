@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -515,11 +516,11 @@ func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
 			var result string
 
 			// Mock current state (what's in Terraform state)
-			var currentCacheLifetime types.Int64
+			var currentCacheLifetime types.String
 			if tt.configValue == nil {
-				currentCacheLifetime = types.Int64Null()
+				currentCacheLifetime = types.StringNull()
 			} else {
-				currentCacheLifetime = types.Int64Value(*tt.configValue)
+				currentCacheLifetime = types.StringValue(strconv.FormatInt(*tt.configValue, 10))
 			}
 
 			// Apply the logic from our fixed callRuleProxyReadAPI function
@@ -529,7 +530,7 @@ func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
 				} else {
 					result = fmt.Sprintf("%v", tt.apiResponse)
 				}
-			} else if currentCacheLifetime.ValueInt64() == -1 {
+			} else if currentCacheLifetime.ValueString() == "-1" {
 				// Preserve -1 sentinel value
 				result = "-1"
 			} else {

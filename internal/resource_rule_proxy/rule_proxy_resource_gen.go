@@ -36,7 +36,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Computed: true,
 				Default:  stringdefault.StaticString(""),
 			},
-			"cache_lifetime": schema.Int64Attribute{
+			"cache_lifetime": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 			},
@@ -396,7 +396,7 @@ type RuleProxyModel struct {
 	Action                    types.String      `tfsdk:"action"`
 	AuthPass                  types.String      `tfsdk:"auth_pass"`
 	AuthUser                  types.String      `tfsdk:"auth_user"`
-	CacheLifetime             types.Int64       `tfsdk:"cache_lifetime"`
+	CacheLifetime             types.String      `tfsdk:"cache_lifetime"`
 	Country                   types.String      `tfsdk:"country"`
 	CountryIs                 types.List        `tfsdk:"country_is"`
 	CountryIsNot              types.List        `tfsdk:"country_is_not"`
