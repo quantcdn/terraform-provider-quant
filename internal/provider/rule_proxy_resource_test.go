@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -40,7 +41,7 @@ var ruleProxyResponse = map[string]interface{}{
 		"host":                         "backend.example.com",
 		"waf_enabled":                  true,
 		"origin_timeout":               "30000",
-		"cache_lifetime":               3600,
+		"cache_lifetime":               "3600",
 		"failover_mode":                false,
 		"failover_origin_ttfb":         "5000",
 		"failover_lifetime":            "300",
@@ -289,6 +290,12 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 
 	// Create a simple response without WAF complications
 	createSimpleResponse := func(name string, cacheLifetime interface{}) map[string]interface{} {
+		// Convert cache_lifetime to string format for API compatibility
+		var cacheLifetimeStr string
+		if cacheLifetime != nil {
+			cacheLifetimeStr = fmt.Sprintf("%v", cacheLifetime)
+		}
+		
 		return map[string]interface{}{
 			"uuid":             "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
 			"rule_id":          "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
@@ -312,7 +319,7 @@ func setupRuleProxyServerForCacheLifetime(t *testing.T, organizationID string, p
 				"host":                         "backend.example.com",
 				"waf_enabled":                  false,
 				"proxy_alert_enabled":          false,
-				"cache_lifetime":               cacheLifetime,
+				"cache_lifetime":               cacheLifetimeStr,
 				"failover_mode":                false,
 				"failover_origin_ttfb":         "2000",
 				"failover_lifetime":            "300",
@@ -515,11 +522,11 @@ func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
 			var result string
 
 			// Mock current state (what's in Terraform state)
-			var currentCacheLifetime types.Int64
+			var currentCacheLifetime types.String
 			if tt.configValue == nil {
-				currentCacheLifetime = types.Int64Null()
+				currentCacheLifetime = types.StringNull()
 			} else {
-				currentCacheLifetime = types.Int64Value(*tt.configValue)
+				currentCacheLifetime = types.StringValue(strconv.FormatInt(*tt.configValue, 10))
 			}
 
 			// Apply the logic from our fixed callRuleProxyReadAPI function
@@ -529,7 +536,7 @@ func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
 				} else {
 					result = fmt.Sprintf("%v", tt.apiResponse)
 				}
-			} else if currentCacheLifetime.ValueInt64() == -1 {
+			} else if currentCacheLifetime.ValueString() == "-1" {
 				// Preserve -1 sentinel value
 				result = "-1"
 			} else {

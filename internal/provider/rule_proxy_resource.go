@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_proxy"
 	"terraform-provider-quant/internal/utils"
@@ -28,6 +29,35 @@ func NewRuleProxyResource() resource.Resource {
 
 type ruleProxyResource struct {
 	client *client.Client
+}
+
+// Helper functions for backwards compatibility with cache_lifetime field
+// The field is now a string in the schema but the API still expects an integer
+
+// parseCacheLifetime converts a string cache_lifetime value to int64 for API calls
+// Supports backwards compatibility with existing integer configurations
+func parseCacheLifetime(cacheLifetimeStr types.String) (int64, error) {
+	if cacheLifetimeStr.IsNull() || cacheLifetimeStr.IsUnknown() {
+		return 0, fmt.Errorf("cache_lifetime is null or unknown")
+	}
+	
+	value := cacheLifetimeStr.ValueString()
+	if value == "" {
+		return 0, fmt.Errorf("cache_lifetime is empty")
+	}
+	
+	// Parse as integer (handles both string representations of integers and actual integers)
+	cacheLifetime, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid cache_lifetime value '%s': must be a valid integer", value)
+	}
+	
+	return cacheLifetime, nil
+}
+
+// formatCacheLifetime converts a string cache_lifetime value to types.String for Terraform state
+func formatCacheLifetime(cacheLifetime string) types.String {
+	return types.StringValue(cacheLifetime)
 }
 
 func (r *ruleProxyResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -277,9 +307,16 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// Proxy configuration
 	req.SetTo(data.To.ValueString())
 	req.SetHost(data.Host.ValueString())
-	if !data.CacheLifetime.IsNull() {
-		cacheLifetime := data.CacheLifetime.ValueInt64()
-		req.SetCacheLifetime(int32(cacheLifetime))
+	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
+		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
+		if err != nil {
+			diags.AddError(
+				"Invalid cache_lifetime value",
+				fmt.Sprintf("Could not parse cache_lifetime: %s", err.Error()),
+			)
+			return
+		}
+		req.SetCacheLifetime(strconv.FormatInt(cacheLifetime, 10))
 	}
 
 	if !data.AuthUser.IsNull() && !data.AuthPass.IsNull() {
@@ -543,9 +580,16 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// Proxy configuration
 	req.SetTo(data.To.ValueString())
 	req.SetHost(data.Host.ValueString())
-	if !data.CacheLifetime.IsNull() {
-		cacheLifetime := data.CacheLifetime.ValueInt64()
-		req.SetCacheLifetime(int32(cacheLifetime))
+	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
+		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
+		if err != nil {
+			diags.AddError(
+				"Invalid cache_lifetime value",
+				fmt.Sprintf("Could not parse cache_lifetime: %s", err.Error()),
+			)
+			return
+		}
+		req.SetCacheLifetime(strconv.FormatInt(cacheLifetime, 10))
 	}
 
 	if !data.AuthUser.IsNull() && !data.AuthPass.IsNull() {
@@ -816,9 +860,9 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.To = types.StringValue(actionConfig.GetTo())
 	data.Host = types.StringValue(actionConfig.GetHost())
 
-	// Handle cache_lifetime - always use the API value
+	// Handle cache_lifetime - always use the API value, convert to string for backwards compatibility
 	if !data.CacheLifetime.IsNull() {
-		data.CacheLifetime = types.Int64Value(int64(actionConfig.GetCacheLifetime()))
+		data.CacheLifetime = formatCacheLifetime(actionConfig.GetCacheLifetime())
 	}
 	// If data.CacheLifetime.IsNull(), leave it null (omitted case)
 
