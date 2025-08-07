@@ -434,7 +434,7 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	// Preserve computed fields from state
 	plan.DomainVerified = state.DomainVerified
 	plan.CreatedAt = state.CreatedAt
-	plan.UpdatedAt = state.UpdatedAt
+	// Don't preserve UpdatedAt - let it be updated by the API response
 	plan.Id = state.Id
 	plan.ProjectId = state.ProjectId
 
