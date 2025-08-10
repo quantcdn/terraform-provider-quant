@@ -54,6 +54,11 @@ func (r *ruleContentFilterResource) Configure(_ context.Context, req resource.Co
 }
 
 func (r *ruleContentFilterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var data resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform plan data into the model
@@ -100,6 +105,11 @@ func (r *ruleContentFilterResource) Read(ctx context.Context, req resource.ReadR
 }
 
 func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var plan resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform plan data into the model
@@ -136,6 +146,11 @@ func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.Upd
 }
 
 func (r *ruleContentFilterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var data resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform prior state data into the model

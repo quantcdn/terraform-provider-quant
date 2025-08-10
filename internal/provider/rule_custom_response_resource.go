@@ -58,6 +58,11 @@ func (r *ruleCustomResponseResource) Configure(_ context.Context, req resource.C
 }
 
 func (r *ruleCustomResponseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var data resource_rule_custom_response.RuleCustomResponseModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -98,6 +103,11 @@ func (r *ruleCustomResponseResource) Read(ctx context.Context, req resource.Read
 }
 
 func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var plan resource_rule_custom_response.RuleCustomResponseModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -127,6 +137,11 @@ func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.Up
 }
 
 func (r *ruleCustomResponseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var data resource_rule_custom_response.RuleCustomResponseModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
