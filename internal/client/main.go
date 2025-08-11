@@ -1,10 +1,11 @@
 package client
 
 import (
-	"context"
-	"net/http"
+    "context"
+    "net/http"
+    "sync"
 
-	openapi "github.com/quantcdn/quant-admin-go"
+    openapi "github.com/quantcdn/quant-admin-go"
 )
 
 type Client struct {
@@ -14,6 +15,8 @@ type Client struct {
 	Instance        *openapi.APIClient
 	httpClient      *RateLimitedHTTPClient
 	rateLimitConfig *RateLimitConfig
+    // RulesMutex serialises rule modifications across resources that operate on a shared backend file
+    RulesMutex      *sync.Mutex
 }
 
 // ClientOptions allows customization of the client
@@ -75,13 +78,14 @@ func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Cl
 	client := openapi.NewAPIClient(cfg)
 	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
 
-	return &Client{
+    return &Client{
 		Bearer:          bearer,
 		AuthContext:     ctx,
 		Instance:        client,
 		Organization:    organization,
 		httpClient:      httpClient,
 		rateLimitConfig: rateLimitConfig,
+        RulesMutex:      &sync.Mutex{},
 	}
 }
 

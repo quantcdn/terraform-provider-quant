@@ -56,6 +56,11 @@ func (r *ruleRedirectResource) Configure(_ context.Context, req resource.Configu
 }
 
 func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var data resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform plan data into the model
@@ -102,6 +107,11 @@ func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var plan resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform plan data into the model
@@ -134,6 +144,11 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+    // Serialise rule modifications to avoid backend JSON races
+    if r.client != nil && r.client.RulesMutex != nil {
+        r.client.RulesMutex.Lock()
+        defer r.client.RulesMutex.Unlock()
+    }
 	var data resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform prior state data into the model
