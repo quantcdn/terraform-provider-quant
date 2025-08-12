@@ -220,7 +220,7 @@ func (r *ruleProxyResource) ImportState(ctx context.Context, req resource.Import
 }
 
 func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *resource_rule_proxy.RuleProxyModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleProxyRequestWithDefaults()
+	req := *quantadmingo.NewRuleProxyRequestCreateWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -322,6 +322,23 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// Proxy configuration
 	req.SetTo(data.To.ValueString())
 	req.SetHost(data.Host.ValueString())
+	// Application proxy configuration
+	if !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() {
+		req.SetApplicationProxy(data.ApplicationProxy.ValueBool())
+	}
+	if !data.ApplicationName.IsNull() && !data.ApplicationName.IsUnknown() {
+		req.SetApplicationName(data.ApplicationName.ValueString())
+	}
+	if !data.ApplicationEnvironment.IsNull() && !data.ApplicationEnvironment.IsUnknown() {
+		req.SetApplicationEnvironment(data.ApplicationEnvironment.ValueString())
+	}
+	if !data.ApplicationContainer.IsNull() && !data.ApplicationContainer.IsUnknown() {
+		req.SetApplicationContainer(data.ApplicationContainer.ValueString())
+	}
+	if !data.ApplicationPort.IsNull() && !data.ApplicationPort.IsUnknown() {
+		// API expects integer; cast to int32 which is typical for ports
+		req.SetApplicationPort(int32(data.ApplicationPort.ValueInt64()))
+	}
 	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
 		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
 		if err != nil {
@@ -468,7 +485,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	// Make the API call
-	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleProxyRequest(req).Execute()
+	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleProxyRequestCreate(req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating rule proxy",
@@ -595,6 +612,23 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// Proxy configuration
 	req.SetTo(data.To.ValueString())
 	req.SetHost(data.Host.ValueString())
+	// Application proxy configuration
+	if !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() {
+		req.SetApplicationProxy(data.ApplicationProxy.ValueBool())
+	}
+	if !data.ApplicationName.IsNull() && !data.ApplicationName.IsUnknown() {
+		req.SetApplicationName(data.ApplicationName.ValueString())
+	}
+	if !data.ApplicationEnvironment.IsNull() && !data.ApplicationEnvironment.IsUnknown() {
+		req.SetApplicationEnvironment(data.ApplicationEnvironment.ValueString())
+	}
+	if !data.ApplicationContainer.IsNull() && !data.ApplicationContainer.IsUnknown() {
+		req.SetApplicationContainer(data.ApplicationContainer.ValueString())
+	}
+	if !data.ApplicationPort.IsNull() && !data.ApplicationPort.IsUnknown() {
+		// API expects integer; cast to int32 which is typical for ports
+		req.SetApplicationPort(int32(data.ApplicationPort.ValueInt64()))
+	}
 	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
 		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
 		if err != nil {
@@ -874,6 +908,23 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	// Handle proxy configuration
 	data.To = types.StringValue(actionConfig.GetTo())
 	data.Host = types.StringValue(actionConfig.GetHost())
+
+	// Application proxy fields are request-only; not present in response
+	if data.ApplicationProxy.IsNull() {
+		data.ApplicationProxy = types.BoolNull()
+	}
+	if data.ApplicationName.IsNull() {
+		data.ApplicationName = types.StringNull()
+	}
+	if data.ApplicationEnvironment.IsNull() {
+		data.ApplicationEnvironment = types.StringNull()
+	}
+	if data.ApplicationContainer.IsNull() {
+		data.ApplicationContainer = types.StringNull()
+	}
+	if data.ApplicationPort.IsNull() {
+		data.ApplicationPort = types.Int64Null()
+	}
 
 	// Handle cache_lifetime - always use the API value, convert to string for backwards compatibility
 	if !data.CacheLifetime.IsNull() {
