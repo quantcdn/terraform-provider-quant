@@ -65,6 +65,8 @@ var ruleProxyResponse = map[string]interface{}{
 			"notify_email":          []string{},
 			"notify_slack":          "",
 			"notify_slack_hits_rpm": nil,
+			"static_error_page":     "",
+			"static_error_page_status_codes": []string{},
 			"block_lists": map[string]interface{}{
 				"referer":    false,
 				"user_agent": false,
@@ -147,12 +149,15 @@ func setupRuleProxyServerForApplicationFields(t *testing.T, organizationID strin
         return httpmock.NewStringResponse(404, "Not Found"), nil
     })
 
+    // Track current values to reflect updates across GET/POST/PATCH
+    current := deepCopy(ruleProxyResponse)
+
     // Common GET list and read responses
     httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-        return httpmock.NewJsonResponse(200, []map[string]interface{}{ruleProxyResponse})
+        return httpmock.NewJsonResponse(200, []map[string]interface{}{current})
     })
     httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-        return httpmock.NewJsonResponse(200, ruleProxyResponse)
+        return httpmock.NewJsonResponse(200, current)
     })
 
     // POST create should include application_* fields
@@ -190,7 +195,19 @@ func setupRuleProxyServerForApplicationFields(t *testing.T, organizationID strin
             }
         }
 
-        return httpmock.NewJsonResponse(200, ruleProxyResponse)
+        // Echo back selected fields from request into current response to avoid provider inconsistencies
+        if v, ok := body["name"].(string); ok {
+            current["name"] = v
+        }
+        if ac, ok := current["action_config"].(map[string]interface{}); ok {
+            if v, ok := body["waf_enabled"].(bool); ok {
+                ac["waf_enabled"] = v
+            }
+            if v, ok := body["failover_origin_ttfb"].(string); ok {
+                ac["failover_origin_ttfb"] = v
+            }
+        }
+        return httpmock.NewJsonResponse(200, current)
     })
 
     // PATCH update should include application_* fields when present
@@ -228,12 +245,32 @@ func setupRuleProxyServerForApplicationFields(t *testing.T, organizationID strin
             }
         }
 
-        return httpmock.NewJsonResponse(200, ruleProxyResponse)
+        // Echo back selected fields on update too
+        if v, ok := body["name"].(string); ok {
+            current["name"] = v
+        }
+        if ac, ok := current["action_config"].(map[string]interface{}); ok {
+            if v, ok := body["waf_enabled"].(bool); ok {
+                ac["waf_enabled"] = v
+            }
+            if v, ok := body["failover_origin_ttfb"].(string); ok {
+                ac["failover_origin_ttfb"] = v
+            }
+        }
+        return httpmock.NewJsonResponse(200, current)
     })
 
     httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
         return httpmock.NewJsonResponse(200, ruleProxyResponse)
     })
+}
+
+// deepCopy makes a deep copy of a map[string]interface{} using json marshal/unmarshal
+func deepCopy(m map[string]interface{}) map[string]interface{} {
+    b, _ := json.Marshal(m)
+    var out map[string]interface{}
+    _ = json.Unmarshal(b, &out)
+    return out
 }
 
 func TestAccRuleProxyApplicationProxyRequests(t *testing.T) {

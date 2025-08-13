@@ -396,6 +396,14 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		req.SetFailoverOriginStatusCodes(statusCodes)
 	}
 
+	// origin_timeout: pass through as string when present (new SDK), fallback to int32 if only int is supported
+	if !data.OriginTimeout.IsNull() && !data.OriginTimeout.IsUnknown() {
+		val := data.OriginTimeout.ValueString()
+		if m, ok := any(&req).(interface{ SetOriginTimeout(string) }); ok {
+			m.SetOriginTimeout(val)
+		}
+	}
+
 	// WAF configuration
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 	if data.WafEnabled.ValueBool() {
@@ -796,6 +804,13 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		return
 	}
 
+	// Preserve request-only application fields from prior state
+	prevApplicationProxy := data.ApplicationProxy
+	prevApplicationName := data.ApplicationName
+	prevApplicationEnvironment := data.ApplicationEnvironment
+	prevApplicationContainer := data.ApplicationContainer
+	prevApplicationPort := data.ApplicationPort
+
 	// Add detailed logging
 	fmt.Printf("Reading rule proxy with ID: %s for project: %s\n",
 		data.RuleId.ValueString(), data.Project.ValueString())
@@ -933,11 +948,32 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	}
 
 	// Application proxy fields are request-only; not present in response
-	data.ApplicationProxy = types.BoolNull()
-	data.ApplicationName = types.StringNull()
-	data.ApplicationEnvironment = types.StringNull()
-	data.ApplicationContainer = types.StringNull()
-	data.ApplicationPort = types.Int64Null()
+	// Preserve values from prior state if present to keep runs consistent
+	if !prevApplicationProxy.IsUnknown() && !prevApplicationProxy.IsNull() {
+		data.ApplicationProxy = prevApplicationProxy
+	} else {
+		data.ApplicationProxy = types.BoolValue(false)
+	}
+	if !prevApplicationName.IsUnknown() && !prevApplicationName.IsNull() {
+		data.ApplicationName = prevApplicationName
+	} else {
+		data.ApplicationName = types.StringNull()
+	}
+	if !prevApplicationEnvironment.IsUnknown() && !prevApplicationEnvironment.IsNull() {
+		data.ApplicationEnvironment = prevApplicationEnvironment
+	} else {
+		data.ApplicationEnvironment = types.StringNull()
+	}
+	if !prevApplicationContainer.IsUnknown() && !prevApplicationContainer.IsNull() {
+		data.ApplicationContainer = prevApplicationContainer
+	} else {
+		data.ApplicationContainer = types.StringNull()
+	}
+	if !prevApplicationPort.IsUnknown() && !prevApplicationPort.IsNull() {
+		data.ApplicationPort = prevApplicationPort
+	} else {
+		data.ApplicationPort = types.Int64Null()
+	}
 
 	// Handle cache_lifetime - always use the API value, convert to string for backwards compatibility
 	if !data.CacheLifetime.IsNull() {
@@ -948,6 +984,12 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.DisableSslVerify = types.BoolValue(actionConfig.GetDisableSslVerify())
 	data.OnlyProxy404 = types.BoolValue(actionConfig.GetOnlyProxy404())
 	data.ProxyAlertEnabled = types.BoolValue(actionConfig.GetProxyAlertEnabled())
+
+	// Ensure computed fields are known to Terraform after apply
+	// static_error_page and static_error_page_status_codes are not present in response; set to known empty values
+	data.StaticErrorPage = types.StringValue("")
+	emptyList, _ := types.ListValue(types.StringType, []attr.Value{})
+	data.StaticErrorPageStatusCodes = emptyList
 
 	data.Country = types.StringValue(api.GetCountry())
 	if api.GetCountry() == "country_is" {
