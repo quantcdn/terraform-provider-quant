@@ -40,7 +40,7 @@ var ruleProxyResponse = map[string]interface{}{
 		"to":                           "https://backend.example.com",
 		"host":                         "backend.example.com",
 		"waf_enabled":                  true,
-		"origin_timeout":               "30000",
+        "origin_timeout":               "30000",
 		"cache_lifetime":               "3600",
 		"failover_mode":                false,
 		"failover_origin_ttfb":         "5000",

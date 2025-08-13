@@ -909,22 +909,35 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.To = types.StringValue(actionConfig.GetTo())
 	data.Host = types.StringValue(actionConfig.GetHost())
 
+	// Map origin_timeout (handle string or int32 depending on SDK version)
+	// Prefer using the raw field via Ok getter patterns when available
+	// Fallback to known getters
+	{
+		// Try Ok getter if available (value, ok)
+		if v, ok := actionConfig.GetOriginTimeoutOk(); ok {
+			formatted := fmt.Sprintf("%v", *v)
+			if formatted == "" || formatted == "0" {
+				data.OriginTimeout = types.StringNull()
+			} else {
+				data.OriginTimeout = types.StringValue(formatted)
+			}
+		} else {
+			// Fallback to non-Ok getter
+			formatted := fmt.Sprintf("%v", actionConfig.GetOriginTimeout())
+			if formatted == "" || formatted == "0" {
+				data.OriginTimeout = types.StringNull()
+			} else {
+				data.OriginTimeout = types.StringValue(formatted)
+			}
+		}
+	}
+
 	// Application proxy fields are request-only; not present in response
-	if data.ApplicationProxy.IsNull() {
-		data.ApplicationProxy = types.BoolNull()
-	}
-	if data.ApplicationName.IsNull() {
-		data.ApplicationName = types.StringNull()
-	}
-	if data.ApplicationEnvironment.IsNull() {
-		data.ApplicationEnvironment = types.StringNull()
-	}
-	if data.ApplicationContainer.IsNull() {
-		data.ApplicationContainer = types.StringNull()
-	}
-	if data.ApplicationPort.IsNull() {
-		data.ApplicationPort = types.Int64Null()
-	}
+	data.ApplicationProxy = types.BoolNull()
+	data.ApplicationName = types.StringNull()
+	data.ApplicationEnvironment = types.StringNull()
+	data.ApplicationContainer = types.StringNull()
+	data.ApplicationPort = types.Int64Null()
 
 	// Handle cache_lifetime - always use the API value, convert to string for backwards compatibility
 	if !data.CacheLifetime.IsNull() {

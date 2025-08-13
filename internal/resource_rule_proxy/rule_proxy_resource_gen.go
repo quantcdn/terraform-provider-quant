@@ -220,7 +220,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"origin_timeout": schema.Int64Attribute{
+			"origin_timeout": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 			},
@@ -460,7 +460,7 @@ type RuleProxyModel struct {
 	OnlyProxy404               types.Bool        `tfsdk:"only_proxy_404"`
 	OnlyWithCookie             types.String      `tfsdk:"only_with_cookie"`
 	Organization               types.String      `tfsdk:"organization"`
-	OriginTimeout              types.Int64       `tfsdk:"origin_timeout"`
+	OriginTimeout              types.String      `tfsdk:"origin_timeout"`
 	Project                    types.String      `tfsdk:"project"`
 	ProxyAlertEnabled          types.Bool        `tfsdk:"proxy_alert_enabled"`
 	ProxyStripHeaders          types.List        `tfsdk:"proxy_strip_headers"`
