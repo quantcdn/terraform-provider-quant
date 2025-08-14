@@ -119,6 +119,30 @@ resource "quant_rule_proxy" "full_example" {
 }
 ```
 
+### Application Proxy Example
+
+```hcl
+resource "quant_rule_proxy" "app_proxy" {
+  name    = "orders-proxy"
+  project = quant_project.test.machine_name
+  domain  = ["any"]
+  url     = ["/orders/*"]
+
+  to   = "https://backend.example.com"
+  host = "backend.example.com"
+
+  # Enable application proxy computation on the backend
+  application_proxy       = true
+  application_name        = "orders"
+  application_environment = "staging"
+  application_container   = "orders-api"
+  application_port        = 8080
+
+  # Optional origin timeout (milliseconds) – represented as a string by the API
+  origin_timeout = "30000"
+}
+```
+
 ### Migrating Existing Rules to Use Origin Headers
 
 If you have existing proxy rules that explicitly set `cache_lifetime = 0` but you want them to respect origin headers instead, you can use `-1`:
@@ -155,6 +179,7 @@ This is particularly useful when updating existing infrastructure where you want
 * `url` - (Required) List of URL patterns to match.
 * `to` - (Required) The target URL to proxy requests to.
 * `host` - (Optional) The host header to send to the backend.
+* `origin_timeout` - (Optional) Origin timeout in milliseconds. Represented as a string by the API (e.g. `"30000"`).
 * `cache_lifetime` - (Optional) Cache lifetime in seconds. Different values have different behaviors:
   - **Omitted**: Respects origin headers (recommended for new resources)
   - **`0`**: Disables caching entirely  
@@ -165,6 +190,16 @@ This is particularly useful when updating existing infrastructure where you want
 * `proxy_alert_enabled` - (Optional) Enable proxy alerts for monitoring and notifications. Defaults to `false`.
 * `proxy_strip_headers` - (Optional) List of headers to strip from the response.
 * `proxy_strip_request_headers` - (Optional) List of headers to strip from the request.
+
+### Application Proxy (Request-only computation fields)
+
+These fields instruct the backend to compute application proxy settings. They are provided on create/update and preserved in state for consistency.
+
+* `application_proxy` - (Optional) Enable application proxy behaviour. Defaults to `false`.
+* `application_name` - (Optional) The application name to route to (e.g. `"orders"`).
+* `application_environment` - (Optional) The application environment (e.g. `"staging"`, `"prod"`).
+* `application_container` - (Optional) The application container identifier/name.
+* `application_port` - (Optional) The application container port number.
 
 ### Rule Selection Criteria
 
