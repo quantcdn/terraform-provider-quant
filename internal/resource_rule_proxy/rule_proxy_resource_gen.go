@@ -8,9 +8,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -29,23 +33,38 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"application_container": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"application_environment": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"application_name": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"application_port": schema.Int64Attribute{
 				Optional: true,
 				Computed: true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"application_proxy": schema.BoolAttribute{
 				Optional: true,
 				Computed: true,
 				Default:  booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"auth_pass": schema.StringAttribute{
 				Optional: true,
@@ -121,6 +140,9 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Computed: true,
 				Validators: []validator.String{
 					HostRequiredUnlessAppProxy(),
+				},
+				PlanModifiers: []planmodifier.String{
+					HostRecomputeWhenAppProxy(),
 				},
 			},
 			"inject_headers": schema.MapAttribute{
@@ -266,6 +288,9 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Computed: true,
 				Validators: []validator.String{
 					ToRequiredUnlessAppProxy(),
+				},
+				PlanModifiers: []planmodifier.String{
+					ToRecomputeWhenAppProxy(),
 				},
 			},
 			"url": schema.ListAttribute{
