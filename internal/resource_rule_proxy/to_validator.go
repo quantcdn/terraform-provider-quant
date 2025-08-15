@@ -40,12 +40,20 @@ func (v toRequiredUnlessAppProxyValidator) ValidateString(ctx context.Context, r
         return
     }
 
-    // Otherwise, ensure `to` is present and non-empty
-    if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || req.ConfigValue.ValueString() == "" {
+    // Otherwise, ensure `to` is present. Allow unknown (expressions). Enforce non-empty only when known.
+    if req.ConfigValue.IsNull() {
         resp.Diagnostics.AddAttributeError(
             req.Path,
             "Missing required argument: to",
             "The attribute `to` is required when `application_proxy` is not true.",
+        )
+        return
+    }
+    if !req.ConfigValue.IsUnknown() && req.ConfigValue.ValueString() == "" {
+        resp.Diagnostics.AddAttributeError(
+            req.Path,
+            "Invalid argument: to",
+            "The attribute `to` cannot be an empty string when `application_proxy` is not true.",
         )
     }
 }
@@ -84,14 +92,7 @@ func (v hostRequiredUnlessAppProxyValidator) ValidateString(ctx context.Context,
         }
         return
     }
-
-    if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || req.ConfigValue.ValueString() == "" {
-        resp.Diagnostics.AddAttributeError(
-            req.Path,
-            "Missing required argument: host",
-            "The attribute `host` is required when `application_proxy` is not true.",
-        )
-    }
+    // Otherwise optional: no requirement when application_proxy is not true
 }
 
 // HostRequiredUnlessAppProxy returns the validator instance for schema wiring.
