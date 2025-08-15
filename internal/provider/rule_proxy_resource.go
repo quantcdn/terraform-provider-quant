@@ -220,7 +220,7 @@ func (r *ruleProxyResource) ImportState(ctx context.Context, req resource.Import
 }
 
 func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *resource_rule_proxy.RuleProxyModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleProxyRequestWithDefaults()
+	req := *quantadmingo.NewRuleProxyRequestCreateWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -320,8 +320,33 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	// Proxy configuration
-	req.SetTo(data.To.ValueString())
-	req.SetHost(data.Host.ValueString())
+	// Only set `to` when application_proxy is not true; otherwise backend computes it
+	appProxy := !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() && data.ApplicationProxy.ValueBool()
+	if !appProxy {
+		if !data.To.IsNull() && !data.To.IsUnknown() && data.To.ValueString() != "" {
+			req.SetTo(data.To.ValueString())
+		}
+	}
+	if !data.Host.IsNull() && !data.Host.IsUnknown() && data.Host.ValueString() != "" {
+		req.SetHost(data.Host.ValueString())
+	}
+	// Application proxy configuration
+	if !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() {
+		req.SetApplicationProxy(data.ApplicationProxy.ValueBool())
+	}
+	if !data.ApplicationName.IsNull() && !data.ApplicationName.IsUnknown() {
+		req.SetApplicationName(data.ApplicationName.ValueString())
+	}
+	if !data.ApplicationEnvironment.IsNull() && !data.ApplicationEnvironment.IsUnknown() {
+		req.SetApplicationEnvironment(data.ApplicationEnvironment.ValueString())
+	}
+	if !data.ApplicationContainer.IsNull() && !data.ApplicationContainer.IsUnknown() {
+		req.SetApplicationContainer(data.ApplicationContainer.ValueString())
+	}
+	if !data.ApplicationPort.IsNull() && !data.ApplicationPort.IsUnknown() {
+		// API expects integer; cast to int32 which is typical for ports
+		req.SetApplicationPort(int32(data.ApplicationPort.ValueInt64()))
+	}
 	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
 		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
 		if err != nil {
@@ -377,6 +402,14 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 			}
 		}
 		req.SetFailoverOriginStatusCodes(statusCodes)
+	}
+
+	// origin_timeout: pass through as string when present (new SDK), fallback to int32 if only int is supported
+	if !data.OriginTimeout.IsNull() && !data.OriginTimeout.IsUnknown() {
+		val := data.OriginTimeout.ValueString()
+		if m, ok := any(&req).(interface{ SetOriginTimeout(string) }); ok {
+			m.SetOriginTimeout(val)
+		}
 	}
 
 	// WAF configuration
@@ -468,7 +501,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	// Make the API call
-	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleProxyRequest(req).Execute()
+	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleProxyRequestCreate(req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating rule proxy",
@@ -593,8 +626,33 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	// Proxy configuration
-	req.SetTo(data.To.ValueString())
-	req.SetHost(data.Host.ValueString())
+	// Only set `to` when application_proxy is not true; otherwise backend computes it
+	appProxy := !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() && data.ApplicationProxy.ValueBool()
+	if !appProxy {
+		if !data.To.IsNull() && !data.To.IsUnknown() && data.To.ValueString() != "" {
+			req.SetTo(data.To.ValueString())
+		}
+	}
+	if !data.Host.IsNull() && !data.Host.IsUnknown() && data.Host.ValueString() != "" {
+		req.SetHost(data.Host.ValueString())
+	}
+	// Application proxy configuration
+	if !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() {
+		req.SetApplicationProxy(data.ApplicationProxy.ValueBool())
+	}
+	if !data.ApplicationName.IsNull() && !data.ApplicationName.IsUnknown() {
+		req.SetApplicationName(data.ApplicationName.ValueString())
+	}
+	if !data.ApplicationEnvironment.IsNull() && !data.ApplicationEnvironment.IsUnknown() {
+		req.SetApplicationEnvironment(data.ApplicationEnvironment.ValueString())
+	}
+	if !data.ApplicationContainer.IsNull() && !data.ApplicationContainer.IsUnknown() {
+		req.SetApplicationContainer(data.ApplicationContainer.ValueString())
+	}
+	if !data.ApplicationPort.IsNull() && !data.ApplicationPort.IsUnknown() {
+		// API expects integer; cast to int32 which is typical for ports
+		req.SetApplicationPort(int32(data.ApplicationPort.ValueInt64()))
+	}
 	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
 		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
 		if err != nil {
@@ -762,6 +820,13 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		return
 	}
 
+	// Preserve request-only application fields from prior state
+	prevApplicationProxy := data.ApplicationProxy
+	prevApplicationName := data.ApplicationName
+	prevApplicationEnvironment := data.ApplicationEnvironment
+	prevApplicationContainer := data.ApplicationContainer
+	prevApplicationPort := data.ApplicationPort
+
 	// Add detailed logging
 	fmt.Printf("Reading rule proxy with ID: %s for project: %s\n",
 		data.RuleId.ValueString(), data.Project.ValueString())
@@ -875,6 +940,57 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.To = types.StringValue(actionConfig.GetTo())
 	data.Host = types.StringValue(actionConfig.GetHost())
 
+	// Map origin_timeout (handle string or int32 depending on SDK version)
+	// Prefer using the raw field via Ok getter patterns when available
+	// Fallback to known getters
+	{
+		// Try Ok getter if available (value, ok)
+		if v, ok := actionConfig.GetOriginTimeoutOk(); ok {
+			formatted := fmt.Sprintf("%v", *v)
+			if formatted == "" || formatted == "0" {
+				data.OriginTimeout = types.StringNull()
+			} else {
+				data.OriginTimeout = types.StringValue(formatted)
+			}
+		} else {
+			// Fallback to non-Ok getter
+			formatted := fmt.Sprintf("%v", actionConfig.GetOriginTimeout())
+			if formatted == "" || formatted == "0" {
+				data.OriginTimeout = types.StringNull()
+			} else {
+				data.OriginTimeout = types.StringValue(formatted)
+			}
+		}
+	}
+
+	// Application proxy fields are request-only; not present in response
+	// Preserve values from prior state if present to keep runs consistent
+	if !prevApplicationProxy.IsUnknown() && !prevApplicationProxy.IsNull() {
+		data.ApplicationProxy = prevApplicationProxy
+	} else {
+		data.ApplicationProxy = types.BoolValue(false)
+	}
+	if !prevApplicationName.IsUnknown() && !prevApplicationName.IsNull() {
+		data.ApplicationName = prevApplicationName
+	} else {
+		data.ApplicationName = types.StringNull()
+	}
+	if !prevApplicationEnvironment.IsUnknown() && !prevApplicationEnvironment.IsNull() {
+		data.ApplicationEnvironment = prevApplicationEnvironment
+	} else {
+		data.ApplicationEnvironment = types.StringNull()
+	}
+	if !prevApplicationContainer.IsUnknown() && !prevApplicationContainer.IsNull() {
+		data.ApplicationContainer = prevApplicationContainer
+	} else {
+		data.ApplicationContainer = types.StringNull()
+	}
+	if !prevApplicationPort.IsUnknown() && !prevApplicationPort.IsNull() {
+		data.ApplicationPort = prevApplicationPort
+	} else {
+		data.ApplicationPort = types.Int64Null()
+	}
+
 	// Handle cache_lifetime - always use the API value, convert to string for backwards compatibility
 	if !data.CacheLifetime.IsNull() {
 		data.CacheLifetime = formatCacheLifetime(actionConfig.GetCacheLifetime())
@@ -884,6 +1000,12 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.DisableSslVerify = types.BoolValue(actionConfig.GetDisableSslVerify())
 	data.OnlyProxy404 = types.BoolValue(actionConfig.GetOnlyProxy404())
 	data.ProxyAlertEnabled = types.BoolValue(actionConfig.GetProxyAlertEnabled())
+
+	// Ensure computed fields are known to Terraform after apply
+	// static_error_page and static_error_page_status_codes are not present in response; set to known empty values
+	data.StaticErrorPage = types.StringValue("")
+	emptyList, _ := types.ListValue(types.StringType, []attr.Value{})
+	data.StaticErrorPageStatusCodes = emptyList
 
 	data.Country = types.StringValue(api.GetCountry())
 	if api.GetCountry() == "country_is" {

@@ -501,7 +501,17 @@
 								{
 									"name": "to",
 									"string": {
-										"computed_optional_required": "computed"
+										"computed_optional_required": "computed_optional",
+										"validators": [
+											{
+												"custom": {
+												  "imports": [
+													{ "path": "terraform-provider-quant/internal/resource_rule_proxy" }
+												  ],
+												  "schema_definition": "resource_rule_proxy.ToRequiredUnlessAppProxy()"
+												}
+											  }
+										]
 									}
 								},
 								{
@@ -1417,7 +1427,17 @@
 					{
 						"name": "host",
 						"string": {
-							"computed_optional_required": "computed_optional"
+							"computed_optional_required": "computed_optional",
+							"validators": [
+								{
+									"custom": {
+										"imports": [
+											{ "path": "terraform-provider-quant/internal/resource_rule_proxy" }
+										],
+										"schema_definition": "resource_rule_proxy.HostRequiredUnlessAppProxy()"
+									}
+								}
+							]
 						}
 					},
 					{

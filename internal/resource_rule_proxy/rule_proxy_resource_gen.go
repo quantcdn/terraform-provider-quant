@@ -26,6 +26,27 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"action": schema.StringAttribute{
 				Computed: true,
 			},
+			"application_container": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"application_environment": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"application_name": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"application_port": schema.Int64Attribute{
+				Optional: true,
+				Computed: true,
+			},
+			"application_proxy": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
 			"auth_pass": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -98,6 +119,9 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"host": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				Validators: []validator.String{
+					HostRequiredUnlessAppProxy(),
+				},
 			},
 			"inject_headers": schema.MapAttribute{
 				ElementType: types.StringType,
@@ -199,6 +223,10 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
+			"origin_timeout": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
 			"project": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -224,8 +252,21 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"rule_id": schema.StringAttribute{
 				Computed: true,
 			},
+			"static_error_page": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"static_error_page_status_codes": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
 			"to": schema.StringAttribute{
-				Required: true,
+				Optional: true,
+				Computed: true,
+				Validators: []validator.String{
+					ToRequiredUnlessAppProxy(),
+				},
 			},
 			"url": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -393,46 +434,54 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type RuleProxyModel struct {
-	Action                    types.String      `tfsdk:"action"`
-	AuthPass                  types.String      `tfsdk:"auth_pass"`
-	AuthUser                  types.String      `tfsdk:"auth_user"`
-	CacheLifetime             types.String      `tfsdk:"cache_lifetime"`
-	Country                   types.String      `tfsdk:"country"`
-	CountryIs                 types.List        `tfsdk:"country_is"`
-	CountryIsNot              types.List        `tfsdk:"country_is_not"`
-	DisableSslVerify          types.Bool        `tfsdk:"disable_ssl_verify"`
-	Disabled                  types.Bool        `tfsdk:"disabled"`
-	Domain                    types.List        `tfsdk:"domain"`
-	FailoverLifetime          types.String      `tfsdk:"failover_lifetime"`
-	FailoverMode              types.Bool        `tfsdk:"failover_mode"`
-	FailoverOriginStatusCodes types.List        `tfsdk:"failover_origin_status_codes"`
-	FailoverOriginTtfb        types.String      `tfsdk:"failover_origin_ttfb"`
-	Host                      types.String      `tfsdk:"host"`
-	InjectHeaders             types.Map         `tfsdk:"inject_headers"`
-	Ip                        types.String      `tfsdk:"ip"`
-	IpIs                      types.List        `tfsdk:"ip_is"`
-	IpIsNot                   types.List        `tfsdk:"ip_is_not"`
-	Method                    types.String      `tfsdk:"method"`
-	MethodIs                  types.List        `tfsdk:"method_is"`
-	MethodIsNot               types.List        `tfsdk:"method_is_not"`
-	Name                      types.String      `tfsdk:"name"`
-	Notify                    types.String      `tfsdk:"notify"`
-	NotifyConfig              NotifyConfigValue `tfsdk:"notify_config"`
-	OnlyProxy404              types.Bool        `tfsdk:"only_proxy_404"`
-	OnlyWithCookie            types.String      `tfsdk:"only_with_cookie"`
-	Organization              types.String      `tfsdk:"organization"`
-	Project                   types.String      `tfsdk:"project"`
-	ProxyAlertEnabled         types.Bool        `tfsdk:"proxy_alert_enabled"`
-	ProxyStripHeaders         types.List        `tfsdk:"proxy_strip_headers"`
-	ProxyStripRequestHeaders  types.List        `tfsdk:"proxy_strip_request_headers"`
-	Rule                      types.String      `tfsdk:"rule"`
-	RuleId                    types.String      `tfsdk:"rule_id"`
-	To                        types.String      `tfsdk:"to"`
-	Url                       types.List        `tfsdk:"url"`
-	Uuid                      types.String      `tfsdk:"uuid"`
-	WafConfig                 WafConfigValue    `tfsdk:"waf_config"`
-	WafEnabled                types.Bool        `tfsdk:"waf_enabled"`
-	Weight                    types.Int64       `tfsdk:"weight"`
+	Action                     types.String      `tfsdk:"action"`
+	ApplicationContainer       types.String      `tfsdk:"application_container"`
+	ApplicationEnvironment     types.String      `tfsdk:"application_environment"`
+	ApplicationName            types.String      `tfsdk:"application_name"`
+	ApplicationPort            types.Int64       `tfsdk:"application_port"`
+	ApplicationProxy           types.Bool        `tfsdk:"application_proxy"`
+	AuthPass                   types.String      `tfsdk:"auth_pass"`
+	AuthUser                   types.String      `tfsdk:"auth_user"`
+	CacheLifetime              types.String      `tfsdk:"cache_lifetime"`
+	Country                    types.String      `tfsdk:"country"`
+	CountryIs                  types.List        `tfsdk:"country_is"`
+	CountryIsNot               types.List        `tfsdk:"country_is_not"`
+	DisableSslVerify           types.Bool        `tfsdk:"disable_ssl_verify"`
+	Disabled                   types.Bool        `tfsdk:"disabled"`
+	Domain                     types.List        `tfsdk:"domain"`
+	FailoverLifetime           types.String      `tfsdk:"failover_lifetime"`
+	FailoverMode               types.Bool        `tfsdk:"failover_mode"`
+	FailoverOriginStatusCodes  types.List        `tfsdk:"failover_origin_status_codes"`
+	FailoverOriginTtfb         types.String      `tfsdk:"failover_origin_ttfb"`
+	Host                       types.String      `tfsdk:"host"`
+	InjectHeaders              types.Map         `tfsdk:"inject_headers"`
+	Ip                         types.String      `tfsdk:"ip"`
+	IpIs                       types.List        `tfsdk:"ip_is"`
+	IpIsNot                    types.List        `tfsdk:"ip_is_not"`
+	Method                     types.String      `tfsdk:"method"`
+	MethodIs                   types.List        `tfsdk:"method_is"`
+	MethodIsNot                types.List        `tfsdk:"method_is_not"`
+	Name                       types.String      `tfsdk:"name"`
+	Notify                     types.String      `tfsdk:"notify"`
+	NotifyConfig               NotifyConfigValue `tfsdk:"notify_config"`
+	OnlyProxy404               types.Bool        `tfsdk:"only_proxy_404"`
+	OnlyWithCookie             types.String      `tfsdk:"only_with_cookie"`
+	Organization               types.String      `tfsdk:"organization"`
+	OriginTimeout              types.String      `tfsdk:"origin_timeout"`
+	Project                    types.String      `tfsdk:"project"`
+	ProxyAlertEnabled          types.Bool        `tfsdk:"proxy_alert_enabled"`
+	ProxyStripHeaders          types.List        `tfsdk:"proxy_strip_headers"`
+	ProxyStripRequestHeaders   types.List        `tfsdk:"proxy_strip_request_headers"`
+	Rule                       types.String      `tfsdk:"rule"`
+	RuleId                     types.String      `tfsdk:"rule_id"`
+	StaticErrorPage            types.String      `tfsdk:"static_error_page"`
+	StaticErrorPageStatusCodes types.List        `tfsdk:"static_error_page_status_codes"`
+	To                         types.String      `tfsdk:"to"`
+	Url                        types.List        `tfsdk:"url"`
+	Uuid                       types.String      `tfsdk:"uuid"`
+	WafConfig                  WafConfigValue    `tfsdk:"waf_config"`
+	WafEnabled                 types.Bool        `tfsdk:"waf_enabled"`
+	Weight                     types.Int64       `tfsdk:"weight"`
 }
 
 var _ basetypes.ObjectTypable = NotifyConfigType{}

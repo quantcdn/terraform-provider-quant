@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+    "strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -40,7 +41,7 @@ var ruleProxyResponse = map[string]interface{}{
 		"to":                           "https://backend.example.com",
 		"host":                         "backend.example.com",
 		"waf_enabled":                  true,
-		"origin_timeout":               "30000",
+        "origin_timeout":               "30000",
 		"cache_lifetime":               "3600",
 		"failover_mode":                false,
 		"failover_origin_ttfb":         "5000",
@@ -65,6 +66,8 @@ var ruleProxyResponse = map[string]interface{}{
 			"notify_email":          []string{},
 			"notify_slack":          "",
 			"notify_slack_hits_rpm": nil,
+			"static_error_page":     "",
+			"static_error_page_status_codes": []string{},
 			"block_lists": map[string]interface{}{
 				"referer":    false,
 				"user_agent": false,
@@ -135,6 +138,221 @@ func setupRuleProxyServer(t *testing.T, organizationID string, projectID string)
 	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
 		return httpmock.NewJsonResponse(200, ruleProxyResponse)
 	})
+}
+
+// Setup a mock server that validates application_* fields are sent on create and update
+func setupRuleProxyServerForApplicationFields(t *testing.T, organizationID string, projectID string, expectedCreate map[string]interface{}, expectedUpdate map[string]interface{}) {
+    httpmock.Activate()
+    baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+    httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+        t.Logf("Request: %s", req.URL)
+        return httpmock.NewStringResponse(404, "Not Found"), nil
+    })
+
+    // Track current values to reflect updates across GET/POST/PATCH
+    current := deepCopy(ruleProxyResponse)
+
+    // Common GET list and read responses
+    httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+        return httpmock.NewJsonResponse(200, []map[string]interface{}{current})
+    })
+    httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+        return httpmock.NewJsonResponse(200, current)
+    })
+
+    // POST create should include application_* fields
+    httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+        var body map[string]interface{}
+        if req.Body != nil {
+            raw, _ := io.ReadAll(req.Body)
+            _ = json.Unmarshal(raw, &body)
+        }
+
+        // Assertions for create
+        if v, ok := expectedCreate["application_proxy"]; ok {
+            if body["application_proxy"] != v {
+                t.Errorf("application_proxy (create) mismatch: got %v want %v", body["application_proxy"], v)
+            }
+        }
+        if v, ok := expectedCreate["application_name"]; ok {
+            if body["application_name"] != v {
+                t.Errorf("application_name (create) mismatch: got %v want %v", body["application_name"], v)
+            }
+        }
+        if v, ok := expectedCreate["application_environment"]; ok {
+            if body["application_environment"] != v {
+                t.Errorf("application_environment (create) mismatch: got %v want %v", body["application_environment"], v)
+            }
+        }
+        if v, ok := expectedCreate["application_container"]; ok {
+            if body["application_container"] != v {
+                t.Errorf("application_container (create) mismatch: got %v want %v", body["application_container"], v)
+            }
+        }
+        if v, ok := expectedCreate["application_port"]; ok {
+            if body["application_port"] != v {
+                t.Errorf("application_port (create) mismatch: got %v want %v", body["application_port"], v)
+            }
+        }
+
+        // Echo back selected fields from request into current response to avoid provider inconsistencies
+        if v, ok := body["name"].(string); ok {
+            current["name"] = v
+        }
+        if ac, ok := current["action_config"].(map[string]interface{}); ok {
+            if v, ok := body["waf_enabled"].(bool); ok {
+                ac["waf_enabled"] = v
+            }
+            if v, ok := body["failover_origin_ttfb"].(string); ok {
+                ac["failover_origin_ttfb"] = v
+            }
+        }
+        return httpmock.NewJsonResponse(200, current)
+    })
+
+    // PATCH update should include application_* fields when present
+    httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+        var body map[string]interface{}
+        if req.Body != nil {
+            raw, _ := io.ReadAll(req.Body)
+            _ = json.Unmarshal(raw, &body)
+        }
+
+        // Assertions for update
+        if v, ok := expectedUpdate["application_proxy"]; ok {
+            if body["application_proxy"] != v {
+                t.Errorf("application_proxy (update) mismatch: got %v want %v", body["application_proxy"], v)
+            }
+        }
+        if v, ok := expectedUpdate["application_name"]; ok {
+            if body["application_name"] != v {
+                t.Errorf("application_name (update) mismatch: got %v want %v", body["application_name"], v)
+            }
+        }
+        if v, ok := expectedUpdate["application_environment"]; ok {
+            if body["application_environment"] != v {
+                t.Errorf("application_environment (update) mismatch: got %v want %v", body["application_environment"], v)
+            }
+        }
+        if v, ok := expectedUpdate["application_container"]; ok {
+            if body["application_container"] != v {
+                t.Errorf("application_container (update) mismatch: got %v want %v", body["application_container"], v)
+            }
+        }
+        if v, ok := expectedUpdate["application_port"]; ok {
+            if body["application_port"] != v {
+                t.Errorf("application_port (update) mismatch: got %v want %v", body["application_port"], v)
+            }
+        }
+
+        // Echo back selected fields on update too
+        if v, ok := body["name"].(string); ok {
+            current["name"] = v
+        }
+        if ac, ok := current["action_config"].(map[string]interface{}); ok {
+            if v, ok := body["waf_enabled"].(bool); ok {
+                ac["waf_enabled"] = v
+            }
+            if v, ok := body["failover_origin_ttfb"].(string); ok {
+                ac["failover_origin_ttfb"] = v
+            }
+        }
+        return httpmock.NewJsonResponse(200, current)
+    })
+
+    httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
+        return httpmock.NewJsonResponse(200, ruleProxyResponse)
+    })
+}
+
+// deepCopy makes a deep copy of a map[string]interface{} using json marshal/unmarshal
+func deepCopy(m map[string]interface{}) map[string]interface{} {
+    b, _ := json.Marshal(m)
+    var out map[string]interface{}
+    _ = json.Unmarshal(b, &out)
+    return out
+}
+
+func TestAccRuleProxyApplicationProxyRequests(t *testing.T) {
+    createExpected := map[string]interface{}{
+        "application_proxy":       true,
+        "application_name":        "orders",
+        "application_environment": "prod",
+        "application_container":   "orders-app",
+        "application_port":        float64(8080),
+    }
+    updateExpected := map[string]interface{}{
+        "application_proxy":       true,
+        "application_name":        "orders-v2",
+        "application_environment": "staging",
+        "application_container":   "orders-app-v2",
+        "application_port":        float64(9090),
+    }
+
+    setupRuleProxyServerForApplicationFields(t, "test-organization", "default", createExpected, updateExpected)
+    defer httpmock.DeactivateAndReset()
+
+    resource.Test(t, resource.TestCase{
+        PreCheck:                 func() { testAccRuleProxyPreCheck(t) },
+        ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+        Steps: []resource.TestStep{
+            {
+                Config: testAccRuleProxyResourceConfigWithApplicationFields("test-proxy-app", createExpected),
+                Check: resource.ComposeAggregateTestCheckFunc(
+                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-proxy-app"),
+                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "project", "default"),
+                ),
+            },
+            {
+                Config: testAccRuleProxyResourceConfigWithApplicationFields("test-proxy-app", updateExpected),
+                Check: resource.ComposeAggregateTestCheckFunc(
+                    resource.TestCheckResourceAttr("quant_rule_proxy.test", "name", "test-proxy-app"),
+                ),
+            },
+        },
+    })
+}
+
+func testAccRuleProxyResourceConfigWithApplicationFields(name string, vals map[string]interface{}) string {
+    // Build config; omit `to` when application_proxy=true because backend computes it.
+    base := fmt.Sprintf(`
+provider "quant" {
+  bearer = "testtoken"
+  organization = "test-organization"
+}
+
+resource "quant_rule_proxy" "test" {
+  name    = %q
+  project = "default"
+  domain  = ["any"]
+  url     = ["/proxy"]
+  application_proxy       = %v
+  application_name        = %q
+  application_environment = %q
+  application_container   = %q
+  application_port        = %d
+
+  waf_enabled = false
+  waf_config = {
+    mode = "report"
+  }
+}
+`, name,
+        vals["application_proxy"],
+        vals["application_name"],
+        vals["application_environment"],
+        vals["application_container"],
+        int(vals["application_port"].(float64)))
+
+    if ap, ok := vals["application_proxy"].(bool); ok && ap {
+        // No `to` when application_proxy=true
+        return base
+    }
+
+    // Fallback: include to/host when not using application proxy
+    withTo := strings.Replace(base, "url     = [\"/proxy\"]\n", "url     = [\"/proxy\"]\n\n  to   = \"https://backend.example.com\"\n  host = \"backend.example.com\"\n\n", 1)
+    return withTo
 }
 
 func TestAccRuleProxyResourceMock(t *testing.T) {
