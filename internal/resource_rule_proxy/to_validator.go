@@ -84,14 +84,7 @@ func (v hostRequiredUnlessAppProxyValidator) ValidateString(ctx context.Context,
         }
         return
     }
-
-    if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || req.ConfigValue.ValueString() == "" {
-        resp.Diagnostics.AddAttributeError(
-            req.Path,
-            "Missing required argument: host",
-            "The attribute `host` is required when `application_proxy` is not true.",
-        )
-    }
+    // Otherwise optional: no requirement when application_proxy is not true
 }
 
 // HostRequiredUnlessAppProxy returns the validator instance for schema wiring.
