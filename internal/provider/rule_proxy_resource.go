@@ -320,8 +320,16 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	// Proxy configuration
-	req.SetTo(data.To.ValueString())
-	req.SetHost(data.Host.ValueString())
+	// Only set `to` when application_proxy is not true; otherwise backend computes it
+	appProxy := !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() && data.ApplicationProxy.ValueBool()
+	if !appProxy {
+		if !data.To.IsNull() && !data.To.IsUnknown() && data.To.ValueString() != "" {
+			req.SetTo(data.To.ValueString())
+		}
+	}
+	if !data.Host.IsNull() && !data.Host.IsUnknown() && data.Host.ValueString() != "" {
+		req.SetHost(data.Host.ValueString())
+	}
 	// Application proxy configuration
 	if !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() {
 		req.SetApplicationProxy(data.ApplicationProxy.ValueBool())
@@ -618,8 +626,16 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	}
 
 	// Proxy configuration
-	req.SetTo(data.To.ValueString())
-	req.SetHost(data.Host.ValueString())
+	// Only set `to` when application_proxy is not true; otherwise backend computes it
+	appProxy := !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() && data.ApplicationProxy.ValueBool()
+	if !appProxy {
+		if !data.To.IsNull() && !data.To.IsUnknown() && data.To.ValueString() != "" {
+			req.SetTo(data.To.ValueString())
+		}
+	}
+	if !data.Host.IsNull() && !data.Host.IsUnknown() && data.Host.ValueString() != "" {
+		req.SetHost(data.Host.ValueString())
+	}
 	// Application proxy configuration
 	if !data.ApplicationProxy.IsNull() && !data.ApplicationProxy.IsUnknown() {
 		req.SetApplicationProxy(data.ApplicationProxy.ValueBool())

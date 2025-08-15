@@ -119,6 +119,9 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"host": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				Validators: []validator.String{
+					HostRequiredUnlessAppProxy(),
+				},
 			},
 			"inject_headers": schema.MapAttribute{
 				ElementType: types.StringType,
@@ -259,7 +262,11 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Computed:    true,
 			},
 			"to": schema.StringAttribute{
-				Required: true,
+				Optional: true,
+				Computed: true,
+				Validators: []validator.String{
+					ToRequiredUnlessAppProxy(),
+				},
 			},
 			"url": schema.ListAttribute{
 				ElementType: types.StringType,

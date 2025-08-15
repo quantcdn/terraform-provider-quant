@@ -128,15 +128,17 @@ resource "quant_rule_proxy" "app_proxy" {
   domain  = ["any"]
   url     = ["/orders/*"]
 
-  to   = "https://backend.example.com"
-  host = "backend.example.com"
+  # Note: `to` and `host` are computed by the backend when proxying to an application.
 
-  # Enable application proxy computation on the backend
   application_proxy       = true
   application_name        = "orders"
   application_environment = "staging"
   application_container   = "orders-api"
   application_port        = 8080
+
+  waf_config = {
+    mode = "report"
+  }
 
   # Optional origin timeout (milliseconds) – represented as a string by the API
   origin_timeout = "30000"
@@ -177,8 +179,8 @@ This is particularly useful when updating existing infrastructure where you want
 * `project` - (Required) The machine name of the project.
 * `domain` - (Required) The domain to apply the rule to.
 * `url` - (Required) List of URL patterns to match.
-* `to` - (Required) The target URL to proxy requests to.
-* `host` - (Optional) The host header to send to the backend.
+* `to` - (Conditionally Required) The target URL to proxy requests to. Required when `application_proxy` is not true. Must be omitted when `application_proxy` is true as it will be computed by the backend.
+* `host` - (Optional) The host header to send to the backend, if `application_proxy` is true, this field must be omitted.
 * `origin_timeout` - (Optional) Origin timeout in milliseconds. Represented as a string by the API (e.g. `"30000"`).
 * `cache_lifetime` - (Optional) Cache lifetime in seconds. Different values have different behaviors:
   - **Omitted**: Respects origin headers (recommended for new resources)

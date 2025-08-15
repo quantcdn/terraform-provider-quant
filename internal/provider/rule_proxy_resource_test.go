@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+    "strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -314,8 +315,8 @@ func TestAccRuleProxyApplicationProxyRequests(t *testing.T) {
 }
 
 func testAccRuleProxyResourceConfigWithApplicationFields(name string, vals map[string]interface{}) string {
-    // values from map are asserted by server; here we just use them in config
-    return fmt.Sprintf(`
+    // Build config; omit `to` when application_proxy=true because backend computes it.
+    base := fmt.Sprintf(`
 provider "quant" {
   bearer = "testtoken"
   organization = "test-organization"
@@ -326,10 +327,6 @@ resource "quant_rule_proxy" "test" {
   project = "default"
   domain  = ["any"]
   url     = ["/proxy"]
-
-  to   = "https://backend.example.com"
-  host = "backend.example.com"
-
   application_proxy       = %v
   application_name        = %q
   application_environment = %q
@@ -341,14 +338,21 @@ resource "quant_rule_proxy" "test" {
     mode = "report"
   }
 }
-`,
-        name,
+`, name,
         vals["application_proxy"],
         vals["application_name"],
         vals["application_environment"],
         vals["application_container"],
-        int(vals["application_port"].(float64)),
-    )
+        int(vals["application_port"].(float64)))
+
+    if ap, ok := vals["application_proxy"].(bool); ok && ap {
+        // No `to` when application_proxy=true
+        return base
+    }
+
+    // Fallback: include to/host when not using application proxy
+    withTo := strings.Replace(base, "url     = [\"/proxy\"]\n", "url     = [\"/proxy\"]\n\n  to   = \"https://backend.example.com\"\n  host = \"backend.example.com\"\n\n", 1)
+    return withTo
 }
 
 func TestAccRuleProxyResourceMock(t *testing.T) {
