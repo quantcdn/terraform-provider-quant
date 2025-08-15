@@ -21,15 +21,33 @@ func (m toRecomputeWhenAppProxyPlanModifier) MarkdownDescription(_ context.Conte
 }
 
 func (m toRecomputeWhenAppProxyPlanModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
-	// If we're creating and there is no prior state, defer to other modifiers/validators
-	// We only force unknown when application_proxy is explicitly true in the planned config.
-	var appProxy types.Bool
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("application_proxy"), &appProxy)...)
+	// Only mark as unknown if application_proxy is changing to true or if we're creating a new resource
+	var configAppProxy types.Bool
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("application_proxy"), &configAppProxy)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !appProxy.IsUnknown() && appProxy.ValueBool() {
+	// If application_proxy is not true in config, don't modify
+	if configAppProxy.IsUnknown() || !configAppProxy.ValueBool() {
+		return
+	}
+
+	// If this is a create operation (no state), mark as unknown
+	if req.StateValue.IsNull() {
+		resp.PlanValue = basetypes.NewStringUnknown()
+		return
+	}
+
+	// For updates, only mark as unknown if application_proxy is changing from false to true
+	var stateAppProxy types.Bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("application_proxy"), &stateAppProxy)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If application_proxy is changing from false/null to true, mark as unknown
+	if stateAppProxy.IsNull() || !stateAppProxy.ValueBool() {
 		resp.PlanValue = basetypes.NewStringUnknown()
 	}
 }
@@ -46,13 +64,33 @@ func (m hostRecomputeWhenAppProxyPlanModifier) MarkdownDescription(_ context.Con
 }
 
 func (m hostRecomputeWhenAppProxyPlanModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
-	var appProxy types.Bool
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("application_proxy"), &appProxy)...)
+	// Only mark as unknown if application_proxy is changing to true or if we're creating a new resource
+	var configAppProxy types.Bool
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("application_proxy"), &configAppProxy)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !appProxy.IsUnknown() && appProxy.ValueBool() {
+	// If application_proxy is not true in config, don't modify
+	if configAppProxy.IsUnknown() || !configAppProxy.ValueBool() {
+		return
+	}
+
+	// If this is a create operation (no state), mark as unknown
+	if req.StateValue.IsNull() {
+		resp.PlanValue = basetypes.NewStringUnknown()
+		return
+	}
+
+	// For updates, only mark as unknown if application_proxy is changing from false to true
+	var stateAppProxy types.Bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("application_proxy"), &stateAppProxy)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If application_proxy is changing from false/null to true, mark as unknown
+	if stateAppProxy.IsNull() || !stateAppProxy.ValueBool() {
 		resp.PlanValue = basetypes.NewStringUnknown()
 	}
 }
