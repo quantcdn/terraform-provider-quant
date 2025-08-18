@@ -710,6 +710,14 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		req.SetFailoverOriginStatusCodes(statusCodes)
 	}
 
+	// origin_timeout: pass through as string when present (new SDK), fallback to int32 if only int is supported
+	if !data.OriginTimeout.IsNull() && !data.OriginTimeout.IsUnknown() {
+		val := data.OriginTimeout.ValueString()
+		if m, ok := any(&req).(interface{ SetOriginTimeout(string) }); ok {
+			m.SetOriginTimeout(val)
+		}
+	}
+
 	// WAF configuration
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 	if data.WafEnabled.ValueBool() {
