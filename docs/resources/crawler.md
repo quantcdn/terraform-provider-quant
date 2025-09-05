@@ -15,6 +15,7 @@ resource "quant_crawler" "crawler" {
     headers = {
         "X-Header" = "value"
     }
+    force_refresh = "2024-01-15T10:30:00Z"  # Optional: triggers refresh when changed
 }
 ```
 
@@ -26,3 +27,4 @@ resource "quant_crawler" "crawler" {
 - `urls` - (Required) The URLs to apply the crawler to.
 - `browser_mode` - (Required) Whether to use browser mode.
 - `exclude` - (Required) The URLs to exclude from the crawler.
+- `force_refresh` - (Optional) Forces a refresh of the crawler when changed. Set to any value (e.g., timestamp) to trigger an update.

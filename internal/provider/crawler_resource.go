@@ -455,6 +455,9 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		plan.Uuid = state.Uuid
 	}
 
+	// Handle force_refresh - don't preserve from state, allow it to trigger updates
+	// The force_refresh field is intentionally not preserved from state to allow changes
+
 	// Preserve exclude if it's in the plan but not in the state
 	if !plan.Exclude.IsNull() && !plan.Exclude.IsUnknown() && state.Exclude.IsNull() {
 		// Keep the exclude from the plan
