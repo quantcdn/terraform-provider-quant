@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"strconv"
 	"terraform-provider-quant/internal/client"
@@ -34,6 +35,7 @@ type quantProviderModel struct {
 	BaseDelayMs       types.Int64   `tfsdk:"base_delay_ms"`
 	MaxDelayMs        types.Int64   `tfsdk:"max_delay_ms"`
 	EnableJitter      types.Bool    `tfsdk:"enable_jitter"`
+	TimeoutSeconds    types.Int64   `tfsdk:"timeout_seconds"`
 }
 
 func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
@@ -70,6 +72,10 @@ func (p *quantProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			},
 			"enable_jitter": schema.BoolAttribute{
 				MarkdownDescription: "Whether to add random jitter to retry delays to avoid thundering herd. Defaults to true",
+				Optional:            true,
+			},
+			"timeout_seconds": schema.Int64Attribute{
+				MarkdownDescription: "HTTP client timeout in seconds for API requests. Defaults to 120 seconds to handle slow operations and potential deadlocks. Can also be set via QUANTCDN_TIMEOUT_SECONDS environment variable.",
 				Optional:            true,
 			},
 		},
@@ -187,13 +193,26 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		}
 	}
 
-	// Create client with rate limiting configuration
-	var c *client.Client
-	if baseURL != "" {
-		c = client.NewWithRateLimitAndBaseURL(bearer, organization, rateLimitConfig, baseURL)
-	} else {
-		c = client.NewWithRateLimit(bearer, organization, rateLimitConfig)
+	// Configure timeout
+	timeout := 120 * time.Second // Default to 120 seconds for slow operations and deadlock resilience
+	if !config.TimeoutSeconds.IsNull() {
+		timeout = time.Duration(config.TimeoutSeconds.ValueInt64()) * time.Second
+	} else if envVal := os.Getenv("QUANTCDN_TIMEOUT_SECONDS"); envVal != "" {
+		if val, err := strconv.ParseInt(envVal, 10, 64); err == nil {
+			timeout = time.Duration(val) * time.Second
+		}
 	}
+
+	// Create client with rate limiting and timeout configuration
+	clientOpts := &client.ClientOptions{
+		RateLimitConfig: rateLimitConfig,
+		BaseURL:         baseURL,
+		HTTPClient: &http.Client{
+			Timeout: timeout,
+		},
+	}
+
+	c := client.NewWithOptions(bearer, organization, clientOpts)
 
 	// Make the SDK client available during DataSource and Resource
 	// type Configure methods.

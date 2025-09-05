@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -169,6 +170,128 @@ func TestNewRateLimitedHTTPClientWithNilConfig(t *testing.T) {
 	// Should use default configuration
 	if client.rateLimiter.config.RequestsPerSecond != 10.0 {
 		t.Errorf("Expected default RequestsPerSecond of 10.0, got %f", client.rateLimiter.config.RequestsPerSecond)
+	}
+}
+
+// TestTimeoutRetryCondition tests that timeout errors are properly retried
+func TestTimeoutRetryCondition(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"context deadline exceeded", fmt.Errorf("context deadline exceeded"), true},
+		{"Client.Timeout exceeded", fmt.Errorf("Get \"url\": Client.Timeout exceeded while awaiting headers"), true},
+		{"generic timeout", fmt.Errorf("timeout occurred"), true},
+		{"connection reset", fmt.Errorf("connection reset by peer"), true},
+		{"connection refused", fmt.Errorf("connection refused"), true},
+		{"other network error", fmt.Errorf("network unreachable"), true},
+		{"nil error", nil, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DefaultRetryCondition(nil, tt.err)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v for error: %v", tt.expected, result, tt.err)
+			}
+		})
+	}
+
+	// Test HTTP 408 Request Timeout
+	resp := &http.Response{StatusCode: http.StatusRequestTimeout}
+	if !DefaultRetryCondition(resp, nil) {
+		t.Error("Expected HTTP 408 Request Timeout to be retried")
+	}
+}
+
+// TestTimeoutConfiguration tests timeout configuration
+func TestTimeoutConfiguration(t *testing.T) {
+	// Test with custom timeout
+	customTimeout := 60 * time.Second
+	config := &RateLimitConfig{
+		RequestsPerSecond: 5.0,
+		MaxRetries:        2,
+		BaseDelay:         100 * time.Millisecond,
+		MaxDelay:          5 * time.Second,
+		EnableJitter:      false,
+	}
+
+	httpClient := &http.Client{Timeout: customTimeout}
+	client := &RateLimitedHTTPClient{
+		Client:      httpClient,
+		rateLimiter: NewRateLimitedRoundTripper(nil, config),
+	}
+
+	if client.Client.Timeout != customTimeout {
+		t.Errorf("Expected timeout %v, got %v", customTimeout, client.Client.Timeout)
+	}
+}
+
+// TestDeadlockScenario simulates a deadlock scenario with timeout and retry
+func TestDeadlockScenario(t *testing.T) {
+	// Create a test server that simulates deadlock by hanging
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		if attemptCount < 3 {
+			// Simulate deadlock by hanging for longer than client timeout
+			time.Sleep(2 * time.Second) // Longer than test client timeout
+			return
+		}
+		// Success on 3rd attempt
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("Success after deadlock recovery"))
+	}))
+	defer server.Close()
+
+	config := &RateLimitConfig{
+		RequestsPerSecond: 100.0, // High rate limit to focus on timeout/retry logic
+		MaxRetries:        3,
+		BaseDelay:         100 * time.Millisecond, // Short delay for testing
+		MaxDelay:          1 * time.Second,
+		EnableJitter:      false,
+		RetryCondition:    DefaultRetryCondition,
+		RequestTimeout:    1 * time.Second, // Per-request timeout
+	}
+
+	// Create client with timeout that allows for retries
+	// The individual request timeout should be shorter than total client timeout
+	rateLimiter := NewRateLimitedRoundTripper(http.DefaultTransport, config)
+	client := &RateLimitedHTTPClient{
+		Client: &http.Client{
+			Transport: rateLimiter,
+			Timeout:   10 * time.Second, // Total timeout including retries
+		},
+		rateLimiter: rateLimiter,
+	}
+	defer client.Close()
+
+	start := time.Now()
+	resp, err := client.Get(server.URL)
+	duration := time.Since(start)
+
+	if err != nil {
+		// We expect this to fail with timeout after retries
+		t.Logf("Expected timeout failure after retries: %v (took %v)", err, duration)
+
+		// Should have attempted multiple times due to retries
+		if attemptCount < 2 {
+			t.Errorf("Expected at least 2 attempts due to retries, got %d", attemptCount)
+		}
+
+		// Should have taken longer than a single timeout due to retries
+		expectedMinDuration := time.Duration(config.MaxRetries) * config.RequestTimeout
+		if duration < expectedMinDuration/2 { // Allow some variance
+			t.Errorf("Expected duration >= %v due to retries, got %v", expectedMinDuration/2, duration)
+		}
+	} else {
+		defer resp.Body.Close()
+		t.Logf("Request succeeded after %d attempts in %v", attemptCount, duration)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200 OK, got %d", resp.StatusCode)
+		}
 	}
 }
 

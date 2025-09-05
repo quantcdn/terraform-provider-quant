@@ -2,6 +2,8 @@ package provider_test
 
 import (
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -80,13 +82,6 @@ func setupCrawlerServer(t *testing.T, organizationID string, projectID string) {
 			return httpmock.NewJsonResponse(200, []map[string]interface{}{crawlerResponse})
 		})
 
-	// Get crawler by UUID
-	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
-		func(req *http.Request) (*http.Response, error) {
-			t.Logf("Get crawler request received")
-			return httpmock.NewJsonResponse(200, crawlerResponse)
-		})
-
 	// Create crawler
 	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
 		func(req *http.Request) (*http.Response, error) {
@@ -95,9 +90,19 @@ func setupCrawlerServer(t *testing.T, organizationID string, projectID string) {
 		})
 
 	// Update crawler - make sure this exactly matches the URL pattern used by the API
+	// We'll simulate eventual consistency by returning stale data on first read after update
+	updateCallCount := 0
 	httpmock.RegisterResponder("PUT", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
 		func(req *http.Request) (*http.Response, error) {
-			t.Logf("Update crawler request received: %s", req.URL.String())
+			updateCallCount++
+			t.Logf("Update crawler request received: %s (call #%d)", req.URL.String(), updateCallCount)
+			return httpmock.NewJsonResponse(200, crawlerResponse)
+		})
+
+	// Get crawler by UUID - return consistent data for regular tests
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Get crawler request received")
 			return httpmock.NewJsonResponse(200, crawlerResponse)
 		})
 
@@ -113,6 +118,113 @@ func setupCrawlerServer(t *testing.T, organizationID string, projectID string) {
 		func(req *http.Request) (*http.Response, error) {
 			t.Logf("Delete crawler request received")
 			// Return the crawler object as per OpenAPI spec (delete returns the deleted crawler)
+			return httpmock.NewJsonResponse(200, crawlerResponse)
+		})
+}
+
+// setupCrawlerServerForDomainUpdate creates a test server specifically for testing domain updates with eventual consistency
+func setupCrawlerServerForDomainUpdate(t *testing.T, organizationID string, projectID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	// Log all requests for debugging
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	// List crawlers - always return the original crawler for listing
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("List crawlers request received")
+			return httpmock.NewJsonResponse(200, []map[string]interface{}{crawlerResponse})
+		})
+
+	// Create crawler - return the original response
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Create crawler request received")
+			return httpmock.NewJsonResponse(200, crawlerResponse)
+		})
+
+	// Track state for domain update testing
+	var (
+		updateCallCount = 0
+		readCallCount   = 0
+		currentDomain   = "https://www.quantcdn.io" // Start with original domain
+	)
+
+	// Update crawler - change the current domain when update is called
+	httpmock.RegisterResponder("PUT", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			updateCallCount++
+			t.Logf("Update crawler request received (call #%d)", updateCallCount)
+
+			// Parse the request body to see what domain is being set
+			body, _ := io.ReadAll(req.Body)
+			t.Logf("Update request body: %s", string(body))
+
+			// Update our expected domain based on the request
+			if strings.Contains(string(body), "nginx-canary-researchcentre.govcms10.amazee.io") {
+				currentDomain = "https://nginx-canary-researchcentre.govcms10.amazee.io"
+				t.Logf("Domain updated to: %s", currentDomain)
+			}
+
+			return httpmock.NewJsonResponse(200, crawlerResponse) // Update API doesn't return body
+		})
+
+	// Also handle PATCH requests (some APIs use PATCH instead of PUT)
+	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			updateCallCount++
+			t.Logf("PATCH crawler request received (call #%d)", updateCallCount)
+
+			// Parse the request body to see what domain is being set
+			body, _ := io.ReadAll(req.Body)
+			t.Logf("PATCH request body: %s", string(body))
+
+			// Update our expected domain based on the request
+			if strings.Contains(string(body), "nginx-canary-researchcentre.govcms10.amazee.io") {
+				currentDomain = "https://nginx-canary-researchcentre.govcms10.amazee.io"
+				t.Logf("Domain updated via PATCH to: %s", currentDomain)
+			}
+
+			return httpmock.NewJsonResponse(200, crawlerResponse) // Update API doesn't return body
+		})
+
+	// Read crawler - simulate eventual consistency for domain updates
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			readCallCount++
+			t.Logf("Get crawler request received (call #%d), current domain: %s", readCallCount, currentDomain)
+
+			// Create response based on current state
+			response := make(map[string]interface{})
+			for k, v := range crawlerResponse {
+				response[k] = v
+			}
+
+			// For domain updates, simulate eventual consistency
+			if updateCallCount > 0 && currentDomain != "https://www.quantcdn.io" {
+				// First 1-2 reads after update return stale data
+				if readCallCount <= updateCallCount+1 { // Allow 1-2 stale reads per update
+					response["domain"] = "https://www.quantcdn.io" // Return old domain
+					t.Logf("Returning stale domain data for read #%d", readCallCount)
+				} else {
+					response["domain"] = currentDomain // Return updated domain
+					t.Logf("Returning updated domain data: %s", currentDomain)
+				}
+			} else {
+				response["domain"] = currentDomain
+			}
+
+			return httpmock.NewJsonResponse(200, response)
+		})
+
+	// Delete crawler
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Delete crawler request received")
 			return httpmock.NewJsonResponse(200, crawlerResponse)
 		})
 }
@@ -208,6 +320,36 @@ func TestAccCrawlerResourceMock(t *testing.T) {
 	})
 }
 
+// Test for domain updates with eventual consistency
+func TestAccCrawlerResourceDomainUpdateWithRetry(t *testing.T) {
+	setupCrawlerServerForDomainUpdate(t, "test-organization", "default")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCrawlerResourceConfigMock(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.test", "domain", "https://www.quantcdn.io"),
+					testAccCheckCrawlerExists("quant_crawler.test"),
+				),
+			},
+			{
+				// Test domain update - this should trigger our retry logic
+				Config: testAccCrawlerResourceConfigDomainUpdate(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.test", "name", "SDK TF crawler 1719545580"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "domain", "https://nginx-canary-researchcentre.govcms10.amazee.io"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "browser_mode", "true"),
+					testAccCheckCrawlerExists("quant_crawler.test"),
+				),
+			},
+		},
+	})
+}
+
 // Test for sensitive headers that are not returned by the API on read operations
 func TestAccCrawlerResourceSensitiveHeaders(t *testing.T) {
 	setupCrawlerSensitiveHeadersServer(t, "test-organization", "default")
@@ -284,6 +426,28 @@ resource "quant_crawler" "test" {
 	}
 	urls = ["/start-here"]
 	exclude = ["/exclude-path"]
+}
+`
+}
+
+// Test configuration for domain update that triggers eventual consistency
+func testAccCrawlerResourceConfigDomainUpdate() string {
+	return `
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_crawler" "test" {
+	name    = "SDK TF crawler 1719545580"
+	project = "default"
+	domain  = "https://nginx-canary-researchcentre.govcms10.amazee.io"
+	browser_mode = true
+	headers = {
+		"x-test-heaer" = "true"
+		"x-test-other-header" = "false"
+	}
+	urls = ["/start-here"]
 }
 `
 }
