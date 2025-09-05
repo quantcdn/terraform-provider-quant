@@ -79,6 +79,10 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			"uuid": schema.StringAttribute{
 				Computed: true,
 			},
+			"force_refresh": schema.StringAttribute{
+				Optional:    true,
+				Description: "Forces a refresh of the crawler when changed. Set to any value (e.g., timestamp) to trigger an update.",
+			},
 		},
 	}
 }
@@ -102,4 +106,5 @@ type CrawlerModel struct {
 	Urls           types.List   `tfsdk:"urls"`
 	UrlsList       types.String `tfsdk:"urls_list"`
 	Uuid           types.String `tfsdk:"uuid"`
+	ForceRefresh   types.String `tfsdk:"force_refresh"`
 }
