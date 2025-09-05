@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,8 @@ type RateLimitConfig struct {
 	EnableJitter bool
 	// Custom retry condition function
 	RetryCondition func(*http.Response, error) bool
+	// Per-request timeout (optional, for fine-grained timeout control)
+	RequestTimeout time.Duration
 }
 
 // DefaultRateLimitConfig returns sensible defaults for rate limiting
@@ -39,8 +42,18 @@ func DefaultRateLimitConfig() *RateLimitConfig {
 
 // DefaultRetryCondition determines if a request should be retried
 func DefaultRetryCondition(resp *http.Response, err error) bool {
-	// Retry on network errors
+	// Retry on network errors, including timeout errors
 	if err != nil {
+		// Check for specific timeout-related errors that might indicate deadlocks
+		errStr := err.Error()
+		if strings.Contains(errStr, "context deadline exceeded") ||
+			strings.Contains(errStr, "Client.Timeout exceeded") ||
+			strings.Contains(errStr, "timeout") ||
+			strings.Contains(errStr, "connection reset") ||
+			strings.Contains(errStr, "connection refused") {
+			return true
+		}
+		// Retry on other network errors as well
 		return true
 	}
 
@@ -56,6 +69,8 @@ func DefaultRetryCondition(resp *http.Response, err error) bool {
 		case http.StatusServiceUnavailable: // 503
 			return true
 		case http.StatusGatewayTimeout: // 504
+			return true
+		case http.StatusRequestTimeout: // 408
 			return true
 		}
 	}
@@ -143,8 +158,22 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 			}
 		}
 
+		// Apply per-request timeout if configured
+		var cancel context.CancelFunc
+		requestReq := req
+		if rt.config.RequestTimeout > 0 {
+			requestCtx, c := context.WithTimeout(context.Background(), rt.config.RequestTimeout)
+			cancel = c
+			requestReq = req.WithContext(requestCtx)
+		}
+
 		// Make the request
-		resp, err := rt.transport.RoundTrip(req)
+		resp, err := rt.transport.RoundTrip(requestReq)
+		
+		// Clean up timeout context
+		if cancel != nil {
+			cancel()
+		}
 
 		// Check if we should retry
 		if attempt < rt.config.MaxRetries && rt.config.RetryCondition(resp, err) {
