@@ -5,7 +5,6 @@ package resource_crawler
 import (
 	"context"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -37,7 +36,6 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"domain_verified": schema.Int64Attribute{
 				Computed: true,
-				Default:  int64default.StaticInt64(0),
 			},
 			"exclude": schema.ListAttribute{
 				ElementType: types.StringType,

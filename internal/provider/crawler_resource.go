@@ -3,12 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
-	"math"
-	"math/rand"
 	"strings"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_crawler"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -178,9 +175,8 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	crawler.Uuid = types.StringValue(api.GetUuid())
 	crawler.Id = types.Int64Value(int64(api.GetId()))
 
-	// Use retry logic for post-create read to handle eventual consistency
-	// No domain validation needed for create since we're not changing existing values
-	return callCrawlerReadAPIWithRetry(ctx, r, crawler, "")
+	// Post-create read to populate computed fields
+	return callCrawlerReadAPI(ctx, r, crawler)
 }
 
 func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
@@ -370,11 +366,8 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	req := *quantadmingo.NewCrawlerRequestUpdateWithDefaults()
 
-	// Store expected values for consistency validation
-	expectedDomain := ""
 	if !crawler.Domain.IsNull() && !crawler.Domain.IsUnknown() {
-		expectedDomain = crawler.Domain.ValueString()
-		req.SetDomain(expectedDomain)
+		req.SetDomain(crawler.Domain.ValueString())
 	}
 
 	if !crawler.BrowserMode.IsNull() && !crawler.BrowserMode.IsUnknown() {
@@ -421,104 +414,8 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-	// Use retry logic for post-update read to handle eventual consistency
-	return callCrawlerReadAPIWithRetry(ctx, r, crawler, expectedDomain)
-}
-
-// callCrawlerReadAPIWithRetry implements retry logic for eventual consistency after updates
-// This follows the same patterns as our HTTP client retry logic but at the application level
-func callCrawlerReadAPIWithRetry(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel, expectedDomain string) (diags diag.Diagnostics) {
-	// Use the same retry configuration as our HTTP client for consistency
-	config := r.client.GetRateLimitConfig()
-	if config == nil {
-		// Fallback to default retry configuration
-		config = &client.RateLimitConfig{
-			MaxRetries:   3,
-			BaseDelay:    500 * time.Millisecond,
-			MaxDelay:     5 * time.Second,
-			EnableJitter: true,
-		}
-	}
-
-	var lastDiags diag.Diagnostics
-
-	for attempt := 0; attempt <= config.MaxRetries; attempt++ {
-		// Add delay before retry (except for first attempt)
-		if attempt > 0 {
-			delay := calculateRetryDelay(attempt-1, config)
-
-			// Respect context cancellation during delay
-			select {
-			case <-time.After(delay):
-				// Continue with retry
-			case <-ctx.Done():
-				diags.AddError("Context cancelled during retry", ctx.Err().Error())
-				return diags
-			}
-		}
-
-		// Attempt to read the crawler
-		diags = callCrawlerReadAPI(ctx, r, crawler)
-		if diags.HasError() {
-			// If there's an actual error (not just inconsistent data), return immediately
-			return diags
-		}
-
-		// Check for consistency if we're validating domain updates
-		if expectedDomain != "" {
-			actualDomain := crawler.Domain.ValueString()
-			if actualDomain == expectedDomain {
-				// Consistency achieved, return success
-				return diags
-			}
-
-			// Store the inconsistent result for potential final return
-			lastDiags = diags
-
-			// Log the inconsistency for debugging (this will appear in Terraform logs)
-			if attempt < config.MaxRetries {
-				// Don't log on the last attempt to avoid noise if we're going to fail anyway
-				continue
-			}
-		} else {
-			// No specific validation needed, return success
-			return diags
-		}
-	}
-
-	// All retries exhausted and still inconsistent
-	diags.AddWarning(
-		"Eventual consistency timeout",
-		fmt.Sprintf("After %d attempts, the API still returns domain=%s instead of expected domain=%s. This may indicate a backend issue or longer than expected eventual consistency delay.",
-			config.MaxRetries+1,
-			crawler.Domain.ValueString(),
-			expectedDomain,
-		),
-	)
-
-	// Return the last read result - Terraform will detect the inconsistency and may retry the entire operation
-	return lastDiags
-}
-
-// calculateRetryDelay calculates delay using exponential backoff with jitter
-// This mirrors the logic in our HTTP client's retry mechanism
-func calculateRetryDelay(attempt int, config *client.RateLimitConfig) time.Duration {
-	// Exponential backoff: baseDelay * 2^attempt
-	delay := time.Duration(float64(config.BaseDelay) * math.Pow(2, float64(attempt)))
-
-	// Cap at maximum delay
-	if delay > config.MaxDelay {
-		delay = config.MaxDelay
-	}
-
-	// Add jitter if enabled
-	if config.EnableJitter {
-		// Add up to 25% jitter to avoid thundering herd
-		jitter := time.Duration(rand.Float64() * float64(delay) * 0.25)
-		delay += jitter
-	}
-
-	return delay
+	// Simple post-update read since domain_verified expectation is now handled in ModifyPlan
+	return callCrawlerReadAPI(ctx, r, crawler)
 }
 
 func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -535,8 +432,19 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		return
 	}
 
-	// Preserve computed fields from state
-	plan.DomainVerified = state.DomainVerified
+	// Check if domain is changing
+	domainChanging := !plan.Domain.Equal(state.Domain)
+	
+	// Preserve computed fields from state, with special handling for domain_verified
+	if domainChanging {
+		// When domain changes, the API will reset domain_verified to 0
+		// Set this expectation in the plan to avoid inconsistent result errors
+		plan.DomainVerified = types.Int64Value(0)
+	} else {
+		// Domain not changing, preserve existing domain_verified value
+		plan.DomainVerified = state.DomainVerified
+	}
+	
 	plan.CreatedAt = state.CreatedAt
 	// Don't preserve UpdatedAt - let it be updated by the API response
 	plan.Id = state.Id
