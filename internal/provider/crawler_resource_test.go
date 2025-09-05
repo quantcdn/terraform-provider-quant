@@ -320,7 +320,7 @@ func TestAccCrawlerResourceMock(t *testing.T) {
 	})
 }
 
-// Test for domain updates with eventual consistency
+// Test for domain updates where API may return resolved/canonical domain
 func TestAccCrawlerResourceDomainUpdateWithRetry(t *testing.T) {
 	setupCrawlerServerForDomainUpdate(t, "test-organization", "default")
 	defer httpmock.DeactivateAndReset()
@@ -337,7 +337,7 @@ func TestAccCrawlerResourceDomainUpdateWithRetry(t *testing.T) {
 				),
 			},
 			{
-				// Test domain update - this should trigger our retry logic
+				// Test domain update - API may return canonical/resolved domain
 				Config: testAccCrawlerResourceConfigDomainUpdate(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_crawler.test", "name", "SDK TF crawler 1719545580"),
@@ -472,6 +472,140 @@ resource "quant_crawler" "test" {
 	urls = ["/"]
 }
 `
+}
+
+// Test that verifies domain_verified resets to 0 when domain changes
+func TestAccCrawlerResource_DomainVerifiedReset(t *testing.T) {
+	organizationID := "test-organization"
+	projectID := "default"
+
+	// Set up mock server with domain change behavior
+	setupCrawlerServerWithDomainChange(t, organizationID, projectID)
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create crawler with initial domain and domain_verified = 1 (simulating previously verified domain)
+			{
+				Config: testAccCrawlerResourceConfigDomainVerified(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.test", "domain", "https://www.quantcdn.io"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "domain_verified", "1"),
+					testAccCheckCrawlerExists("quant_crawler.test"),
+				),
+			},
+			// Update domain - domain_verified should reset to 0
+			{
+				Config: testAccCrawlerResourceConfigDomainChange(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.test", "domain", "https://www.example.com"),
+					resource.TestCheckResourceAttr("quant_crawler.test", "domain_verified", "0"),
+					testAccCheckCrawlerExists("quant_crawler.test"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCrawlerResourceConfigDomainVerified() string {
+	return `
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_crawler" "test" {
+	name    = "SDK TF crawler domain test"
+	project = "default"
+	domain  = "https://www.quantcdn.io"
+	browser_mode = true
+}
+`
+}
+
+func testAccCrawlerResourceConfigDomainChange() string {
+	return `
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_crawler" "test" {
+	name    = "SDK TF crawler domain test"
+	project = "default"
+	domain  = "https://www.example.com"
+	browser_mode = true
+}
+`
+}
+
+func setupCrawlerServerWithDomainChange(t *testing.T, organizationID string, projectID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	// Initial response with domain_verified = 1 (simulating a previously verified domain)
+	initialResponse := map[string]interface{}{
+		"id":              5,
+		"project_id":      17,
+		"uuid":           "domain-test-uuid-123",
+		"name":           "SDK TF crawler domain test",
+		"config":         "config:\n    browser_mode: true\ndomain: 'https://www.quantcdn.io'\n",
+		"domain":         "https://www.quantcdn.io",
+		"domain_verified": 1,
+		"created_at":     "2024-06-28T03:33:02.000000Z",
+		"updated_at":     "2024-06-28T03:50:26.000000Z",
+	}
+
+	// Updated response with new domain and domain_verified reset to 0
+	updatedResponse := map[string]interface{}{
+		"id":              5,
+		"project_id":      17,
+		"uuid":           "domain-test-uuid-123",
+		"name":           "SDK TF crawler domain test",
+		"config":         "config:\n    browser_mode: true\ndomain: 'https://www.example.com'\n",
+		"domain":         "https://www.example.com",
+		"domain_verified": 0,
+		"created_at":     "2024-06-28T03:33:02.000000Z",
+		"updated_at":     "2024-06-28T03:55:26.000000Z",
+	}
+
+	// Track which response to return
+	isUpdated := false
+
+	// Create crawler
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, initialResponse)
+		})
+
+	// Read crawler - return appropriate response based on update state
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/domain-test-uuid-123", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			if isUpdated {
+				return httpmock.NewJsonResponse(200, updatedResponse)
+			}
+			return httpmock.NewJsonResponse(200, initialResponse)
+		})
+
+	// Update crawler - changes domain and resets domain_verified
+	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/domain-test-uuid-123", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			// Read request body to determine which domain is being set
+			body, _ := io.ReadAll(req.Body)
+			if strings.Contains(string(body), "example.com") {
+				isUpdated = true
+				return httpmock.NewJsonResponse(200, updatedResponse)
+			}
+			return httpmock.NewJsonResponse(200, initialResponse)
+		})
+
+	// Delete crawler
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/domain-test-uuid-123", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(204, nil)
+		})
 }
 
 func testAccCheckCrawlerExists(n string) resource.TestCheckFunc {
