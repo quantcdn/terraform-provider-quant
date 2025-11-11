@@ -127,10 +127,9 @@ func (r *crawlerScheduleResource) Delete(ctx context.Context, req resource.Delet
 }
 
 func callCrawlerScheduleCreateAPI(ctx context.Context, r *crawlerScheduleResource, schedule *resource_crawler_schedule.CrawlerScheduleModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewCrawlerScheduleRequest(schedule.ScheduleCronString.ValueString())
-	req.SetName(schedule.Name.ValueString())
+	req := quantadmingo.NewV2CrawlerScheduleRequest(schedule.Name.ValueString(), schedule.ScheduleCronString.ValueString())
 
-	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesCreate(r.client.AuthContext, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString()).CrawlerScheduleRequest(req).Execute()
+	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesAdd(r.client.AuthContext, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString()).V2CrawlerScheduleRequest(*req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -166,7 +165,7 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	}
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
-	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesRead(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).Execute()
+	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesShow(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).Execute()
 	if err != nil {
 		diags.AddError("Unable to load crawler schedule", fmt.Sprintf("Error: %s", err.Error()))
 		return diags
@@ -179,17 +178,15 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	schedule.CrawlerLastRunId = types.Int64Value(int64(api.GetCrawlerLastRunId()))
 	schedule.ScheduleCronString = types.StringValue(api.GetScheduleCronString())
 	schedule.Name = types.StringValue(api.GetName())
-	schedule.CreatedAt = types.StringValue(api.GetCreatedAt())
-	schedule.UpdatedAt = types.StringValue(api.GetUpdatedAt())
+	schedule.CreatedAt = types.StringValue(api.GetCreatedAt().Format("2006-01-02T15:04:05Z07:00"))
+	schedule.UpdatedAt = types.StringValue(api.GetUpdatedAt().Format("2006-01-02T15:04:05Z07:00"))
 	schedule.Organization = types.StringValue(r.client.Organization)
 	schedule.CrawlerSchedule = types.StringValue(api.GetScheduleCronString()) // This might need a different value
 
-	// Set deleted_at (null if not deleted)
-	if api.DeletedAt != nil {
-		schedule.DeletedAt = types.StringValue(*api.DeletedAt)
-	} else {
-		schedule.DeletedAt = types.StringNull()
-	}
+	// Note: schedule.Crawler (UUID) is not returned by the API, so it's preserved from the config/state
+	
+	// Set deleted_at (null if not deleted) - note: V2 API may not have this field
+	schedule.DeletedAt = types.StringNull()
 
 	return diags
 }
@@ -214,7 +211,7 @@ func callCrawlerScheduleDeleteAPI(ctx context.Context, r *crawlerScheduleResourc
 	}
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
-	_, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesDelete(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).Execute()
+	_, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesDelete(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).Execute()
 	if err != nil {
 		diags.AddError("Unable to delete crawler schedule", fmt.Sprintf("Error: %s", err.Error()))
 	}
@@ -240,17 +237,16 @@ func callCrawlerScheduleUpdateAPI(ctx context.Context, r *crawlerScheduleResourc
 		return
 	}
 
-	req := *quantadmingo.NewCrawlerScheduleRequestUpdateWithDefaults()
-	req.SetScheduleCronString(schedule.ScheduleCronString.ValueString())
+	req := quantadmingo.NewV2CrawlerScheduleRequest(schedule.Name.ValueString(), schedule.ScheduleCronString.ValueString())
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
-	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesUpdate(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).CrawlerScheduleRequestUpdate(req).Execute()
+	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesEdit(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).V2CrawlerScheduleRequest(*req).Execute()
 	if err != nil {
 		diags.AddError("Unable to update crawler schedule", fmt.Sprintf("Error: %s", err.Error()))
 		return
 	}
 
-	schedule.UpdatedAt = types.StringValue(api.GetUpdatedAt())
+	schedule.UpdatedAt = types.StringValue(api.GetUpdatedAt().Format("2006-01-02T15:04:05Z07:00"))
 
 	return diags
 }

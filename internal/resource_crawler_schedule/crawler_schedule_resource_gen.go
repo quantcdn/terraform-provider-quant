@@ -13,48 +13,68 @@ func CrawlerScheduleResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"crawler": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Crawler identifier",
+				MarkdownDescription: "Crawler identifier",
 			},
 			"crawler_config_id": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Crawler config ID",
+				MarkdownDescription: "Crawler config ID",
 			},
 			"crawler_last_run_id": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Last run ID",
+				MarkdownDescription: "Last run ID",
 			},
 			"crawler_schedule": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Crawler schedule identifier",
+				MarkdownDescription: "Crawler schedule identifier",
 			},
 			"created_at": schema.StringAttribute{
-				Computed: true,
-			},
-			"deleted_at": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Creation timestamp",
+				MarkdownDescription: "Creation timestamp",
 			},
 			"id": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Schedule ID",
+				MarkdownDescription: "Schedule ID",
 			},
 			"name": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Required:            true,
+				Description:         "Schedule name",
+				MarkdownDescription: "Schedule name",
 			},
 			"organization": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 			"project_id": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Project ID",
+				MarkdownDescription: "Project ID",
 			},
 			"schedule_cron_string": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				Description:         "Cron schedule string",
+				MarkdownDescription: "Cron schedule string",
 			},
 			"updated_at": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Last update timestamp",
+				MarkdownDescription: "Last update timestamp",
 			},
 		},
 	}
@@ -66,7 +86,6 @@ type CrawlerScheduleModel struct {
 	CrawlerLastRunId   types.Int64  `tfsdk:"crawler_last_run_id"`
 	CrawlerSchedule    types.String `tfsdk:"crawler_schedule"`
 	CreatedAt          types.String `tfsdk:"created_at"`
-	DeletedAt          types.String `tfsdk:"deleted_at"`
 	Id                 types.Int64  `tfsdk:"id"`
 	Name               types.String `tfsdk:"name"`
 	Organization       types.String `tfsdk:"organization"`

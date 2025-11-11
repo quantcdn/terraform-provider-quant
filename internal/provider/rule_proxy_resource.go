@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_proxy"
@@ -13,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
@@ -106,11 +109,7 @@ func (r *ruleProxyResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	diags = callRuleProxyReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// No need to read immediately after create - we have all the data from the create response
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -166,12 +165,9 @@ func (r *ruleProxyResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Read updated state
-	diags = callRuleProxyReadAPI(ctx, r, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// Note: We don't read immediately after update to avoid eventual consistency issues.
+	// The update response contains the new UUID which we've already captured.
+	// The next terraform refresh/plan will read the latest state.
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -220,7 +216,7 @@ func (r *ruleProxyResource) ImportState(ctx context.Context, req resource.Import
 }
 
 func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *resource_rule_proxy.RuleProxyModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleProxyRequestCreateWithDefaults()
+	req := *quantadmingo.NewV2RuleProxyRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -415,7 +411,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// WAF configuration
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 	if data.WafEnabled.ValueBool() {
-		wafConfig := quantadmingo.NewWAFConfigWithDefaults()
+		wafConfig := quantadmingo.NewWafConfig()
 		wafConfig.SetMode(data.WafConfig.Mode.ValueString())
 		wafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
 
@@ -494,14 +490,15 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 			wafConfig.SetNotifySlackHitsRpm(int32(data.WafConfig.NotifySlackHitsRpm.ValueInt64()))
 		}
 
-		if !data.WafConfig.RequestHeaderName.IsNull() {
-			wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
-		}
+		// V2 API may not have RequestHeaderName in WafConfig
+		// if !data.WafConfig.RequestHeaderName.IsNull() {
+		// 	wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
+		// }
 		req.SetWafConfig(*wafConfig)
 	}
 
 	// Make the API call
-	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleProxyRequestCreate(req).Execute()
+	api, _, err := r.client.Instance.RulesAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).V2RuleProxyRequest(req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating rule proxy",
@@ -512,6 +509,101 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	data.Uuid = types.StringValue(api.GetUuid())
 	data.RuleId = types.StringValue(api.GetRuleId())
+	data.Organization = types.StringValue(r.client.Organization)
+	data.Action = types.StringValue("proxy")
+	
+	// Set fields that may not be returned by API to null/empty
+	data.Rule = types.StringValue("")
+	data.StaticErrorPage = types.StringNull()
+	
+	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+	data.StaticErrorPageStatusCodes = emptyList
+	data.ProxyStripHeaders = emptyList
+	data.ProxyStripRequestHeaders = emptyList
+	
+	// Set only_with_cookie if returned
+	if api.OnlyWithCookie != nil && *api.OnlyWithCookie != "" {
+		data.OnlyWithCookie = types.StringValue(*api.OnlyWithCookie)
+	} else {
+		data.OnlyWithCookie = types.StringNull()
+	}
+	
+	// Set optional fields to null if not in input
+	if data.OriginTimeout.IsNull() || data.OriginTimeout.IsUnknown() {
+		data.OriginTimeout = types.StringNull()
+	}
+	if data.ProxyAlertEnabled.IsNull() || data.ProxyAlertEnabled.IsUnknown() {
+		data.ProxyAlertEnabled = types.BoolNull()
+	}
+	if data.CacheLifetime.IsNull() || data.CacheLifetime.IsUnknown() {
+		data.CacheLifetime = types.StringNull()
+	}
+	
+	// Application proxy fields
+	if data.ApplicationName.IsNull() || data.ApplicationName.IsUnknown() {
+		data.ApplicationName = types.StringNull()
+	}
+	if data.ApplicationEnvironment.IsNull() || data.ApplicationEnvironment.IsUnknown() {
+		data.ApplicationEnvironment = types.StringNull()
+	}
+	if data.ApplicationContainer.IsNull() || data.ApplicationContainer.IsUnknown() {
+		data.ApplicationContainer = types.StringNull()
+	}
+	if data.ApplicationPort.IsNull() || data.ApplicationPort.IsUnknown() {
+		data.ApplicationPort = types.Int64Null()
+	}
+	
+	// Set conditional fields to null if not used
+	if data.Method.IsNull() || data.Method.IsUnknown() {
+		data.Method = types.StringNull()
+		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+		data.MethodIs = emptyList
+		data.MethodIsNot = emptyList
+	}
+	
+	if data.Country.IsNull() || data.Country.IsUnknown() {
+		data.Country = types.StringNull()
+		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+		data.CountryIs = emptyList
+		data.CountryIsNot = emptyList
+	}
+	
+	if data.Ip.IsNull() || data.Ip.IsUnknown() {
+		data.Ip = types.StringNull()
+		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+		data.IpIs = emptyList
+		data.IpIsNot = emptyList
+	}
+	
+	// Lists that should be empty if not provided
+	if data.FailoverOriginStatusCodes.IsNull() || data.FailoverOriginStatusCodes.IsUnknown() {
+		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
+		data.FailoverOriginStatusCodes = emptyList
+	}
+	if data.InjectHeaders.IsNull() || data.InjectHeaders.IsUnknown() {
+		emptyMap, _ := types.MapValueFrom(ctx, types.StringType, map[string]string{})
+		data.InjectHeaders = emptyMap
+	}
+	
+	// Explicitly set NotifyConfig to null if not provided in input
+	if data.NotifyConfig.IsNull() || data.NotifyConfig.IsUnknown() {
+		data.NotifyConfig = resource_rule_proxy.NewNotifyConfigValueNull()
+	}
+	
+	// Explicitly set WafConfig nested fields that weren't in the input
+	// These need to be set to prevent "unknown value" errors
+	if !data.WafConfig.IsNull() && !data.WafConfig.IsUnknown() {
+		// If these fields are unknown, set them to null
+		if data.WafConfig.NotifySlack.IsUnknown() {
+			data.WafConfig.NotifySlack = types.StringNull()
+		}
+		if data.WafConfig.NotifySlackHitsRpm.IsUnknown() {
+			data.WafConfig.NotifySlackHitsRpm = types.Int64Null()
+		}
+		if data.WafConfig.RequestHeaderName.IsUnknown() {
+			data.WafConfig.RequestHeaderName = types.StringNull()
+		}
+	}
 
 	return
 }
@@ -526,7 +618,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
-	req := *quantadmingo.NewRuleProxyRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2RuleProxyRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -721,7 +813,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// WAF configuration
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 	if data.WafEnabled.ValueBool() {
-		wafConfig := *quantadmingo.NewWAFConfigUpdateWithDefaults()
+		wafConfig := quantadmingo.NewWafConfig()
 		wafConfig.SetMode(data.WafConfig.Mode.ValueString())
 		wafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
 
@@ -794,18 +886,19 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 		wafConfig.SetNotifySlack(data.WafConfig.NotifySlack.ValueString())
 		wafConfig.SetNotifySlackHitsRpm(int32(data.WafConfig.NotifySlackHitsRpm.ValueInt64()))
-		wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
+		// V2 API may not have RequestHeaderName in WafConfig
+		// wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
 
-		req.SetWafConfig(wafConfig)
+		req.SetWafConfig(*wafConfig)
 	}
 
 	// Make the API call
-	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyUpdate(
+	api, _, err := r.client.Instance.RulesAPI.RulesProxyUpdate(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).RuleProxyRequestUpdate(req).Execute()
+		data.Uuid.ValueString(),
+	).V2RuleProxyRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -814,6 +907,10 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		)
 		return
 	}
+
+	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
+	data.Uuid = types.StringValue(api.GetUuid())
+	data.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
@@ -836,23 +933,48 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	prevApplicationPort := data.ApplicationPort
 
 	// Add detailed logging
-	fmt.Printf("Reading rule proxy with ID: %s for project: %s\n",
-		data.RuleId.ValueString(), data.Project.ValueString())
+	tflog.Debug(ctx, "=== RULE PROXY READ REQUEST ===", map[string]interface{}{
+		"organization": r.client.Organization,
+		"project":      data.Project.ValueString(),
+		"rule_id":      data.RuleId.ValueString(),
+		"uuid":         data.Uuid.ValueString(),
+	})
 
-	api, resp, err := r.client.Instance.RulesProxyAPI.RulesProxyRead(
-		r.client.AuthContext,
-		r.client.Organization,
-		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).Execute()
+	// Use shared retry logic for eventual consistency
+	api, httpResp, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleProxy, *http.Response, error) {
+		return r.client.Instance.RulesAPI.RulesProxyRead(
+			r.client.AuthContext,
+			r.client.Organization,
+			data.Project.ValueString(),
+			data.Uuid.ValueString(),
+		).Execute()
+	}, "rule_proxy")
+
+	// Debug: Log the API response
+	if httpResp != nil && httpResp.Body != nil {
+		bodyBytes, _ := io.ReadAll(httpResp.Body)
+		tflog.Debug(ctx, "=== RULE PROXY READ RESPONSE ===", map[string]interface{}{
+			"status": httpResp.Status,
+			"body":   string(bodyBytes),
+		})
+	}
 
 	// Enhanced error handling
 	if err != nil {
-		// Log detailed error information
-		fmt.Printf("Error response: %+v\n", resp)
-
+		// Try to parse API error response
+		if httpResp != nil && httpResp.Body != nil {
+			bodyBytes, _ := io.ReadAll(httpResp.Body)
+			var apiError struct {
+				Error   bool   `json:"error"`
+				Message string `json:"message"`
+			}
+			if jsonErr := json.Unmarshal(bodyBytes, &apiError); jsonErr == nil && apiError.Message != "" {
+				diags.AddError("Failed to read rule proxy", apiError.Message)
+				return
+			}
+		}
 		// Check if it's a 404 error, which might indicate the rule was deleted
-		if resp != nil && resp.StatusCode == 404 {
+		if httpResp != nil && httpResp.StatusCode == 404 {
 			diags.AddError(
 				"Rule proxy not found",
 				fmt.Sprintf("The rule proxy with ID %s no longer exists. It may have been deleted outside of Terraform.",
@@ -862,9 +984,9 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		}
 
 		// For 500 errors, try to get more information
-		if resp != nil && resp.StatusCode == 500 {
+		if httpResp != nil && httpResp.StatusCode == 500 {
 			// Try to list all rules to see if there's a general API issue
-			allRules, _, listErr := r.client.Instance.RulesProxyAPI.RulesProxyList(
+			allRules, _, listErr := r.client.Instance.RulesAPI.RulesProxyList(
 				r.client.AuthContext,
 				r.client.Organization,
 				data.Project.ValueString(),
@@ -1201,7 +1323,8 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(wafConfig.GetNotifySlackHitsRpm()))
 		}
 
-		data.WafConfig.RequestHeaderName = types.StringValue(wafConfig.GetRequestHeaderName())
+		// V2 API may not have RequestHeaderName in WafConfig
+		// data.WafConfig.RequestHeaderName = types.StringValue(wafConfig.GetRequestHeaderName())
 	} else {
 		// WAF is disabled, but if we have a waf_config block in the configuration,
 		// we need to populate it with default/empty values to avoid unknown values
@@ -1267,23 +1390,11 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	notifycfg := actionConfig.GetNotifyConfig()
 	data.Notify = types.StringValue(*actionConfig.Notify)
 
-	originStatusCodes := notifycfg.GetOriginStatusCodes()
-	var originStatusCodesList basetypes.ListValue
-	if originStatusCodes == nil {
-		originStatusCodesList = types.ListNull(types.StringType)
-	} else {
-		var diag diag.Diagnostics
-		originStatusCodesList, diag = types.ListValueFrom(ctx, types.StringType, originStatusCodes)
-		if diag.HasError() {
-			diags.Append(diag...)
-			return
-		}
-	}
-
+	// V2 API notify config only has webhook_url
 	data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{
-		OriginStatusCodes: originStatusCodesList,
-		Period:            types.StringValue(notifycfg.GetPeriod()),
-		SlackWebhook:      types.StringValue(notifycfg.GetSlackWebhook()),
+		OriginStatusCodes: types.ListNull(types.StringType),
+		Period:            types.StringNull(),
+		SlackWebhook:      types.StringValue(notifycfg.GetWebhookUrl()),
 	}
 
 	return
@@ -1299,11 +1410,11 @@ func callRuleProxyDeleteAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
-	_, err := r.client.Instance.RulesProxyAPI.RulesProxyDelete(
+	_, err := r.client.Instance.RulesAPI.RulesProxyDelete(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
+		data.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {

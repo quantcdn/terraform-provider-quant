@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_crawler"
@@ -12,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"gopkg.in/yaml.v3"
 
@@ -139,34 +143,198 @@ func (r *crawlerResource) Delete(ctx context.Context, req resource.DeleteRequest
 }
 
 func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewCrawlerRequestWithDefaults()
+	req := *quantadmingo.NewV2CrawlerRequestWithDefaults()
 
-	req.SetBrowserMode(crawler.BrowserMode.ValueBool())
+	// Required fields
 	req.SetDomain(crawler.Domain.ValueString())
-	req.SetName(crawler.Name.ValueString())
 
-	// Initialize exclude with an empty list by default
-	exclude := make([]string, 0)
-
-	// Only set exclude if it's provided
-	if !crawler.Exclude.IsNull() {
-		diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
+	// Basic optional fields
+	if !crawler.Name.IsNull() && !crawler.Name.IsUnknown() {
+		req.SetName(crawler.Name.ValueString())
 	}
-	req.SetExclude(exclude) // Always set exclude, even if empty
 
-	// Set headers if provided
-	if !crawler.Headers.IsNull() {
+	if !crawler.BrowserMode.IsNull() && !crawler.BrowserMode.IsUnknown() {
+		req.SetBrowserMode(crawler.BrowserMode.ValueBool())
+	}
+
+	if !crawler.ExecuteJs.IsNull() && !crawler.ExecuteJs.IsUnknown() {
+		req.SetExecuteJs(crawler.ExecuteJs.ValueBool())
+	}
+
+	// URLs - explicit list to crawl (no discovery)
+	if !crawler.Urls.IsNull() && !crawler.Urls.IsUnknown() {
+		urls := make([]string, 0, len(crawler.Urls.Elements()))
+		diags.Append(crawler.Urls.ElementsAs(ctx, &urls, false)...)
+		if !diags.HasError() {
+			req.SetUrls(urls)
+		}
+	}
+
+	// Start URLs - starting points for discovery crawl
+	if !crawler.StartUrls.IsNull() && !crawler.StartUrls.IsUnknown() {
+		startUrls := make([]string, 0, len(crawler.StartUrls.Elements()))
+		diags.Append(crawler.StartUrls.ElementsAs(ctx, &startUrls, false)...)
+		if !diags.HasError() {
+			req.SetStartUrls(startUrls)
+		}
+	}
+
+	// Exclude patterns
+	if !crawler.Exclude.IsNull() && !crawler.Exclude.IsUnknown() {
+		exclude := make([]string, 0, len(crawler.Exclude.Elements()))
+		diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
+		if !diags.HasError() {
+			req.SetExclude(exclude)
+		}
+	}
+
+	// Include patterns
+	if !crawler.Include.IsNull() && !crawler.Include.IsUnknown() {
+		include := make([]string, 0, len(crawler.Include.Elements()))
+		diags.Append(crawler.Include.ElementsAs(ctx, &include, false)...)
+		if !diags.HasError() {
+			req.SetInclude(include)
+		}
+	}
+
+	// Headers
+	if !crawler.Headers.IsNull() && !crawler.Headers.IsUnknown() {
 		headers := make(map[string]string, len(crawler.Headers.Elements()))
 		diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
-		req.SetHeaders(headers)
+		if !diags.HasError() {
+			req.SetHeaders(headers)
+		}
 	}
 
-	api, _, err := r.client.Instance.CrawlersAPI.CrawlersCreate(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).CrawlerRequest(req).Execute()
+	// Webhook configuration
+	if !crawler.WebhookUrl.IsNull() && !crawler.WebhookUrl.IsUnknown() {
+		req.SetWebhookUrl(crawler.WebhookUrl.ValueString())
+	}
+
+	if !crawler.WebhookAuthHeader.IsNull() && !crawler.WebhookAuthHeader.IsUnknown() {
+		req.SetWebhookAuthHeader(crawler.WebhookAuthHeader.ValueString())
+	}
+
+	if !crawler.WebhookExtraVars.IsNull() && !crawler.WebhookExtraVars.IsUnknown() {
+		req.SetWebhookExtraVars(crawler.WebhookExtraVars.ValueString())
+	}
+
+	// Advanced settings (verified domains only)
+	if !crawler.Workers.IsNull() && !crawler.Workers.IsUnknown() {
+		req.SetWorkers(int32(crawler.Workers.ValueInt64()))
+	}
+
+	if !crawler.Delay.IsNull() && !crawler.Delay.IsUnknown() {
+		req.SetDelay(float32(crawler.Delay.ValueFloat64()))
+	}
+
+	if !crawler.Depth.IsNull() && !crawler.Depth.IsUnknown() {
+		req.SetDepth(int32(crawler.Depth.ValueInt64()))
+	}
+
+	if !crawler.MaxHits.IsNull() && !crawler.MaxHits.IsUnknown() {
+		req.SetMaxHits(int32(crawler.MaxHits.ValueInt64()))
+	}
+
+	if !crawler.MaxHtml.IsNull() && !crawler.MaxHtml.IsUnknown() {
+		req.SetMaxHtml(int32(crawler.MaxHtml.ValueInt64()))
+	}
+
+	if !crawler.MaxErrors.IsNull() && !crawler.MaxErrors.IsUnknown() {
+		req.SetMaxErrors(int32(crawler.MaxErrors.ValueInt64()))
+	}
+
+	if !crawler.UserAgent.IsNull() && !crawler.UserAgent.IsUnknown() {
+		req.SetUserAgent(crawler.UserAgent.ValueString())
+	}
+
+	// Status OK codes
+	if !crawler.StatusOk.IsNull() && !crawler.StatusOk.IsUnknown() {
+		statusOk := make([]int32, 0, len(crawler.StatusOk.Elements()))
+		var statusOkInt64 []int64
+		diags.Append(crawler.StatusOk.ElementsAs(ctx, &statusOkInt64, false)...)
+		if !diags.HasError() {
+			for _, v := range statusOkInt64 {
+				statusOk = append(statusOk, int32(v))
+			}
+			req.SetStatusOk(statusOk)
+		}
+	}
+
+	// Allowed domains
+	if !crawler.AllowedDomains.IsNull() && !crawler.AllowedDomains.IsUnknown() {
+		allowedDomains := make([]string, 0, len(crawler.AllowedDomains.Elements()))
+		diags.Append(crawler.AllowedDomains.ElementsAs(ctx, &allowedDomains, false)...)
+		if !diags.HasError() {
+			req.SetAllowedDomains(allowedDomains)
+		}
+	}
+
+	// Complex object fields - convert nested objects to API format
+	if !crawler.Sitemap.IsNull() && !crawler.Sitemap.IsUnknown() {
+		var sitemapEntries []resource_crawler.SitemapEntryModel
+		diags.Append(crawler.Sitemap.ElementsAs(ctx, &sitemapEntries, false)...)
+		if !diags.HasError() {
+			sitemapArray := make([]map[string]interface{}, len(sitemapEntries))
+			for i, entry := range sitemapEntries {
+				sitemapArray[i] = map[string]interface{}{
+					"url":       entry.Url.ValueString(),
+					"recursive": entry.Recursive.ValueBool(),
+				}
+			}
+			req.SetSitemap(sitemapArray)
+		}
+	}
+
+	if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
+		var assets resource_crawler.AssetsModel
+		diags.Append(crawler.Assets.As(ctx, &assets, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() && !assets.NetworkIntercept.IsNull() {
+			var networkIntercept resource_crawler.NetworkInterceptModel
+			diags.Append(assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
+			if !diags.HasError() {
+				assetsObj := map[string]interface{}{
+					"network_intercept": map[string]interface{}{
+						"enabled": networkIntercept.Enabled.ValueBool(),
+						"timeout": networkIntercept.Timeout.ValueInt64(),
+					},
+				}
+				req.SetAssets(assetsObj)
+			}
+		}
+	}
+
+	// Debug: Log the request payload
+	reqJSON, _ := json.Marshal(req)
+	tflog.Debug(ctx, "=== CRAWLER CREATE REQUEST ===", map[string]interface{}{
+		"payload": string(reqJSON),
+	})
+	
+	api, httpResp, err := r.client.Instance.CrawlersAPI.CrawlersCreate(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).V2CrawlerRequest(req).Execute()
 
 	if err != nil {
+		// Try to extract detailed error message from API response
+		errorMsg := err.Error()
+		if httpResp != nil && httpResp.Body != nil {
+			bodyBytes, _ := io.ReadAll(httpResp.Body)
+			tflog.Debug(ctx, "=== CRAWLER CREATE RESPONSE ===", map[string]interface{}{
+				"status": httpResp.Status,
+				"body":   string(bodyBytes),
+			})
+			
+			// Try to parse API error response
+			var apiError struct {
+				Error   bool   `json:"error"`
+				Message string `json:"message"`
+			}
+			if jsonErr := json.Unmarshal(bodyBytes, &apiError); jsonErr == nil && apiError.Message != "" {
+				errorMsg = apiError.Message
+			}
+		}
+		
 		diags.AddError(
 			"Unable to create crawler",
-			fmt.Sprintf("Error: %s", err.Error()),
+			errorMsg,
 		)
 		return diags
 	}
@@ -200,7 +368,16 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	}
 
 	// API call with built-in rate limiting and retry logic
-	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+	api, httpResp, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
+
+	// Debug: Log what we got back
+	if httpResp != nil && httpResp.Body != nil {
+		bodyBytes, _ := io.ReadAll(httpResp.Body)
+		tflog.Debug(ctx, "=== CRAWLER READ RESPONSE ===", map[string]interface{}{
+			"status": httpResp.Status,
+			"body":   string(bodyBytes[:min(len(bodyBytes), 2000)]), // Limit to first 2000 chars
+		})
+	}
 
 	if err != nil {
 		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))
@@ -223,15 +400,41 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	crawler.Name = types.StringValue(api.GetName())
 	crawler.Domain = types.StringValue(api.GetDomain())
 	crawler.DomainVerified = types.Int64Value(int64(api.GetDomainVerified()))
-	crawler.CreatedAt = types.StringValue(api.GetCreatedAt())
-	crawler.UpdatedAt = types.StringValue(api.GetUpdatedAt())
+	crawler.CreatedAt = types.StringValue(api.GetCreatedAt().Format("2006-01-02T15:04:05Z07:00"))
+	crawler.UpdatedAt = types.StringValue(api.GetUpdatedAt().Format("2006-01-02T15:04:05Z07:00"))
+	
+	// Set top-level fields from API response (these are returned at the root level, not in config YAML)
+	if api.WebhookUrl != nil && *api.WebhookUrl != "" {
+		crawler.WebhookUrl = types.StringValue(*api.WebhookUrl)
+	} else {
+		crawler.WebhookUrl = types.StringNull()
+	}
+	
+	if api.WebhookAuthHeader != nil && *api.WebhookAuthHeader != "" {
+		crawler.WebhookAuthHeader = types.StringValue(*api.WebhookAuthHeader)
+	} else {
+		crawler.WebhookAuthHeader = types.StringNull()
+	}
+	
+	if api.WebhookExtraVars != nil && *api.WebhookExtraVars != "" {
+		crawler.WebhookExtraVars = types.StringValue(*api.WebhookExtraVars)
+	} else {
+		crawler.WebhookExtraVars = types.StringNull()
+	}
+	
+	// execute_js is also a top-level field in V2Crawler
+	if api.ExecuteJs != nil {
+		crawler.ExecuteJs = types.BoolValue(*api.ExecuteJs)
+	} else {
+		crawler.ExecuteJs = types.BoolNull()
+	}
 
 	// Set organization to the current organization
 	crawler.Organization = types.StringValue(r.client.Organization)
 
 	// Set deleted_at (null if not deleted)
 	if api.DeletedAt != nil {
-		crawler.DeletedAt = types.StringValue(*api.DeletedAt)
+		crawler.DeletedAt = types.StringValue(api.DeletedAt.Format("2006-01-02T15:04:05Z07:00"))
 	} else {
 		crawler.DeletedAt = types.StringNull()
 	}
@@ -243,19 +446,35 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		// Define a structured type for the config
 		type CrawlerConfig struct {
 			Config struct {
-				UserAgent   string                 `yaml:"user_agent"`
-				BrowserMode bool                   `yaml:"browser_mode"`
-				Workers     int                    `yaml:"workers"`
-				Depth       int                    `yaml:"depth"`
-				MaxHits     int                    `yaml:"max_hits"`
-				MaxHtml     int                    `yaml:"max_html"`
-				Cache       bool                   `yaml:"cache"`
-				Delay       int                    `yaml:"delay"`
-				StatusOk    []int                  `yaml:"status_ok"`
-				Quant       map[string]interface{} `yaml:"quant"`
-				StartUrl    []string               `yaml:"start_url"`
-				Headers     map[string]string      `yaml:"headers"`
-				Exclude     []string               `yaml:"exclude"`
+				UserAgent      string                   `yaml:"user_agent"`
+				BrowserMode    bool                     `yaml:"browser_mode"`
+				Workers        int                      `yaml:"workers"`
+				Depth          int                      `yaml:"depth"`
+				MaxHits        int                      `yaml:"max_hits"`
+				MaxHtml        int                      `yaml:"max_html"`
+				MaxErrors      int                      `yaml:"max_errors"`
+				Cache          bool                     `yaml:"cache"`
+				Delay          float64                  `yaml:"delay"`
+				StatusOk       []int                    `yaml:"status_ok"`
+				Quant          map[string]interface{}   `yaml:"quant"`
+				StartUrl       []string                 `yaml:"start_url"`
+				Headers        map[string]string        `yaml:"headers"`
+				Exclude        []string                 `yaml:"exclude"`
+				Include        []string                 `yaml:"include"`
+				AllowedDomains []string                 `yaml:"allowed_domains"`
+				Sitemap        []map[string]interface{} `yaml:"sitemap"`
+				Assets         struct {
+					NetworkIntercept struct {
+						Enabled   bool `yaml:"enabled"`
+						ExecuteJs bool `yaml:"execute_js"`
+						Timeout   int  `yaml:"timeout"`
+					} `yaml:"network_intercept"`
+				} `yaml:"assets"`
+				Webhook struct {
+					Url        string `yaml:"url"`
+					AuthHeader string `yaml:"auth_header"`
+					ExtraVars  string `yaml:"extra_vars"`
+				} `yaml:"webhook"`
 			}
 			Domain  string            `yaml:"domain"`
 			Headers map[string]string `yaml:"headers"`
@@ -268,8 +487,53 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()),
 			)
 		} else {
-			// Set fields directly from the structured config
+			// Set basic fields directly from the structured config
 			crawler.BrowserMode = types.BoolValue(parsedConfig.Config.BrowserMode)
+			// Note: execute_js is read from top-level API response above, not from config
+
+			// Set numeric fields
+			if parsedConfig.Config.Workers > 0 {
+				crawler.Workers = types.Int64Value(int64(parsedConfig.Config.Workers))
+			} else {
+				crawler.Workers = types.Int64Null()
+			}
+
+			if parsedConfig.Config.Depth != 0 {
+				crawler.Depth = types.Int64Value(int64(parsedConfig.Config.Depth))
+			} else {
+				crawler.Depth = types.Int64Null()
+			}
+
+			if parsedConfig.Config.MaxHits > 0 {
+				crawler.MaxHits = types.Int64Value(int64(parsedConfig.Config.MaxHits))
+			} else {
+				crawler.MaxHits = types.Int64Null()
+			}
+
+			if parsedConfig.Config.MaxHtml > 0 {
+				crawler.MaxHtml = types.Int64Value(int64(parsedConfig.Config.MaxHtml))
+			} else {
+				crawler.MaxHtml = types.Int64Null()
+			}
+
+			if parsedConfig.Config.MaxErrors > 0 {
+				crawler.MaxErrors = types.Int64Value(int64(parsedConfig.Config.MaxErrors))
+			} else {
+				crawler.MaxErrors = types.Int64Null()
+			}
+
+			if parsedConfig.Config.Delay > 0 {
+				crawler.Delay = types.Float64Value(parsedConfig.Config.Delay)
+			} else {
+				crawler.Delay = types.Float64Null()
+			}
+
+			// Set user agent
+			if parsedConfig.Config.UserAgent != "" {
+				crawler.UserAgent = types.StringValue(parsedConfig.Config.UserAgent)
+			} else {
+				crawler.UserAgent = types.StringNull()
+			}
 
 			// Handle exclude list - preserve values from plan if API returns empty
 			if len(parsedConfig.Config.Exclude) > 0 {
@@ -283,6 +547,45 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				// Keep the existing values from the plan
 			} else {
 				crawler.Exclude = types.ListValueMust(types.StringType, []attr.Value{})
+			}
+
+			// Handle include list
+			if len(parsedConfig.Config.Include) > 0 {
+				includeVals := make([]attr.Value, len(parsedConfig.Config.Include))
+				for i, v := range parsedConfig.Config.Include {
+					includeVals[i] = types.StringValue(v)
+				}
+				crawler.Include = types.ListValueMust(types.StringType, includeVals)
+			} else if !crawler.Include.IsNull() && !crawler.Include.IsUnknown() {
+				// Preserve existing values
+			} else {
+				crawler.Include = types.ListValueMust(types.StringType, []attr.Value{})
+			}
+
+			// Handle allowed domains list
+			if len(parsedConfig.Config.AllowedDomains) > 0 {
+				allowedDomainsVals := make([]attr.Value, len(parsedConfig.Config.AllowedDomains))
+				for i, v := range parsedConfig.Config.AllowedDomains {
+					allowedDomainsVals[i] = types.StringValue(v)
+				}
+				crawler.AllowedDomains = types.ListValueMust(types.StringType, allowedDomainsVals)
+			} else if !crawler.AllowedDomains.IsNull() && !crawler.AllowedDomains.IsUnknown() {
+				// Preserve existing values
+			} else {
+				crawler.AllowedDomains = types.ListValueMust(types.StringType, []attr.Value{})
+			}
+
+			// Handle status_ok list
+			if len(parsedConfig.Config.StatusOk) > 0 {
+				statusOkVals := make([]attr.Value, len(parsedConfig.Config.StatusOk))
+				for i, v := range parsedConfig.Config.StatusOk {
+					statusOkVals[i] = types.Int64Value(int64(v))
+				}
+				crawler.StatusOk = types.ListValueMust(types.Int64Type, statusOkVals)
+			} else if !crawler.StatusOk.IsNull() && !crawler.StatusOk.IsUnknown() {
+				// Preserve existing values
+			} else {
+				crawler.StatusOk = types.ListValueMust(types.Int64Type, []attr.Value{})
 			}
 
 			// Handle headers - preserve original headers if API doesn't return them
@@ -300,16 +603,105 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 			}
 
-			// Initialize urls from start_url in config
+			// Initialize start_urls from start_url in config
 			if len(parsedConfig.Config.StartUrl) > 0 {
-				urlVals := make([]attr.Value, len(parsedConfig.Config.StartUrl))
+				startUrlVals := make([]attr.Value, len(parsedConfig.Config.StartUrl))
 				for i, v := range parsedConfig.Config.StartUrl {
-					urlVals[i] = types.StringValue(v)
+					startUrlVals[i] = types.StringValue(v)
 				}
-				crawler.Urls = types.ListValueMust(types.StringType, urlVals)
+				crawler.StartUrls = types.ListValueMust(types.StringType, startUrlVals)
 			} else {
-				// Always set an empty list rather than null
+				crawler.StartUrls = types.ListValueMust(types.StringType, []attr.Value{})
+			}
+
+			// Note: The config YAML may not have a separate "urls" field
+			// If it does, handle it here. For now, initialize as empty if not in state
+			if !crawler.Urls.IsNull() && !crawler.Urls.IsUnknown() {
+				// Preserve existing urls from state/plan
+			} else {
 				crawler.Urls = types.ListValueMust(types.StringType, []attr.Value{})
+			}
+
+			// NOTE: Webhook fields (url, auth_header, extra_vars) are read from top-level API response above,
+			// not from the config YAML, so we don't parse them here
+
+			// Handle complex object fields (sitemap, assets)
+			// Convert YAML objects to Terraform nested structures
+			if len(parsedConfig.Config.Sitemap) > 0 {
+				sitemapVals := make([]attr.Value, len(parsedConfig.Config.Sitemap))
+				sitemapEntryType := types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"url":       types.StringType,
+						"recursive": types.BoolType,
+					},
+				}
+				for i, entry := range parsedConfig.Config.Sitemap {
+					url := ""
+					recursive := false
+					if urlVal, ok := entry["url"].(string); ok {
+						url = urlVal
+					}
+					if recursiveVal, ok := entry["recursive"].(bool); ok {
+						recursive = recursiveVal
+					}
+					objVal, _ := types.ObjectValue(
+						sitemapEntryType.AttrTypes,
+						map[string]attr.Value{
+							"url":       types.StringValue(url),
+							"recursive": types.BoolValue(recursive),
+						},
+					)
+					sitemapVals[i] = objVal
+				}
+				crawler.Sitemap, _ = types.ListValue(sitemapEntryType, sitemapVals)
+			} else if !crawler.Sitemap.IsNull() && !crawler.Sitemap.IsUnknown() {
+				// Preserve existing value from state/plan
+			} else {
+				crawler.Sitemap = types.ListNull(types.ObjectType{
+					AttrTypes: map[string]attr.Type{
+						"url":       types.StringType,
+						"recursive": types.BoolType,
+					},
+				})
+			}
+
+			// Parse assets.network_intercept from the structured config
+			if parsedConfig.Config.Assets.NetworkIntercept.Enabled || parsedConfig.Config.Assets.NetworkIntercept.Timeout > 0 {
+				networkInterceptObj, _ := types.ObjectValue(
+					map[string]attr.Type{
+						"enabled": types.BoolType,
+						"timeout": types.Int64Type,
+					},
+					map[string]attr.Value{
+						"enabled": types.BoolValue(parsedConfig.Config.Assets.NetworkIntercept.Enabled),
+						"timeout": types.Int64Value(int64(parsedConfig.Config.Assets.NetworkIntercept.Timeout)),
+					},
+				)
+				
+				crawler.Assets, _ = types.ObjectValue(
+					map[string]attr.Type{
+						"network_intercept": types.ObjectType{
+							AttrTypes: map[string]attr.Type{
+								"enabled": types.BoolType,
+								"timeout": types.Int64Type,
+							},
+						},
+					},
+					map[string]attr.Value{
+						"network_intercept": networkInterceptObj,
+					},
+				)
+			} else if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
+				// Preserve existing value from state/plan
+			} else {
+				crawler.Assets = types.ObjectNull(map[string]attr.Type{
+					"network_intercept": types.ObjectType{
+						AttrTypes: map[string]attr.Type{
+							"enabled": types.BoolType,
+							"timeout": types.Int64Type,
+						},
+					},
+				})
 			}
 
 			// Make sure crawler field is initialized
@@ -348,7 +740,7 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	}
 
 	// Delete API call with built-in rate limiting and retry logic
-	_, _, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
+	_, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
 		ctx,
 		r.client.Organization,
 		crawler.Project.ValueString(),
@@ -364,17 +756,26 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *resource_crawler.CrawlerModel) (diags diag.Diagnostics) {
 
-	req := *quantadmingo.NewCrawlerRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2CrawlerRequestWithDefaults()
 
+	// Basic fields
 	if !crawler.Domain.IsNull() && !crawler.Domain.IsUnknown() {
 		req.SetDomain(crawler.Domain.ValueString())
+	}
+
+	if !crawler.Name.IsNull() && !crawler.Name.IsUnknown() {
+		req.SetName(crawler.Name.ValueString())
 	}
 
 	if !crawler.BrowserMode.IsNull() && !crawler.BrowserMode.IsUnknown() {
 		req.SetBrowserMode(crawler.BrowserMode.ValueBool())
 	}
 
-	// Only process URLs if the list is not null
+	if !crawler.ExecuteJs.IsNull() && !crawler.ExecuteJs.IsUnknown() {
+		req.SetExecuteJs(crawler.ExecuteJs.ValueBool())
+	}
+
+	// URLs - explicit list to crawl (no discovery)
 	if !crawler.Urls.IsNull() && !crawler.Urls.IsUnknown() {
 		urls := make([]string, 0, len(crawler.Urls.Elements()))
 		diags.Append(crawler.Urls.ElementsAs(ctx, &urls, false)...)
@@ -383,7 +784,16 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		}
 	}
 
-	// Only process exclude if the list is not null
+	// Start URLs - starting points for discovery crawl
+	if !crawler.StartUrls.IsNull() && !crawler.StartUrls.IsUnknown() {
+		startUrls := make([]string, 0, len(crawler.StartUrls.Elements()))
+		diags.Append(crawler.StartUrls.ElementsAs(ctx, &startUrls, false)...)
+		if !diags.HasError() {
+			req.SetStartUrls(startUrls)
+		}
+	}
+
+	// Exclude patterns
 	if !crawler.Exclude.IsNull() && !crawler.Exclude.IsUnknown() {
 		exclude := make([]string, 0, len(crawler.Exclude.Elements()))
 		diags.Append(crawler.Exclude.ElementsAs(ctx, &exclude, false)...)
@@ -392,12 +802,119 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		}
 	}
 
-	// Only process headers if the map is not null
+	// Include patterns
+	if !crawler.Include.IsNull() && !crawler.Include.IsUnknown() {
+		include := make([]string, 0, len(crawler.Include.Elements()))
+		diags.Append(crawler.Include.ElementsAs(ctx, &include, false)...)
+		if !diags.HasError() {
+			req.SetInclude(include)
+		}
+	}
+
+	// Headers
 	if !crawler.Headers.IsNull() && !crawler.Headers.IsUnknown() {
 		headers := make(map[string]string, len(crawler.Headers.Elements()))
 		diags.Append(crawler.Headers.ElementsAs(ctx, &headers, false)...)
 		if !diags.HasError() {
 			req.SetHeaders(headers)
+		}
+	}
+
+	// Webhook configuration
+	if !crawler.WebhookUrl.IsNull() && !crawler.WebhookUrl.IsUnknown() {
+		req.SetWebhookUrl(crawler.WebhookUrl.ValueString())
+	}
+
+	if !crawler.WebhookAuthHeader.IsNull() && !crawler.WebhookAuthHeader.IsUnknown() {
+		req.SetWebhookAuthHeader(crawler.WebhookAuthHeader.ValueString())
+	}
+
+	if !crawler.WebhookExtraVars.IsNull() && !crawler.WebhookExtraVars.IsUnknown() {
+		req.SetWebhookExtraVars(crawler.WebhookExtraVars.ValueString())
+	}
+
+	// Advanced settings (verified domains only)
+	if !crawler.Workers.IsNull() && !crawler.Workers.IsUnknown() {
+		req.SetWorkers(int32(crawler.Workers.ValueInt64()))
+	}
+
+	if !crawler.Delay.IsNull() && !crawler.Delay.IsUnknown() {
+		req.SetDelay(float32(crawler.Delay.ValueFloat64()))
+	}
+
+	if !crawler.Depth.IsNull() && !crawler.Depth.IsUnknown() {
+		req.SetDepth(int32(crawler.Depth.ValueInt64()))
+	}
+
+	if !crawler.MaxHits.IsNull() && !crawler.MaxHits.IsUnknown() {
+		req.SetMaxHits(int32(crawler.MaxHits.ValueInt64()))
+	}
+
+	if !crawler.MaxHtml.IsNull() && !crawler.MaxHtml.IsUnknown() {
+		req.SetMaxHtml(int32(crawler.MaxHtml.ValueInt64()))
+	}
+
+	if !crawler.MaxErrors.IsNull() && !crawler.MaxErrors.IsUnknown() {
+		req.SetMaxErrors(int32(crawler.MaxErrors.ValueInt64()))
+	}
+
+	if !crawler.UserAgent.IsNull() && !crawler.UserAgent.IsUnknown() {
+		req.SetUserAgent(crawler.UserAgent.ValueString())
+	}
+
+	// Status OK codes
+	if !crawler.StatusOk.IsNull() && !crawler.StatusOk.IsUnknown() {
+		statusOk := make([]int32, 0, len(crawler.StatusOk.Elements()))
+		var statusOkInt64 []int64
+		diags.Append(crawler.StatusOk.ElementsAs(ctx, &statusOkInt64, false)...)
+		if !diags.HasError() {
+			for _, v := range statusOkInt64 {
+				statusOk = append(statusOk, int32(v))
+			}
+			req.SetStatusOk(statusOk)
+		}
+	}
+
+	// Allowed domains
+	if !crawler.AllowedDomains.IsNull() && !crawler.AllowedDomains.IsUnknown() {
+		allowedDomains := make([]string, 0, len(crawler.AllowedDomains.Elements()))
+		diags.Append(crawler.AllowedDomains.ElementsAs(ctx, &allowedDomains, false)...)
+		if !diags.HasError() {
+			req.SetAllowedDomains(allowedDomains)
+		}
+	}
+
+	// Complex object fields - convert nested objects to API format
+	if !crawler.Sitemap.IsNull() && !crawler.Sitemap.IsUnknown() {
+		var sitemapEntries []resource_crawler.SitemapEntryModel
+		diags.Append(crawler.Sitemap.ElementsAs(ctx, &sitemapEntries, false)...)
+		if !diags.HasError() {
+			sitemapArray := make([]map[string]interface{}, len(sitemapEntries))
+			for i, entry := range sitemapEntries {
+				sitemapArray[i] = map[string]interface{}{
+					"url":       entry.Url.ValueString(),
+					"recursive": entry.Recursive.ValueBool(),
+				}
+			}
+			req.SetSitemap(sitemapArray)
+		}
+	}
+
+	if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
+		var assets resource_crawler.AssetsModel
+		diags.Append(crawler.Assets.As(ctx, &assets, basetypes.ObjectAsOptions{})...)
+		if !diags.HasError() && !assets.NetworkIntercept.IsNull() {
+			var networkIntercept resource_crawler.NetworkInterceptModel
+			diags.Append(assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
+			if !diags.HasError() {
+				assetsObj := map[string]interface{}{
+					"network_intercept": map[string]interface{}{
+						"enabled": networkIntercept.Enabled.ValueBool(),
+						"timeout": networkIntercept.Timeout.ValueInt64(),
+					},
+				}
+				req.SetAssets(assetsObj)
+			}
 		}
 	}
 
@@ -407,7 +924,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		r.client.Organization,
 		crawler.Project.ValueString(),
 		crawler.Uuid.ValueString(),
-	).CrawlerRequestUpdate(req).Execute()
+	).V2CrawlerRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update crawler", fmt.Sprintf("Error: %s", err.Error()))

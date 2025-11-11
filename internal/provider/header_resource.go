@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
@@ -177,7 +179,7 @@ func generateID(headers map[string]string) string {
 
 // Create headers with the API.
 func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewHeadersCreateRequestWithDefaults()
+	req := *quantadmingo.NewV2CustomHeaderRequest(make(map[string]string))
 
 	if req.Headers == nil {
 		req.Headers = make(map[string]string)
@@ -193,7 +195,7 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource 
 		req.Headers[k] = strVal.ValueString()
 	}
 
-	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersCreateRequest(req).Execute()
+	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).V2CustomHeaderRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to add custom headers", err.Error())
@@ -206,15 +208,32 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource 
 
 // Load headers from the API.
 func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	api, _, err := h.client.Instance.HeadersAPI.HeadersList(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).Execute()
+	api, httpResp, err := h.client.Instance.HeadersAPI.HeadersList(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).Execute()
+
+	// Debug: Log the raw response
+	if httpResp != nil {
+		tflog.Debug(ctx, "HeadersList API Response", map[string]interface{}{
+			"status": httpResp.Status,
+		})
+	}
+	
+	// Debug: Log what we got back
+	apiJSON, _ := json.Marshal(api)
+	tflog.Debug(ctx, "HeadersList API Data", map[string]interface{}{
+		"raw_response": string(apiJSON),
+		"type":         fmt.Sprintf("%T", api),
+	})
 
 	if err != nil {
 		diags.AddError("Error getting custom headers", err.Error())
 		return
 	}
 
+	// V2 API returns a single map[string]string, not an array
+	allHeaders := api
+	
 	a := make(map[string]attr.Value)
-	for k, v := range api {
+	for k, v := range allHeaders {
 		a[k] = types.StringValue(v)
 	}
 
@@ -225,19 +244,20 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 		return
 	}
 
-	resource.Id = types.StringValue(generateID(api))
+	resource.Id = types.StringValue(generateID(allHeaders))
 	resource.Headers = headers
 	return
 }
 
 // To delete headers we remove just update with an empty map.
 func callHeaderDeleteAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewHeadersDeleteRequestWithDefaults()
-	req.Headers = []string{}
+	// V2CustomHeaderRequest expects headers map, not array of header names
+	headersToDelete := make(map[string]string)
 	for k := range resource.Headers.Elements() {
-		req.Headers = append(req.Headers, k)
+		headersToDelete[k] = "" // Empty value to indicate deletion
 	}
-	_, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersDeleteRequest(req).Execute()
+	req := *quantadmingo.NewV2CustomHeaderRequest(headersToDelete)
+	_, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).V2CustomHeaderRequest(req).Execute()
 	if err != nil {
 		diags.AddError("Error removing custom headers", err.Error())
 		return

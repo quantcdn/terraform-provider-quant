@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
-	quantadmingoclient "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
 var (
@@ -202,7 +202,7 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // Create project request.
 func callProjectCreateAPI(ctx context.Context, r *projectResource, project *resource_project.ProjectModel) (diags diag.Diagnostics) {
-	req := *quantadmingoclient.NewProjectRequestWithDefaults()
+	req := *quantadmingo.NewV2ProjectRequestWithDefaults()
 
 	if project.Name.IsNull() || project.Name.IsUnknown() {
 		diags.AddAttributeError(
@@ -230,10 +230,21 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	req.SetName(project.Name.ValueString())
-	req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
-	req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
-	req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
-	req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
+	
+	// Only set optional fields if they have values
+	if !project.AllowQueryParams.IsNull() && !project.AllowQueryParams.IsUnknown() {
+		req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
+	}
+	if !project.BasicAuthPassword.IsNull() && !project.BasicAuthPassword.IsUnknown() {
+		req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
+	}
+	if !project.BasicAuthUsername.IsNull() && !project.BasicAuthUsername.IsUnknown() {
+		req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
+	}
+	// V2 API may not support BasicAuthPreviewOnly
+	// if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
+	// 	req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
+	// }
 
 	if project.Region.IsNull() || project.Region.IsUnknown() {
 		project.Region = types.StringValue("au")
@@ -241,7 +252,7 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 
 	req.SetRegion(project.Region.ValueString())
 
-	res, resp, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).ProjectRequest(req).Execute()
+	res, resp, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).V2ProjectRequest(req).Execute()
 
 	if err != nil {
 		if resp != nil {
@@ -347,7 +358,7 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	org := r.client.Organization
-	req := *quantadmingoclient.NewProjectRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2ProjectRequestWithDefaults()
 
 	if project.BasicAuthUsername.IsNull() && !project.BasicAuthPassword.IsNull() {
 		diags.AddError(
@@ -369,10 +380,11 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 	req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
 	req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
 	req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
-	req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
+	// V2 API may not support BasicAuthPreviewOnly
+	// req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
 
 	api := r.client.Instance.ProjectsAPI.ProjectsUpdate(r.client.AuthContext, org, project.MachineName.ValueString())
-	_, _, err := api.ProjectRequestUpdate(req).Execute()
+	_, _, err := api.V2ProjectRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update project", fmt.Sprintf("Error: %s", err.Error()))
@@ -405,21 +417,19 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 		return diags
 	}
 
-	project.Id = types.Int64Value(int64(api.GetId()))
+	// V2Project only has name and machine_name
+	project.Name = types.StringValue(api.GetName())
 	project.MachineName = types.StringValue(api.GetMachineName())
-	project.CreatedAt = types.StringValue(api.GetCreatedAt())
-	project.UpdatedAt = types.StringValue(api.GetUpdatedAt())
-	project.Uuid = types.StringValue(api.GetUuid())
-
-	project.SecurityScore = types.StringValue(api.GetSecurityScore())
-	project.GitUrl = types.StringValue(api.GetGitUrl())
-	project.OrganizationId = types.Int64Value(int64(api.GetOrganizationId()))
-	// Only set write_token if with_token is true
-	if !project.WithToken.IsNull() && project.WithToken.ValueBool() {
-		project.WriteToken = types.StringValue(api.GetWriteToken())
-	} else {
-		project.WriteToken = types.StringNull()
-	}
+	
+	// V2 API doesn't return these fields - set to null/defaults
+	project.Id = types.Int64Null()
+	project.CreatedAt = types.StringNull()
+	project.UpdatedAt = types.StringNull()
+	project.Uuid = types.StringNull()
+	project.SecurityScore = types.StringNull()
+	project.GitUrl = types.StringNull()
+	project.OrganizationId = types.Int64Null()
+	project.WriteToken = types.StringNull()
 
 	// API doesn't currently return these values
 	if project.AllowQueryParams.IsNull() || project.AllowQueryParams.IsUnknown() {

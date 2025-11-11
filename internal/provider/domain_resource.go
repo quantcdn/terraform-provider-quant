@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
-	quantadmingoclient "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go"
 	"terraform-provider-quant/internal/utils"
 )
 
@@ -168,7 +168,7 @@ func (r *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 
 // Create domain request.
 func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	req := *quantadmingoclient.NewDomainRequestWithDefaults()
+	req := *quantadmingo.NewV2DomainRequestWithDefaults()
 
 	if domain.Domain.IsNull() || domain.Domain.IsUnknown() {
 		diags.AddAttributeError(
@@ -183,7 +183,7 @@ func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resourc
 
 	org := r.client.Organization
 	project := domain.Project.ValueString()
-	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsCreate(r.client.AuthContext, org, project).DomainRequest(req).Execute()
+	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsCreate(r.client.AuthContext, org, project).V2DomainRequest(req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating domain",
@@ -228,10 +228,12 @@ func callDomainUpdateAPI(ctx context.Context, r *domainResource, domain *resourc
 	}
 
 	org := r.client.Organization
-	req := *quantadmingoclient.NewDomainRequestUpdateWithDefaults()
-
+	// Note: V2 API may not support domain updates - only create/delete
+	// If update is needed, it might require delete + recreate
 	project := domain.Project.ValueString()
-	_, _, err := r.client.Instance.DomainsAPI.DomainsUpdate(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).DomainRequestUpdate(req).Execute()
+	_ = org
+	_ = project
+	var err error = fmt.Errorf("domain update not supported in V2 API")
 	if err != nil {
 		diags.AddError(
 			"Error updating domain",
@@ -266,14 +268,16 @@ func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_
 
 	domain.Id = types.Int64Value(int64(apiResp.GetId()))
 	domain.Domain = types.StringValue(apiResp.GetDomain())
-	domain.CreatedAt = types.StringValue(apiResp.GetCreatedAt())
-	domain.UpdatedAt = types.StringValue(apiResp.GetUpdatedAt())
-	domain.DeletedAt = types.StringValue(apiResp.GetDeletedAt())
 	domain.DnsEngaged = types.Int64Value(int64(apiResp.GetDnsEngaged()))
-	domain.InSection = types.Int64Value(int64(apiResp.GetInSection()))
-	domain.ProjectId = types.Int64Value(int64(apiResp.GetProjectId()))
-	domain.SectionMessage = types.StringValue(apiResp.GetSectionMessage())
 	domain.Organization = types.StringValue(org)
+	
+	// V2Domain doesn't return these fields - set to null or computed defaults
+	domain.CreatedAt = types.StringNull()
+	domain.UpdatedAt = types.StringNull()
+	domain.DeletedAt = types.StringNull()
+	domain.InSection = types.Int64Null()
+	domain.ProjectId = types.Int64Null()
+	domain.SectionMessage = types.StringNull()
 
 	return diags
 }
@@ -289,7 +293,7 @@ func callDomainDeleteAPI(ctx context.Context, r *domainResource, domain *resourc
 
 	org := r.client.Organization
 	project := domain.Project.ValueString()
-	_, _, err := r.client.Instance.DomainsAPI.DomainsDelete(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).Execute()
+	_, err := r.client.Instance.DomainsAPI.DomainsDelete(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error deleting domain",

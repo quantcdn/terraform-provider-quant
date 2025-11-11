@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_content_filter"
 	"terraform-provider-quant/internal/utils"
@@ -74,11 +75,7 @@ func (r *ruleContentFilterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	diags = callRuleContentFilterReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// No need to read immediately after create - we have all the data from the create response
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -134,12 +131,9 @@ func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	// Read updated state
-	diags = callRuleContentFilterReadAPI(ctx, r, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// Note: We don't read immediately after update to avoid eventual consistency issues.
+	// The update response contains the new UUID which we've already captured.
+	// The next terraform refresh/plan will read the latest state.
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -188,7 +182,7 @@ func (r *ruleContentFilterResource) ImportState(ctx context.Context, req resourc
 }
 
 func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterResource, data *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleContentFilterRequestWithDefaults()
+	req := *quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -298,7 +292,7 @@ func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterRes
 	}
 
 	// Make the API call
-	api, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleContentFilterRequest(req).Execute()
+	api, _, err := r.client.Instance.RulesAPI.RulesContentFilterCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).V2RuleContentFilterRequest(req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating rule content filter",
@@ -323,7 +317,7 @@ func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterRes
 		return
 	}
 
-	req := *quantadmingo.NewRuleContentFilterRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -433,12 +427,12 @@ func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterRes
 	}
 
 	// Make the API call
-	_, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterUpdate(
+	api, _, err := r.client.Instance.RulesAPI.RulesContentFilterUpdate(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).RuleContentFilterRequestUpdate(req).Execute()
+		data.Uuid.ValueString(),
+	).V2RuleContentFilterRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -447,6 +441,10 @@ func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterRes
 		)
 		return
 	}
+
+	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
+	data.Uuid = types.StringValue(api.GetUuid())
+	data.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
@@ -461,12 +459,15 @@ func callRuleContentFilterReadAPI(ctx context.Context, r *ruleContentFilterResou
 		return
 	}
 
-	api, resp, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterRead(
-		r.client.AuthContext,
-		r.client.Organization,
-		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).Execute()
+	// Use shared retry logic for eventual consistency
+	api, resp, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleContentFilter, *http.Response, error) {
+		return r.client.Instance.RulesAPI.RulesContentFilterRead(
+			r.client.AuthContext,
+			r.client.Organization,
+			data.Project.ValueString(),
+			data.Uuid.ValueString(),
+		).Execute()
+	}, "rule_content_filter")
 
 	if err != nil {
 		// Check if it's a 404 error, which might indicate the rule was deleted
@@ -643,11 +644,11 @@ func callRuleContentFilterDeleteAPI(ctx context.Context, r *ruleContentFilterRes
 		return
 	}
 
-	_, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterDelete(
+	_, err := r.client.Instance.RulesAPI.RulesContentFilterDelete(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
+		data.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {

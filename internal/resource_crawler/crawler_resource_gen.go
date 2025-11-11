@@ -4,8 +4,17 @@ package resource_crawler
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
@@ -13,98 +22,801 @@ import (
 func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"allowed_domains": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed domains for multi-domain crawling, automatically enables merge_domains",
+				MarkdownDescription: "Allowed domains for multi-domain crawling, automatically enables merge_domains",
+			},
+			"assets": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{},
+				CustomType: AssetsType{
+					ObjectType: types.ObjectType{
+						AttrTypes: AssetsValue{}.AttributeTypes(ctx),
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Asset harvesting configuration",
+				MarkdownDescription: "Asset harvesting configuration",
+			},
 			"browser_mode": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  booldefault.StaticBool(false),
+				Optional:            true,
+				Computed:            true,
+				Description:         "Enable browser mode",
+				MarkdownDescription: "Enable browser mode",
+				Default:             booldefault.StaticBool(false),
 			},
 			"config": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Crawler configuration (YAML)",
+				MarkdownDescription: "Crawler configuration (YAML)",
 			},
 			"crawler": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 			},
 			"created_at": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Creation timestamp",
+				MarkdownDescription: "Creation timestamp",
+			},
+			"delay": schema.Float64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Delay between requests in seconds (default: 4, non-default requires verification)",
+				MarkdownDescription: "Delay between requests in seconds (default: 4, non-default requires verification)",
 			},
 			"deleted_at": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Deletion timestamp",
+				MarkdownDescription: "Deletion timestamp",
+			},
+			"depth": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Maximum crawl depth, -1 for unlimited",
+				MarkdownDescription: "Maximum crawl depth, -1 for unlimited",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(-1),
+				},
 			},
 			"domain": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				Description:         "Domain to crawl",
+				MarkdownDescription: "Domain to crawl",
 			},
 			"domain_verified": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Domain verification status",
+				MarkdownDescription: "Domain verification status",
+				Default:             int64default.StaticInt64(0),
 			},
 			"exclude": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "URL patterns to exclude (regex)",
+				MarkdownDescription: "URL patterns to exclude (regex)",
+			},
+			"execute_js": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Execute JavaScript during asset collection (only when browser_mode is enabled)",
+				MarkdownDescription: "Execute JavaScript during asset collection (only when browser_mode is enabled)",
+				Default:             booldefault.StaticBool(false),
 			},
 			"headers": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Custom headers",
+				MarkdownDescription: "Custom headers",
 			},
 			"id": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Crawler ID",
+				MarkdownDescription: "Crawler ID",
+			},
+			"include": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "URL patterns to include (regex)",
+				MarkdownDescription: "URL patterns to include (regex)",
+			},
+			"max_errors": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Maximum errors before stopping crawl",
+				MarkdownDescription: "Maximum errors before stopping crawl",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"max_hits": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Maximum total requests, 0 for unlimited (default: 0, non-default requires verification)",
+				MarkdownDescription: "Maximum total requests, 0 for unlimited (default: 0, non-default requires verification)",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"max_html": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Maximum HTML pages, 0 for unlimited (default: org limit, non-default requires verification)",
+				MarkdownDescription: "Maximum HTML pages, 0 for unlimited (default: org limit, non-default requires verification)",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
 			},
 			"name": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Crawler name",
+				MarkdownDescription: "Crawler name",
 			},
 			"organization": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 			"project_id": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Project ID",
+				MarkdownDescription: "Project ID",
+			},
+			"sitemap": schema.ListNestedAttribute{
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{},
+					CustomType: SitemapType{
+						ObjectType: types.ObjectType{
+							AttrTypes: SitemapValue{}.AttributeTypes(ctx),
+						},
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Sitemap configuration",
+				MarkdownDescription: "Sitemap configuration",
+			},
+			"start_urls": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Starting URLs for crawl",
+				MarkdownDescription: "Starting URLs for crawl",
+			},
+			"status_ok": schema.ListAttribute{
+				ElementType:         types.Int64Type,
+				Optional:            true,
+				Computed:            true,
+				Description:         "HTTP status codes that will result in content being captured and pushed to Quant",
+				MarkdownDescription: "HTTP status codes that will result in content being captured and pushed to Quant",
 			},
 			"updated_at": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Last update timestamp",
+				MarkdownDescription: "Last update timestamp",
 			},
 			"urls": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "URLs to crawl",
+				MarkdownDescription: "URLs to crawl",
 			},
 			"urls_list": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "URLs list (YAML)",
+				MarkdownDescription: "URLs list (YAML)",
+			},
+			"user_agent": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Custom user agent, only when browser_mode is false",
+				MarkdownDescription: "Custom user agent, only when browser_mode is false",
 			},
 			"uuid": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Crawler UUID",
+				MarkdownDescription: "Crawler UUID",
 			},
-			"force_refresh": schema.StringAttribute{
-				Optional:    true,
-				Description: "Forces a refresh of the crawler when changed. Set to any value (e.g., timestamp) to trigger an update.",
+			"webhook_auth_header": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Authorization header for webhook",
+				MarkdownDescription: "Authorization header for webhook",
+			},
+			"webhook_extra_vars": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Extra variables for webhook",
+				MarkdownDescription: "Extra variables for webhook",
+			},
+			"webhook_url": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Webhook URL for notifications",
+				MarkdownDescription: "Webhook URL for notifications",
+			},
+			"workers": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Number of concurrent workers (default: 2, non-default requires verification)",
+				MarkdownDescription: "Number of concurrent workers (default: 2, non-default requires verification)",
+				Validators: []validator.Int64{
+					int64validator.Between(1, 20),
+				},
 			},
 		},
 	}
 }
 
 type CrawlerModel struct {
-	BrowserMode    types.Bool   `tfsdk:"browser_mode"`
-	Config         types.String `tfsdk:"config"`
-	Crawler        types.String `tfsdk:"crawler"`
-	CreatedAt      types.String `tfsdk:"created_at"`
-	DeletedAt      types.String `tfsdk:"deleted_at"`
-	Domain         types.String `tfsdk:"domain"`
-	DomainVerified types.Int64  `tfsdk:"domain_verified"`
-	Exclude        types.List   `tfsdk:"exclude"`
-	Headers        types.Map    `tfsdk:"headers"`
-	Id             types.Int64  `tfsdk:"id"`
-	Name           types.String `tfsdk:"name"`
-	Organization   types.String `tfsdk:"organization"`
-	Project        types.String `tfsdk:"project"`
-	ProjectId      types.Int64  `tfsdk:"project_id"`
-	UpdatedAt      types.String `tfsdk:"updated_at"`
-	Urls           types.List   `tfsdk:"urls"`
-	UrlsList       types.String `tfsdk:"urls_list"`
-	Uuid           types.String `tfsdk:"uuid"`
-	ForceRefresh   types.String `tfsdk:"force_refresh"`
+	AllowedDomains    types.List    `tfsdk:"allowed_domains"`
+	Assets            AssetsValue   `tfsdk:"assets"`
+	BrowserMode       types.Bool    `tfsdk:"browser_mode"`
+	Config            types.String  `tfsdk:"config"`
+	Crawler           types.String  `tfsdk:"crawler"`
+	CreatedAt         types.String  `tfsdk:"created_at"`
+	Delay             types.Float64 `tfsdk:"delay"`
+	DeletedAt         types.String  `tfsdk:"deleted_at"`
+	Depth             types.Int64   `tfsdk:"depth"`
+	Domain            types.String  `tfsdk:"domain"`
+	DomainVerified    types.Int64   `tfsdk:"domain_verified"`
+	Exclude           types.List    `tfsdk:"exclude"`
+	ExecuteJs         types.Bool    `tfsdk:"execute_js"`
+	Headers           types.Map     `tfsdk:"headers"`
+	Id                types.Int64   `tfsdk:"id"`
+	Include           types.List    `tfsdk:"include"`
+	MaxErrors         types.Int64   `tfsdk:"max_errors"`
+	MaxHits           types.Int64   `tfsdk:"max_hits"`
+	MaxHtml           types.Int64   `tfsdk:"max_html"`
+	Name              types.String  `tfsdk:"name"`
+	Organization      types.String  `tfsdk:"organization"`
+	Project           types.String  `tfsdk:"project"`
+	ProjectId         types.Int64   `tfsdk:"project_id"`
+	Sitemap           types.List    `tfsdk:"sitemap"`
+	StartUrls         types.List    `tfsdk:"start_urls"`
+	StatusOk          types.List    `tfsdk:"status_ok"`
+	UpdatedAt         types.String  `tfsdk:"updated_at"`
+	Urls              types.List    `tfsdk:"urls"`
+	UrlsList          types.String  `tfsdk:"urls_list"`
+	UserAgent         types.String  `tfsdk:"user_agent"`
+	Uuid              types.String  `tfsdk:"uuid"`
+	WebhookAuthHeader types.String  `tfsdk:"webhook_auth_header"`
+	WebhookExtraVars  types.String  `tfsdk:"webhook_extra_vars"`
+	WebhookUrl        types.String  `tfsdk:"webhook_url"`
+	Workers           types.Int64   `tfsdk:"workers"`
+}
+
+var _ basetypes.ObjectTypable = AssetsType{}
+
+type AssetsType struct {
+	basetypes.ObjectType
+}
+
+func (t AssetsType) Equal(o attr.Type) bool {
+	other, ok := o.(AssetsType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t AssetsType) String() string {
+	return "AssetsType"
+}
+
+func (t AssetsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return AssetsValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewAssetsValueNull() AssetsValue {
+	return AssetsValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewAssetsValueUnknown() AssetsValue {
+	return AssetsValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewAssetsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (AssetsValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing AssetsValue Attribute Value",
+				"While creating a AssetsValue value, a missing attribute value was detected. "+
+					"A AssetsValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("AssetsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid AssetsValue Attribute Type",
+				"While creating a AssetsValue value, an invalid attribute value was detected. "+
+					"A AssetsValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("AssetsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("AssetsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra AssetsValue Attribute Value",
+				"While creating a AssetsValue value, an extra attribute value was detected. "+
+					"A AssetsValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra AssetsValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewAssetsValueUnknown(), diags
+	}
+
+	if diags.HasError() {
+		return NewAssetsValueUnknown(), diags
+	}
+
+	return AssetsValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewAssetsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) AssetsValue {
+	object, diags := NewAssetsValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewAssetsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t AssetsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewAssetsValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewAssetsValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewAssetsValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewAssetsValueMust(AssetsValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t AssetsType) ValueType(ctx context.Context) attr.Value {
+	return AssetsValue{}
+}
+
+var _ basetypes.ObjectValuable = AssetsValue{}
+
+type AssetsValue struct {
+	state attr.ValueState
+}
+
+func (v AssetsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 0)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 0)
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v AssetsValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v AssetsValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v AssetsValue) String() string {
+	return "AssetsValue"
+}
+
+func (v AssetsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{})
+
+	return objVal, diags
+}
+
+func (v AssetsValue) Equal(o attr.Value) bool {
+	other, ok := o.(AssetsValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	return true
+}
+
+func (v AssetsValue) Type(ctx context.Context) attr.Type {
+	return AssetsType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v AssetsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{}
+}
+
+var _ basetypes.ObjectTypable = SitemapType{}
+
+type SitemapType struct {
+	basetypes.ObjectType
+}
+
+func (t SitemapType) Equal(o attr.Type) bool {
+	other, ok := o.(SitemapType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t SitemapType) String() string {
+	return "SitemapType"
+}
+
+func (t SitemapType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return SitemapValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSitemapValueNull() SitemapValue {
+	return SitemapValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewSitemapValueUnknown() SitemapValue {
+	return SitemapValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewSitemapValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (SitemapValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing SitemapValue Attribute Value",
+				"While creating a SitemapValue value, a missing attribute value was detected. "+
+					"A SitemapValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SitemapValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid SitemapValue Attribute Type",
+				"While creating a SitemapValue value, an invalid attribute value was detected. "+
+					"A SitemapValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SitemapValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("SitemapValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra SitemapValue Attribute Value",
+				"While creating a SitemapValue value, an extra attribute value was detected. "+
+					"A SitemapValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra SitemapValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewSitemapValueUnknown(), diags
+	}
+
+	if diags.HasError() {
+		return NewSitemapValueUnknown(), diags
+	}
+
+	return SitemapValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSitemapValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) SitemapValue {
+	object, diags := NewSitemapValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewSitemapValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t SitemapType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewSitemapValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewSitemapValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewSitemapValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewSitemapValueMust(SitemapValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t SitemapType) ValueType(ctx context.Context) attr.Value {
+	return SitemapValue{}
+}
+
+var _ basetypes.ObjectValuable = SitemapValue{}
+
+type SitemapValue struct {
+	state attr.ValueState
+}
+
+func (v SitemapValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 0)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 0)
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v SitemapValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v SitemapValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v SitemapValue) String() string {
+	return "SitemapValue"
+}
+
+func (v SitemapValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{})
+
+	return objVal, diags
+}
+
+func (v SitemapValue) Equal(o attr.Value) bool {
+	other, ok := o.(SitemapValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	return true
+}
+
+func (v SitemapValue) Type(ctx context.Context) attr.Type {
+	return SitemapType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v SitemapValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{}
 }

@@ -5,8 +5,6 @@ package resource_project
 import (
 	"context"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -16,134 +14,73 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"allow_query_params": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allow query parameters",
+				MarkdownDescription: "Allow query parameters",
 			},
 			"basic_auth_password": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
-			"basic_auth_preview_only": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Basic auth password",
+				MarkdownDescription: "Basic auth password",
 			},
 			"basic_auth_username": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
-			"created_at": schema.StringAttribute{
-				Computed: true,
-			},
-			"custom_s3_sync_access_key": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
-			"custom_s3_sync_bucket": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
-			"custom_s3_sync_region": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
-			"custom_s3_sync_secret_key": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
-			"deleted_at": schema.StringAttribute{
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Basic auth username",
+				MarkdownDescription: "Basic auth username",
 			},
 			"disable_revisions": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  booldefault.StaticBool(true),
-			},
-			"fastly_migrated": schema.Int64Attribute{
-				Computed: true,
-				Default:  int64default.StaticInt64(1),
-			},
-			"git_url": schema.StringAttribute{
-				Computed: true,
-			},
-			"id": schema.Int64Attribute{
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Disable revisions",
+				MarkdownDescription: "Disable revisions",
 			},
 			"machine_name": schema.StringAttribute{
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project machine name",
+				MarkdownDescription: "Project machine name",
 			},
 			"name": schema.StringAttribute{
-				Required: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project name",
+				MarkdownDescription: "Project name",
 			},
 			"organization": schema.StringAttribute{
 				Optional: true,
-				Computed: true,
-			},
-			"organization_id": schema.Int64Attribute{
-				Computed: true,
-			},
-			"parent_project_id": schema.Int64Attribute{
 				Computed: true,
 			},
 			"project": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 			},
-			"project_type": schema.StringAttribute{
-				Computed: true,
-				Default:  stringdefault.StaticString("normal"),
-			},
 			"region": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  stringdefault.StaticString("au"),
-			},
-			"security_score": schema.StringAttribute{
-				Computed: true,
-			},
-			"updated_at": schema.StringAttribute{
-				Computed: true,
-			},
-			"uuid": schema.StringAttribute{
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project region",
+				MarkdownDescription: "Project region",
 			},
 			"with_token": schema.BoolAttribute{
 				Optional: true,
 				Computed: true,
 				Default:  booldefault.StaticBool(false),
 			},
-			"write_token": schema.StringAttribute{
-				Computed: true,
-			},
 		},
 	}
 }
 
 type ProjectModel struct {
-	AllowQueryParams      types.Bool   `tfsdk:"allow_query_params"`
-	BasicAuthPassword     types.String `tfsdk:"basic_auth_password"`
-	BasicAuthPreviewOnly  types.String `tfsdk:"basic_auth_preview_only"`
-	BasicAuthUsername     types.String `tfsdk:"basic_auth_username"`
-	CreatedAt             types.String `tfsdk:"created_at"`
-	CustomS3SyncAccessKey types.String `tfsdk:"custom_s3_sync_access_key"`
-	CustomS3SyncBucket    types.String `tfsdk:"custom_s3_sync_bucket"`
-	CustomS3SyncRegion    types.String `tfsdk:"custom_s3_sync_region"`
-	CustomS3SyncSecretKey types.String `tfsdk:"custom_s3_sync_secret_key"`
-	DeletedAt             types.String `tfsdk:"deleted_at"`
-	DisableRevisions      types.Bool   `tfsdk:"disable_revisions"`
-	FastlyMigrated        types.Int64  `tfsdk:"fastly_migrated"`
-	GitUrl                types.String `tfsdk:"git_url"`
-	Id                    types.Int64  `tfsdk:"id"`
-	MachineName           types.String `tfsdk:"machine_name"`
-	Name                  types.String `tfsdk:"name"`
-	Organization          types.String `tfsdk:"organization"`
-	OrganizationId        types.Int64  `tfsdk:"organization_id"`
-	ParentProjectId       types.Int64  `tfsdk:"parent_project_id"`
-	Project               types.String `tfsdk:"project"`
-	ProjectType           types.String `tfsdk:"project_type"`
-	Region                types.String `tfsdk:"region"`
-	SecurityScore         types.String `tfsdk:"security_score"`
-	UpdatedAt             types.String `tfsdk:"updated_at"`
-	Uuid                  types.String `tfsdk:"uuid"`
-	WithToken             types.Bool   `tfsdk:"with_token"`
-	WriteToken            types.String `tfsdk:"write_token"`
+	AllowQueryParams  types.Bool   `tfsdk:"allow_query_params"`
+	BasicAuthPassword types.String `tfsdk:"basic_auth_password"`
+	BasicAuthUsername types.String `tfsdk:"basic_auth_username"`
+	DisableRevisions  types.Bool   `tfsdk:"disable_revisions"`
+	MachineName       types.String `tfsdk:"machine_name"`
+	Name              types.String `tfsdk:"name"`
+	Organization      types.String `tfsdk:"organization"`
+	Project           types.String `tfsdk:"project"`
+	Region            types.String `tfsdk:"region"`
+	WithToken         types.Bool   `tfsdk:"with_token"`
 }

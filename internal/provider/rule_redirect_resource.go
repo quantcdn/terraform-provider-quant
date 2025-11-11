@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_redirect"
 	"terraform-provider-quant/internal/utils"
@@ -11,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
@@ -78,11 +82,7 @@ func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	diags = callRuleRedirectReadAPI(ctx, r, &data)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	resp.Diagnostics.Append(diags...)
+	// No need to read immediately after create - we have all the data from the create response
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -133,11 +133,9 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	diags = callRuleRedirectReadAPI(ctx, r, &plan)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	resp.Diagnostics.Append(diags...)
+	// Note: We don't read immediately after update to avoid eventual consistency issues.
+	// The update response contains the new UUID which we've already captured.
+	// The next terraform refresh/plan will read the latest state.
 
 	// Save updated plan into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -188,7 +186,7 @@ func (r *ruleRedirectResource) ImportState(ctx context.Context, req resource.Imp
 // callRuleRedirectCreateAPI calls the API endpoint to create a rule
 // resource in Quant.
 func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rule *resource_rule_redirect.RuleRedirectModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleRedirectRequestWithDefaults()
+	req := *quantadmingo.NewV2RuleRedirectRequestWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
@@ -276,7 +274,34 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		req.SetWeight(weight)
 	}
 
-	res, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).RuleRedirectRequest(req).Execute()
+	// Debug: Log the request payload
+	reqJSON, _ := json.Marshal(req)
+	tflog.Debug(ctx, "=== RULE REDIRECT CREATE REQUEST ===", map[string]interface{}{
+		"payload": string(reqJSON),
+	})
+
+	res, httpResp, err := r.client.Instance.RulesAPI.RulesRedirectCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).V2RuleRedirectRequest(req).Execute()
+
+	// Debug: Log the API response
+	if httpResp != nil && httpResp.Body != nil {
+		bodyBytes, _ := io.ReadAll(httpResp.Body)
+		tflog.Debug(ctx, "=== RULE REDIRECT CREATE RESPONSE ===", map[string]interface{}{
+			"status": httpResp.Status,
+			"body":   string(bodyBytes),
+		})
+		
+		// Try to parse API error response
+		if err != nil {
+			var apiError struct {
+				Error   bool   `json:"error"`
+				Message string `json:"message"`
+			}
+			if jsonErr := json.Unmarshal(bodyBytes, &apiError); jsonErr == nil && apiError.Message != "" {
+				diags.AddError("Failed to create rule", apiError.Message)
+				return
+			}
+		}
+	}
 
 	if err != nil {
 		diags.AddError("Failed to create rule", err.Error())
@@ -322,6 +347,13 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		rule.IpIsNot = emptyList
 	}
 
+	// Set only_with_cookie from API response or null if not provided
+	if res.OnlyWithCookie != nil && *res.OnlyWithCookie != "" {
+		rule.OnlyWithCookie = types.StringValue(*res.OnlyWithCookie)
+	} else {
+		rule.OnlyWithCookie = types.StringNull()
+	}
+
 	return
 }
 
@@ -336,7 +368,10 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 		return
 	}
 
-	api, res, err := r.client.Instance.RulesRedirectAPI.RulesRedirectRead(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
+	// Use shared retry logic for eventual consistency
+	api, res, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleRedirect, *http.Response, error) {
+		return r.client.Instance.RulesAPI.RulesRedirectRead(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	}, "rule_redirect")
 
 	if err != nil {
 		diags.AddError("Failed to read rule", err.Error())
@@ -438,7 +473,11 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 	rule.Url = urls
 
 	// Handle redirect specific fields
-	rule.RedirectCode = types.StringValue(api.ActionConfig.StatusCode)
+	if api.ActionConfig.StatusCode != nil {
+		rule.RedirectCode = types.StringValue(*api.ActionConfig.StatusCode)
+	} else {
+		rule.RedirectCode = types.StringNull()
+	}
 	rule.RedirectTo = types.StringValue(api.ActionConfig.To)
 
 	return
@@ -455,7 +494,7 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		return
 	}
 
-	req := *quantadmingo.NewRuleRedirectRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2RuleRedirectRequestWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
@@ -531,13 +570,17 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		req.SetWeight(weight)
 	}
 
-	_, res, err := r.client.Instance.RulesRedirectAPI.RulesRedirectUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).RuleRedirectRequestUpdate(req).Execute()
+	api, res, err := r.client.Instance.RulesAPI.RulesRedirectUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.Uuid.ValueString()).V2RuleRedirectRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to update rule", err.Error())
 		diags.AddError("Response", fmt.Sprintf("%v", res))
 		return
 	}
+
+	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
+	rule.Uuid = types.StringValue(api.GetUuid())
+	rule.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
@@ -553,7 +596,7 @@ func callRuleRedirectDeleteAPI(ctx context.Context, r *ruleRedirectResource, rul
 	}
 
 	org := r.client.Organization
-	_, _, err := r.client.Instance.RulesRedirectAPI.RulesRedirectDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
+	_, err := r.client.Instance.RulesAPI.RulesRedirectDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to delete rule", err.Error())

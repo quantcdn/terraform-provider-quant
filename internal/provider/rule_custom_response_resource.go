@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_custom_response"
 	"terraform-provider-quant/internal/utils"
@@ -78,11 +79,7 @@ func (r *ruleCustomResponseResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	diags = callRuleCustomResponseReadAPI(ctx, r, &data)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	resp.Diagnostics.Append(diags...)
+	// No need to read immediately after create - we have all the data from the create response
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -127,11 +124,9 @@ func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	diags = callRuleCustomResponseReadAPI(ctx, r, &plan)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	resp.Diagnostics.Append(diags...)
+	// Note: We don't read immediately after update to avoid eventual consistency issues.
+	// The update response contains the new UUID which we've already captured.
+	// The next terraform refresh/plan will read the latest state.
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -176,7 +171,7 @@ func (r *ruleCustomResponseResource) ImportState(ctx context.Context, req resour
 }
 
 func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseResource, rule *resource_rule_custom_response.RuleCustomResponseModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleCustomResponseRequestWithDefaults()
+	req := *quantadmingo.NewV2RuleCustomResponseRequestWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
@@ -264,7 +259,7 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 		req.SetWeight(weight)
 	}
 
-	res, _, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).RuleCustomResponseRequest(req).Execute()
+	res, _, err := r.client.Instance.RulesAPI.RulesCustomResponseCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).V2RuleCustomResponseRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to create rule", err.Error())
@@ -274,6 +269,37 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 	rule.Uuid = types.StringValue(res.GetUuid())
 	rule.RuleId = types.StringValue(res.GetRuleId())
 	rule.Organization = types.StringValue(r.client.Organization)
+	rule.Action = types.StringValue("custom_response")
+	rule.Rule = types.StringValue("")
+	
+	// Set only_with_cookie from API response or null if not provided
+	if res.OnlyWithCookie != nil && *res.OnlyWithCookie != "" {
+		rule.OnlyWithCookie = types.StringValue(*res.OnlyWithCookie)
+	} else {
+		rule.OnlyWithCookie = types.StringNull()
+	}
+	
+	// Set conditional fields to null if not used
+	if rule.Method.IsNull() || rule.Method.IsUnknown() {
+		rule.Method = types.StringNull()
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		rule.MethodIs = emptyList
+		rule.MethodIsNot = emptyList
+	}
+	
+	if rule.Country.IsNull() || rule.Country.IsUnknown() {
+		rule.Country = types.StringNull()
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		rule.CountryIs = emptyList
+		rule.CountryIsNot = emptyList
+	}
+	
+	if rule.Ip.IsNull() || rule.Ip.IsUnknown() {
+		rule.Ip = types.StringNull()
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		rule.IpIs = emptyList
+		rule.IpIsNot = emptyList
+	}
 
 	return
 }
@@ -288,7 +314,10 @@ func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseRes
 		return
 	}
 
-	api, res, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseRead(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
+	// Use shared retry logic for eventual consistency
+	api, res, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleCustomResponse, *http.Response, error) {
+		return r.client.Instance.RulesAPI.RulesCustomResponseRead(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	}, "rule_custom_response")
 
 	if err != nil {
 		diags.AddError("Failed to read rule", err.Error())
@@ -390,7 +419,11 @@ func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseRes
 	rule.Url = urls
 
 	// Handle custom response specific fields
-	rule.CustomResponseStatusCode = types.Int64Value(int64(api.ActionConfig.CustomResponseStatusCode))
+	if api.ActionConfig.CustomResponseStatusCode != nil {
+		rule.CustomResponseStatusCode = types.Int64Value(int64(*api.ActionConfig.CustomResponseStatusCode))
+	} else {
+		rule.CustomResponseStatusCode = types.Int64Null()
+	}
 	rule.CustomResponseBody = types.StringValue(api.ActionConfig.CustomResponseBody)
 
 	return
@@ -406,7 +439,7 @@ func callRuleCustomResponseUpdateAPI(ctx context.Context, r *ruleCustomResponseR
 		return
 	}
 
-	req := *quantadmingo.NewRuleCustomResponseRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2RuleCustomResponseRequestWithDefaults()
 	req.SetName(rule.Name.ValueString())
 
 	var domains []string
@@ -482,13 +515,17 @@ func callRuleCustomResponseUpdateAPI(ctx context.Context, r *ruleCustomResponseR
 		req.SetWeight(weight)
 	}
 
-	_, res, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.RuleId.ValueString()).RuleCustomResponseRequestUpdate(req).Execute()
+	api, res, err := r.client.Instance.RulesAPI.RulesCustomResponseUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.Uuid.ValueString()).V2RuleCustomResponseRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to update rule", err.Error())
 		diags.AddError("Response", fmt.Sprintf("%v", res))
 		return
 	}
+
+	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
+	rule.Uuid = types.StringValue(api.GetUuid())
+	rule.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
@@ -503,7 +540,7 @@ func callRuleCustomResponseDeleteAPI(ctx context.Context, r *ruleCustomResponseR
 	}
 
 	org := r.client.Organization
-	_, _, err := r.client.Instance.RulesCustomResponseAPI.RulesCustomResponseDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.RuleId.ValueString()).Execute()
+	_, err := r.client.Instance.RulesAPI.RulesCustomResponseDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to delete rule", err.Error())

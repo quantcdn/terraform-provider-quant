@@ -4,6 +4,7 @@ import (
     "context"
     "net/http"
     "sync"
+    "time"
 
     openapi "github.com/quantcdn/quant-admin-go"
 )
@@ -45,18 +46,27 @@ func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Cl
 	}
 
 	// Create rate-limited HTTP client
-	if opts != nil && opts.HTTPClient != nil {
-		// Wrap existing HTTP client with rate limiting
-		rateLimiter := NewRateLimitedRoundTripper(opts.HTTPClient.Transport, rateLimitConfig)
-		httpClient = &RateLimitedHTTPClient{
-			Client: &http.Client{
-				Transport: rateLimiter,
-				Timeout:   opts.HTTPClient.Timeout,
-			},
-			rateLimiter: rateLimiter,
-		}
+	var baseTransport http.RoundTripper
+	if opts != nil && opts.HTTPClient != nil && opts.HTTPClient.Transport != nil {
+		baseTransport = opts.HTTPClient.Transport
 	} else {
-		httpClient = NewRateLimitedHTTPClient(rateLimitConfig)
+		baseTransport = http.DefaultTransport
+	}
+	
+	// Create rate limiter
+	rateLimiter := NewRateLimitedRoundTripper(baseTransport, rateLimitConfig)
+	
+	timeout := 120 * time.Second
+	if opts != nil && opts.HTTPClient != nil && opts.HTTPClient.Timeout > 0 {
+		timeout = opts.HTTPClient.Timeout
+	}
+	
+	httpClient = &RateLimitedHTTPClient{
+		Client: &http.Client{
+			Transport: rateLimiter,
+			Timeout:   timeout,
+		},
+		rateLimiter: rateLimiter,
 	}
 
 	// Configure OpenAPI client
@@ -76,7 +86,9 @@ func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Cl
 	cfg.AddDefaultHeader("Authorization", "Bearer "+bearer)
 
 	client := openapi.NewAPIClient(cfg)
-	ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
+	ctx := context.Background()
+	// Don't use ContextAccessToken as it adds Bearer prefix again
+	// ctx := context.WithValue(context.Background(), openapi.ContextAccessToken, bearer)
 
     return &Client{
 		Bearer:          bearer,
@@ -146,6 +158,7 @@ func (c *Client) UpdateRateLimitConfig(config *RateLimitConfig) {
 	cfg := openapi.NewConfiguration()
 	cfg.HTTPClient = c.httpClient.Client
 	cfg.AddDefaultHeader("Authorization", "Bearer "+c.Bearer)
+	// Ensure no duplicate Bearer prefix
 
 	c.Instance = openapi.NewAPIClient(cfg)
 }
