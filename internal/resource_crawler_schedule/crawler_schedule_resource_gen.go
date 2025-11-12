@@ -34,6 +34,11 @@ func CrawlerScheduleResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Crawler schedule identifier",
 				MarkdownDescription: "Crawler schedule identifier",
 			},
+			"crawler_uuid": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Crawler UUID",
+				MarkdownDescription: "Crawler UUID",
+			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
 				Description:         "Creation timestamp",
@@ -85,6 +90,7 @@ type CrawlerScheduleModel struct {
 	CrawlerConfigId    types.Int64  `tfsdk:"crawler_config_id"`
 	CrawlerLastRunId   types.Int64  `tfsdk:"crawler_last_run_id"`
 	CrawlerSchedule    types.String `tfsdk:"crawler_schedule"`
+	CrawlerUuid        types.String `tfsdk:"crawler_uuid"`
 	CreatedAt          types.String `tfsdk:"created_at"`
 	Id                 types.Int64  `tfsdk:"id"`
 	Name               types.String `tfsdk:"name"`

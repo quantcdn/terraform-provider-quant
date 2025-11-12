@@ -55,11 +55,11 @@ func (r *ruleContentFilterResource) Configure(_ context.Context, req resource.Co
 }
 
 func (r *ruleContentFilterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform plan data into the model
@@ -102,11 +102,11 @@ func (r *ruleContentFilterResource) Read(ctx context.Context, req resource.ReadR
 }
 
 func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var plan resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform plan data into the model
@@ -131,20 +131,23 @@ func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	// Note: We don't read immediately after update to avoid eventual consistency issues.
-	// The update response contains the new UUID which we've already captured.
-	// The next terraform refresh/plan will read the latest state.
+	// Read after update to populate computed fields correctly
+	diags = callRuleContentFilterReadAPI(ctx, r, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ruleContentFilterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform prior state data into the model
@@ -303,6 +306,50 @@ func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterRes
 
 	data.Uuid = types.StringValue(api.GetUuid())
 	data.RuleId = types.StringValue(api.GetRuleId())
+	data.Organization = types.StringValue(r.client.Organization)
+	data.Action = types.StringValue("content_filter")
+
+	// Set computed fields to null if unknown
+	if data.Rule.IsUnknown() {
+		data.Rule = types.StringNull()
+	}
+	if data.OnlyWithCookie.IsUnknown() {
+		data.OnlyWithCookie = types.StringNull()
+	}
+	if data.Method.IsUnknown() {
+		data.Method = types.StringNull()
+	}
+	if data.Country.IsUnknown() {
+		data.Country = types.StringNull()
+	}
+	if data.Ip.IsUnknown() {
+		data.Ip = types.StringNull()
+	}
+
+	// Set conditional lists to empty if unknown
+	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+	if data.MethodIs.IsUnknown() {
+		data.MethodIs = emptyList
+	}
+	if data.MethodIsNot.IsUnknown() {
+		data.MethodIsNot = emptyList
+	}
+	if data.CountryIs.IsUnknown() {
+		data.CountryIs = emptyList
+	}
+	if data.CountryIsNot.IsUnknown() {
+		data.CountryIsNot = emptyList
+	}
+	if data.IpIs.IsUnknown() {
+		data.IpIs = emptyList
+	}
+	if data.IpIsNot.IsUnknown() {
+		data.IpIsNot = emptyList
+	}
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	data.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
 
 	return
 }
@@ -630,6 +677,10 @@ func callRuleContentFilterReadAPI(ctx context.Context, r *ruleContentFilterResou
 	}
 
 	data.Rule = types.StringNull() // Obsolete field
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	data.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
 
 	return
 }

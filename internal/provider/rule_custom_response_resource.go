@@ -59,11 +59,11 @@ func (r *ruleCustomResponseResource) Configure(_ context.Context, req resource.C
 }
 
 func (r *ruleCustomResponseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_custom_response.RuleCustomResponseModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -100,11 +100,11 @@ func (r *ruleCustomResponseResource) Read(ctx context.Context, req resource.Read
 }
 
 func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var plan resource_rule_custom_response.RuleCustomResponseModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -115,6 +115,9 @@ func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.Up
 
 	var state resource_rule_custom_response.RuleCustomResponseModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	// Preserve UUID and RuleId from state (needed for update API call)
+	plan.Uuid = state.Uuid
 	plan.RuleId = state.RuleId
 
 	diags := callRuleCustomResponseUpdateAPI(ctx, r, &plan)
@@ -124,19 +127,22 @@ func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	// Note: We don't read immediately after update to avoid eventual consistency issues.
-	// The update response contains the new UUID which we've already captured.
-	// The next terraform refresh/plan will read the latest state.
+	// Read after update to populate computed fields correctly
+	diags = callRuleCustomResponseReadAPI(ctx, r, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ruleCustomResponseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_custom_response.RuleCustomResponseModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -271,14 +277,14 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 	rule.Organization = types.StringValue(r.client.Organization)
 	rule.Action = types.StringValue("custom_response")
 	rule.Rule = types.StringValue("")
-	
+
 	// Set only_with_cookie from API response or null if not provided
 	if res.OnlyWithCookie != nil && *res.OnlyWithCookie != "" {
 		rule.OnlyWithCookie = types.StringValue(*res.OnlyWithCookie)
 	} else {
 		rule.OnlyWithCookie = types.StringNull()
 	}
-	
+
 	// Set conditional fields to null if not used
 	if rule.Method.IsNull() || rule.Method.IsUnknown() {
 		rule.Method = types.StringNull()
@@ -286,19 +292,31 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 		rule.MethodIs = emptyList
 		rule.MethodIsNot = emptyList
 	}
-	
+
 	if rule.Country.IsNull() || rule.Country.IsUnknown() {
 		rule.Country = types.StringNull()
 		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
 		rule.CountryIs = emptyList
 		rule.CountryIsNot = emptyList
 	}
-	
+
 	if rule.Ip.IsNull() || rule.Ip.IsUnknown() {
 		rule.Ip = types.StringNull()
 		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
 		rule.IpIs = emptyList
 		rule.IpIsNot = emptyList
+	}
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	rule.ActionConfig = resource_rule_custom_response.NewActionConfigValueNull()
+
+	// Set body and status_code to null if unknown
+	if rule.Body.IsUnknown() {
+		rule.Body = types.StringNull()
+	}
+	if rule.StatusCode.IsUnknown() {
+		rule.StatusCode = types.Int64Null()
 	}
 
 	return
@@ -425,6 +443,14 @@ func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseRes
 		rule.CustomResponseStatusCode = types.Int64Null()
 	}
 	rule.CustomResponseBody = types.StringValue(api.ActionConfig.CustomResponseBody)
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	rule.ActionConfig = resource_rule_custom_response.NewActionConfigValueNull()
+
+	// Set body and status_code to null (these are schema-level computed fields)
+	rule.Body = types.StringNull()
+	rule.StatusCode = types.Int64Null()
 
 	return
 }

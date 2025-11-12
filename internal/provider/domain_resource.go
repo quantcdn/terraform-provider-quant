@@ -271,13 +271,8 @@ func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_
 	domain.DnsEngaged = types.Int64Value(int64(apiResp.GetDnsEngaged()))
 	domain.Organization = types.StringValue(org)
 	
-	// V2Domain doesn't return these fields - set to null or computed defaults
-	domain.CreatedAt = types.StringNull()
-	domain.UpdatedAt = types.StringNull()
-	domain.DeletedAt = types.StringNull()
-	domain.InSection = types.Int64Null()
-	domain.ProjectId = types.Int64Null()
-	domain.SectionMessage = types.StringNull()
+	// Note: V2Domain doesn't return these fields, and they're no longer in the schema:
+	// CreatedAt, UpdatedAt, DeletedAt, InSection, ProjectId, SectionMessage
 
 	return diags
 }

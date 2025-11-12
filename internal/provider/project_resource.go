@@ -230,7 +230,7 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	req.SetName(project.Name.ValueString())
-	
+
 	// Only set optional fields if they have values
 	if !project.AllowQueryParams.IsNull() && !project.AllowQueryParams.IsUnknown() {
 		req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
@@ -241,10 +241,10 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 	if !project.BasicAuthUsername.IsNull() && !project.BasicAuthUsername.IsUnknown() {
 		req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
 	}
-	// V2 API may not support BasicAuthPreviewOnly
-	// if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
-	// 	req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
-	// }
+	// V2 API supports BasicAuthPreviewOnly (API team confirmed)
+	if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
+		req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueBool())
+	}
 
 	if project.Region.IsNull() || project.Region.IsUnknown() {
 		project.Region = types.StringValue("au")
@@ -377,11 +377,24 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 	}
 
 	req.SetName(project.Name.ValueString())
-	req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
-	req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
-	req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
-	// V2 API may not support BasicAuthPreviewOnly
-	// req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueString())
+
+	// Only set optional fields if they have values
+	if !project.AllowQueryParams.IsNull() && !project.AllowQueryParams.IsUnknown() {
+		req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
+	}
+	if !project.BasicAuthPassword.IsNull() && !project.BasicAuthPassword.IsUnknown() {
+		req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
+	}
+	if !project.BasicAuthUsername.IsNull() && !project.BasicAuthUsername.IsUnknown() {
+		req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
+	}
+	// V2 API supports BasicAuthPreviewOnly (API team confirmed)
+	if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
+		req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueBool())
+	}
+	if !project.DisableRevisions.IsNull() && !project.DisableRevisions.IsUnknown() {
+		req.SetDisableRevisions(project.DisableRevisions.ValueBool())
+	}
 
 	api := r.client.Instance.ProjectsAPI.ProjectsUpdate(r.client.AuthContext, org, project.MachineName.ValueString())
 	_, _, err := api.V2ProjectRequest(req).Execute()
@@ -417,67 +430,37 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 		return diags
 	}
 
-	// V2Project only has name and machine_name
+	// V2Project returns id, uuid, name, machine_name (API team confirmed)
+	project.Id = types.Int64Value(int64(api.GetId()))
+	project.Uuid = types.StringValue(api.GetUuid())
 	project.Name = types.StringValue(api.GetName())
 	project.MachineName = types.StringValue(api.GetMachineName())
-	
-	// V2 API doesn't return these fields - set to null/defaults
-	project.Id = types.Int64Null()
-	project.CreatedAt = types.StringNull()
-	project.UpdatedAt = types.StringNull()
-	project.Uuid = types.StringNull()
-	project.SecurityScore = types.StringNull()
-	project.GitUrl = types.StringNull()
-	project.OrganizationId = types.Int64Null()
-	project.WriteToken = types.StringNull()
 
-	// API doesn't currently return these values
-	if project.AllowQueryParams.IsNull() || project.AllowQueryParams.IsUnknown() {
+	// write_token is only returned when with_token=true query param is used
+	if api.WriteToken != nil {
+		project.WriteToken = types.StringValue(api.GetWriteToken())
+	} else {
+		project.WriteToken = types.StringNull()
+	}
+
+	// Set optional fields to null if not returned by API
+	if project.AllowQueryParams.IsUnknown() {
 		project.AllowQueryParams = types.BoolNull()
 	}
-
-	if project.BasicAuthPassword.IsNull() || project.BasicAuthPassword.IsUnknown() {
+	if project.BasicAuthPassword.IsUnknown() {
 		project.BasicAuthPassword = types.StringNull()
 	}
-
-	if project.BasicAuthUsername.IsNull() || project.BasicAuthUsername.IsUnknown() {
+	if project.BasicAuthUsername.IsUnknown() {
 		project.BasicAuthUsername = types.StringNull()
 	}
-
-	if project.BasicAuthPreviewOnly.IsNull() || project.BasicAuthPreviewOnly.IsUnknown() {
-		project.BasicAuthPreviewOnly = types.StringNull()
+	if project.DisableRevisions.IsUnknown() {
+		project.DisableRevisions = types.BoolNull()
 	}
-
-	if project.CustomS3SyncAccessKey.IsNull() || project.CustomS3SyncAccessKey.IsUnknown() {
-		project.CustomS3SyncAccessKey = types.StringNull()
-	}
-
-	if project.CustomS3SyncRegion.IsNull() || project.CustomS3SyncRegion.IsUnknown() {
-		project.CustomS3SyncRegion = types.StringNull()
-	}
-
-	if project.CustomS3SyncSecretKey.IsNull() || project.CustomS3SyncSecretKey.IsUnknown() {
-		project.CustomS3SyncSecretKey = types.StringNull()
-	}
-
-	if project.CustomS3SyncBucket.IsNull() || project.CustomS3SyncBucket.IsUnknown() {
-		project.CustomS3SyncBucket = types.StringNull()
-	}
-
-	if project.Project.IsNull() || project.Project.IsUnknown() {
+	if project.Project.IsUnknown() {
 		project.Project = types.StringNull()
 	}
-
-	if project.ParentProjectId.IsNull() || project.ParentProjectId.IsUnknown() {
-		project.ParentProjectId = types.Int64Null()
-	}
-
 	if project.Organization.IsNull() || project.Organization.IsUnknown() {
 		project.Organization = types.StringNull()
-	}
-
-	if project.DeletedAt.IsNull() || project.DeletedAt.IsUnknown() {
-		project.DeletedAt = types.StringNull()
 	}
 
 	return diags

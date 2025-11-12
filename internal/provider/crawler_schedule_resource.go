@@ -95,6 +95,13 @@ func (r *crawlerScheduleResource) Update(ctx context.Context, req resource.Updat
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
+	// Read the current state to get computed fields like ID
+	var state resource_crawler_schedule.CrawlerScheduleModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	// Preserve ID from state (it's computed and needed for update)
+	data.Id = state.Id
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -183,10 +190,12 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	schedule.Organization = types.StringValue(r.client.Organization)
 	schedule.CrawlerSchedule = types.StringValue(api.GetScheduleCronString()) // This might need a different value
 
-	// Note: schedule.Crawler (UUID) is not returned by the API, so it's preserved from the config/state
-	
-	// Set deleted_at (null if not deleted) - note: V2 API may not have this field
-	schedule.DeletedAt = types.StringNull()
+	// API team added crawler_uuid to response (API team confirmed)
+	if api.CrawlerUuid != nil {
+		schedule.CrawlerUuid = types.StringValue(api.GetCrawlerUuid())
+	}
+
+	// Note: V2 API doesn't return deleted_at, and it's no longer in the schema
 
 	return diags
 }
@@ -240,13 +249,12 @@ func callCrawlerScheduleUpdateAPI(ctx context.Context, r *crawlerScheduleResourc
 	req := quantadmingo.NewV2CrawlerScheduleRequest(schedule.Name.ValueString(), schedule.ScheduleCronString.ValueString())
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
-	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesEdit(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).V2CrawlerScheduleRequest(*req).Execute()
+	_, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesEdit(ctx, r.client.Organization, schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId).V2CrawlerScheduleRequest(*req).Execute()
 	if err != nil {
 		diags.AddError("Unable to update crawler schedule", fmt.Sprintf("Error: %s", err.Error()))
 		return
 	}
 
-	schedule.UpdatedAt = types.StringValue(api.GetUpdatedAt().Format("2006-01-02T15:04:05Z07:00"))
-
-	return diags
+	// Post-update read to populate computed fields
+	return callCrawlerScheduleReadAPI(ctx, r, schedule)
 }

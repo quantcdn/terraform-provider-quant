@@ -4,11 +4,15 @@ package resource_rule_function
 
 import (
 	"context"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
@@ -17,143 +21,506 @@ func RuleFunctionResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"action": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Rule action",
+				MarkdownDescription: "Rule action",
+			},
+			"action_config": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"fn_uuid": schema.StringAttribute{
+						Computed:            true,
+						Description:         "Function UUID",
+						MarkdownDescription: "Function UUID",
+					},
+				},
+				CustomType: ActionConfigType{
+					ObjectType: types.ObjectType{
+						AttrTypes: ActionConfigValue{}.AttributeTypes(ctx),
+					},
+				},
 				Computed: true,
 			},
 			"country": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(
-						"country_is",
-						"country_is_not",
-						"any",
-					),
-				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Country filter type (country_is, country_is_not, any)",
+				MarkdownDescription: "Country filter type (country_is, country_is_not, any)",
 			},
 			"country_is": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed countries",
+				MarkdownDescription: "Allowed countries",
 			},
 			"country_is_not": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded countries",
+				MarkdownDescription: "Excluded countries",
 			},
 			"disabled": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  booldefault.StaticBool(false),
+				Optional:            true,
+				Computed:            true,
+				Description:         "Whether rule is disabled",
+				MarkdownDescription: "Whether rule is disabled",
+				Default:             booldefault.StaticBool(false),
 			},
 			"domain": schema.ListAttribute{
-				ElementType: types.StringType,
-				Required:    true,
+				ElementType:         types.StringType,
+				Required:            true,
+				Description:         "Domain patterns (default: any)",
+				MarkdownDescription: "Domain patterns (default: any)",
 			},
 			"fn_uuid": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				Description:         "Function UUID",
+				MarkdownDescription: "Function UUID",
 			},
 			"ip": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(
-						"ip_is",
-						"ip_is_not",
-						"any",
-					),
-				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "IP filter type (ip_is, ip_is_not, any)",
+				MarkdownDescription: "IP filter type (ip_is, ip_is_not, any)",
 			},
 			"ip_is": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed IP addresses",
+				MarkdownDescription: "Allowed IP addresses",
 			},
 			"ip_is_not": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded IP addresses",
+				MarkdownDescription: "Excluded IP addresses",
 			},
 			"method": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(
-						"method_is",
-						"method_is_not",
-						"any",
-					),
-				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Method filter type (method_is, method_is_not, any)",
+				MarkdownDescription: "Method filter type (method_is, method_is_not, any)",
 			},
 			"method_is": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed HTTP methods",
+				MarkdownDescription: "Allowed HTTP methods",
 			},
 			"method_is_not": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
-				Computed:    true,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded HTTP methods",
+				MarkdownDescription: "Excluded HTTP methods",
 			},
 			"name": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Rule name",
+				MarkdownDescription: "Rule name",
 			},
 			"only_with_cookie": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Only apply with cookie",
+				MarkdownDescription: "Only apply with cookie",
 			},
 			"organization": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 			"rule": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Rule identifier",
+				MarkdownDescription: "Rule identifier",
 			},
 			"rule_id": schema.StringAttribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Rule ID",
+				MarkdownDescription: "Rule ID",
 			},
 			"url": schema.ListAttribute{
-				ElementType: types.StringType,
-				Required:    true,
+				ElementType:         types.StringType,
+				Required:            true,
+				Description:         "URL patterns",
+				MarkdownDescription: "URL patterns",
 			},
 			"uuid": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Rule UUID",
+				MarkdownDescription: "Rule UUID",
 			},
 			"weight": schema.Int64Attribute{
-				Optional: true,
-				Computed: true,
-				Default:  int64default.StaticInt64(0),
+				Optional:            true,
+				Computed:            true,
+				Description:         "Rule weight",
+				MarkdownDescription: "Rule weight",
+				Default:             int64default.StaticInt64(0),
 			},
 		},
 	}
 }
 
 type RuleFunctionModel struct {
-	Action         types.String `tfsdk:"action"`
-	Country        types.String `tfsdk:"country"`
-	CountryIs      types.List   `tfsdk:"country_is"`
-	CountryIsNot   types.List   `tfsdk:"country_is_not"`
-	Disabled       types.Bool   `tfsdk:"disabled"`
-	Domain         types.List   `tfsdk:"domain"`
-	FnUuid         types.String `tfsdk:"fn_uuid"`
-	Ip             types.String `tfsdk:"ip"`
-	IpIs           types.List   `tfsdk:"ip_is"`
-	IpIsNot        types.List   `tfsdk:"ip_is_not"`
-	Method         types.String `tfsdk:"method"`
-	MethodIs       types.List   `tfsdk:"method_is"`
-	MethodIsNot    types.List   `tfsdk:"method_is_not"`
-	Name           types.String `tfsdk:"name"`
-	OnlyWithCookie types.String `tfsdk:"only_with_cookie"`
-	Organization   types.String `tfsdk:"organization"`
-	Project        types.String `tfsdk:"project"`
-	Rule           types.String `tfsdk:"rule"`
-	RuleId         types.String `tfsdk:"rule_id"`
-	Url            types.List   `tfsdk:"url"`
-	Uuid           types.String `tfsdk:"uuid"`
-	Weight         types.Int64  `tfsdk:"weight"`
+	Action         types.String      `tfsdk:"action"`
+	ActionConfig   ActionConfigValue `tfsdk:"action_config"`
+	Country        types.String      `tfsdk:"country"`
+	CountryIs      types.List        `tfsdk:"country_is"`
+	CountryIsNot   types.List        `tfsdk:"country_is_not"`
+	Disabled       types.Bool        `tfsdk:"disabled"`
+	Domain         types.List        `tfsdk:"domain"`
+	FnUuid         types.String      `tfsdk:"fn_uuid"`
+	Ip             types.String      `tfsdk:"ip"`
+	IpIs           types.List        `tfsdk:"ip_is"`
+	IpIsNot        types.List        `tfsdk:"ip_is_not"`
+	Method         types.String      `tfsdk:"method"`
+	MethodIs       types.List        `tfsdk:"method_is"`
+	MethodIsNot    types.List        `tfsdk:"method_is_not"`
+	Name           types.String      `tfsdk:"name"`
+	OnlyWithCookie types.String      `tfsdk:"only_with_cookie"`
+	Organization   types.String      `tfsdk:"organization"`
+	Project        types.String      `tfsdk:"project"`
+	Rule           types.String      `tfsdk:"rule"`
+	RuleId         types.String      `tfsdk:"rule_id"`
+	Url            types.List        `tfsdk:"url"`
+	Uuid           types.String      `tfsdk:"uuid"`
+	Weight         types.Int64       `tfsdk:"weight"`
+}
+
+var _ basetypes.ObjectTypable = ActionConfigType{}
+
+type ActionConfigType struct {
+	basetypes.ObjectType
+}
+
+func (t ActionConfigType) Equal(o attr.Type) bool {
+	other, ok := o.(ActionConfigType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t ActionConfigType) String() string {
+	return "ActionConfigType"
+}
+
+func (t ActionConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	fnUuidAttribute, ok := attributes["fn_uuid"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`fn_uuid is missing from object`)
+
+		return nil, diags
+	}
+
+	fnUuidVal, ok := fnUuidAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`fn_uuid expected to be basetypes.StringValue, was: %T`, fnUuidAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return ActionConfigValue{
+		FnUuid: fnUuidVal,
+		state:  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewActionConfigValueNull() ActionConfigValue {
+	return ActionConfigValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewActionConfigValueUnknown() ActionConfigValue {
+	return ActionConfigValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ActionConfigValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing ActionConfigValue Attribute Value",
+				"While creating a ActionConfigValue value, a missing attribute value was detected. "+
+					"A ActionConfigValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ActionConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid ActionConfigValue Attribute Type",
+				"While creating a ActionConfigValue value, an invalid attribute value was detected. "+
+					"A ActionConfigValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ActionConfigValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("ActionConfigValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra ActionConfigValue Attribute Value",
+				"While creating a ActionConfigValue value, an extra attribute value was detected. "+
+					"A ActionConfigValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra ActionConfigValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewActionConfigValueUnknown(), diags
+	}
+
+	fnUuidAttribute, ok := attributes["fn_uuid"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`fn_uuid is missing from object`)
+
+		return NewActionConfigValueUnknown(), diags
+	}
+
+	fnUuidVal, ok := fnUuidAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`fn_uuid expected to be basetypes.StringValue, was: %T`, fnUuidAttribute))
+	}
+
+	if diags.HasError() {
+		return NewActionConfigValueUnknown(), diags
+	}
+
+	return ActionConfigValue{
+		FnUuid: fnUuidVal,
+		state:  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewActionConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ActionConfigValue {
+	object, diags := NewActionConfigValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewActionConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t ActionConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewActionConfigValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewActionConfigValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewActionConfigValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewActionConfigValueMust(ActionConfigValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t ActionConfigType) ValueType(ctx context.Context) attr.Value {
+	return ActionConfigValue{}
+}
+
+var _ basetypes.ObjectValuable = ActionConfigValue{}
+
+type ActionConfigValue struct {
+	FnUuid basetypes.StringValue `tfsdk:"fn_uuid"`
+	state  attr.ValueState
+}
+
+func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 1)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["fn_uuid"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 1)
+
+		val, err = v.FnUuid.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["fn_uuid"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v ActionConfigValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v ActionConfigValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v ActionConfigValue) String() string {
+	return "ActionConfigValue"
+}
+
+func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"fn_uuid": basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"fn_uuid": v.FnUuid,
+		})
+
+	return objVal, diags
+}
+
+func (v ActionConfigValue) Equal(o attr.Value) bool {
+	other, ok := o.(ActionConfigValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.FnUuid.Equal(other.FnUuid) {
+		return false
+	}
+
+	return true
+}
+
+func (v ActionConfigValue) Type(ctx context.Context) attr.Type {
+	return ActionConfigType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v ActionConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"fn_uuid": basetypes.StringType{},
+	}
 }

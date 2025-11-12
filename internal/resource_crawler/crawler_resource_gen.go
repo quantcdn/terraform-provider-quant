@@ -30,7 +30,58 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Allowed domains for multi-domain crawling, automatically enables merge_domains",
 			},
 			"assets": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{},
+				Attributes: map[string]schema.Attribute{
+					"network_intercept": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{
+							"enabled": schema.BoolAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "Enable network intercept",
+								MarkdownDescription: "Enable network intercept",
+							},
+							"execute_js": schema.BoolAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "Execute JavaScript during asset collection",
+								MarkdownDescription: "Execute JavaScript during asset collection",
+							},
+							"timeout": schema.Int64Attribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "Request timeout in seconds",
+								MarkdownDescription: "Request timeout in seconds",
+							},
+						},
+						CustomType: NetworkInterceptType{
+							ObjectType: types.ObjectType{
+								AttrTypes: NetworkInterceptValue{}.AttributeTypes(ctx),
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "Network intercept configuration for asset collection",
+						MarkdownDescription: "Network intercept configuration for asset collection",
+					},
+					"parser": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{
+							"enabled": schema.BoolAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "Enable parser",
+								MarkdownDescription: "Enable parser",
+							},
+						},
+						CustomType: ParserType{
+							ObjectType: types.ObjectType{
+								AttrTypes: ParserValue{}.AttributeTypes(ctx),
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "Parser configuration for asset extraction",
+						MarkdownDescription: "Parser configuration for asset extraction",
+					},
+				},
 				CustomType: AssetsType{
 					ObjectType: types.ObjectType{
 						AttrTypes: AssetsValue{}.AttributeTypes(ctx),
@@ -99,13 +150,6 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "URL patterns to exclude (regex)",
 				MarkdownDescription: "URL patterns to exclude (regex)",
-			},
-			"execute_js": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Execute JavaScript during asset collection (only when browser_mode is enabled)",
-				MarkdownDescription: "Execute JavaScript during asset collection (only when browser_mode is enabled)",
-				Default:             booldefault.StaticBool(false),
 			},
 			"headers": schema.MapAttribute{
 				ElementType:         types.StringType,
@@ -178,7 +222,20 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"sitemap": schema.ListNestedAttribute{
 				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{},
+					Attributes: map[string]schema.Attribute{
+						"recursive": schema.BoolAttribute{
+							Optional:            true,
+							Computed:            true,
+							Description:         "Recursively follow sitemap links",
+							MarkdownDescription: "Recursively follow sitemap links",
+						},
+						"url": schema.StringAttribute{
+							Optional:            true,
+							Computed:            true,
+							Description:         "Sitemap URL",
+							MarkdownDescription: "Sitemap URL",
+						},
+					},
 					CustomType: SitemapType{
 						ObjectType: types.ObjectType{
 							AttrTypes: SitemapValue{}.AttributeTypes(ctx),
@@ -276,7 +333,6 @@ type CrawlerModel struct {
 	Domain            types.String  `tfsdk:"domain"`
 	DomainVerified    types.Int64   `tfsdk:"domain_verified"`
 	Exclude           types.List    `tfsdk:"exclude"`
-	ExecuteJs         types.Bool    `tfsdk:"execute_js"`
 	Headers           types.Map     `tfsdk:"headers"`
 	Id                types.Int64   `tfsdk:"id"`
 	Include           types.List    `tfsdk:"include"`
@@ -324,12 +380,52 @@ func (t AssetsType) String() string {
 func (t AssetsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
+	attributes := in.Attributes()
+
+	networkInterceptAttribute, ok := attributes["network_intercept"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`network_intercept is missing from object`)
+
+		return nil, diags
+	}
+
+	networkInterceptVal, ok := networkInterceptAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`network_intercept expected to be basetypes.ObjectValue, was: %T`, networkInterceptAttribute))
+	}
+
+	parserAttribute, ok := attributes["parser"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`parser is missing from object`)
+
+		return nil, diags
+	}
+
+	parserVal, ok := parserAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`parser expected to be basetypes.ObjectValue, was: %T`, parserAttribute))
+	}
+
 	if diags.HasError() {
 		return nil, diags
 	}
 
 	return AssetsValue{
-		state: attr.ValueStateKnown,
+		NetworkIntercept: networkInterceptVal,
+		Parser:           parserVal,
+		state:            attr.ValueStateKnown,
 	}, diags
 }
 
@@ -396,12 +492,50 @@ func NewAssetsValue(attributeTypes map[string]attr.Type, attributes map[string]a
 		return NewAssetsValueUnknown(), diags
 	}
 
+	networkInterceptAttribute, ok := attributes["network_intercept"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`network_intercept is missing from object`)
+
+		return NewAssetsValueUnknown(), diags
+	}
+
+	networkInterceptVal, ok := networkInterceptAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`network_intercept expected to be basetypes.ObjectValue, was: %T`, networkInterceptAttribute))
+	}
+
+	parserAttribute, ok := attributes["parser"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`parser is missing from object`)
+
+		return NewAssetsValueUnknown(), diags
+	}
+
+	parserVal, ok := parserAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`parser expected to be basetypes.ObjectValue, was: %T`, parserAttribute))
+	}
+
 	if diags.HasError() {
 		return NewAssetsValueUnknown(), diags
 	}
 
 	return AssetsValue{
-		state: attr.ValueStateKnown,
+		NetworkIntercept: networkInterceptVal,
+		Parser:           parserVal,
+		state:            attr.ValueStateKnown,
 	}, diags
 }
 
@@ -473,17 +607,45 @@ func (t AssetsType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = AssetsValue{}
 
 type AssetsValue struct {
-	state attr.ValueState
+	NetworkIntercept basetypes.ObjectValue `tfsdk:"network_intercept"`
+	Parser           basetypes.ObjectValue `tfsdk:"parser"`
+	state            attr.ValueState
 }
 
 func (v AssetsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 0)
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["network_intercept"] = basetypes.ObjectType{
+		AttrTypes: NetworkInterceptValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
+	attrTypes["parser"] = basetypes.ObjectType{
+		AttrTypes: ParserValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
 
 	objectType := tftypes.Object{AttributeTypes: attrTypes}
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 0)
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.NetworkIntercept.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["network_intercept"] = val
+
+		val, err = v.Parser.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["parser"] = val
 
 		if err := tftypes.ValidateValue(objectType, vals); err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
@@ -514,7 +676,56 @@ func (v AssetsValue) String() string {
 func (v AssetsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	attributeTypes := map[string]attr.Type{}
+	var networkIntercept basetypes.ObjectValue
+
+	if v.NetworkIntercept.IsNull() {
+		networkIntercept = types.ObjectNull(
+			NetworkInterceptValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.NetworkIntercept.IsUnknown() {
+		networkIntercept = types.ObjectUnknown(
+			NetworkInterceptValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.NetworkIntercept.IsNull() && !v.NetworkIntercept.IsUnknown() {
+		networkIntercept = types.ObjectValueMust(
+			NetworkInterceptValue{}.AttributeTypes(ctx),
+			v.NetworkIntercept.Attributes(),
+		)
+	}
+
+	var parser basetypes.ObjectValue
+
+	if v.Parser.IsNull() {
+		parser = types.ObjectNull(
+			ParserValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.Parser.IsUnknown() {
+		parser = types.ObjectUnknown(
+			ParserValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.Parser.IsNull() && !v.Parser.IsUnknown() {
+		parser = types.ObjectValueMust(
+			ParserValue{}.AttributeTypes(ctx),
+			v.Parser.Attributes(),
+		)
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"network_intercept": basetypes.ObjectType{
+			AttrTypes: NetworkInterceptValue{}.AttributeTypes(ctx),
+		},
+		"parser": basetypes.ObjectType{
+			AttrTypes: ParserValue{}.AttributeTypes(ctx),
+		},
+	}
 
 	if v.IsNull() {
 		return types.ObjectNull(attributeTypes), diags
@@ -526,7 +737,10 @@ func (v AssetsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, 
 
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
-		map[string]attr.Value{})
+		map[string]attr.Value{
+			"network_intercept": networkIntercept,
+			"parser":            parser,
+		})
 
 	return objVal, diags
 }
@@ -546,6 +760,14 @@ func (v AssetsValue) Equal(o attr.Value) bool {
 		return true
 	}
 
+	if !v.NetworkIntercept.Equal(other.NetworkIntercept) {
+		return false
+	}
+
+	if !v.Parser.Equal(other.Parser) {
+		return false
+	}
+
 	return true
 }
 
@@ -558,7 +780,772 @@ func (v AssetsValue) Type(ctx context.Context) attr.Type {
 }
 
 func (v AssetsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
-	return map[string]attr.Type{}
+	return map[string]attr.Type{
+		"network_intercept": basetypes.ObjectType{
+			AttrTypes: NetworkInterceptValue{}.AttributeTypes(ctx),
+		},
+		"parser": basetypes.ObjectType{
+			AttrTypes: ParserValue{}.AttributeTypes(ctx),
+		},
+	}
+}
+
+var _ basetypes.ObjectTypable = NetworkInterceptType{}
+
+type NetworkInterceptType struct {
+	basetypes.ObjectType
+}
+
+func (t NetworkInterceptType) Equal(o attr.Type) bool {
+	other, ok := o.(NetworkInterceptType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t NetworkInterceptType) String() string {
+	return "NetworkInterceptType"
+}
+
+func (t NetworkInterceptType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	enabledAttribute, ok := attributes["enabled"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`enabled is missing from object`)
+
+		return nil, diags
+	}
+
+	enabledVal, ok := enabledAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`enabled expected to be basetypes.BoolValue, was: %T`, enabledAttribute))
+	}
+
+	executeJsAttribute, ok := attributes["execute_js"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`execute_js is missing from object`)
+
+		return nil, diags
+	}
+
+	executeJsVal, ok := executeJsAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`execute_js expected to be basetypes.BoolValue, was: %T`, executeJsAttribute))
+	}
+
+	timeoutAttribute, ok := attributes["timeout"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`timeout is missing from object`)
+
+		return nil, diags
+	}
+
+	timeoutVal, ok := timeoutAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`timeout expected to be basetypes.Int64Value, was: %T`, timeoutAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return NetworkInterceptValue{
+		Enabled:   enabledVal,
+		ExecuteJs: executeJsVal,
+		Timeout:   timeoutVal,
+		state:     attr.ValueStateKnown,
+	}, diags
+}
+
+func NewNetworkInterceptValueNull() NetworkInterceptValue {
+	return NetworkInterceptValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewNetworkInterceptValueUnknown() NetworkInterceptValue {
+	return NetworkInterceptValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewNetworkInterceptValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (NetworkInterceptValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing NetworkInterceptValue Attribute Value",
+				"While creating a NetworkInterceptValue value, a missing attribute value was detected. "+
+					"A NetworkInterceptValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("NetworkInterceptValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid NetworkInterceptValue Attribute Type",
+				"While creating a NetworkInterceptValue value, an invalid attribute value was detected. "+
+					"A NetworkInterceptValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("NetworkInterceptValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("NetworkInterceptValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra NetworkInterceptValue Attribute Value",
+				"While creating a NetworkInterceptValue value, an extra attribute value was detected. "+
+					"A NetworkInterceptValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra NetworkInterceptValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewNetworkInterceptValueUnknown(), diags
+	}
+
+	enabledAttribute, ok := attributes["enabled"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`enabled is missing from object`)
+
+		return NewNetworkInterceptValueUnknown(), diags
+	}
+
+	enabledVal, ok := enabledAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`enabled expected to be basetypes.BoolValue, was: %T`, enabledAttribute))
+	}
+
+	executeJsAttribute, ok := attributes["execute_js"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`execute_js is missing from object`)
+
+		return NewNetworkInterceptValueUnknown(), diags
+	}
+
+	executeJsVal, ok := executeJsAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`execute_js expected to be basetypes.BoolValue, was: %T`, executeJsAttribute))
+	}
+
+	timeoutAttribute, ok := attributes["timeout"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`timeout is missing from object`)
+
+		return NewNetworkInterceptValueUnknown(), diags
+	}
+
+	timeoutVal, ok := timeoutAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`timeout expected to be basetypes.Int64Value, was: %T`, timeoutAttribute))
+	}
+
+	if diags.HasError() {
+		return NewNetworkInterceptValueUnknown(), diags
+	}
+
+	return NetworkInterceptValue{
+		Enabled:   enabledVal,
+		ExecuteJs: executeJsVal,
+		Timeout:   timeoutVal,
+		state:     attr.ValueStateKnown,
+	}, diags
+}
+
+func NewNetworkInterceptValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) NetworkInterceptValue {
+	object, diags := NewNetworkInterceptValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewNetworkInterceptValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t NetworkInterceptType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewNetworkInterceptValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewNetworkInterceptValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewNetworkInterceptValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewNetworkInterceptValueMust(NetworkInterceptValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t NetworkInterceptType) ValueType(ctx context.Context) attr.Value {
+	return NetworkInterceptValue{}
+}
+
+var _ basetypes.ObjectValuable = NetworkInterceptValue{}
+
+type NetworkInterceptValue struct {
+	Enabled   basetypes.BoolValue  `tfsdk:"enabled"`
+	ExecuteJs basetypes.BoolValue  `tfsdk:"execute_js"`
+	Timeout   basetypes.Int64Value `tfsdk:"timeout"`
+	state     attr.ValueState
+}
+
+func (v NetworkInterceptValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["enabled"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["execute_js"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["timeout"] = basetypes.Int64Type{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.Enabled.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["enabled"] = val
+
+		val, err = v.ExecuteJs.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["execute_js"] = val
+
+		val, err = v.Timeout.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["timeout"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v NetworkInterceptValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v NetworkInterceptValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v NetworkInterceptValue) String() string {
+	return "NetworkInterceptValue"
+}
+
+func (v NetworkInterceptValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"enabled":    basetypes.BoolType{},
+		"execute_js": basetypes.BoolType{},
+		"timeout":    basetypes.Int64Type{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"enabled":    v.Enabled,
+			"execute_js": v.ExecuteJs,
+			"timeout":    v.Timeout,
+		})
+
+	return objVal, diags
+}
+
+func (v NetworkInterceptValue) Equal(o attr.Value) bool {
+	other, ok := o.(NetworkInterceptValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Enabled.Equal(other.Enabled) {
+		return false
+	}
+
+	if !v.ExecuteJs.Equal(other.ExecuteJs) {
+		return false
+	}
+
+	if !v.Timeout.Equal(other.Timeout) {
+		return false
+	}
+
+	return true
+}
+
+func (v NetworkInterceptValue) Type(ctx context.Context) attr.Type {
+	return NetworkInterceptType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v NetworkInterceptValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"enabled":    basetypes.BoolType{},
+		"execute_js": basetypes.BoolType{},
+		"timeout":    basetypes.Int64Type{},
+	}
+}
+
+var _ basetypes.ObjectTypable = ParserType{}
+
+type ParserType struct {
+	basetypes.ObjectType
+}
+
+func (t ParserType) Equal(o attr.Type) bool {
+	other, ok := o.(ParserType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t ParserType) String() string {
+	return "ParserType"
+}
+
+func (t ParserType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	enabledAttribute, ok := attributes["enabled"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`enabled is missing from object`)
+
+		return nil, diags
+	}
+
+	enabledVal, ok := enabledAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`enabled expected to be basetypes.BoolValue, was: %T`, enabledAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return ParserValue{
+		Enabled: enabledVal,
+		state:   attr.ValueStateKnown,
+	}, diags
+}
+
+func NewParserValueNull() ParserValue {
+	return ParserValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewParserValueUnknown() ParserValue {
+	return ParserValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewParserValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ParserValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing ParserValue Attribute Value",
+				"While creating a ParserValue value, a missing attribute value was detected. "+
+					"A ParserValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ParserValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid ParserValue Attribute Type",
+				"While creating a ParserValue value, an invalid attribute value was detected. "+
+					"A ParserValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ParserValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("ParserValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra ParserValue Attribute Value",
+				"While creating a ParserValue value, an extra attribute value was detected. "+
+					"A ParserValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra ParserValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewParserValueUnknown(), diags
+	}
+
+	enabledAttribute, ok := attributes["enabled"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`enabled is missing from object`)
+
+		return NewParserValueUnknown(), diags
+	}
+
+	enabledVal, ok := enabledAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`enabled expected to be basetypes.BoolValue, was: %T`, enabledAttribute))
+	}
+
+	if diags.HasError() {
+		return NewParserValueUnknown(), diags
+	}
+
+	return ParserValue{
+		Enabled: enabledVal,
+		state:   attr.ValueStateKnown,
+	}, diags
+}
+
+func NewParserValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ParserValue {
+	object, diags := NewParserValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewParserValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t ParserType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewParserValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewParserValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewParserValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewParserValueMust(ParserValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t ParserType) ValueType(ctx context.Context) attr.Value {
+	return ParserValue{}
+}
+
+var _ basetypes.ObjectValuable = ParserValue{}
+
+type ParserValue struct {
+	Enabled basetypes.BoolValue `tfsdk:"enabled"`
+	state   attr.ValueState
+}
+
+func (v ParserValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 1)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["enabled"] = basetypes.BoolType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 1)
+
+		val, err = v.Enabled.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["enabled"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v ParserValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v ParserValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v ParserValue) String() string {
+	return "ParserValue"
+}
+
+func (v ParserValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"enabled": basetypes.BoolType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"enabled": v.Enabled,
+		})
+
+	return objVal, diags
+}
+
+func (v ParserValue) Equal(o attr.Value) bool {
+	other, ok := o.(ParserValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Enabled.Equal(other.Enabled) {
+		return false
+	}
+
+	return true
+}
+
+func (v ParserValue) Type(ctx context.Context) attr.Type {
+	return ParserType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v ParserValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"enabled": basetypes.BoolType{},
+	}
 }
 
 var _ basetypes.ObjectTypable = SitemapType{}
@@ -584,12 +1571,52 @@ func (t SitemapType) String() string {
 func (t SitemapType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
+	attributes := in.Attributes()
+
+	recursiveAttribute, ok := attributes["recursive"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`recursive is missing from object`)
+
+		return nil, diags
+	}
+
+	recursiveVal, ok := recursiveAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`recursive expected to be basetypes.BoolValue, was: %T`, recursiveAttribute))
+	}
+
+	urlAttribute, ok := attributes["url"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`url is missing from object`)
+
+		return nil, diags
+	}
+
+	urlVal, ok := urlAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`url expected to be basetypes.StringValue, was: %T`, urlAttribute))
+	}
+
 	if diags.HasError() {
 		return nil, diags
 	}
 
 	return SitemapValue{
-		state: attr.ValueStateKnown,
+		Recursive: recursiveVal,
+		Url:       urlVal,
+		state:     attr.ValueStateKnown,
 	}, diags
 }
 
@@ -656,12 +1683,50 @@ func NewSitemapValue(attributeTypes map[string]attr.Type, attributes map[string]
 		return NewSitemapValueUnknown(), diags
 	}
 
+	recursiveAttribute, ok := attributes["recursive"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`recursive is missing from object`)
+
+		return NewSitemapValueUnknown(), diags
+	}
+
+	recursiveVal, ok := recursiveAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`recursive expected to be basetypes.BoolValue, was: %T`, recursiveAttribute))
+	}
+
+	urlAttribute, ok := attributes["url"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`url is missing from object`)
+
+		return NewSitemapValueUnknown(), diags
+	}
+
+	urlVal, ok := urlAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`url expected to be basetypes.StringValue, was: %T`, urlAttribute))
+	}
+
 	if diags.HasError() {
 		return NewSitemapValueUnknown(), diags
 	}
 
 	return SitemapValue{
-		state: attr.ValueStateKnown,
+		Recursive: recursiveVal,
+		Url:       urlVal,
+		state:     attr.ValueStateKnown,
 	}, diags
 }
 
@@ -733,17 +1798,41 @@ func (t SitemapType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = SitemapValue{}
 
 type SitemapValue struct {
-	state attr.ValueState
+	Recursive basetypes.BoolValue   `tfsdk:"recursive"`
+	Url       basetypes.StringValue `tfsdk:"url"`
+	state     attr.ValueState
 }
 
 func (v SitemapValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 0)
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["recursive"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["url"] = basetypes.StringType{}.TerraformType(ctx)
 
 	objectType := tftypes.Object{AttributeTypes: attrTypes}
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 0)
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.Recursive.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["recursive"] = val
+
+		val, err = v.Url.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["url"] = val
 
 		if err := tftypes.ValidateValue(objectType, vals); err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
@@ -774,7 +1863,10 @@ func (v SitemapValue) String() string {
 func (v SitemapValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	attributeTypes := map[string]attr.Type{}
+	attributeTypes := map[string]attr.Type{
+		"recursive": basetypes.BoolType{},
+		"url":       basetypes.StringType{},
+	}
 
 	if v.IsNull() {
 		return types.ObjectNull(attributeTypes), diags
@@ -786,7 +1878,10 @@ func (v SitemapValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
-		map[string]attr.Value{})
+		map[string]attr.Value{
+			"recursive": v.Recursive,
+			"url":       v.Url,
+		})
 
 	return objVal, diags
 }
@@ -806,6 +1901,14 @@ func (v SitemapValue) Equal(o attr.Value) bool {
 		return true
 	}
 
+	if !v.Recursive.Equal(other.Recursive) {
+		return false
+	}
+
+	if !v.Url.Equal(other.Url) {
+		return false
+	}
+
 	return true
 }
 
@@ -818,5 +1921,8 @@ func (v SitemapValue) Type(ctx context.Context) attr.Type {
 }
 
 func (v SitemapValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
-	return map[string]attr.Type{}
+	return map[string]attr.Type{
+		"recursive": basetypes.BoolType{},
+		"url":       basetypes.StringType{},
+	}
 }

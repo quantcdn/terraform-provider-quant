@@ -25,6 +25,13 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Basic auth password",
 				MarkdownDescription: "Basic auth password",
 			},
+			"basic_auth_preview_only": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Apply basic auth to preview domain only",
+				MarkdownDescription: "Apply basic auth to preview domain only",
+				Default:             booldefault.StaticBool(false),
+			},
 			"basic_auth_username": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -36,6 +43,11 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "Disable revisions",
 				MarkdownDescription: "Disable revisions",
+			},
+			"id": schema.Int64Attribute{
+				Computed:            true,
+				Description:         "Project ID",
+				MarkdownDescription: "Project ID",
 			},
 			"machine_name": schema.StringAttribute{
 				Optional:            true,
@@ -63,24 +75,38 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Project region",
 				MarkdownDescription: "Project region",
 			},
+			"uuid": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Project UUID",
+				MarkdownDescription: "Project UUID",
+			},
 			"with_token": schema.BoolAttribute{
 				Optional: true,
 				Computed: true,
 				Default:  booldefault.StaticBool(false),
+			},
+			"write_token": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Write token for API access",
+				MarkdownDescription: "Write token for API access",
 			},
 		},
 	}
 }
 
 type ProjectModel struct {
-	AllowQueryParams  types.Bool   `tfsdk:"allow_query_params"`
-	BasicAuthPassword types.String `tfsdk:"basic_auth_password"`
-	BasicAuthUsername types.String `tfsdk:"basic_auth_username"`
-	DisableRevisions  types.Bool   `tfsdk:"disable_revisions"`
-	MachineName       types.String `tfsdk:"machine_name"`
-	Name              types.String `tfsdk:"name"`
-	Organization      types.String `tfsdk:"organization"`
-	Project           types.String `tfsdk:"project"`
-	Region            types.String `tfsdk:"region"`
-	WithToken         types.Bool   `tfsdk:"with_token"`
+	AllowQueryParams     types.Bool   `tfsdk:"allow_query_params"`
+	BasicAuthPassword    types.String `tfsdk:"basic_auth_password"`
+	BasicAuthPreviewOnly types.Bool   `tfsdk:"basic_auth_preview_only"`
+	BasicAuthUsername    types.String `tfsdk:"basic_auth_username"`
+	DisableRevisions     types.Bool   `tfsdk:"disable_revisions"`
+	Id                   types.Int64  `tfsdk:"id"`
+	MachineName          types.String `tfsdk:"machine_name"`
+	Name                 types.String `tfsdk:"name"`
+	Organization         types.String `tfsdk:"organization"`
+	Project              types.String `tfsdk:"project"`
+	Region               types.String `tfsdk:"region"`
+	Uuid                 types.String `tfsdk:"uuid"`
+	WithToken            types.Bool   `tfsdk:"with_token"`
+	WriteToken           types.String `tfsdk:"write_token"`
 }

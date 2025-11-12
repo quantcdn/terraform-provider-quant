@@ -60,11 +60,11 @@ func (r *ruleRedirectResource) Configure(_ context.Context, req resource.Configu
 }
 
 func (r *ruleRedirectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform plan data into the model
@@ -107,11 +107,11 @@ func (r *ruleRedirectResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var plan resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform plan data into the model
@@ -123,6 +123,9 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 
 	var state resource_rule_redirect.RuleRedirectModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	// Preserve UUID and RuleId from state (needed for update API call)
+	plan.Uuid = state.Uuid
 	plan.RuleId = state.RuleId
 
 	// Update API call logic
@@ -133,20 +136,23 @@ func (r *ruleRedirectResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	// Note: We don't read immediately after update to avoid eventual consistency issues.
-	// The update response contains the new UUID which we've already captured.
-	// The next terraform refresh/plan will read the latest state.
+	// Read after update to populate computed fields correctly
+	diags = callRuleRedirectReadAPI(ctx, r, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	// Save updated plan into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ruleRedirectResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_redirect.RuleRedirectModel
 
 	// Read Terraform prior state data into the model
@@ -289,7 +295,7 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 			"status": httpResp.Status,
 			"body":   string(bodyBytes),
 		})
-		
+
 		// Try to parse API error response
 		if err != nil {
 			var apiError struct {
@@ -353,6 +359,10 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	} else {
 		rule.OnlyWithCookie = types.StringNull()
 	}
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	rule.ActionConfig = resource_rule_redirect.NewActionConfigValueNull()
 
 	return
 }
@@ -479,6 +489,10 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 		rule.RedirectCode = types.StringNull()
 	}
 	rule.RedirectTo = types.StringValue(api.ActionConfig.To)
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	rule.ActionConfig = resource_rule_redirect.NewActionConfigValueNull()
 
 	return
 }

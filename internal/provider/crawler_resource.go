@@ -157,10 +157,6 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		req.SetBrowserMode(crawler.BrowserMode.ValueBool())
 	}
 
-	if !crawler.ExecuteJs.IsNull() && !crawler.ExecuteJs.IsUnknown() {
-		req.SetExecuteJs(crawler.ExecuteJs.ValueBool())
-	}
-
 	// URLs - explicit list to crawl (no discovery)
 	if !crawler.Urls.IsNull() && !crawler.Urls.IsUnknown() {
 		urls := make([]string, 0, len(crawler.Urls.Elements()))
@@ -272,34 +268,34 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	// Complex object fields - convert nested objects to API format
 	if !crawler.Sitemap.IsNull() && !crawler.Sitemap.IsUnknown() {
-		var sitemapEntries []resource_crawler.SitemapEntryModel
+		var sitemapEntries []resource_crawler.SitemapValue
 		diags.Append(crawler.Sitemap.ElementsAs(ctx, &sitemapEntries, false)...)
 		if !diags.HasError() {
-			sitemapArray := make([]map[string]interface{}, len(sitemapEntries))
+			sitemapArray := make([]quantadmingo.V2CrawlerSitemapInner, len(sitemapEntries))
 			for i, entry := range sitemapEntries {
-				sitemapArray[i] = map[string]interface{}{
-					"url":       entry.Url.ValueString(),
-					"recursive": entry.Recursive.ValueBool(),
-				}
+				sitemapItem := quantadmingo.NewV2CrawlerSitemapInner()
+				url := entry.Url.ValueString()
+				recursive := entry.Recursive.ValueBool()
+				sitemapItem.SetUrl(url)
+				sitemapItem.SetRecursive(recursive)
+				sitemapArray[i] = *sitemapItem
 			}
 			req.SetSitemap(sitemapArray)
 		}
 	}
 
 	if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
-		var assets resource_crawler.AssetsModel
-		diags.Append(crawler.Assets.As(ctx, &assets, basetypes.ObjectAsOptions{})...)
-		if !diags.HasError() && !assets.NetworkIntercept.IsNull() {
-			var networkIntercept resource_crawler.NetworkInterceptModel
-			diags.Append(assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
+		// Assets.NetworkIntercept is a basetypes.ObjectValue - convert to NetworkInterceptValue
+		if !crawler.Assets.NetworkIntercept.IsNull() && !crawler.Assets.NetworkIntercept.IsUnknown() {
+			var networkIntercept resource_crawler.NetworkInterceptValue
+			diags.Append(crawler.Assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
 			if !diags.HasError() {
-				assetsObj := map[string]interface{}{
-					"network_intercept": map[string]interface{}{
-						"enabled": networkIntercept.Enabled.ValueBool(),
-						"timeout": networkIntercept.Timeout.ValueInt64(),
-					},
-				}
-				req.SetAssets(assetsObj)
+				assetsObj := quantadmingo.NewV2CrawlerAssets()
+				niObj := quantadmingo.NewV2CrawlerAssetsNetworkIntercept()
+				niObj.SetEnabled(networkIntercept.Enabled.ValueBool())
+				niObj.SetTimeout(int32(networkIntercept.Timeout.ValueInt64()))
+				assetsObj.SetNetworkIntercept(*niObj)
+				req.SetAssets(*assetsObj)
 			}
 		}
 	}
@@ -309,7 +305,7 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	tflog.Debug(ctx, "=== CRAWLER CREATE REQUEST ===", map[string]interface{}{
 		"payload": string(reqJSON),
 	})
-	
+
 	api, httpResp, err := r.client.Instance.CrawlersAPI.CrawlersCreate(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).V2CrawlerRequest(req).Execute()
 
 	if err != nil {
@@ -321,7 +317,7 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 				"status": httpResp.Status,
 				"body":   string(bodyBytes),
 			})
-			
+
 			// Try to parse API error response
 			var apiError struct {
 				Error   bool   `json:"error"`
@@ -331,7 +327,7 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 				errorMsg = apiError.Message
 			}
 		}
-		
+
 		diags.AddError(
 			"Unable to create crawler",
 			errorMsg,
@@ -402,32 +398,27 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	crawler.DomainVerified = types.Int64Value(int64(api.GetDomainVerified()))
 	crawler.CreatedAt = types.StringValue(api.GetCreatedAt().Format("2006-01-02T15:04:05Z07:00"))
 	crawler.UpdatedAt = types.StringValue(api.GetUpdatedAt().Format("2006-01-02T15:04:05Z07:00"))
-	
+
 	// Set top-level fields from API response (these are returned at the root level, not in config YAML)
 	if api.WebhookUrl != nil && *api.WebhookUrl != "" {
 		crawler.WebhookUrl = types.StringValue(*api.WebhookUrl)
 	} else {
 		crawler.WebhookUrl = types.StringNull()
 	}
-	
+
 	if api.WebhookAuthHeader != nil && *api.WebhookAuthHeader != "" {
 		crawler.WebhookAuthHeader = types.StringValue(*api.WebhookAuthHeader)
 	} else {
 		crawler.WebhookAuthHeader = types.StringNull()
 	}
-	
+
 	if api.WebhookExtraVars != nil && *api.WebhookExtraVars != "" {
 		crawler.WebhookExtraVars = types.StringValue(*api.WebhookExtraVars)
 	} else {
 		crawler.WebhookExtraVars = types.StringNull()
 	}
-	
-	// execute_js is also a top-level field in V2Crawler
-	if api.ExecuteJs != nil {
-		crawler.ExecuteJs = types.BoolValue(*api.ExecuteJs)
-	} else {
-		crawler.ExecuteJs = types.BoolNull()
-	}
+
+	// Note: execute_js is now only in assets.network_intercept, not at top-level
 
 	// Set organization to the current organization
 	crawler.Organization = types.StringValue(r.client.Organization)
@@ -504,7 +495,10 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.Depth = types.Int64Null()
 			}
 
-			if parsedConfig.Config.MaxHits > 0 {
+			// Use top-level API field if available, otherwise use config YAML
+			if api.MaxHits != nil {
+				crawler.MaxHits = types.Int64Value(int64(*api.MaxHits))
+			} else if parsedConfig.Config.MaxHits >= 0 {
 				crawler.MaxHits = types.Int64Value(int64(parsedConfig.Config.MaxHits))
 			} else {
 				crawler.MaxHits = types.Int64Null()
@@ -516,7 +510,10 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.MaxHtml = types.Int64Null()
 			}
 
-			if parsedConfig.Config.MaxErrors > 0 {
+			// Use top-level API field if available, otherwise use config YAML
+			if api.MaxErrors != nil {
+				crawler.MaxErrors = types.Int64Value(int64(*api.MaxErrors))
+			} else if parsedConfig.Config.MaxErrors >= 0 {
 				crawler.MaxErrors = types.Int64Value(int64(parsedConfig.Config.MaxErrors))
 			} else {
 				crawler.MaxErrors = types.Int64Null()
@@ -677,8 +674,8 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 						"timeout": types.Int64Value(int64(parsedConfig.Config.Assets.NetworkIntercept.Timeout)),
 					},
 				)
-				
-				crawler.Assets, _ = types.ObjectValue(
+
+				crawler.Assets = resource_crawler.NewAssetsValueMust(
 					map[string]attr.Type{
 						"network_intercept": types.ObjectType{
 							AttrTypes: map[string]attr.Type{
@@ -686,22 +683,17 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 								"timeout": types.Int64Type,
 							},
 						},
+						"parser": types.ObjectType{AttrTypes: map[string]attr.Type{}},
 					},
 					map[string]attr.Value{
 						"network_intercept": networkInterceptObj,
+						"parser":            types.ObjectNull(map[string]attr.Type{}),
 					},
 				)
 			} else if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
 				// Preserve existing value from state/plan
 			} else {
-				crawler.Assets = types.ObjectNull(map[string]attr.Type{
-					"network_intercept": types.ObjectType{
-						AttrTypes: map[string]attr.Type{
-							"enabled": types.BoolType,
-							"timeout": types.Int64Type,
-						},
-					},
-				})
+				crawler.Assets = resource_crawler.NewAssetsValueNull()
 			}
 
 			// Make sure crawler field is initialized
@@ -769,10 +761,6 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	if !crawler.BrowserMode.IsNull() && !crawler.BrowserMode.IsUnknown() {
 		req.SetBrowserMode(crawler.BrowserMode.ValueBool())
-	}
-
-	if !crawler.ExecuteJs.IsNull() && !crawler.ExecuteJs.IsUnknown() {
-		req.SetExecuteJs(crawler.ExecuteJs.ValueBool())
 	}
 
 	// URLs - explicit list to crawl (no discovery)
@@ -886,34 +874,34 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 
 	// Complex object fields - convert nested objects to API format
 	if !crawler.Sitemap.IsNull() && !crawler.Sitemap.IsUnknown() {
-		var sitemapEntries []resource_crawler.SitemapEntryModel
+		var sitemapEntries []resource_crawler.SitemapValue
 		diags.Append(crawler.Sitemap.ElementsAs(ctx, &sitemapEntries, false)...)
 		if !diags.HasError() {
-			sitemapArray := make([]map[string]interface{}, len(sitemapEntries))
+			sitemapArray := make([]quantadmingo.V2CrawlerSitemapInner, len(sitemapEntries))
 			for i, entry := range sitemapEntries {
-				sitemapArray[i] = map[string]interface{}{
-					"url":       entry.Url.ValueString(),
-					"recursive": entry.Recursive.ValueBool(),
-				}
+				sitemapItem := quantadmingo.NewV2CrawlerSitemapInner()
+				url := entry.Url.ValueString()
+				recursive := entry.Recursive.ValueBool()
+				sitemapItem.SetUrl(url)
+				sitemapItem.SetRecursive(recursive)
+				sitemapArray[i] = *sitemapItem
 			}
 			req.SetSitemap(sitemapArray)
 		}
 	}
 
 	if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
-		var assets resource_crawler.AssetsModel
-		diags.Append(crawler.Assets.As(ctx, &assets, basetypes.ObjectAsOptions{})...)
-		if !diags.HasError() && !assets.NetworkIntercept.IsNull() {
-			var networkIntercept resource_crawler.NetworkInterceptModel
-			diags.Append(assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
+		// Assets.NetworkIntercept is a basetypes.ObjectValue - convert to NetworkInterceptValue
+		if !crawler.Assets.NetworkIntercept.IsNull() && !crawler.Assets.NetworkIntercept.IsUnknown() {
+			var networkIntercept resource_crawler.NetworkInterceptValue
+			diags.Append(crawler.Assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
 			if !diags.HasError() {
-				assetsObj := map[string]interface{}{
-					"network_intercept": map[string]interface{}{
-						"enabled": networkIntercept.Enabled.ValueBool(),
-						"timeout": networkIntercept.Timeout.ValueInt64(),
-					},
-				}
-				req.SetAssets(assetsObj)
+				assetsObj := quantadmingo.NewV2CrawlerAssets()
+				niObj := quantadmingo.NewV2CrawlerAssetsNetworkIntercept()
+				niObj.SetEnabled(networkIntercept.Enabled.ValueBool())
+				niObj.SetTimeout(int32(networkIntercept.Timeout.ValueInt64()))
+				assetsObj.SetNetworkIntercept(*niObj)
+				req.SetAssets(*assetsObj)
 			}
 		}
 	}
@@ -931,7 +919,9 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		return
 	}
 
-	// Simple post-update read since domain_verified expectation is now handled in ModifyPlan
+	// Post-update read to populate computed fields
+	// Note: This may cause optional+computed fields to show as "(known after apply)" in plans
+	// but is required for updates to succeed without errors
 	return callCrawlerReadAPI(ctx, r, crawler)
 }
 
@@ -951,7 +941,7 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 
 	// Check if domain is changing
 	domainChanging := !plan.Domain.Equal(state.Domain)
-	
+
 	// Preserve computed fields from state, with special handling for domain_verified
 	if domainChanging {
 		// When domain changes, the API will reset domain_verified to 0
@@ -961,16 +951,11 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		// Domain not changing, preserve existing domain_verified value
 		plan.DomainVerified = state.DomainVerified
 	}
-	
+
 	plan.CreatedAt = state.CreatedAt
 	// Don't preserve UpdatedAt - let it be updated by the API response
 	plan.Id = state.Id
 	plan.ProjectId = state.ProjectId
-
-	// If UUID is not set in plan but exists in state, preserve it
-	if plan.Uuid.IsNull() && !state.Uuid.IsNull() {
-		plan.Uuid = state.Uuid
-	}
 
 	// Handle force_refresh - don't preserve from state, allow it to trigger updates
 	// The force_refresh field is intentionally not preserved from state to allow changes
