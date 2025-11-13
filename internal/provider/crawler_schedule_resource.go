@@ -190,12 +190,9 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	schedule.Organization = types.StringValue(r.client.Organization)
 	schedule.CrawlerSchedule = types.StringValue(api.GetScheduleCronString()) // This might need a different value
 
-	// API team added crawler_uuid to response (API team confirmed)
 	if api.CrawlerUuid != nil {
 		schedule.CrawlerUuid = types.StringValue(api.GetCrawlerUuid())
 	}
-
-	// Note: V2 API doesn't return deleted_at, and it's no longer in the schema
 
 	return diags
 }

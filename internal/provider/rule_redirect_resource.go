@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
@@ -280,24 +279,12 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		req.SetWeight(weight)
 	}
 
-	// Debug: Log the request payload
-	reqJSON, _ := json.Marshal(req)
-	tflog.Debug(ctx, "=== RULE REDIRECT CREATE REQUEST ===", map[string]interface{}{
-		"payload": string(reqJSON),
-	})
-
 	res, httpResp, err := r.client.Instance.RulesAPI.RulesRedirectCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).V2RuleRedirectRequest(req).Execute()
 
-	// Debug: Log the API response
-	if httpResp != nil && httpResp.Body != nil {
-		bodyBytes, _ := io.ReadAll(httpResp.Body)
-		tflog.Debug(ctx, "=== RULE REDIRECT CREATE RESPONSE ===", map[string]interface{}{
-			"status": httpResp.Status,
-			"body":   string(bodyBytes),
-		})
-
+	if err != nil {
 		// Try to parse API error response
-		if err != nil {
+		if httpResp != nil && httpResp.Body != nil {
+			bodyBytes, _ := io.ReadAll(httpResp.Body)
 			var apiError struct {
 				Error   bool   `json:"error"`
 				Message string `json:"message"`

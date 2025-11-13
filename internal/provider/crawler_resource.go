@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"gopkg.in/yaml.v3"
 
@@ -300,12 +299,6 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		}
 	}
 
-	// Debug: Log the request payload
-	reqJSON, _ := json.Marshal(req)
-	tflog.Debug(ctx, "=== CRAWLER CREATE REQUEST ===", map[string]interface{}{
-		"payload": string(reqJSON),
-	})
-
 	api, httpResp, err := r.client.Instance.CrawlersAPI.CrawlersCreate(r.client.AuthContext, r.client.Organization, crawler.Project.ValueString()).V2CrawlerRequest(req).Execute()
 
 	if err != nil {
@@ -313,10 +306,6 @@ func callCrawlerCreateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 		errorMsg := err.Error()
 		if httpResp != nil && httpResp.Body != nil {
 			bodyBytes, _ := io.ReadAll(httpResp.Body)
-			tflog.Debug(ctx, "=== CRAWLER CREATE RESPONSE ===", map[string]interface{}{
-				"status": httpResp.Status,
-				"body":   string(bodyBytes),
-			})
 
 			// Try to parse API error response
 			var apiError struct {
@@ -364,16 +353,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	}
 
 	// API call with built-in rate limiting and retry logic
-	api, httpResp, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
-
-	// Debug: Log what we got back
-	if httpResp != nil && httpResp.Body != nil {
-		bodyBytes, _ := io.ReadAll(httpResp.Body)
-		tflog.Debug(ctx, "=== CRAWLER READ RESPONSE ===", map[string]interface{}{
-			"status": httpResp.Status,
-			"body":   string(bodyBytes[:min(len(bodyBytes), 2000)]), // Limit to first 2000 chars
-		})
-	}
+	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))

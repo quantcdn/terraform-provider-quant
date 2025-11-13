@@ -522,7 +522,6 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// Get action_config for additional fields
 	actionConfig := api.GetActionConfig()
 
-	// StaticErrorPage fields ARE supported in action_config (API team confirmed)
 	if actionConfig.HasStaticErrorPage() {
 		data.StaticErrorPage = types.StringValue(actionConfig.GetStaticErrorPage())
 	} else {
@@ -1062,15 +1061,6 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.Uuid.ValueString(),
 		).Execute()
 	}, "rule_proxy")
-
-	// Debug: Log the API response
-	if httpResp != nil && httpResp.Body != nil {
-		bodyBytes, _ := io.ReadAll(httpResp.Body)
-		tflog.Debug(ctx, "=== RULE PROXY READ RESPONSE ===", map[string]interface{}{
-			"status": httpResp.Status,
-			"body":   string(bodyBytes),
-		})
-	}
 
 	// Enhanced error handling
 	if err != nil {

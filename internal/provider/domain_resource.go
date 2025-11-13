@@ -228,8 +228,6 @@ func callDomainUpdateAPI(ctx context.Context, r *domainResource, domain *resourc
 	}
 
 	org := r.client.Organization
-	// Note: V2 API may not support domain updates - only create/delete
-	// If update is needed, it might require delete + recreate
 	project := domain.Project.ValueString()
 	_ = org
 	_ = project

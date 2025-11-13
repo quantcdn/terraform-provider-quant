@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
@@ -208,21 +206,7 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource 
 
 // Load headers from the API.
 func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	api, httpResp, err := h.client.Instance.HeadersAPI.HeadersList(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).Execute()
-
-	// Debug: Log the raw response
-	if httpResp != nil {
-		tflog.Debug(ctx, "HeadersList API Response", map[string]interface{}{
-			"status": httpResp.Status,
-		})
-	}
-	
-	// Debug: Log what we got back
-	apiJSON, _ := json.Marshal(api)
-	tflog.Debug(ctx, "HeadersList API Data", map[string]interface{}{
-		"raw_response": string(apiJSON),
-		"type":         fmt.Sprintf("%T", api),
-	})
+	api, _, err := h.client.Instance.HeadersAPI.HeadersList(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError("Error getting custom headers", err.Error())

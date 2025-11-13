@@ -241,7 +241,6 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 	if !project.BasicAuthUsername.IsNull() && !project.BasicAuthUsername.IsUnknown() {
 		req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
 	}
-	// V2 API supports BasicAuthPreviewOnly (API team confirmed)
 	if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
 		req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueBool())
 	}
@@ -388,7 +387,6 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 	if !project.BasicAuthUsername.IsNull() && !project.BasicAuthUsername.IsUnknown() {
 		req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
 	}
-	// V2 API supports BasicAuthPreviewOnly (API team confirmed)
 	if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
 		req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueBool())
 	}
@@ -430,7 +428,6 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 		return diags
 	}
 
-	// V2Project returns id, uuid, name, machine_name (API team confirmed)
 	project.Id = types.Int64Value(int64(api.GetId()))
 	project.Uuid = types.StringValue(api.GetUuid())
 	project.Name = types.StringValue(api.GetName())
