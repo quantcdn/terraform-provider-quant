@@ -145,23 +145,36 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	// Map API response to model
-	// V2Project only has name and machine_name
 	data.Name = types.StringValue(api.GetName())
 	data.MachineName = types.StringValue(api.GetMachineName())
 	data.WithToken = types.BoolValue(withToken)
 	
-	// V2 API doesn't return these fields - set to null/defaults
-	data.Id = types.Int64Null()
-	data.Uuid = types.StringNull()
+	// Set V2 API fields that are now supported
+	if id, ok := api.GetIdOk(); ok && id != nil {
+		data.Id = types.Int64Value(int64(*id))
+	} else {
+		data.Id = types.Int64Null()
+	}
+	
+	if uuid, ok := api.GetUuidOk(); ok && uuid != nil {
+		data.Uuid = types.StringValue(*uuid)
+	} else {
+		data.Uuid = types.StringNull()
+	}
+	
+	if writeToken, ok := api.GetWriteTokenOk(); ok && writeToken != nil {
+		data.WriteToken = types.StringValue(*writeToken)
+	} else {
+		data.WriteToken = types.StringNull()
+	}
+	
+	// Fields not in V2 API - set to null
 	data.CreatedAt = types.StringNull()
 	data.UpdatedAt = types.StringNull()
 	data.Region = types.StringNull()
 	data.OrganizationId = types.Int64Null()
 	data.SecurityScore = types.StringNull()
 	data.GitUrl = types.StringNull()
-
-	// Set write_token from API response (V2 may not have this field)
-	data.WriteToken = types.StringNull() // V2Project doesn't have WriteToken field
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

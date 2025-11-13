@@ -536,9 +536,15 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		data.StaticErrorPageStatusCodes = emptyList
 	}
 
-	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
-	data.ProxyStripHeaders = emptyList
-	data.ProxyStripRequestHeaders = emptyList
+	// Only set proxy_strip_headers to empty if not already set in config
+	if data.ProxyStripHeaders.IsNull() || data.ProxyStripHeaders.IsUnknown() {
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		data.ProxyStripHeaders = emptyList
+	}
+	if data.ProxyStripRequestHeaders.IsNull() || data.ProxyStripRequestHeaders.IsUnknown() {
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		data.ProxyStripRequestHeaders = emptyList
+	}
 
 	// Set only_with_cookie if returned
 	if api.OnlyWithCookie != nil && *api.OnlyWithCookie != "" {
@@ -574,9 +580,9 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	// Set unused conditional lists to empty based on the condition type
 	// API only returns the list that matches the condition (e.g., if country="country_is", only country_is is returned)
+	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
 	if data.Method.IsNull() || data.Method.IsUnknown() {
 		data.Method = types.StringNull()
-		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 		data.MethodIs = emptyList
 		data.MethodIsNot = emptyList
 	} else if data.Method.ValueString() == "method_is" {
@@ -593,7 +599,6 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	if data.Country.IsNull() || data.Country.IsUnknown() {
 		data.Country = types.StringNull()
-		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 		data.CountryIs = emptyList
 		data.CountryIsNot = emptyList
 	} else if data.Country.ValueString() == "country_is" {
@@ -610,7 +615,6 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	if data.Ip.IsNull() || data.Ip.IsUnknown() {
 		data.Ip = types.StringNull()
-		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 		data.IpIs = emptyList
 		data.IpIsNot = emptyList
 	} else if data.Ip.ValueString() == "ip_is" {
@@ -627,7 +631,6 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	// Lists that should be empty if not provided
 	if data.FailoverOriginStatusCodes.IsNull() || data.FailoverOriginStatusCodes.IsUnknown() {
-		emptyList, _ = types.ListValueFrom(ctx, types.StringType, []string{})
 		data.FailoverOriginStatusCodes = emptyList
 	}
 	if data.InjectHeaders.IsNull() || data.InjectHeaders.IsUnknown() {
@@ -699,10 +702,20 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
 			data.WafConfig.NotifyEmail = emptyList
 		}
-		// Don't set thresholds to empty - they come from user config
-		// But we need to ensure all optional threshold fields are set based on type
-		// This will be handled after the response is parsed
+
+		// Set thresholds to empty list if unknown (API may not return it)
+		if data.WafConfig.Thresholds.IsUnknown() {
+			emptyThresholdsList, _ := types.ListValueFrom(ctx, types.ObjectType{
+				AttrTypes: resource_rule_proxy.ThresholdsValue{}.AttributeTypes(ctx),
+			}, []attr.Value{})
+			data.WafConfig.Thresholds = emptyThresholdsList
+		}
 	}
+
+	// Read back from API to get computed fields and ensure state consistency
+	// The DB-backed API has eliminated eventual consistency, so this is safe
+	readDiags := callRuleProxyReadAPI(ctx, r, data)
+	diags.Append(readDiags...)
 
 	return
 }

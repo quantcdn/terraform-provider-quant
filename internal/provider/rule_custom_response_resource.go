@@ -319,6 +319,11 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 		rule.StatusCode = types.Int64Null()
 	}
 
+	// Read back from API to get computed fields and ensure state consistency
+	// The DB-backed API has eliminated eventual consistency, so this is safe
+	readDiags := callRuleCustomResponseReadAPI(ctx, r, rule)
+	diags.Append(readDiags...)
+
 	return
 }
 

@@ -15,6 +15,7 @@ import (
 )
 
 var projectResponse = map[string]interface{}{
+	"id":                 123,
 	"name":               "test-project",
 	"allow_query_params": false,
 	"region":             "au",
@@ -25,6 +26,7 @@ var projectResponse = map[string]interface{}{
 	"project_type":       "normal",
 	"organization":       "test-organization",
 	"parent_project_id":  0,
+	"write_token":        "test-write-token-123",
 }
 
 func mockProjectServer(t *testing.T, organizationID string, projectID string) {
@@ -56,6 +58,15 @@ func mockProjectServer(t *testing.T, organizationID string, projectID string) {
 
 	httpmock.RegisterResponder("GET",
 		fmt.Sprintf("%s/organizations/%s/projects/0", baseUrl, organizationID), func(req *http.Request) (*http.Response, error) {
+			if projectDeleted {
+				return httpmock.NewStringResponse(404, "Not Found"), nil
+			}
+			return httpmock.NewJsonResponse(200, projectResponse)
+		})
+
+	// Handle import by UUID (id field = "123")
+	httpmock.RegisterResponder("GET",
+		fmt.Sprintf("%s/organizations/%s/projects/123", baseUrl, organizationID), func(req *http.Request) (*http.Response, error) {
 			if projectDeleted {
 				return httpmock.NewStringResponse(404, "Not Found"), nil
 			}

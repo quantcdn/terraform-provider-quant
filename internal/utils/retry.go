@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// RetryRuleRead retries a rule read operation with exponential backoff to handle API eventual consistency.
-// The API takes 5-10s to index new rules, so we retry up to ~25s total.
+// RetryRuleRead retries a rule read operation with minimal backoff for transient network issues.
+// The DB-backed API has eliminated eventual consistency, so this is just a safety net.
 func RetryRuleRead[T any](
 	ctx context.Context,
 	readFunc func() (T, *http.Response, error),
@@ -20,8 +20,9 @@ func RetryRuleRead[T any](
 	var httpResp *http.Response
 	var err error
 	
-	// Retry with exponential backoff: 0s, 3s, 5s, 7s, 10s = ~25s total
-	retryDelays := []int{0, 3, 5, 7, 10}
+	// Minimal retry for transient errors: 0s, 2s = 2s total
+	// The DB-backed API is consistent, so we only need to handle brief network glitches
+	retryDelays := []int{0, 2}
 	
 	for attempt, delay := range retryDelays {
 		if attempt > 0 {
@@ -48,8 +49,13 @@ func RetryRuleRead[T any](
 		}
 		
 		if attempt < len(retryDelays)-1 {
-			tflog.Debug(ctx, fmt.Sprintf("[%s] Got status %d, will retry...", 
-				resourceType, httpResp.StatusCode))
+			if httpResp != nil {
+				tflog.Debug(ctx, fmt.Sprintf("[%s] Got status %d, will retry...", 
+					resourceType, httpResp.StatusCode))
+			} else {
+				tflog.Debug(ctx, fmt.Sprintf("[%s] Got error (no response), will retry...", 
+					resourceType))
+			}
 		}
 	}
 	

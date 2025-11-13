@@ -351,6 +351,11 @@ func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterRes
 	// This prevents "unknown value" errors
 	data.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
 
+	// Read back from API to get computed fields and ensure state consistency
+	// The DB-backed API has eliminated eventual consistency, so this is safe
+	readDiags := callRuleContentFilterReadAPI(ctx, r, data)
+	diags.Append(readDiags...)
+
 	return
 }
 

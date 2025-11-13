@@ -364,6 +364,11 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 	// This prevents "unknown value" errors
 	rule.ActionConfig = resource_rule_redirect.NewActionConfigValueNull()
 
+	// Read back from API to get computed fields and ensure state consistency
+	// The DB-backed API has eliminated eventual consistency, so this is safe
+	readDiags := callRuleRedirectReadAPI(ctx, r, rule)
+	diags.Append(readDiags...)
+
 	return
 }
 
