@@ -74,16 +74,10 @@ resource "aws_ssm_parameter" "quant_token" {
 ## Attributes Reference
 
 - `id` - The numeric ID of the project.
-- `name` - The display name of the project.
 - `uuid` - The UUID of the project.
+- `name` - The display name of the project.
 - `machine_name` - The machine name of the project.
-- `region` - The region where the project is deployed (e.g., "au", "us").
-- `organization_id` - The numeric ID of the organization that owns this project.
-- `security_score` - The security score of the project.
-- `git_url` - The Git repository URL associated with the project, if configured.
 - `write_token` - (Sensitive) The project write token for API access. Only populated when `with_token = true`.
-- `created_at` - The timestamp when the project was created.
-- `updated_at` - The timestamp when the project was last updated.
 - `with_token` - Whether the write token was requested and included in the response.
 
 ## Notes

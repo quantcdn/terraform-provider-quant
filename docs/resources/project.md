@@ -4,43 +4,82 @@ Manages a Quant project.
 
 ## Example Usage
 
+### Basic Project
+
 ```hcl
 resource "quant_project" "example" {
-  # Required
-  name = "My Project Name"
+  name = "My Project"
+}
+```
 
-  # Optional
-  region            = "au"  # Defaults to "au" if not specified
+### Project with Configuration
+
+```hcl
+resource "quant_project" "configured" {
+  name               = "My Configured Project"
+  region             = "au"
   allow_query_params = true
+  disable_revisions  = false
+}
+```
 
-  # Optional - Basic Authentication
-  # Note: If setting basic auth, both username and password must be provided
-  basic_auth_username     = "admin"
-  basic_auth_password     = "secret123"
-  basic_auth_preview_only = "enabled"  # Optional basic auth setting
+### Project with Basic Authentication
+
+```hcl
+resource "quant_project" "with_auth" {
+  name = "Protected Project"
+  
+  # Basic authentication
+  basic_auth_username      = "admin"
+  basic_auth_password      = "secure-password-123"
+  basic_auth_preview_only  = true  # Only apply to preview domain
 }
 ```
 
 ## Argument Reference
 
-- `name` - (Required) The name of the project.
-- `region` - (Optional) The region where the project is hosted. Defaults to "au".
-- `allow_query_params` - (Optional) Whether to allow query parameters in URLs. Defaults to false.
-- `basic_auth_username` - (Optional) The username for basic authentication. Must be provided together with `basic_auth_password` if basic auth is desired.
-- `basic_auth_password` - (Optional) The password for basic authentication. Must be provided together with `basic_auth_username` if basic auth is desired.
-- `basic_auth_preview_only` - (Optional) Whether basic authentication applies only to preview environments. Valid values are "enabled" or "disabled".
+### Required Arguments
 
+- `name` - (Required) The display name of the project.
+
+### Optional Arguments
+
+- `machine_name` - (Optional, Computed) The machine-readable name of the project. If not provided, will be generated from the project name.
+- `region` - (Optional, Computed) The region where the project is hosted (e.g., "au", "us"). 
+- `allow_query_params` - (Optional, Computed) Whether to allow query parameters in URLs. Defaults to `false`.
+- `disable_revisions` - (Optional, Computed) Whether to disable content revisions. Defaults to `false`.
+
+#### Basic Authentication
+
+- `basic_auth_username` - (Optional, Computed) The username for basic authentication. Must be provided together with `basic_auth_password`.
+- `basic_auth_password` - (Optional, Computed) The password for basic authentication. Must be provided together with `basic_auth_username`.
+- `basic_auth_preview_only` - (Optional, Computed) Whether basic authentication applies only to preview domains. Defaults to `false`.
+
+#### Advanced Options
+
+- `with_token` - (Optional) Whether to include the write token in the response. Defaults to `false`. Typically used with data sources rather than resources.
 
 ## Attributes Reference
 
-- `id` - The ID of the project.
-- `machine_name` - The machine-readable name of the project.
-- `created_at` - The timestamp when the project was created.
-- `deleted_at` - The timestamp when the project was deleted, if applicable.
-- `organization` - The organization that owns the project.
-- `parent_project_id` - The ID of the parent project, if this is a child project.
+In addition to all arguments above, the following attributes are exported:
+
+- `id` - The numeric ID of the project.
+- `uuid` - The UUID of the project.
+- `write_token` - The write token for API access (only populated when `with_token = true`).
+- `organization` - The organization identifier.
 - `project` - The project identifier.
-- `custom_s3_sync_access_key` - The access key for custom S3 sync configuration, if configured.
-- `custom_s3_sync_secret_key` - The secret key for custom S3 sync configuration, if configured.
-- `custom_s3_sync_region` - The region for custom S3 sync configuration, if configured.
-- `custom_s3_sync_bucket` - The bucket name for custom S3 sync configuration, if configured.
+
+## Import
+
+Projects can be imported using the machine name:
+
+```shell
+terraform import quant_project.example my-project-name
+```
+
+## Notes
+
+- The `machine_name` is automatically generated from the `name` if not explicitly provided.
+- Basic auth credentials (`basic_auth_username` and `basic_auth_password`) must be provided together or not at all.
+- The `write_token` attribute is sensitive and will not be displayed in Terraform output by default.
+- The `region` field is optional and will use the API's default if not specified.

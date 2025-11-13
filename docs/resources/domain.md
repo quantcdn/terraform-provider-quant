@@ -1,54 +1,65 @@
 # Domain Resource
 
-The `quant_domain` resource manages domains within a Quant project.
+Manages domains within a Quant project.
 
 ## Example Usage
 
+### Basic Domain
+
 ```hcl
-provider "quant" {
-  organization = "test-organization"
-  bearer       = "testtoken"
+resource "quant_domain" "example" {
+  domain  = "example.com"
+  project = "my-project"
+}
+```
+
+### Multiple Domains
+
+```hcl
+resource "quant_project" "website" {
+  name = "My Website"
 }
 
-resource "quant_domain" "test" {
+resource "quant_domain" "main" {
   domain  = "example.com"
-  project = "default"
+  project = quant_project.website.machine_name
+}
+
+resource "quant_domain" "www" {
+  domain  = "www.example.com"
+  project = quant_project.website.machine_name
+}
+
+resource "quant_domain" "staging" {
+  domain  = "staging.example.com"
+  project = quant_project.website.machine_name
 }
 ```
 
 ## Argument Reference
 
-The following arguments are supported:
+### Required Arguments
 
-* `domain` - (Required) The domain name to manage.
-* `project` - (Optional) The project machine name to create the domain in. Defaults to "default".
+- `domain` - (Required) The domain name to manage (e.g., "example.com", "www.example.com").
 
-## Attribute Reference
+### Optional Arguments
+
+- `project` - (Optional, Computed) The project machine name to create the domain in. If not specified, uses the provider's default project.
+- `organization` - (Optional, Computed) The organization identifier. Typically inherited from the provider configuration.
+
+## Attributes Reference
 
 In addition to all arguments above, the following attributes are exported:
 
-* `id` - The ID of the domain.
-* `created_at` - The timestamp when the domain was created.
-* `updated_at` - The timestamp when the domain was last updated.
-* `deleted_at` - The timestamp when the domain was deleted, if applicable.
-* `dns_engaged` - Whether DNS is engaged for this domain.
-* `in_section` - Whether the domain is in a section.
-* `project_id` - The ID of the project the domain belongs to.
-* `section_message` - Any section-related message for the domain.
-* `organization` - The organization the domain belongs to.
+- `id` - The numeric ID of the domain.
+- `dns_engaged` - DNS engagement status (0 = not engaged, 1 = engaged).
 
 ## Import
 
-Domain resources can be imported using the following format:
+Domains can be imported using the format `project_name/domain_id`:
 
-```bash
-terraform import quant_domain.resource_name "project_name/domain_id"
-```
-
-### Example
-
-```bash
-terraform import quant_domain.test "my-project/9555"
+```shell
+terraform import quant_domain.example my-project/9555
 ```
 
 ### Import Format
@@ -59,8 +70,8 @@ The import ID must follow the pattern `project_name/domain_id` where:
 
 ### Finding the Domain ID
 
-To find the domain ID, you can:
-1. Use the QuantCDN dashboard - Look in the domains section for your domain
+To find the domain ID:
+1. Use the QuantCDN dashboard - Navigate to the domains section
 2. Use the API directly - Call the domains list endpoint
 3. Check existing Terraform state - If you have other domains already managed
 
@@ -68,19 +79,19 @@ To find the domain ID, you can:
 
 1. **Add the resource to your Terraform configuration**:
    ```hcl
-   resource "quant_domain" "test" {
+   resource "quant_domain" "example" {
      domain  = "example.com"
      project = "my-project"
    }
    ```
 
 2. **Run the import command**:
-   ```bash
-   terraform import quant_domain.test "my-project/9555"
+   ```shell
+   terraform import quant_domain.example "my-project/9555"
    ```
 
 3. **Verify the import**:
-   ```bash
+   ```shell
    terraform plan
    ```
 
@@ -88,4 +99,10 @@ To find the domain ID, you can:
 
 - **Invalid Import ID**: Ensure the format is exactly `project_name/domain_id`
 - **Domain not found**: Verify the domain ID exists in the specified project
-- **Project not found**: Ensure the project machine name is correct 
+- **Project not found**: Ensure the project machine name is correct
+
+## Notes
+
+- Domain updates are not supported by the V2 API. To change a domain, you must delete and recreate it.
+- The `dns_engaged` field indicates whether DNS management is active for the domain.
+- Domains must be verified before they can be used for content delivery.
