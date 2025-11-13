@@ -192,6 +192,11 @@ This is particularly useful when updating existing infrastructure where you want
 * `proxy_alert_enabled` - (Optional) Enable proxy alerts for monitoring and notifications. Defaults to `false`.
 * `proxy_strip_headers` - (Optional) List of headers to strip from the response.
 * `proxy_strip_request_headers` - (Optional) List of headers to strip from the request.
+* `inject_headers` - (Optional) Map of headers to inject into the response.
+* `auth_user` - (Optional) Basic authentication username for the origin server.
+* `auth_pass` - (Optional) Basic authentication password for the origin server.
+* `static_error_page` - (Optional) Custom HTML content to serve when origin errors occur (used with failover).
+* `static_error_page_status_codes` - (Optional) List of status codes that should serve the static error page.
 
 ### Application Proxy (Request-only computation fields)
 
@@ -226,6 +231,7 @@ These fields instruct the backend to compute application proxy settings. They ar
   * `block_ip` - (Optional) List of IPs to block.
   * `block_ua` - (Optional) List of User Agents to block.
   * `block_referer` - (Optional) List of Referers to block.
+  * `block_asn` - (Optional) List of ASNs to block.
   * `notify_email` - (Optional) List of email addresses for notifications.
   * `notify_slack` - (Optional) Slack webhook URL for notifications.
   * `notify_slack_hits_rpm` - (Optional) Threshold for Slack notifications (hits per minute).
@@ -253,11 +259,10 @@ These fields instruct the backend to compute application proxy settings. They ar
 
 ### Failover Configuration
 
-* `failover` - (Optional) Failover configuration block.
-  * `failover_mode` - (Optional) Enable failover mode. Defaults to `false`.
-  * `failover_lifetime` - (Optional) Failover cache lifetime. Defaults to `300`.
-  * `failover_origin_status_codes` - (Optional) List of origin status codes to trigger failover.
-  * `failover_origin_ttfb` - (Optional) Origin TTFB threshold in milliseconds. Defaults to `2000`.
+* `failover_mode` - (Optional) Enable failover mode. Defaults to `false`.
+* `failover_lifetime` - (Optional) Failover cache lifetime in seconds. Defaults to `300`.
+* `failover_origin_status_codes` - (Optional) List of origin status codes to trigger failover (e.g., `["502", "503", "504"]`).
+* `failover_origin_ttfb` - (Optional) Origin Time To First Byte threshold in milliseconds. Defaults to `2000`.
 
 ### Notification Configuration
 
