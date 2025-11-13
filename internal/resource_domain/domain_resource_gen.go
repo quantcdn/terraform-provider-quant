@@ -12,55 +12,41 @@ import (
 func DomainResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"created_at": schema.StringAttribute{
-				Computed: true,
-			},
-			"deleted_at": schema.StringAttribute{
-				Computed: true,
-			},
 			"dns_engaged": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "DNS engagement status",
+				MarkdownDescription: "DNS engagement status",
 			},
 			"domain": schema.StringAttribute{
-				Required: true,
+				Required:            true,
+				Description:         "Domain name",
+				MarkdownDescription: "Domain name",
 			},
 			"id": schema.Int64Attribute{
-				Computed: true,
-			},
-			"in_section": schema.Int64Attribute{
-				Computed: true,
+				Computed:            true,
+				Description:         "Domain ID",
+				MarkdownDescription: "Domain ID",
 			},
 			"organization": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-			},
-			"project_id": schema.Int64Attribute{
-				Computed: true,
-			},
-			"section_message": schema.StringAttribute{
-				Computed: true,
-			},
-			"updated_at": schema.StringAttribute{
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 		},
 	}
 }
 
 type DomainModel struct {
-	CreatedAt      types.String `tfsdk:"created_at"`
-	DeletedAt      types.String `tfsdk:"deleted_at"`
-	DnsEngaged     types.Int64  `tfsdk:"dns_engaged"`
-	Domain         types.String `tfsdk:"domain"`
-	Id             types.Int64  `tfsdk:"id"`
-	InSection      types.Int64  `tfsdk:"in_section"`
-	Organization   types.String `tfsdk:"organization"`
-	Project        types.String `tfsdk:"project"`
-	ProjectId      types.Int64  `tfsdk:"project_id"`
-	SectionMessage types.String `tfsdk:"section_message"`
-	UpdatedAt      types.String `tfsdk:"updated_at"`
+	DnsEngaged   types.Int64  `tfsdk:"dns_engaged"`
+	Domain       types.String `tfsdk:"domain"`
+	Id           types.Int64  `tfsdk:"id"`
+	Organization types.String `tfsdk:"organization"`
+	Project      types.String `tfsdk:"project"`
 }

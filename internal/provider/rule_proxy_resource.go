@@ -2,7 +2,10 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_proxy"
@@ -13,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go"
 )
 
@@ -40,18 +43,18 @@ func parseCacheLifetime(cacheLifetimeStr types.String) (int64, error) {
 	if cacheLifetimeStr.IsNull() || cacheLifetimeStr.IsUnknown() {
 		return 0, fmt.Errorf("cache_lifetime is null or unknown")
 	}
-	
+
 	value := cacheLifetimeStr.ValueString()
 	if value == "" {
 		return 0, fmt.Errorf("cache_lifetime is empty")
 	}
-	
+
 	// Parse as integer (handles both string representations of integers and actual integers)
 	cacheLifetime, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid cache_lifetime value '%s': must be a valid integer", value)
 	}
-	
+
 	return cacheLifetime, nil
 }
 
@@ -86,11 +89,11 @@ func (r *ruleProxyResource) Configure(_ context.Context, req resource.ConfigureR
 }
 
 func (r *ruleProxyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_proxy.RuleProxyModel
 
 	// Read Terraform plan data into the model
@@ -106,11 +109,7 @@ func (r *ruleProxyResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	diags = callRuleProxyReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// No need to read immediately after create - we have all the data from the create response
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -137,11 +136,11 @@ func (r *ruleProxyResource) Read(ctx context.Context, req resource.ReadRequest, 
 }
 
 func (r *ruleProxyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var plan resource_rule_proxy.RuleProxyModel
 
 	// Read Terraform plan data into the model
@@ -166,7 +165,8 @@ func (r *ruleProxyResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Read updated state
+	// Read after update to populate computed fields correctly
+	// Note: We capture the new UUID in callRuleProxyUpdateAPI first, then read with it
 	diags = callRuleProxyReadAPI(ctx, r, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -178,11 +178,11 @@ func (r *ruleProxyResource) Update(ctx context.Context, req resource.UpdateReque
 }
 
 func (r *ruleProxyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_proxy.RuleProxyModel
 
 	// Read Terraform prior state data into the model
@@ -220,7 +220,7 @@ func (r *ruleProxyResource) ImportState(ctx context.Context, req resource.Import
 }
 
 func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *resource_rule_proxy.RuleProxyModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleProxyRequestCreateWithDefaults()
+	req := *quantadmingo.NewV2RuleProxyRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -415,7 +415,7 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// WAF configuration
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 	if data.WafEnabled.ValueBool() {
-		wafConfig := quantadmingo.NewWAFConfigWithDefaults()
+		wafConfig := quantadmingo.NewWafConfig()
 		wafConfig.SetMode(data.WafConfig.Mode.ValueString())
 		wafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
 
@@ -494,14 +494,15 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 			wafConfig.SetNotifySlackHitsRpm(int32(data.WafConfig.NotifySlackHitsRpm.ValueInt64()))
 		}
 
-		if !data.WafConfig.RequestHeaderName.IsNull() {
-			wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
-		}
+		// V2 API may not have RequestHeaderName in WafConfig
+		// if !data.WafConfig.RequestHeaderName.IsNull() {
+		// 	wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
+		// }
 		req.SetWafConfig(*wafConfig)
 	}
 
 	// Make the API call
-	api, _, err := r.client.Instance.RulesProxyAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleProxyRequestCreate(req).Execute()
+	api, _, err := r.client.Instance.RulesAPI.RulesProxyCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).V2RuleProxyRequest(req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating rule proxy",
@@ -512,6 +513,208 @@ func callRuleProxyCreateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 	data.Uuid = types.StringValue(api.GetUuid())
 	data.RuleId = types.StringValue(api.GetRuleId())
+	data.Organization = types.StringValue(r.client.Organization)
+	data.Action = types.StringValue("proxy")
+
+	// Set fields that may not be returned by API to null/empty
+	data.Rule = types.StringValue("")
+
+	// Get action_config for additional fields
+	actionConfig := api.GetActionConfig()
+
+	if actionConfig.HasStaticErrorPage() {
+		data.StaticErrorPage = types.StringValue(actionConfig.GetStaticErrorPage())
+	} else {
+		data.StaticErrorPage = types.StringNull()
+	}
+	if actionConfig.HasStaticErrorPageStatusCodes() {
+		statusCodes, _ := types.ListValueFrom(ctx, types.StringType, actionConfig.GetStaticErrorPageStatusCodes())
+		data.StaticErrorPageStatusCodes = statusCodes
+	} else {
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		data.StaticErrorPageStatusCodes = emptyList
+	}
+
+	// Only set proxy_strip_headers to empty if not already set in config
+	if data.ProxyStripHeaders.IsNull() || data.ProxyStripHeaders.IsUnknown() {
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		data.ProxyStripHeaders = emptyList
+	}
+	if data.ProxyStripRequestHeaders.IsNull() || data.ProxyStripRequestHeaders.IsUnknown() {
+		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+		data.ProxyStripRequestHeaders = emptyList
+	}
+
+	// Set only_with_cookie if returned
+	if api.OnlyWithCookie != nil && *api.OnlyWithCookie != "" {
+		data.OnlyWithCookie = types.StringValue(*api.OnlyWithCookie)
+	} else {
+		data.OnlyWithCookie = types.StringNull()
+	}
+
+	// Set optional fields to null if not in input
+	if data.OriginTimeout.IsNull() || data.OriginTimeout.IsUnknown() {
+		data.OriginTimeout = types.StringNull()
+	}
+	if data.ProxyAlertEnabled.IsNull() || data.ProxyAlertEnabled.IsUnknown() {
+		data.ProxyAlertEnabled = types.BoolNull()
+	}
+	if data.CacheLifetime.IsNull() || data.CacheLifetime.IsUnknown() {
+		data.CacheLifetime = types.StringNull()
+	}
+
+	// Application proxy fields
+	if data.ApplicationName.IsNull() || data.ApplicationName.IsUnknown() {
+		data.ApplicationName = types.StringNull()
+	}
+	if data.ApplicationEnvironment.IsNull() || data.ApplicationEnvironment.IsUnknown() {
+		data.ApplicationEnvironment = types.StringNull()
+	}
+	if data.ApplicationContainer.IsNull() || data.ApplicationContainer.IsUnknown() {
+		data.ApplicationContainer = types.StringNull()
+	}
+	if data.ApplicationPort.IsNull() || data.ApplicationPort.IsUnknown() {
+		data.ApplicationPort = types.Int64Null()
+	}
+
+	// Set unused conditional lists to empty based on the condition type
+	// API only returns the list that matches the condition (e.g., if country="country_is", only country_is is returned)
+	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+	if data.Method.IsNull() || data.Method.IsUnknown() {
+		data.Method = types.StringNull()
+		data.MethodIs = emptyList
+		data.MethodIsNot = emptyList
+	} else if data.Method.ValueString() == "method_is" {
+		if data.MethodIsNot.IsNull() || data.MethodIsNot.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.MethodIsNot = emptyList
+		}
+	} else if data.Method.ValueString() == "method_is_not" {
+		if data.MethodIs.IsNull() || data.MethodIs.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.MethodIs = emptyList
+		}
+	}
+
+	if data.Country.IsNull() || data.Country.IsUnknown() {
+		data.Country = types.StringNull()
+		data.CountryIs = emptyList
+		data.CountryIsNot = emptyList
+	} else if data.Country.ValueString() == "country_is" {
+		if data.CountryIsNot.IsNull() || data.CountryIsNot.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.CountryIsNot = emptyList
+		}
+	} else if data.Country.ValueString() == "country_is_not" {
+		if data.CountryIs.IsNull() || data.CountryIs.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.CountryIs = emptyList
+		}
+	}
+
+	if data.Ip.IsNull() || data.Ip.IsUnknown() {
+		data.Ip = types.StringNull()
+		data.IpIs = emptyList
+		data.IpIsNot = emptyList
+	} else if data.Ip.ValueString() == "ip_is" {
+		if data.IpIsNot.IsNull() || data.IpIsNot.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.IpIsNot = emptyList
+		}
+	} else if data.Ip.ValueString() == "ip_is_not" {
+		if data.IpIs.IsNull() || data.IpIs.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.IpIs = emptyList
+		}
+	}
+
+	// Lists that should be empty if not provided
+	if data.FailoverOriginStatusCodes.IsNull() || data.FailoverOriginStatusCodes.IsUnknown() {
+		data.FailoverOriginStatusCodes = emptyList
+	}
+	if data.InjectHeaders.IsNull() || data.InjectHeaders.IsUnknown() {
+		emptyMap, _ := types.MapValueFrom(ctx, types.StringType, map[string]string{})
+		data.InjectHeaders = emptyMap
+	}
+
+	// Note: NotifyConfig no longer at top-level in V2 schema (it's in action_config)
+	// Note: WafConfig.RequestHeaderName removed - use waf_config.thresholds instead
+
+	// Note: failover_s3_bucket and failover_s3_region have been removed from the schema as they are no longer supported by the API
+
+	// Set action_config to null if unknown (not returned in V2 create response)
+	if data.ActionConfig.IsNull() || data.ActionConfig.IsUnknown() {
+		data.ActionConfig = resource_rule_proxy.NewActionConfigValueNull()
+	}
+
+	// Set host to null if unknown
+	if data.Host.IsNull() || data.Host.IsUnknown() {
+		data.Host = types.StringNull()
+	}
+
+	// Set waf_config to null if unknown
+	if data.WafConfig.IsNull() || data.WafConfig.IsUnknown() {
+		data.WafConfig = resource_rule_proxy.NewWafConfigValueNull()
+	}
+
+	// Explicitly set WafConfig nested fields that weren't in the input
+	// These need to be set to prevent "unknown value" errors
+	if !data.WafConfig.IsNull() && !data.WafConfig.IsUnknown() {
+		// If these fields are unknown, set them to null/empty
+		if data.WafConfig.NotifySlack.IsUnknown() {
+			data.WafConfig.NotifySlack = types.StringNull()
+		}
+		if data.WafConfig.NotifySlackHitsRpm.IsUnknown() {
+			data.WafConfig.NotifySlackHitsRpm = types.Int64Null()
+		}
+		if data.WafConfig.AllowIp.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.WafConfig.AllowIp = emptyList
+		}
+		if data.WafConfig.AllowRules.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.WafConfig.AllowRules = emptyList
+		}
+		if data.WafConfig.BlockAsn.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.WafConfig.BlockAsn = emptyList
+		}
+		if data.WafConfig.BlockIp.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.WafConfig.BlockIp = emptyList
+		}
+		if data.WafConfig.BlockLists.IsUnknown() {
+			data.WafConfig.BlockLists = types.ObjectNull(resource_rule_proxy.BlockListsValue{}.AttributeTypes(ctx))
+		}
+		if data.WafConfig.BlockReferer.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.WafConfig.BlockReferer = emptyList
+		}
+		if data.WafConfig.BlockUa.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.WafConfig.BlockUa = emptyList
+		}
+		if data.WafConfig.Httpbl.IsUnknown() {
+			data.WafConfig.Httpbl = types.ObjectNull(resource_rule_proxy.HttpblValue{}.AttributeTypes(ctx))
+		}
+		if data.WafConfig.NotifyEmail.IsUnknown() {
+			emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+			data.WafConfig.NotifyEmail = emptyList
+		}
+
+		// Set thresholds to empty list if unknown (API may not return it)
+		if data.WafConfig.Thresholds.IsUnknown() {
+			emptyThresholdsList, _ := types.ListValueFrom(ctx, types.ObjectType{
+				AttrTypes: resource_rule_proxy.ThresholdsValue{}.AttributeTypes(ctx),
+			}, []attr.Value{})
+			data.WafConfig.Thresholds = emptyThresholdsList
+		}
+	}
+
+	// Read back from API to get computed fields and ensure state consistency
+	// The DB-backed API has eliminated eventual consistency, so this is safe
+	readDiags := callRuleProxyReadAPI(ctx, r, data)
+	diags.Append(readDiags...)
 
 	return
 }
@@ -526,7 +729,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
-	req := *quantadmingo.NewRuleProxyRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2RuleProxyRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -721,7 +924,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 	// WAF configuration
 	req.SetWafEnabled(data.WafEnabled.ValueBool())
 	if data.WafEnabled.ValueBool() {
-		wafConfig := *quantadmingo.NewWAFConfigUpdateWithDefaults()
+		wafConfig := quantadmingo.NewWafConfig()
 		wafConfig.SetMode(data.WafConfig.Mode.ValueString())
 		wafConfig.SetParanoiaLevel(int32(data.WafConfig.ParanoiaLevel.ValueInt64()))
 
@@ -794,18 +997,19 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 
 		wafConfig.SetNotifySlack(data.WafConfig.NotifySlack.ValueString())
 		wafConfig.SetNotifySlackHitsRpm(int32(data.WafConfig.NotifySlackHitsRpm.ValueInt64()))
-		wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
+		// V2 API may not have RequestHeaderName in WafConfig
+		// wafConfig.SetRequestHeaderName(data.WafConfig.RequestHeaderName.ValueString())
 
-		req.SetWafConfig(wafConfig)
+		req.SetWafConfig(*wafConfig)
 	}
 
 	// Make the API call
-	_, _, err := r.client.Instance.RulesProxyAPI.RulesProxyUpdate(
+	api, _, err := r.client.Instance.RulesAPI.RulesProxyUpdate(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).RuleProxyRequestUpdate(req).Execute()
+		data.Uuid.ValueString(),
+	).V2RuleProxyRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -814,6 +1018,10 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		)
 		return
 	}
+
+	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
+	data.Uuid = types.StringValue(api.GetUuid())
+	data.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
@@ -834,25 +1042,42 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	prevApplicationEnvironment := data.ApplicationEnvironment
 	prevApplicationContainer := data.ApplicationContainer
 	prevApplicationPort := data.ApplicationPort
+	prevTo := data.To // Preserve 'to' field for application proxy
 
 	// Add detailed logging
-	fmt.Printf("Reading rule proxy with ID: %s for project: %s\n",
-		data.RuleId.ValueString(), data.Project.ValueString())
+	tflog.Debug(ctx, "=== RULE PROXY READ REQUEST ===", map[string]interface{}{
+		"organization": r.client.Organization,
+		"project":      data.Project.ValueString(),
+		"rule_id":      data.RuleId.ValueString(),
+		"uuid":         data.Uuid.ValueString(),
+	})
 
-	api, resp, err := r.client.Instance.RulesProxyAPI.RulesProxyRead(
-		r.client.AuthContext,
-		r.client.Organization,
-		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).Execute()
+	// Use shared retry logic for eventual consistency
+	api, httpResp, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleProxy, *http.Response, error) {
+		return r.client.Instance.RulesAPI.RulesProxyRead(
+			r.client.AuthContext,
+			r.client.Organization,
+			data.Project.ValueString(),
+			data.Uuid.ValueString(),
+		).Execute()
+	}, "rule_proxy")
 
 	// Enhanced error handling
 	if err != nil {
-		// Log detailed error information
-		fmt.Printf("Error response: %+v\n", resp)
-
+		// Try to parse API error response
+		if httpResp != nil && httpResp.Body != nil {
+			bodyBytes, _ := io.ReadAll(httpResp.Body)
+			var apiError struct {
+				Error   bool   `json:"error"`
+				Message string `json:"message"`
+			}
+			if jsonErr := json.Unmarshal(bodyBytes, &apiError); jsonErr == nil && apiError.Message != "" {
+				diags.AddError("Failed to read rule proxy", apiError.Message)
+				return
+			}
+		}
 		// Check if it's a 404 error, which might indicate the rule was deleted
-		if resp != nil && resp.StatusCode == 404 {
+		if httpResp != nil && httpResp.StatusCode == 404 {
 			diags.AddError(
 				"Rule proxy not found",
 				fmt.Sprintf("The rule proxy with ID %s no longer exists. It may have been deleted outside of Terraform.",
@@ -862,9 +1087,9 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		}
 
 		// For 500 errors, try to get more information
-		if resp != nil && resp.StatusCode == 500 {
+		if httpResp != nil && httpResp.StatusCode == 500 {
 			// Try to list all rules to see if there's a general API issue
-			allRules, _, listErr := r.client.Instance.RulesProxyAPI.RulesProxyList(
+			allRules, _, listErr := r.client.Instance.RulesAPI.RulesProxyList(
 				r.client.AuthContext,
 				r.client.Organization,
 				data.Project.ValueString(),
@@ -945,7 +1170,13 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	}
 
 	// Handle proxy configuration
-	data.To = types.StringValue(actionConfig.GetTo())
+	// When application_proxy is true, API auto-generates the 'to' field
+	// Keep the original value (empty string) instead of API's generated URL to avoid inconsistency
+	if !prevApplicationProxy.IsNull() && prevApplicationProxy.ValueBool() {
+		data.To = prevTo
+	} else {
+		data.To = types.StringValue(actionConfig.GetTo())
+	}
 	data.Host = types.StringValue(actionConfig.GetHost())
 
 	// Map origin_timeout (handle string or int32 depending on SDK version)
@@ -1009,11 +1240,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.OnlyProxy404 = types.BoolValue(actionConfig.GetOnlyProxy404())
 	data.ProxyAlertEnabled = types.BoolValue(actionConfig.GetProxyAlertEnabled())
 
-	// Ensure computed fields are known to Terraform after apply
-	// static_error_page and static_error_page_status_codes are not present in response; set to known empty values
-	data.StaticErrorPage = types.StringValue("")
-	emptyList, _ := types.ListValue(types.StringType, []attr.Value{})
-	data.StaticErrorPageStatusCodes = emptyList
+	// Note: StaticErrorPage and StaticErrorPageStatusCodes no longer in V2 schema
 
 	data.Country = types.StringValue(api.GetCountry())
 	if api.GetCountry() == "country_is" {
@@ -1188,6 +1415,63 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.WafConfig.BlockIp = blockIpList
 		}
 
+		blockUa := wafConfig.GetBlockUa()
+		if blockUa == nil {
+			data.WafConfig.BlockUa = types.ListNull(types.StringType)
+		} else {
+			blockUaList, diag := types.ListValueFrom(ctx, types.StringType, blockUa)
+			if diag.HasError() {
+				diags.Append(diag...)
+				return
+			}
+			data.WafConfig.BlockUa = blockUaList
+		}
+
+		blockReferer := wafConfig.GetBlockReferer()
+		if blockReferer == nil {
+			data.WafConfig.BlockReferer = types.ListNull(types.StringType)
+		} else {
+			blockRefererList, diag := types.ListValueFrom(ctx, types.StringType, blockReferer)
+			if diag.HasError() {
+				diags.Append(diag...)
+				return
+			}
+			data.WafConfig.BlockReferer = blockRefererList
+		}
+
+		blockAsn := wafConfig.GetBlockAsn()
+		if blockAsn == nil {
+			data.WafConfig.BlockAsn = types.ListNull(types.StringType)
+		} else {
+			blockAsnList, diag := types.ListValueFrom(ctx, types.StringType, blockAsn)
+			if diag.HasError() {
+				diags.Append(diag...)
+				return
+			}
+			data.WafConfig.BlockAsn = blockAsnList
+		}
+
+		notifyEmail := wafConfig.GetNotifyEmail()
+		if notifyEmail == nil {
+			data.WafConfig.NotifyEmail = types.ListNull(types.StringType)
+		} else {
+			notifyEmailList, diag := types.ListValueFrom(ctx, types.StringType, notifyEmail)
+			if diag.HasError() {
+				diags.Append(diag...)
+				return
+			}
+			data.WafConfig.NotifyEmail = notifyEmailList
+		}
+
+		// Set nested objects to null - these are returned by API but we'll set them to null for simplicity
+		// They can be properly handled if users actually configure them
+		data.WafConfig.Httpbl = types.ObjectNull(resource_rule_proxy.HttpblValue{}.AttributeTypes(ctx))
+		data.WafConfig.BlockLists = types.ObjectNull(resource_rule_proxy.BlockListsValue{}.AttributeTypes(ctx))
+
+		// Thresholds - set to empty list for now (API returns defaults but we'll ignore them unless user configures them)
+		emptyThresholdsList, _ := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: resource_rule_proxy.ThresholdsValue{}.AttributeTypes(ctx)}, []resource_rule_proxy.ThresholdsValue{})
+		data.WafConfig.Thresholds = emptyThresholdsList
+
 		// Preserve values from plan if API returns empty
 		if wafConfig.GetNotifySlack() == "" && !planData.WafConfig.NotifySlack.IsNull() && !planData.WafConfig.NotifySlack.IsUnknown() {
 			data.WafConfig.NotifySlack = planData.WafConfig.NotifySlack
@@ -1201,7 +1485,8 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(wafConfig.GetNotifySlackHitsRpm()))
 		}
 
-		data.WafConfig.RequestHeaderName = types.StringValue(wafConfig.GetRequestHeaderName())
+		// V2 API may not have RequestHeaderName in WafConfig
+		// data.WafConfig.RequestHeaderName = types.StringValue(wafConfig.GetRequestHeaderName())
 	} else {
 		// WAF is disabled, but if we have a waf_config block in the configuration,
 		// we need to populate it with default/empty values to avoid unknown values
@@ -1209,7 +1494,6 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			// Keep the configured mode (likely from test configuration)
 			// Set other fields to appropriate defaults - use empty lists instead of null to match schema expectations
 			emptyStringList, _ := types.ListValue(types.StringType, []attr.Value{})
-			emptyBoolMap, _ := types.MapValue(types.BoolType, map[string]attr.Value{})
 
 			data.WafConfig.AllowRules = emptyStringList
 			data.WafConfig.AllowIp = emptyStringList
@@ -1219,20 +1503,8 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.WafConfig.NotifyEmail = emptyStringList
 			data.WafConfig.NotifySlack = types.StringValue("")
 			data.WafConfig.NotifySlackHitsRpm = types.Int64Null()
-			data.WafConfig.RequestHeaderName = types.StringValue("")
-			data.WafConfig.HttpblEnabled = emptyBoolMap
-
-			// Set default values for rate limiting fields
-			data.WafConfig.IpRatelimitCooldown = types.Int64Value(30)
-			data.WafConfig.IpRatelimitMode = types.StringValue("disabled")
-			data.WafConfig.IpRatelimitRps = types.Int64Value(5)
-			data.WafConfig.RequestHeaderRatelimitCooldown = types.Int64Value(30)
-			data.WafConfig.RequestHeaderRatelimitMode = types.StringValue("disabled")
-			data.WafConfig.RequestHeaderRatelimitRps = types.Int64Value(5)
-			data.WafConfig.WafRatelimitCooldown = types.Int64Value(300)
-			data.WafConfig.WafRatelimitHits = types.Int64Value(10)
-			data.WafConfig.WafRatelimitMode = types.StringValue("disabled")
-			data.WafConfig.WafRatelimitRps = types.Int64Value(5)
+			// Note: These flattened fields no longer exist, use waf_config.thresholds instead:
+			// RequestHeaderName, HttpblEnabled, IpRatelimit*, RequestHeaderRatelimit*, WafRatelimit*
 
 			// Keep the paranoia level from configuration or use default
 			if data.WafConfig.ParanoiaLevel.IsNull() || data.WafConfig.ParanoiaLevel.IsUnknown() {
@@ -1264,26 +1536,26 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		data.FailoverOriginStatusCodes = statusCodesList
 	}
 
-	notifycfg := actionConfig.GetNotifyConfig()
-	data.Notify = types.StringValue(*actionConfig.Notify)
+	// Note: Notify and NotifyConfig no longer exist at top-level in V2 schema
+	// notifycfg := actionConfig.GetNotifyConfig()
+	// These fields moved to action_config.notify_config in V2
 
-	originStatusCodes := notifycfg.GetOriginStatusCodes()
-	var originStatusCodesList basetypes.ListValue
-	if originStatusCodes == nil {
-		originStatusCodesList = types.ListNull(types.StringType)
-	} else {
-		var diag diag.Diagnostics
-		originStatusCodesList, diag = types.ListValueFrom(ctx, types.StringType, originStatusCodes)
-		if diag.HasError() {
-			diags.Append(diag...)
-			return
-		}
+	// Set action_config to null since we expose all its fields as top-level attributes
+	// This prevents "unknown value" errors
+	data.ActionConfig = resource_rule_proxy.NewActionConfigValueNull()
+
+	// Set static_error_page fields to null if they weren't populated
+	if data.StaticErrorPage.IsUnknown() {
+		data.StaticErrorPage = types.StringNull()
+	}
+	if data.StaticErrorPageStatusCodes.IsUnknown() {
+		data.StaticErrorPageStatusCodes = types.ListNull(types.StringType)
 	}
 
-	data.NotifyConfig = resource_rule_proxy.NotifyConfigValue{
-		OriginStatusCodes: originStatusCodesList,
-		Period:            types.StringValue(notifycfg.GetPeriod()),
-		SlackWebhook:      types.StringValue(notifycfg.GetSlackWebhook()),
+	// If waf_config wasn't properly populated, set to null
+	// This happens when waf_enabled is set but no waf_config block in TF
+	if data.WafConfig.IsUnknown() || data.WafConfig.Mode.IsUnknown() {
+		data.WafConfig = resource_rule_proxy.NewWafConfigValueNull()
 	}
 
 	return
@@ -1299,11 +1571,11 @@ func callRuleProxyDeleteAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
-	_, err := r.client.Instance.RulesProxyAPI.RulesProxyDelete(
+	_, err := r.client.Instance.RulesAPI.RulesProxyDelete(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
+		data.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {

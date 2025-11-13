@@ -110,9 +110,6 @@ func TestDomainResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_domain.test", "domain", "example.com"),
 					resource.TestCheckResourceAttr("quant_domain.test", "dns_engaged", "0"),
-					resource.TestCheckResourceAttr("quant_domain.test", "in_section", "0"),
-					resource.TestCheckResourceAttr("quant_domain.test", "project_id", "1"),
-					resource.TestCheckResourceAttr("quant_domain.test", "section_message", ""),
 				),
 			},
 			// Import testing

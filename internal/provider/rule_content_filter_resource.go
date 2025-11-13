@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_rule_content_filter"
 	"terraform-provider-quant/internal/utils"
@@ -54,11 +55,11 @@ func (r *ruleContentFilterResource) Configure(_ context.Context, req resource.Co
 }
 
 func (r *ruleContentFilterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform plan data into the model
@@ -74,11 +75,7 @@ func (r *ruleContentFilterResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	diags = callRuleContentFilterReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// No need to read immediately after create - we have all the data from the create response
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -105,11 +102,11 @@ func (r *ruleContentFilterResource) Read(ctx context.Context, req resource.ReadR
 }
 
 func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var plan resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform plan data into the model
@@ -134,7 +131,7 @@ func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	// Read updated state
+	// Read after update to populate computed fields correctly
 	diags = callRuleContentFilterReadAPI(ctx, r, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -146,11 +143,11 @@ func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.Upd
 }
 
 func (r *ruleContentFilterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-    // Serialise rule modifications to avoid backend JSON races
-    if r.client != nil && r.client.RulesMutex != nil {
-        r.client.RulesMutex.Lock()
-        defer r.client.RulesMutex.Unlock()
-    }
+	// Serialise rule modifications to avoid backend JSON races
+	if r.client != nil && r.client.RulesMutex != nil {
+		r.client.RulesMutex.Lock()
+		defer r.client.RulesMutex.Unlock()
+	}
 	var data resource_rule_content_filter.RuleContentFilterModel
 
 	// Read Terraform prior state data into the model
@@ -188,7 +185,7 @@ func (r *ruleContentFilterResource) ImportState(ctx context.Context, req resourc
 }
 
 func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterResource, data *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewRuleContentFilterRequestWithDefaults()
+	req := *quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -298,7 +295,7 @@ func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterRes
 	}
 
 	// Make the API call
-	api, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).RuleContentFilterRequest(req).Execute()
+	api, _, err := r.client.Instance.RulesAPI.RulesContentFilterCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).V2RuleContentFilterRequest(req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating rule content filter",
@@ -309,6 +306,55 @@ func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterRes
 
 	data.Uuid = types.StringValue(api.GetUuid())
 	data.RuleId = types.StringValue(api.GetRuleId())
+	data.Organization = types.StringValue(r.client.Organization)
+	data.Action = types.StringValue("content_filter")
+
+	// Set computed fields to null if unknown
+	if data.Rule.IsUnknown() {
+		data.Rule = types.StringNull()
+	}
+	if data.OnlyWithCookie.IsUnknown() {
+		data.OnlyWithCookie = types.StringNull()
+	}
+	if data.Method.IsUnknown() {
+		data.Method = types.StringNull()
+	}
+	if data.Country.IsUnknown() {
+		data.Country = types.StringNull()
+	}
+	if data.Ip.IsUnknown() {
+		data.Ip = types.StringNull()
+	}
+
+	// Set conditional lists to empty if unknown
+	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
+	if data.MethodIs.IsUnknown() {
+		data.MethodIs = emptyList
+	}
+	if data.MethodIsNot.IsUnknown() {
+		data.MethodIsNot = emptyList
+	}
+	if data.CountryIs.IsUnknown() {
+		data.CountryIs = emptyList
+	}
+	if data.CountryIsNot.IsUnknown() {
+		data.CountryIsNot = emptyList
+	}
+	if data.IpIs.IsUnknown() {
+		data.IpIs = emptyList
+	}
+	if data.IpIsNot.IsUnknown() {
+		data.IpIsNot = emptyList
+	}
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	data.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
+
+	// Read back from API to get computed fields and ensure state consistency
+	// The DB-backed API has eliminated eventual consistency, so this is safe
+	readDiags := callRuleContentFilterReadAPI(ctx, r, data)
+	diags.Append(readDiags...)
 
 	return
 }
@@ -323,7 +369,7 @@ func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterRes
 		return
 	}
 
-	req := *quantadmingo.NewRuleContentFilterRequestUpdateWithDefaults()
+	req := *quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
 	req.SetName(data.Name.ValueString())
 
 	// Domain handling
@@ -433,12 +479,12 @@ func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterRes
 	}
 
 	// Make the API call
-	_, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterUpdate(
+	api, _, err := r.client.Instance.RulesAPI.RulesContentFilterUpdate(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).RuleContentFilterRequestUpdate(req).Execute()
+		data.Uuid.ValueString(),
+	).V2RuleContentFilterRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError(
@@ -447,6 +493,10 @@ func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterRes
 		)
 		return
 	}
+
+	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
+	data.Uuid = types.StringValue(api.GetUuid())
+	data.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
@@ -461,12 +511,15 @@ func callRuleContentFilterReadAPI(ctx context.Context, r *ruleContentFilterResou
 		return
 	}
 
-	api, resp, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterRead(
-		r.client.AuthContext,
-		r.client.Organization,
-		data.Project.ValueString(),
-		data.RuleId.ValueString(),
-	).Execute()
+	// Use shared retry logic for eventual consistency
+	api, resp, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleContentFilter, *http.Response, error) {
+		return r.client.Instance.RulesAPI.RulesContentFilterRead(
+			r.client.AuthContext,
+			r.client.Organization,
+			data.Project.ValueString(),
+			data.Uuid.ValueString(),
+		).Execute()
+	}, "rule_content_filter")
 
 	if err != nil {
 		// Check if it's a 404 error, which might indicate the rule was deleted
@@ -630,6 +683,10 @@ func callRuleContentFilterReadAPI(ctx context.Context, r *ruleContentFilterResou
 
 	data.Rule = types.StringNull() // Obsolete field
 
+	// Set action_config to null since we expose its fields as top-level attributes
+	// This prevents "unknown value" errors
+	data.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
+
 	return
 }
 
@@ -643,11 +700,11 @@ func callRuleContentFilterDeleteAPI(ctx context.Context, r *ruleContentFilterRes
 		return
 	}
 
-	_, _, err := r.client.Instance.RulesContentFilterAPI.RulesContentFilterDelete(
+	_, err := r.client.Instance.RulesAPI.RulesContentFilterDelete(
 		r.client.AuthContext,
 		r.client.Organization,
 		data.Project.ValueString(),
-		data.RuleId.ValueString(),
+		data.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {

@@ -177,7 +177,7 @@ func generateID(headers map[string]string) string {
 
 // Create headers with the API.
 func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewHeadersCreateRequestWithDefaults()
+	req := *quantadmingo.NewV2CustomHeaderRequest(make(map[string]string))
 
 	if req.Headers == nil {
 		req.Headers = make(map[string]string)
@@ -193,7 +193,7 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource 
 		req.Headers[k] = strVal.ValueString()
 	}
 
-	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersCreateRequest(req).Execute()
+	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).V2CustomHeaderRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to add custom headers", err.Error())
@@ -213,8 +213,11 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 		return
 	}
 
+	// V2 API returns a single map[string]string, not an array
+	allHeaders := api
+	
 	a := make(map[string]attr.Value)
-	for k, v := range api {
+	for k, v := range allHeaders {
 		a[k] = types.StringValue(v)
 	}
 
@@ -225,19 +228,20 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerR
 		return
 	}
 
-	resource.Id = types.StringValue(generateID(api))
+	resource.Id = types.StringValue(generateID(allHeaders))
 	resource.Headers = headers
 	return
 }
 
 // To delete headers we remove just update with an empty map.
 func callHeaderDeleteAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewHeadersDeleteRequestWithDefaults()
-	req.Headers = []string{}
+	// V2CustomHeaderRequest expects headers map, not array of header names
+	headersToDelete := make(map[string]string)
 	for k := range resource.Headers.Elements() {
-		req.Headers = append(req.Headers, k)
+		headersToDelete[k] = "" // Empty value to indicate deletion
 	}
-	_, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).HeadersDeleteRequest(req).Execute()
+	req := *quantadmingo.NewV2CustomHeaderRequest(headersToDelete)
+	_, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).V2CustomHeaderRequest(req).Execute()
 	if err != nil {
 		diags.AddError("Error removing custom headers", err.Error())
 		return

@@ -13,8 +13,10 @@ func CustomHeadersResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"headers": schema.MapAttribute{
-				ElementType: types.StringType,
-				Required:    true,
+				ElementType:         types.StringType,
+				Required:            true,
+				Description:         "Custom headers",
+				MarkdownDescription: "Custom headers",
 			},
 			"organization": schema.StringAttribute{
 				Optional: true,
