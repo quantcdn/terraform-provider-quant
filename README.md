@@ -42,6 +42,7 @@ provider "quant" {
   base_delay_ms      = 500      # Initial retry delay in ms (default: 500)
   max_delay_ms       = 30000    # Maximum retry delay in ms (default: 30000)
   enable_jitter      = true     # Add jitter to delays (default: true)
+  timeout_seconds    = 120      # HTTP request timeout in seconds (default: 120)
 }
 ```
 
@@ -58,6 +59,7 @@ export QUANTCDN_MAX_RETRIES="5"
 export QUANTCDN_BASE_DELAY_MS="1000"
 export QUANTCDN_MAX_DELAY_MS="60000"
 export QUANTCDN_ENABLE_JITTER="true"
+export QUANTCDN_TIMEOUT_SECONDS="120"
 ```
 
 ### Usage Examples
@@ -83,6 +85,7 @@ provider "quant" {
   max_retries        = 5
   base_delay_ms      = 1000
   max_delay_ms       = 60000
+  timeout_seconds    = 180      # 3 minutes for large operations
 }
 ```
 
@@ -97,6 +100,7 @@ provider "quant" {
   max_retries        = 10
   base_delay_ms      = 2000
   max_delay_ms       = 120000
+  timeout_seconds    = 300      # 5 minutes for maximum reliability
 }
 ```
 
@@ -169,6 +173,7 @@ resource "quant_project" "staging_project" {
 | `base_delay_ms` | `500` | Initial delay in milliseconds for exponential backoff |
 | `max_delay_ms` | `30000` | Maximum delay in milliseconds (30 seconds) |
 | `enable_jitter` | `true` | Whether to add random jitter to retry delays |
+| `timeout_seconds` | `120` | HTTP client timeout in seconds for API requests |
 
 ### Best Practices
 
@@ -200,6 +205,7 @@ provider "quant" {
   base_delay_ms      = 1000     # Start with 1 second delay for retries
   max_delay_ms       = 60000    # Maximum 60 second delay between retries
   enable_jitter      = true     # Add randomisation to prevent thundering herd
+  timeout_seconds    = 120      # HTTP client timeout in seconds
 }
 ```
 
@@ -207,13 +213,23 @@ provider "quant" {
 
 ### Resources
 
-- `quant_project` - Manage Quant projects
-- `quant_domain` - Manage domains within projects  
-- `quant_crawler` - Manage crawlers for content discovery
-- `quant_header` - Manage HTTP headers for domains
-- `quant_rule_proxy` - Manage proxy rules for URL routing
-- `quant_rule_redirect` - Manage redirect rules  
-- `quant_rule_custom_response` - Manage custom response rules
+- **`quant_project`** - Manage Quant projects with basic auth, query params, and revision settings
+- **`quant_domain`** - Manage domains within projects  
+- **`quant_crawler`** - Manage web crawlers for content discovery and ingestion
+  - Configure crawl depth, delays, browser mode, asset harvesting
+  - Set up authentication, headers, and URL patterns (include/exclude)
+  - Support for multi-domain crawling and sitemap discovery
+- **`quant_crawler_schedule`** - Manage automated crawler schedules with cron expressions
+- **`quant_header`** - Manage custom HTTP headers for domains
+- **`quant_rule_proxy`** - Manage proxy rules for URL routing
+  - Origin servers, caching, WAF configuration
+  - Application proxy support for containerized apps
+  - Header manipulation, IP whitelisting/blacklisting
+- **`quant_rule_redirect`** - Manage HTTP redirects (301/302)
+- **`quant_rule_custom_response`** - Manage custom HTTP responses with custom status codes
+- **`quant_rule_content_filter`** - Manage content filtering rules with methods and IP restrictions
+
+For detailed documentation on each resource, see the [docs/resources](docs/resources) directory.
 
 ### Data Sources
 
@@ -279,32 +295,16 @@ resource "github_actions_secret" "quant_token" {
 The `quant_project` data source provides the following attributes:
 
 - `id` - Numeric project ID
-- `name` - Project display name
 - `uuid` - Project UUID
+- `name` - Project display name
 - `machine_name` - Project machine name
-- `region` - Deployment region
-- `organization_id` - Organization ID
-- `security_score` - Project security score
-- `git_url` - Associated Git repository URL
 - `write_token` - Project write token (when `with_token = true`)
-- `created_at` - Creation timestamp
-- `updated_at` - Last update timestamp
 
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.22
+- [Go](https://golang.org/doc/install) >= 1.23
 
-## Development Status
-
-This provider is actively maintained and supports the latest QuantCDN API features. Current status:
-
-- ✅ **Production Ready**: Used in production environments
-- ✅ **Full API Coverage**: All major QuantCDN resources supported
-- ✅ **Rate Limiting**: Built-in API rate limiting with exponential backoff
-- ✅ **Multi-Environment**: Support for custom base URLs for different environments
-- ✅ **Comprehensive Testing**: Full test coverage with mocked HTTP responses
-- ✅ **Documentation**: Complete documentation with examples
 
 ## Contributing
 
