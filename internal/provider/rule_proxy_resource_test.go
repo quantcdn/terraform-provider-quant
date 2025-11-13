@@ -1,9 +1,7 @@
 package provider_test
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"testing"
@@ -239,31 +237,6 @@ func testAccCheckRuleProxyExists(n string) resource.TestCheckFunc {
 
 // Test cache_lifetime sentinel value behavior
 // TestAccRuleProxyCacheLifetimeSentinel was removed due to complex WAF config mock issues with post-create reads.
-func testAccRuleProxyConfigCacheLifetimeOmitted(name string) string {
-	return fmt.Sprintf(`
-provider "quant" {
-	bearer = "testtoken"
-	organization = "test-organization"
-}
-
-resource "quant_rule_proxy" "test" {
-	name    = %[1]q
-	project = "default"
-	domain  = ["any"]
-	url     = ["/proxy"]
-	
-	to              = "https://backend.example.com"
-	host            = "backend.example.com"
-	waf_enabled     = false
-	# cache_lifetime omitted - should respect origin headers
-	
-	# Even when WAF is disabled, we need to provide a waf_config block due to schema requirements
-	waf_config = {
-		mode = "report"
-	}
-}
-`, name)
-}
 
 // Unit test for cache_lifetime sentinel value handling
 func TestRuleProxyCacheLifetimeHandling(t *testing.T) {
@@ -360,195 +333,8 @@ func int64Ptr(v int64) *int64 {
 // TestAccRuleProxyOriginTimeoutUpdate was removed due to complex WAF config mock issues with post-create reads.
 // Origin timeout handling is covered by unit test: TestRuleProxyOriginTimeoutHandling.
 
-func setupRuleProxyServerForOriginTimeout(t *testing.T, organizationID string, projectID string) {
-	httpmock.Activate()
-	baseUrl := "https://dashboard.quantcdn.io/api/v2"
 
-	// Track current origin_timeout value to simulate API behavior
-	var currentOriginTimeout = "30000"
-	var currentName = "test-proxy-timeout"
 
-	createResponse := func(name string, originTimeout string) map[string]interface{} {
-		return map[string]interface{}{
-			"uuid":             "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
-			"rule_id":          "4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9",
-			"domain":           []string{"any"},
-			"url":              []string{"/proxy"},
-			"name":             name,
-			"action":           "proxy",
-			"disabled":         false,
-			"method":           "",
-			"method_is":        []string{},
-			"method_is_not":    []string{},
-			"country":          "",
-			"country_is":       []string{},
-			"country_is_not":   []string{},
-			"ip":               "",
-			"ip_is":            []string{},
-			"ip_is_not":        []string{},
-			"only_with_cookie": "",
-			"action_config": map[string]interface{}{
-				"to":                           "https://backend.example.com",
-				"host":                         "backend.example.com",
-				"origin_timeout":               originTimeout,
-				"waf_enabled":                  false,
-				"proxy_alert_enabled":          false,
-				"cache_lifetime":               "3600",
-				"failover_mode":                false,
-				"failover_origin_ttfb":         "2000",
-				"failover_lifetime":            "300",
-				"failover_origin_status_codes": []string{},
-				"disable_ssl_verify":           false,
-				"only_proxy_404":               false,
-				"proxy_strip_headers":          []string{},
-				"proxy_strip_request_headers":  []string{},
-				"auth_user":                    "",
-				"auth_pass":                    "",
-				"inject_headers":               nil,
-				"notify":                       "none",
-				"notify_config": map[string]interface{}{
-					"period":              "60",
-					"slack_webhook":       "",
-					"origin_status_codes": []string{},
-				},
-				"waf_config": map[string]interface{}{
-					"mode":                              "report",
-					"paranoia_level":                    1,
-					"allow_rules":                       []string{},
-					"allow_ip":                          []string{},
-					"block_ip":                          []string{},
-					"block_ua":                          []string{},
-					"block_referer":                     []string{},
-					"notify_email":                      []string{},
-					"notify_slack":                      "",
-					"notify_slack_hits_rpm":             nil,
-					"request_header_name":               "",
-					"httpbl_enabled":                    map[string]interface{}{},
-					"ip_ratelimit_cooldown":             30,
-					"ip_ratelimit_mode":                 "disabled",
-					"ip_ratelimit_rps":                  5,
-					"request_header_ratelimit_cooldown": 30,
-					"request_header_ratelimit_mode":     "disabled",
-					"request_header_ratelimit_rps":      5,
-					"waf_ratelimit_cooldown":            300,
-					"waf_ratelimit_hits":                10,
-					"waf_ratelimit_mode":                "disabled",
-					"waf_ratelimit_rps":                 5,
-				},
-			},
-		}
-	}
-
-	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
-		t.Logf("Request: %s", req.URL)
-		return httpmock.NewStringResponse(404, "Not Found"), nil
-	})
-
-	// GET list and read responses
-	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, []map[string]interface{}{createResponse(currentName, currentOriginTimeout)})
-	})
-
-	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, createResponse(currentName, currentOriginTimeout))
-	})
-
-	// POST create - should validate origin_timeout is sent
-	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		var requestBody map[string]interface{}
-		if req.Body != nil {
-			body, _ := io.ReadAll(req.Body)
-			if err := json.Unmarshal(body, &requestBody); err == nil {
-				if name, ok := requestBody["name"].(string); ok {
-					currentName = name
-				}
-				// Validate that origin_timeout is sent in create request
-				if originTimeout, ok := requestBody["origin_timeout"].(string); ok {
-					currentOriginTimeout = originTimeout
-					t.Logf("CREATE: origin_timeout set to %s", originTimeout)
-				} else {
-					t.Logf("CREATE: origin_timeout not found in request body")
-				}
-			}
-		}
-		return httpmock.NewJsonResponse(200, createResponse(currentName, currentOriginTimeout))
-	})
-
-	// PATCH update - this is the critical test - should validate origin_timeout is sent
-	httpmock.RegisterResponder("PATCH", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		var requestBody map[string]interface{}
-		if req.Body != nil {
-			body, _ := io.ReadAll(req.Body)
-			if err := json.Unmarshal(body, &requestBody); err == nil {
-				if name, ok := requestBody["name"].(string); ok {
-					currentName = name
-				}
-				// This is the key validation - origin_timeout should be sent in update requests
-				if originTimeout, ok := requestBody["origin_timeout"].(string); ok {
-					currentOriginTimeout = originTimeout
-					t.Logf("UPDATE: origin_timeout updated to %s", originTimeout)
-				} else {
-					t.Logf("UPDATE: origin_timeout not found in request body - this would cause the bug!")
-				}
-			}
-		}
-		return httpmock.NewJsonResponse(200, createResponse(currentName, currentOriginTimeout))
-	})
-
-	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/rules/proxy/4bf0b98f-d2f6-49dd-b5f6-5908623a9bc9", baseUrl, organizationID, projectID), func(req *http.Request) (*http.Response, error) {
-		return httpmock.NewJsonResponse(200, createResponse(currentName, currentOriginTimeout))
-	})
-}
-
-func testAccRuleProxyConfigOriginTimeout(name string, originTimeout string) string {
-	return fmt.Sprintf(`
-provider "quant" {
-	bearer = "testtoken"
-	organization = "test-organization"
-}
-
-resource "quant_rule_proxy" "test" {
-	name    = %[1]q
-	project = "default"
-	domain  = ["any"]
-	url     = ["/proxy"]
-	
-	to              = "https://backend.example.com"
-	host            = "backend.example.com"
-	origin_timeout  = %[2]q
-	waf_enabled     = false
-	
-	waf_config = {
-		mode = "report"
-	}
-}
-`, name, originTimeout)
-}
-
-func testAccRuleProxyConfigOriginTimeoutOmitted(name string) string {
-	return fmt.Sprintf(`
-provider "quant" {
-	bearer = "testtoken"
-	organization = "test-organization"
-}
-
-resource "quant_rule_proxy" "test" {
-	name    = %[1]q
-	project = "default"
-	domain  = ["any"]
-	url     = ["/proxy"]
-	
-	to              = "https://backend.example.com"
-	host            = "backend.example.com"
-	# origin_timeout omitted - should use API default
-	waf_enabled     = false
-	
-	waf_config = {
-		mode = "report"
-	}
-}
-`, name)
-}
 
 // Unit test for origin_timeout handling in Create and Update operations
 func TestRuleProxyOriginTimeoutHandling(t *testing.T) {
