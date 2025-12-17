@@ -4,7 +4,13 @@ package resource_domain
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
@@ -14,8 +20,71 @@ func DomainResourceSchema(ctx context.Context) schema.Schema {
 		Attributes: map[string]schema.Attribute{
 			"dns_engaged": schema.Int64Attribute{
 				Computed:            true,
-				Description:         "DNS engagement status",
-				MarkdownDescription: "DNS engagement status",
+				Description:         "DNS engagement status. 1 indicates DNS is properly configured and engaged, 0 indicates DNS configuration is pending or incomplete.",
+				MarkdownDescription: "DNS engagement status. 1 indicates DNS is properly configured and engaged, 0 indicates DNS configuration is pending or incomplete.",
+			},
+			"dns_go_live_records": schema.ListNestedAttribute{
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"description": schema.StringAttribute{
+							Computed:            true,
+							Description:         "Human-readable instructions for configuring this DNS record",
+							MarkdownDescription: "Human-readable instructions for configuring this DNS record",
+						},
+						"name": schema.StringAttribute{
+							Computed:            true,
+							Description:         "DNS record name/host (@ for apex/root domains, subdomain name for subdomains)",
+							MarkdownDescription: "DNS record name/host (@ for apex/root domains, subdomain name for subdomains)",
+						},
+						"type": schema.StringAttribute{
+							Computed:            true,
+							Description:         "DNS record type (CNAME, A, or ALIAS)",
+							MarkdownDescription: "DNS record type (CNAME, A, or ALIAS)",
+						},
+						"value": schema.StringAttribute{
+							Computed:            true,
+							Description:         "DNS record value (IP addresses for A records, domain name for CNAME/ALIAS)",
+							MarkdownDescription: "DNS record value (IP addresses for A records, domain name for CNAME/ALIAS)",
+						},
+					},
+					CustomType: DnsGoLiveRecordsType{
+						ObjectType: types.ObjectType{
+							AttrTypes: DnsGoLiveRecordsValue{}.AttributeTypes(ctx),
+						},
+					},
+				},
+				Computed:            true,
+				Description:         "DNS records required to route traffic to the CDN. These records differ based on domain type (apex vs subdomain). Present when the CDN is configured and ready to receive traffic.",
+				MarkdownDescription: "DNS records required to route traffic to the CDN. These records differ based on domain type (apex vs subdomain). Present when the CDN is configured and ready to receive traffic.",
+			},
+			"dns_validation_records": schema.ListNestedAttribute{
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Computed:            true,
+							Description:         "DNS record name (host/subdomain)",
+							MarkdownDescription: "DNS record name (host/subdomain)",
+						},
+						"type": schema.StringAttribute{
+							Computed:            true,
+							Description:         "DNS record type (typically CNAME)",
+							MarkdownDescription: "DNS record type (typically CNAME)",
+						},
+						"value": schema.StringAttribute{
+							Computed:            true,
+							Description:         "DNS record value to point to",
+							MarkdownDescription: "DNS record value to point to",
+						},
+					},
+					CustomType: DnsValidationRecordsType{
+						ObjectType: types.ObjectType{
+							AttrTypes: DnsValidationRecordsValue{}.AttributeTypes(ctx),
+						},
+					},
+				},
+				Computed:            true,
+				Description:         "DNS validation records required for SSL certificate validation. Present for domains pending certificate validation. Each record contains the CNAME information needed to validate domain ownership.",
+				MarkdownDescription: "DNS validation records required for SSL certificate validation. Present for domains pending certificate validation. Each record contains the CNAME information needed to validate domain ownership.",
 			},
 			"domain": schema.StringAttribute{
 				Required:            true,
@@ -44,9 +113,934 @@ func DomainResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type DomainModel struct {
-	DnsEngaged   types.Int64  `tfsdk:"dns_engaged"`
-	Domain       types.String `tfsdk:"domain"`
-	Id           types.Int64  `tfsdk:"id"`
-	Organization types.String `tfsdk:"organization"`
-	Project      types.String `tfsdk:"project"`
+	DnsEngaged           types.Int64  `tfsdk:"dns_engaged"`
+	DnsGoLiveRecords     types.List   `tfsdk:"dns_go_live_records"`
+	DnsValidationRecords types.List   `tfsdk:"dns_validation_records"`
+	Domain               types.String `tfsdk:"domain"`
+	Id                   types.Int64  `tfsdk:"id"`
+	Organization         types.String `tfsdk:"organization"`
+	Project              types.String `tfsdk:"project"`
+}
+
+var _ basetypes.ObjectTypable = DnsGoLiveRecordsType{}
+
+type DnsGoLiveRecordsType struct {
+	basetypes.ObjectType
+}
+
+func (t DnsGoLiveRecordsType) Equal(o attr.Type) bool {
+	other, ok := o.(DnsGoLiveRecordsType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t DnsGoLiveRecordsType) String() string {
+	return "DnsGoLiveRecordsType"
+}
+
+func (t DnsGoLiveRecordsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	descriptionAttribute, ok := attributes["description"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`description is missing from object`)
+
+		return nil, diags
+	}
+
+	descriptionVal, ok := descriptionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return nil, diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	typeAttribute, ok := attributes["type"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`type is missing from object`)
+
+		return nil, diags
+	}
+
+	typeVal, ok := typeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`type expected to be basetypes.StringValue, was: %T`, typeAttribute))
+	}
+
+	valueAttribute, ok := attributes["value"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`value is missing from object`)
+
+		return nil, diags
+	}
+
+	valueVal, ok := valueAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`value expected to be basetypes.StringValue, was: %T`, valueAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return DnsGoLiveRecordsValue{
+		Description:          descriptionVal,
+		Name:                 nameVal,
+		DnsGoLiveRecordsType: typeVal,
+		Value:                valueVal,
+		state:                attr.ValueStateKnown,
+	}, diags
+}
+
+func NewDnsGoLiveRecordsValueNull() DnsGoLiveRecordsValue {
+	return DnsGoLiveRecordsValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewDnsGoLiveRecordsValueUnknown() DnsGoLiveRecordsValue {
+	return DnsGoLiveRecordsValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewDnsGoLiveRecordsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (DnsGoLiveRecordsValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing DnsGoLiveRecordsValue Attribute Value",
+				"While creating a DnsGoLiveRecordsValue value, a missing attribute value was detected. "+
+					"A DnsGoLiveRecordsValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("DnsGoLiveRecordsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid DnsGoLiveRecordsValue Attribute Type",
+				"While creating a DnsGoLiveRecordsValue value, an invalid attribute value was detected. "+
+					"A DnsGoLiveRecordsValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("DnsGoLiveRecordsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("DnsGoLiveRecordsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra DnsGoLiveRecordsValue Attribute Value",
+				"While creating a DnsGoLiveRecordsValue value, an extra attribute value was detected. "+
+					"A DnsGoLiveRecordsValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra DnsGoLiveRecordsValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewDnsGoLiveRecordsValueUnknown(), diags
+	}
+
+	descriptionAttribute, ok := attributes["description"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`description is missing from object`)
+
+		return NewDnsGoLiveRecordsValueUnknown(), diags
+	}
+
+	descriptionVal, ok := descriptionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return NewDnsGoLiveRecordsValueUnknown(), diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	typeAttribute, ok := attributes["type"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`type is missing from object`)
+
+		return NewDnsGoLiveRecordsValueUnknown(), diags
+	}
+
+	typeVal, ok := typeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`type expected to be basetypes.StringValue, was: %T`, typeAttribute))
+	}
+
+	valueAttribute, ok := attributes["value"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`value is missing from object`)
+
+		return NewDnsGoLiveRecordsValueUnknown(), diags
+	}
+
+	valueVal, ok := valueAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`value expected to be basetypes.StringValue, was: %T`, valueAttribute))
+	}
+
+	if diags.HasError() {
+		return NewDnsGoLiveRecordsValueUnknown(), diags
+	}
+
+	return DnsGoLiveRecordsValue{
+		Description:          descriptionVal,
+		Name:                 nameVal,
+		DnsGoLiveRecordsType: typeVal,
+		Value:                valueVal,
+		state:                attr.ValueStateKnown,
+	}, diags
+}
+
+func NewDnsGoLiveRecordsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) DnsGoLiveRecordsValue {
+	object, diags := NewDnsGoLiveRecordsValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewDnsGoLiveRecordsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t DnsGoLiveRecordsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewDnsGoLiveRecordsValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewDnsGoLiveRecordsValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewDnsGoLiveRecordsValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewDnsGoLiveRecordsValueMust(DnsGoLiveRecordsValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t DnsGoLiveRecordsType) ValueType(ctx context.Context) attr.Value {
+	return DnsGoLiveRecordsValue{}
+}
+
+var _ basetypes.ObjectValuable = DnsGoLiveRecordsValue{}
+
+type DnsGoLiveRecordsValue struct {
+	Description          basetypes.StringValue `tfsdk:"description"`
+	Name                 basetypes.StringValue `tfsdk:"name"`
+	DnsGoLiveRecordsType basetypes.StringValue `tfsdk:"type"`
+	Value                basetypes.StringValue `tfsdk:"value"`
+	state                attr.ValueState
+}
+
+func (v DnsGoLiveRecordsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 4)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["description"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["type"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["value"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 4)
+
+		val, err = v.Description.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["description"] = val
+
+		val, err = v.Name.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["name"] = val
+
+		val, err = v.DnsGoLiveRecordsType.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["type"] = val
+
+		val, err = v.Value.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["value"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v DnsGoLiveRecordsValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v DnsGoLiveRecordsValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v DnsGoLiveRecordsValue) String() string {
+	return "DnsGoLiveRecordsValue"
+}
+
+func (v DnsGoLiveRecordsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"description": basetypes.StringType{},
+		"name":        basetypes.StringType{},
+		"type":        basetypes.StringType{},
+		"value":       basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"description": v.Description,
+			"name":        v.Name,
+			"type":        v.DnsGoLiveRecordsType,
+			"value":       v.Value,
+		})
+
+	return objVal, diags
+}
+
+func (v DnsGoLiveRecordsValue) Equal(o attr.Value) bool {
+	other, ok := o.(DnsGoLiveRecordsValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Description.Equal(other.Description) {
+		return false
+	}
+
+	if !v.Name.Equal(other.Name) {
+		return false
+	}
+
+	if !v.DnsGoLiveRecordsType.Equal(other.DnsGoLiveRecordsType) {
+		return false
+	}
+
+	if !v.Value.Equal(other.Value) {
+		return false
+	}
+
+	return true
+}
+
+func (v DnsGoLiveRecordsValue) Type(ctx context.Context) attr.Type {
+	return DnsGoLiveRecordsType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v DnsGoLiveRecordsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"description": basetypes.StringType{},
+		"name":        basetypes.StringType{},
+		"type":        basetypes.StringType{},
+		"value":       basetypes.StringType{},
+	}
+}
+
+var _ basetypes.ObjectTypable = DnsValidationRecordsType{}
+
+type DnsValidationRecordsType struct {
+	basetypes.ObjectType
+}
+
+func (t DnsValidationRecordsType) Equal(o attr.Type) bool {
+	other, ok := o.(DnsValidationRecordsType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t DnsValidationRecordsType) String() string {
+	return "DnsValidationRecordsType"
+}
+
+func (t DnsValidationRecordsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return nil, diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	typeAttribute, ok := attributes["type"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`type is missing from object`)
+
+		return nil, diags
+	}
+
+	typeVal, ok := typeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`type expected to be basetypes.StringValue, was: %T`, typeAttribute))
+	}
+
+	valueAttribute, ok := attributes["value"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`value is missing from object`)
+
+		return nil, diags
+	}
+
+	valueVal, ok := valueAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`value expected to be basetypes.StringValue, was: %T`, valueAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return DnsValidationRecordsValue{
+		Name:                     nameVal,
+		DnsValidationRecordsType: typeVal,
+		Value:                    valueVal,
+		state:                    attr.ValueStateKnown,
+	}, diags
+}
+
+func NewDnsValidationRecordsValueNull() DnsValidationRecordsValue {
+	return DnsValidationRecordsValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewDnsValidationRecordsValueUnknown() DnsValidationRecordsValue {
+	return DnsValidationRecordsValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewDnsValidationRecordsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (DnsValidationRecordsValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing DnsValidationRecordsValue Attribute Value",
+				"While creating a DnsValidationRecordsValue value, a missing attribute value was detected. "+
+					"A DnsValidationRecordsValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("DnsValidationRecordsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid DnsValidationRecordsValue Attribute Type",
+				"While creating a DnsValidationRecordsValue value, an invalid attribute value was detected. "+
+					"A DnsValidationRecordsValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("DnsValidationRecordsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("DnsValidationRecordsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra DnsValidationRecordsValue Attribute Value",
+				"While creating a DnsValidationRecordsValue value, an extra attribute value was detected. "+
+					"A DnsValidationRecordsValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra DnsValidationRecordsValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewDnsValidationRecordsValueUnknown(), diags
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return NewDnsValidationRecordsValueUnknown(), diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	typeAttribute, ok := attributes["type"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`type is missing from object`)
+
+		return NewDnsValidationRecordsValueUnknown(), diags
+	}
+
+	typeVal, ok := typeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`type expected to be basetypes.StringValue, was: %T`, typeAttribute))
+	}
+
+	valueAttribute, ok := attributes["value"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`value is missing from object`)
+
+		return NewDnsValidationRecordsValueUnknown(), diags
+	}
+
+	valueVal, ok := valueAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`value expected to be basetypes.StringValue, was: %T`, valueAttribute))
+	}
+
+	if diags.HasError() {
+		return NewDnsValidationRecordsValueUnknown(), diags
+	}
+
+	return DnsValidationRecordsValue{
+		Name:                     nameVal,
+		DnsValidationRecordsType: typeVal,
+		Value:                    valueVal,
+		state:                    attr.ValueStateKnown,
+	}, diags
+}
+
+func NewDnsValidationRecordsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) DnsValidationRecordsValue {
+	object, diags := NewDnsValidationRecordsValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewDnsValidationRecordsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t DnsValidationRecordsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewDnsValidationRecordsValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewDnsValidationRecordsValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewDnsValidationRecordsValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewDnsValidationRecordsValueMust(DnsValidationRecordsValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t DnsValidationRecordsType) ValueType(ctx context.Context) attr.Value {
+	return DnsValidationRecordsValue{}
+}
+
+var _ basetypes.ObjectValuable = DnsValidationRecordsValue{}
+
+type DnsValidationRecordsValue struct {
+	Name                     basetypes.StringValue `tfsdk:"name"`
+	DnsValidationRecordsType basetypes.StringValue `tfsdk:"type"`
+	Value                    basetypes.StringValue `tfsdk:"value"`
+	state                    attr.ValueState
+}
+
+func (v DnsValidationRecordsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["type"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["value"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.Name.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["name"] = val
+
+		val, err = v.DnsValidationRecordsType.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["type"] = val
+
+		val, err = v.Value.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["value"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v DnsValidationRecordsValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v DnsValidationRecordsValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v DnsValidationRecordsValue) String() string {
+	return "DnsValidationRecordsValue"
+}
+
+func (v DnsValidationRecordsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"name":  basetypes.StringType{},
+		"type":  basetypes.StringType{},
+		"value": basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"name":  v.Name,
+			"type":  v.DnsValidationRecordsType,
+			"value": v.Value,
+		})
+
+	return objVal, diags
+}
+
+func (v DnsValidationRecordsValue) Equal(o attr.Value) bool {
+	other, ok := o.(DnsValidationRecordsValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Name.Equal(other.Name) {
+		return false
+	}
+
+	if !v.DnsValidationRecordsType.Equal(other.DnsValidationRecordsType) {
+		return false
+	}
+
+	if !v.Value.Equal(other.Value) {
+		return false
+	}
+
+	return true
+}
+
+func (v DnsValidationRecordsValue) Type(ctx context.Context) attr.Type {
+	return DnsValidationRecordsType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v DnsValidationRecordsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"name":  basetypes.StringType{},
+		"type":  basetypes.StringType{},
+		"value": basetypes.StringType{},
+	}
 }
