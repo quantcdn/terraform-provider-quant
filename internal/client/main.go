@@ -6,7 +6,7 @@ import (
     "sync"
     "time"
 
-    openapi "github.com/quantcdn/quant-admin-go"
+    openapi "github.com/quantcdn/quant-admin-go/v4"
 )
 
 type Client struct {

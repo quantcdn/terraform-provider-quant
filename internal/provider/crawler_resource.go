@@ -18,7 +18,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	quantadmingo "github.com/quantcdn/quant-admin-go"
+	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 )
 
 var (
@@ -404,8 +404,8 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	crawler.Organization = types.StringValue(r.client.Organization)
 
 	// Set deleted_at (null if not deleted)
-	if api.DeletedAt != nil {
-		crawler.DeletedAt = types.StringValue(api.DeletedAt.Format("2006-01-02T15:04:05Z07:00"))
+	if api.DeletedAt.IsSet() && api.DeletedAt.Get() != nil {
+		crawler.DeletedAt = types.StringValue(api.DeletedAt.Get().Format("2006-01-02T15:04:05Z07:00"))
 	} else {
 		crawler.DeletedAt = types.StringNull()
 	}
