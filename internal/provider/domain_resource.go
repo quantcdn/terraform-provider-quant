@@ -272,6 +272,21 @@ func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_
 	// Note: V2Domain doesn't return these fields, and they're no longer in the schema:
 	// CreatedAt, UpdatedAt, DeletedAt, InSection, ProjectId, SectionMessage
 
+	// Explicitly set computed fields to null to avoid state inconsistencies
+	dnsGoLiveRecordsElemType := resource_domain.DnsGoLiveRecordsType{
+		ObjectType: types.ObjectType{
+			AttrTypes: resource_domain.DnsGoLiveRecordsValue{}.AttributeTypes(ctx),
+		},
+	}
+	domain.DnsGoLiveRecords = types.ListNull(dnsGoLiveRecordsElemType)
+
+	dnsValidationRecordsElemType := resource_domain.DnsValidationRecordsType{
+		ObjectType: types.ObjectType{
+			AttrTypes: resource_domain.DnsValidationRecordsValue{}.AttributeTypes(ctx),
+		},
+	}
+	domain.DnsValidationRecords = types.ListNull(dnsValidationRecordsElemType)
+
 	return diags
 }
 
