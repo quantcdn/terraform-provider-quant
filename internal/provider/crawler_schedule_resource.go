@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"terraform-provider-quant/internal/client"
 
 	"terraform-provider-quant/internal/resource_crawler_schedule"
@@ -17,8 +18,9 @@ import (
 )
 
 var (
-	_ resource.Resource              = (*crawlerScheduleResource)(nil)
-	_ resource.ResourceWithConfigure = (*crawlerScheduleResource)(nil)
+	_ resource.Resource                = (*crawlerScheduleResource)(nil)
+	_ resource.ResourceWithConfigure   = (*crawlerScheduleResource)(nil)
+	_ resource.ResourceWithImportState = (*crawlerScheduleResource)(nil)
 )
 
 func NewCrawlerScheduleResource() resource.Resource {
@@ -131,6 +133,48 @@ func (r *crawlerScheduleResource) Delete(ctx context.Context, req resource.Delet
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+// ImportState allows importing existing crawler schedules
+// Import ID format: "project:crawler:schedule_id"
+func (r *crawlerScheduleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	parts := strings.Split(req.ID, ":")
+
+	if len(parts) != 3 {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			"Import ID must be in format 'project:crawler:schedule_id' (e.g., 'my-project:my-crawler:123')",
+		)
+		return
+	}
+
+	project := parts[0]
+	crawler := parts[1]
+	scheduleIdStr := parts[2]
+
+	scheduleId, err := strconv.ParseInt(scheduleIdStr, 10, 64)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Schedule ID",
+			fmt.Sprintf("Schedule ID must be a valid integer, got: %s", scheduleIdStr),
+		)
+		return
+	}
+
+	var data resource_crawler_schedule.CrawlerScheduleModel
+	data.Project = types.StringValue(project)
+	data.Crawler = types.StringValue(crawler)
+	data.Id = types.Int64Value(scheduleId)
+
+	// Read the crawler schedule to populate all fields
+	diags := callCrawlerScheduleReadAPI(ctx, r, &data)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
+	// Set the state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func callCrawlerScheduleCreateAPI(ctx context.Context, r *crawlerScheduleResource, schedule *resource_crawler_schedule.CrawlerScheduleModel) (diags diag.Diagnostics) {

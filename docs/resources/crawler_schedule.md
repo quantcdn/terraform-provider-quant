@@ -103,11 +103,16 @@ The cron expression follows standard cron syntax:
 
 ## Import
 
-Crawler schedules can be imported using the format `organization/project/id`:
+Crawler schedules can be imported using the format `project:crawler:schedule_id`:
 
 ```shell
-terraform import quant_crawler_schedule.example my-org/my-project/123
+terraform import quant_crawler_schedule.example my-project:my-crawler:123
 ```
+
+Where:
+- `project` is the project machine name
+- `crawler` is the crawler name/identifier
+- `schedule_id` is the numeric ID of the schedule
 
 ## Notes
 
