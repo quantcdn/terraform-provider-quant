@@ -28,6 +28,75 @@ var (
 	_ resource.ResourceWithImportState = (*crawlerResource)(nil)
 )
 
+// interfaceToStringSlice safely converts an interface{} to []string
+// This handles cases where the API might return strings in different formats
+func interfaceToStringSlice(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+
+	// Direct []string
+	if slice, ok := v.([]string); ok {
+		return slice
+	}
+
+	// []interface{} (common from YAML parsing)
+	if slice, ok := v.([]interface{}); ok {
+		result := make([]string, 0, len(slice))
+		for _, item := range slice {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	}
+
+	// map[string]interface{} - extract keys or values depending on structure
+	if m, ok := v.(map[string]interface{}); ok {
+		// If it's a map, we might want the keys as strings
+		result := make([]string, 0, len(m))
+		for k := range m {
+			result = append(result, k)
+		}
+		return result
+	}
+
+	// Single string
+	if s, ok := v.(string); ok {
+		return []string{s}
+	}
+
+	return nil
+}
+
+// interfaceToStringMap safely converts an interface{} to map[string]string
+func interfaceToStringMap(v interface{}) map[string]string {
+	if v == nil {
+		return nil
+	}
+
+	// Direct map[string]string
+	if m, ok := v.(map[string]string); ok {
+		return m
+	}
+
+	// map[string]interface{} (common from YAML parsing)
+	if m, ok := v.(map[string]interface{}); ok {
+		result := make(map[string]string)
+		for k, val := range m {
+			if s, ok := val.(string); ok {
+				result[k] = s
+			} else {
+				// Convert non-string values to string representation
+				result[k] = fmt.Sprintf("%v", val)
+			}
+		}
+		return result
+	}
+
+	return nil
+}
+
 func NewCrawlerResource() resource.Resource {
 	return &crawlerResource{}
 }
@@ -410,11 +479,51 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		crawler.DeletedAt = types.StringNull()
 	}
 
+	// IMPORTANT: Always initialize computed fields to known values BEFORE YAML parsing
+	// This ensures Terraform never sees unknown values after apply, even if parsing fails
+	// Initialize all list/nested computed fields with empty/null values
+	if crawler.Urls.IsUnknown() {
+		crawler.Urls = types.ListValueMust(types.StringType, []attr.Value{})
+	}
+	if crawler.StartUrls.IsUnknown() {
+		crawler.StartUrls = types.ListValueMust(types.StringType, []attr.Value{})
+	}
+	if crawler.Exclude.IsUnknown() {
+		crawler.Exclude = types.ListValueMust(types.StringType, []attr.Value{})
+	}
+	if crawler.Include.IsUnknown() {
+		crawler.Include = types.ListValueMust(types.StringType, []attr.Value{})
+	}
+	if crawler.AllowedDomains.IsUnknown() {
+		crawler.AllowedDomains = types.ListValueMust(types.StringType, []attr.Value{})
+	}
+	if crawler.StatusOk.IsUnknown() {
+		crawler.StatusOk = types.ListValueMust(types.Int64Type, []attr.Value{})
+	}
+	if crawler.Headers.IsUnknown() {
+		crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
+	}
+	if crawler.Sitemap.IsUnknown() {
+		crawler.Sitemap = types.ListNull(types.ObjectType{
+			AttrTypes: map[string]attr.Type{
+				"url":       types.StringType,
+				"recursive": types.BoolType,
+			},
+		})
+	}
+	if crawler.Assets.IsUnknown() {
+		crawler.Assets = resource_crawler.NewAssetsValueNull()
+	}
+	if crawler.Crawler.IsUnknown() {
+		crawler.Crawler = types.StringNull()
+	}
+
 	// Improved approach with better error handling and structure
 	if api.Config != "" {
 		crawler.Config = types.StringValue(api.GetConfig())
 
 		// Define a structured type for the config
+		// Use interface{} for fields that might have inconsistent types from the API
 		type CrawlerConfig struct {
 			Config struct {
 				UserAgent      string                   `yaml:"user_agent"`
@@ -428,11 +537,11 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				Delay          float64                  `yaml:"delay"`
 				StatusOk       []int                    `yaml:"status_ok"`
 				Quant          map[string]interface{}   `yaml:"quant"`
-				StartUrl       []string                 `yaml:"start_url"`
-				Headers        map[string]string        `yaml:"headers"`
-				Exclude        []string                 `yaml:"exclude"`
-				Include        []string                 `yaml:"include"`
-				AllowedDomains []string                 `yaml:"allowed_domains"`
+				StartUrl       interface{}              `yaml:"start_url"`  // Can be []string or map
+				Headers        interface{}              `yaml:"headers"`    // Can be map[string]string or other
+				Exclude        interface{}              `yaml:"exclude"`    // Can be []string or map
+				Include        interface{}              `yaml:"include"`    // Can be []string or map
+				AllowedDomains interface{}              `yaml:"allowed_domains"` // Can be []string or map
 				Sitemap        []map[string]interface{} `yaml:"sitemap"`
 				Assets         struct {
 					NetworkIntercept struct {
@@ -457,50 +566,61 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				"Unable to parse crawler config",
 				fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()),
 			)
+			// Even on parse error, ensure computed fields are set (done above)
 		} else {
 			// Set basic fields directly from the structured config
 			crawler.BrowserMode = types.BoolValue(parsedConfig.Config.BrowserMode)
 			// Note: execute_js is read from top-level API response above, not from config
 
-			// Set numeric fields
+			// Set numeric fields - IMPORTANT: treat 0 as a valid value, not null
+			// This fixes the "max_html: was 0, but now null" error
 			if parsedConfig.Config.Workers > 0 {
 				crawler.Workers = types.Int64Value(int64(parsedConfig.Config.Workers))
+			} else if !crawler.Workers.IsNull() && !crawler.Workers.IsUnknown() {
+				// Preserve plan value if API returns 0
 			} else {
 				crawler.Workers = types.Int64Null()
 			}
 
 			if parsedConfig.Config.Depth != 0 {
 				crawler.Depth = types.Int64Value(int64(parsedConfig.Config.Depth))
+			} else if !crawler.Depth.IsNull() && !crawler.Depth.IsUnknown() {
+				// Preserve plan value if API returns 0
 			} else {
 				crawler.Depth = types.Int64Null()
 			}
 
 			// Use top-level API field if available, otherwise use config YAML
+			// Treat 0 as a valid value (unlimited), not null
 			if api.MaxHits != nil {
 				crawler.MaxHits = types.Int64Value(int64(*api.MaxHits))
-			} else if parsedConfig.Config.MaxHits >= 0 {
-				crawler.MaxHits = types.Int64Value(int64(parsedConfig.Config.MaxHits))
 			} else {
-				crawler.MaxHits = types.Int64Null()
+				// Always set from config, even if 0 (0 means unlimited)
+				crawler.MaxHits = types.Int64Value(int64(parsedConfig.Config.MaxHits))
 			}
 
-			if parsedConfig.Config.MaxHtml > 0 {
-				crawler.MaxHtml = types.Int64Value(int64(parsedConfig.Config.MaxHtml))
+			// MaxHtml: 0 is a valid value (unlimited)
+			// Priority: 1) API top-level field, 2) Config YAML (even if 0), 3) Preserve plan value
+			if api.MaxHtml != nil {
+				crawler.MaxHtml = types.Int64Value(int64(*api.MaxHtml))
 			} else {
-				crawler.MaxHtml = types.Int64Null()
+				// API didn't return max_html, use config value (could be 0)
+				// Note: For existing crawlers, config YAML should always have this value
+				crawler.MaxHtml = types.Int64Value(int64(parsedConfig.Config.MaxHtml))
 			}
 
 			// Use top-level API field if available, otherwise use config YAML
 			if api.MaxErrors != nil {
 				crawler.MaxErrors = types.Int64Value(int64(*api.MaxErrors))
-			} else if parsedConfig.Config.MaxErrors >= 0 {
-				crawler.MaxErrors = types.Int64Value(int64(parsedConfig.Config.MaxErrors))
 			} else {
-				crawler.MaxErrors = types.Int64Null()
+				// Always set from config, even if 0
+				crawler.MaxErrors = types.Int64Value(int64(parsedConfig.Config.MaxErrors))
 			}
 
 			if parsedConfig.Config.Delay > 0 {
 				crawler.Delay = types.Float64Value(parsedConfig.Config.Delay)
+			} else if !crawler.Delay.IsNull() && !crawler.Delay.IsUnknown() {
+				// Preserve plan value
 			} else {
 				crawler.Delay = types.Float64Null()
 			}
@@ -512,24 +632,25 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.UserAgent = types.StringNull()
 			}
 
-			// Handle exclude list - preserve values from plan if API returns empty
-			if len(parsedConfig.Config.Exclude) > 0 {
-				excludeVals := make([]attr.Value, len(parsedConfig.Config.Exclude))
-				for i, v := range parsedConfig.Config.Exclude {
+			// Handle exclude list - use helper function for type-safe conversion
+			excludeSlice := interfaceToStringSlice(parsedConfig.Config.Exclude)
+			if len(excludeSlice) > 0 {
+				excludeVals := make([]attr.Value, len(excludeSlice))
+				for i, v := range excludeSlice {
 					excludeVals[i] = types.StringValue(v)
 				}
 				crawler.Exclude = types.ListValueMust(types.StringType, excludeVals)
 			} else if !crawler.Exclude.IsNull() && !crawler.Exclude.IsUnknown() {
-				// If API returned empty but we had values in config, preserve them
-				// Keep the existing values from the plan
+				// Preserve existing values from plan
 			} else {
 				crawler.Exclude = types.ListValueMust(types.StringType, []attr.Value{})
 			}
 
-			// Handle include list
-			if len(parsedConfig.Config.Include) > 0 {
-				includeVals := make([]attr.Value, len(parsedConfig.Config.Include))
-				for i, v := range parsedConfig.Config.Include {
+			// Handle include list - use helper function for type-safe conversion
+			includeSlice := interfaceToStringSlice(parsedConfig.Config.Include)
+			if len(includeSlice) > 0 {
+				includeVals := make([]attr.Value, len(includeSlice))
+				for i, v := range includeSlice {
 					includeVals[i] = types.StringValue(v)
 				}
 				crawler.Include = types.ListValueMust(types.StringType, includeVals)
@@ -539,10 +660,11 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.Include = types.ListValueMust(types.StringType, []attr.Value{})
 			}
 
-			// Handle allowed domains list
-			if len(parsedConfig.Config.AllowedDomains) > 0 {
-				allowedDomainsVals := make([]attr.Value, len(parsedConfig.Config.AllowedDomains))
-				for i, v := range parsedConfig.Config.AllowedDomains {
+			// Handle allowed domains list - use helper function for type-safe conversion
+			allowedDomainsSlice := interfaceToStringSlice(parsedConfig.Config.AllowedDomains)
+			if len(allowedDomainsSlice) > 0 {
+				allowedDomainsVals := make([]attr.Value, len(allowedDomainsSlice))
+				for i, v := range allowedDomainsSlice {
 					allowedDomainsVals[i] = types.StringValue(v)
 				}
 				crawler.AllowedDomains = types.ListValueMust(types.StringType, allowedDomainsVals)
@@ -565,25 +687,25 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 				crawler.StatusOk = types.ListValueMust(types.Int64Type, []attr.Value{})
 			}
 
-			// Handle headers - preserve original headers if API doesn't return them
-			if len(parsedConfig.Config.Headers) > 0 {
-				headersMap := make(map[string]attr.Value)
-				for k, v := range parsedConfig.Config.Headers {
-					headersMap[k] = types.StringValue(v)
+			// Handle headers - use helper function for type-safe conversion
+			headersMap := interfaceToStringMap(parsedConfig.Config.Headers)
+			if len(headersMap) > 0 {
+				headersAttrMap := make(map[string]attr.Value)
+				for k, v := range headersMap {
+					headersAttrMap[k] = types.StringValue(v)
 				}
-				crawler.Headers = types.MapValueMust(types.StringType, headersMap)
+				crawler.Headers = types.MapValueMust(types.StringType, headersAttrMap)
 			} else if !crawler.Headers.IsNull() && !crawler.Headers.IsUnknown() {
-				// If API returned empty but we had headers in config, preserve them
-				// This handles cases where API doesn't return sensitive headers like Authorization
-				// Keep the existing headers from the plan/state
+				// Preserve existing headers from plan/state
 			} else {
 				crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 			}
 
-			// Initialize start_urls from start_url in config
-			if len(parsedConfig.Config.StartUrl) > 0 {
-				startUrlVals := make([]attr.Value, len(parsedConfig.Config.StartUrl))
-				for i, v := range parsedConfig.Config.StartUrl {
+			// Initialize start_urls from start_url in config - use helper function
+			startUrlSlice := interfaceToStringSlice(parsedConfig.Config.StartUrl)
+			if len(startUrlSlice) > 0 {
+				startUrlVals := make([]attr.Value, len(startUrlSlice))
+				for i, v := range startUrlSlice {
 					startUrlVals[i] = types.StringValue(v)
 				}
 				crawler.StartUrls = types.ListValueMust(types.StringType, startUrlVals)
@@ -592,10 +714,8 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			}
 
 			// Note: The config YAML may not have a separate "urls" field
-			// If it does, handle it here. For now, initialize as empty if not in state
-			if !crawler.Urls.IsNull() && !crawler.Urls.IsUnknown() {
-				// Preserve existing urls from state/plan
-			} else {
+			// urls field is already initialized above, preserve existing values
+			if crawler.Urls.IsNull() || crawler.Urls.IsUnknown() {
 				crawler.Urls = types.ListValueMust(types.StringType, []attr.Value{})
 			}
 
@@ -643,15 +763,18 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 			}
 
 			// Parse assets.network_intercept from the structured config
-			if parsedConfig.Config.Assets.NetworkIntercept.Enabled || parsedConfig.Config.Assets.NetworkIntercept.Timeout > 0 {
+			// Note: must include all three fields (enabled, execute_js, timeout) to match schema
+			if parsedConfig.Config.Assets.NetworkIntercept.Enabled || parsedConfig.Config.Assets.NetworkIntercept.Timeout > 0 || parsedConfig.Config.Assets.NetworkIntercept.ExecuteJs {
 				networkInterceptObj, _ := types.ObjectValue(
 					map[string]attr.Type{
-						"enabled": types.BoolType,
-						"timeout": types.Int64Type,
+						"enabled":    types.BoolType,
+						"execute_js": types.BoolType,
+						"timeout":    types.Int64Type,
 					},
 					map[string]attr.Value{
-						"enabled": types.BoolValue(parsedConfig.Config.Assets.NetworkIntercept.Enabled),
-						"timeout": types.Int64Value(int64(parsedConfig.Config.Assets.NetworkIntercept.Timeout)),
+						"enabled":    types.BoolValue(parsedConfig.Config.Assets.NetworkIntercept.Enabled),
+						"execute_js": types.BoolValue(parsedConfig.Config.Assets.NetworkIntercept.ExecuteJs),
+						"timeout":    types.Int64Value(int64(parsedConfig.Config.Assets.NetworkIntercept.Timeout)),
 					},
 				)
 
@@ -659,15 +782,18 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 					map[string]attr.Type{
 						"network_intercept": types.ObjectType{
 							AttrTypes: map[string]attr.Type{
-								"enabled": types.BoolType,
-								"timeout": types.Int64Type,
+								"enabled":    types.BoolType,
+								"execute_js": types.BoolType,
+								"timeout":    types.Int64Type,
 							},
 						},
-						"parser": types.ObjectType{AttrTypes: map[string]attr.Type{}},
+						"parser": types.ObjectType{AttrTypes: map[string]attr.Type{
+							"enabled": types.BoolType,
+						}},
 					},
 					map[string]attr.Value{
 						"network_intercept": networkInterceptObj,
-						"parser":            types.ObjectNull(map[string]attr.Type{}),
+						"parser":            types.ObjectNull(map[string]attr.Type{"enabled": types.BoolType}),
 					},
 				)
 			} else if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
