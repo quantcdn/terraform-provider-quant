@@ -232,6 +232,85 @@ func TestToSDK_SkipsFieldsWithNoSetter(t *testing.T) {
 	}
 }
 
+func TestToSDK_RejectsNonPointerSDKReq(t *testing.T) {
+	model := testTFModel{
+		Name:             types.StringValue("hello"),
+		Region:           types.StringNull(),
+		AllowQueryParams: types.BoolNull(),
+		Weight:           types.Int64Null(),
+		Disabled:         types.BoolNull(),
+		Score:            types.Float64Null(),
+	}
+
+	// Pass a non-pointer SDK request — should return an error diagnostic.
+	req := testSDKRequest{}
+	diags := ToSDK(context.Background(), model, req)
+
+	if !diags.HasError() {
+		t.Fatal("expected error diagnostic when sdkReq is not a pointer, got none")
+	}
+
+	found := false
+	for _, d := range diags.Errors() {
+		if d.Summary() == "ToSDK: sdkReq must be a pointer" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected error with summary %q, got: %v", "ToSDK: sdkReq must be a pointer", diags.Errors())
+	}
+}
+
+// mismatchSDKRequest is a test double whose setter expects int64, creating a
+// type mismatch when paired with a types.String TF field.
+type mismatchSDKRequest struct {
+	name *int64
+}
+
+func (r *mismatchSDKRequest) SetName(v int64) { r.name = &v }
+
+func TestToSDK_WarnsOnTypeMismatch(t *testing.T) {
+	// TF model has Name as types.String, but the SDK setter expects int64.
+	type mismatchModel struct {
+		Name types.String `tfsdk:"name"`
+	}
+
+	model := mismatchModel{
+		Name: types.StringValue("hello"),
+	}
+
+	req := &mismatchSDKRequest{}
+	diags := ToSDK(context.Background(), model, req)
+
+	// Should NOT have errors (type mismatch is a warning, not an error).
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+
+	// Should have a warning diagnostic about the type mismatch.
+	warnings := diags.Warnings()
+	if len(warnings) == 0 {
+		t.Fatal("expected a warning diagnostic for type mismatch, got none")
+	}
+
+	found := false
+	for _, w := range warnings {
+		if w.Summary() == `ToSDK: type mismatch for field "name"` {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning with summary %q, got: %v", `ToSDK: type mismatch for field "name"`, warnings)
+	}
+
+	// The setter should NOT have been called.
+	if req.name != nil {
+		t.Errorf("expected name to be nil (setter should not be called on type mismatch), got %v", *req.name)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // snakeToPascal unit tests
 // ---------------------------------------------------------------------------

@@ -44,6 +44,12 @@ func ToSDK(_ context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 
 	sdkVal := reflect.ValueOf(sdkReq)
 
+	if sdkVal.Kind() != reflect.Ptr {
+		diags.AddError("ToSDK: sdkReq must be a pointer",
+			fmt.Sprintf("got %s", sdkVal.Kind()))
+		return diags
+	}
+
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
 		tag := field.Tag.Get("tfsdk")
@@ -67,6 +73,13 @@ func ToSDK(_ context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 
 		args, skip := convertTFValue(fieldVal, setter.Type().In(0))
 		if skip {
+			if setter.IsValid() && !isNullOrUnknown(fieldVal) {
+				diags.AddWarning(
+					fmt.Sprintf("ToSDK: type mismatch for field %q", tag),
+					fmt.Sprintf("setter %s expects %s but TF value is %s — field skipped",
+						setterName, setter.Type().In(0), fieldVal.Type()),
+				)
+			}
 			continue
 		}
 
@@ -143,6 +156,25 @@ func convertToTarget(val reflect.Value, targetType reflect.Type) (reflect.Value,
 		return val.Convert(targetType), false
 	}
 	return reflect.Value{}, true
+}
+
+// isNullOrUnknown reports whether a Terraform attribute value is null or unknown.
+// This is used to distinguish benign skips (null/unknown) from type mismatch skips.
+func isNullOrUnknown(fieldVal reflect.Value) bool {
+	iface := fieldVal.Interface()
+	switch v := iface.(type) {
+	case types.String:
+		return v.IsNull() || v.IsUnknown()
+	case types.Bool:
+		return v.IsNull() || v.IsUnknown()
+	case types.Int64:
+		return v.IsNull() || v.IsUnknown()
+	case types.Float64:
+		return v.IsNull() || v.IsUnknown()
+	default:
+		// Unsupported types are always treated as "null-like" — no warning.
+		return true
+	}
 }
 
 // snakeToPascal converts a snake_case string to PascalCase.
