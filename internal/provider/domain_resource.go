@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/mapper"
 	"terraform-provider-quant/internal/resource_domain"
 	"time"
 
@@ -58,85 +59,69 @@ func (r *domainResource) Configure(_ context.Context, req resource.ConfigureRequ
 func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data resource_domain.DomainModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	resp.Diagnostics.Append(callDomainCreateAPI(ctx, r, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Read the API results back into the model for Terraform state.
 	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data resource_domain.DomainModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Read API call logic
 	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Update is a no-op — the V2 API does not support domain updates.
+// Mutable fields should use RequiresReplace plan modifiers so that Terraform
+// forces destroy+recreate instead of calling Update.
 func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data resource_domain.DomainModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Update API call logic
-	resp.Diagnostics.Append(callDomainUpdateAPI(ctx, r, &data)...)
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
+	// Re-read current state from the API.
 	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *domainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data resource_domain.DomainModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Delete API call logic
 	resp.Diagnostics.Append(callDomainDeleteAPI(ctx, r, &data)...)
 }
 
@@ -168,8 +153,6 @@ func (r *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 
 // Create domain request.
 func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewV2DomainRequestWithDefaults()
-
 	if domain.Domain.IsNull() || domain.Domain.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("domain"),
@@ -179,11 +162,16 @@ func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resourc
 		return
 	}
 
-	req.SetDomain(domain.Domain.ValueString())
+	// Map TF model fields to SDK request via reflection.
+	req := quantadmingo.NewV2DomainRequestWithDefaults()
+	diags.Append(mapper.ToSDK(ctx, domain, req)...)
+	if diags.HasError() {
+		return
+	}
 
 	org := r.client.Organization
 	project := domain.Project.ValueString()
-	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsCreate(r.client.AuthContext, org, project).V2DomainRequest(req).Execute()
+	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsCreate(r.client.AuthContext, org, project).V2DomainRequest(*req).Execute()
 	if err != nil {
 		diags.AddError(
 			"Error creating domain",
@@ -217,32 +205,6 @@ func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resourc
 	return
 }
 
-func callDomainUpdateAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
-	if domain.Id.IsNull() || domain.Id.IsUnknown() {
-		diags.AddAttributeError(
-			path.Root("id"),
-			"Missing domain.id attribute",
-			"To update domain information the domain ID needs to be known, please import the terraform state.",
-		)
-		return
-	}
-
-	org := r.client.Organization
-	project := domain.Project.ValueString()
-	_ = org
-	_ = project
-	var err error = fmt.Errorf("domain update not supported in V2 API")
-	if err != nil {
-		diags.AddError(
-			"Error updating domain",
-			"Could not update domain, unexpected error: "+err.Error(),
-		)
-		return
-	}
-
-	return
-}
-
 func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_domain.DomainModel) (diags diag.Diagnostics) {
 	if domain.Id.IsNull() || domain.Id.IsUnknown() {
 		diags.AddAttributeError(
@@ -264,15 +226,15 @@ func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_
 		return
 	}
 
-	domain.Id = types.Int64Value(int64(apiResp.GetId()))
-	domain.Domain = types.StringValue(apiResp.GetDomain())
-	domain.DnsEngaged = types.Int64Value(int64(apiResp.GetDnsEngaged()))
-	domain.Organization = types.StringValue(org)
-	
-	// Note: V2Domain doesn't return these fields, and they're no longer in the schema:
-	// CreatedAt, UpdatedAt, DeletedAt, InSection, ProjectId, SectionMessage
+	// Map SDK response fields to TF model via reflection.
+	// This covers: Id, Domain, DnsEngaged (scalar fields with matching getters).
+	diags.Append(mapper.FromSDK(ctx, apiResp, domain)...)
 
-	// Explicitly set computed fields to null to avoid state inconsistencies
+	domain.Organization = types.StringValue(org)
+
+	// Nested object lists (dns_go_live_records, dns_validation_records) are not
+	// handled by the mapper — set to null since the V2 API does not reliably
+	// return these in the standard read response.
 	dnsGoLiveRecordsElemType := resource_domain.DnsGoLiveRecordsType{
 		ObjectType: types.ObjectType{
 			AttrTypes: resource_domain.DnsGoLiveRecordsValue{}.AttributeTypes(ctx),
