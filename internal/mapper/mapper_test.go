@@ -413,6 +413,97 @@ func TestFromSDK_MapsInt32ToInt64(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// List test doubles
+// ---------------------------------------------------------------------------
+
+type testTFModelWithList struct {
+	Domain types.List `tfsdk:"domain"`
+	Url    types.List `tfsdk:"url"`
+}
+
+type testSDKReqWithList struct {
+	domain []string
+	url    []string
+}
+
+func (r *testSDKReqWithList) SetDomain(v []string) { r.domain = v }
+func (r *testSDKReqWithList) SetUrl(v []string)    { r.url = v }
+func (r *testSDKReqWithList) GetDomain() []string  { return r.domain }
+func (r *testSDKReqWithList) GetUrl() []string     { return r.url }
+
+// ---------------------------------------------------------------------------
+// List tests — ToSDK
+// ---------------------------------------------------------------------------
+
+func TestToSDK_MapsStringList(t *testing.T) {
+	ctx := context.Background()
+	domains, diags := types.ListValueFrom(ctx, types.StringType, []string{"example.com", "test.com"})
+	if diags.HasError() {
+		t.Fatalf("failed to create list: %v", diags.Errors())
+	}
+
+	model := testTFModelWithList{
+		Domain: domains,
+		Url:    types.ListNull(types.StringType),
+	}
+
+	req := &testSDKReqWithList{}
+	d := ToSDK(ctx, &model, req)
+	if d.HasError() {
+		t.Fatalf("unexpected errors: %v", d.Errors())
+	}
+
+	if len(req.domain) != 2 || req.domain[0] != "example.com" || req.domain[1] != "test.com" {
+		t.Errorf("expected domain=[example.com, test.com], got %v", req.domain)
+	}
+}
+
+func TestToSDK_SkipsNullList(t *testing.T) {
+	model := testTFModelWithList{
+		Domain: types.ListNull(types.StringType),
+		Url:    types.ListNull(types.StringType),
+	}
+
+	req := &testSDKReqWithList{}
+	d := ToSDK(context.Background(), &model, req)
+	if d.HasError() {
+		t.Fatalf("unexpected errors: %v", d.Errors())
+	}
+
+	if req.domain != nil {
+		t.Errorf("expected domain=nil (null list), got %v", req.domain)
+	}
+	if req.url != nil {
+		t.Errorf("expected url=nil (null list), got %v", req.url)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// List tests — FromSDK
+// ---------------------------------------------------------------------------
+
+func TestFromSDK_MapsStringSliceToList(t *testing.T) {
+	ctx := context.Background()
+	resp := &testSDKReqWithList{domain: []string{"a.com", "b.com"}}
+
+	type listModel struct {
+		Domain types.List `tfsdk:"domain"`
+	}
+
+	model := &listModel{}
+	d := FromSDK(ctx, resp, model)
+	if d.HasError() {
+		t.Fatalf("unexpected errors: %v", d.Errors())
+	}
+
+	var result []string
+	model.Domain.ElementsAs(ctx, &result, false)
+	if len(result) != 2 || result[0] != "a.com" || result[1] != "b.com" {
+		t.Errorf("expected [a.com, b.com], got %v", result)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // snakeToPascal unit tests
 // ---------------------------------------------------------------------------
 

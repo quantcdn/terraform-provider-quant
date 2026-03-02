@@ -19,12 +19,13 @@ import (
 // sdkReq. If the TF value is neither null nor unknown, the setter is called
 // with the Go-native value.
 //
-// Supported TF types: types.String, types.Bool, types.Int64, types.Float64.
-// types.List and nested objects are silently skipped (handled per-resource).
+// Supported TF types: types.String, types.Bool, types.Int64, types.Float64,
+// types.List (string elements only). Nested objects are silently skipped
+// (handled per-resource).
 //
 // sdkReq must be a pointer so that setter methods with pointer receivers are
 // found by reflection.
-func ToSDK(_ context.Context, tfModel any, sdkReq any) diag.Diagnostics {
+func ToSDK(ctx context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	modelVal := reflect.ValueOf(tfModel)
@@ -71,7 +72,7 @@ func ToSDK(_ context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 			continue
 		}
 
-		args, skip := convertTFValue(fieldVal, setter.Type().In(0))
+		args, skip := convertTFValue(ctx, fieldVal, setter.Type().In(0))
 		if skip {
 			if setter.IsValid() && !isNullOrUnknown(fieldVal) {
 				diags.AddWarning(
@@ -93,7 +94,7 @@ func ToSDK(_ context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 // attribute value and converts it to match the setter's expected parameter type.
 // Returns the converted reflect.Value and a bool indicating whether the field
 // should be skipped (true = skip).
-func convertTFValue(fieldVal reflect.Value, targetType reflect.Type) (reflect.Value, bool) {
+func convertTFValue(ctx context.Context, fieldVal reflect.Value, targetType reflect.Type) (reflect.Value, bool) {
 	iface := fieldVal.Interface()
 
 	switch v := iface.(type) {
@@ -121,8 +122,19 @@ func convertTFValue(fieldVal reflect.Value, targetType reflect.Type) (reflect.Va
 		}
 		return convertToTarget(reflect.ValueOf(v.ValueFloat64()), targetType)
 
+	case types.List:
+		if v.IsNull() || v.IsUnknown() {
+			return reflect.Value{}, true
+		}
+		var elems []string
+		diags := v.ElementsAs(ctx, &elems, false)
+		if diags.HasError() {
+			return reflect.Value{}, true
+		}
+		return reflect.ValueOf(elems), false
+
 	default:
-		// Unsupported type (types.List, nested objects, etc.) — skip silently.
+		// Unsupported type (nested objects, etc.) — skip silently.
 		return reflect.Value{}, true
 	}
 }
@@ -170,6 +182,8 @@ func isNullOrUnknown(fieldVal reflect.Value) bool {
 	case types.Int64:
 		return v.IsNull() || v.IsUnknown()
 	case types.Float64:
+		return v.IsNull() || v.IsUnknown()
+	case types.List:
 		return v.IsNull() || v.IsUnknown()
 	default:
 		// Unsupported types are always treated as "null-like" — no warning.
@@ -246,7 +260,7 @@ func FromSDK(ctx context.Context, sdkResp any, tfModel any) diag.Diagnostics {
 // convertToTFValue converts a Go-native value returned by an SDK getter into
 // the corresponding Terraform Plugin Framework attribute value. Returns the
 // converted reflect.Value and a bool indicating success (false = skip).
-func convertToTFValue(_ context.Context, val reflect.Value) (reflect.Value, bool) {
+func convertToTFValue(ctx context.Context, val reflect.Value) (reflect.Value, bool) {
 	switch val.Kind() {
 	case reflect.String:
 		return reflect.ValueOf(types.StringValue(val.String())), true
@@ -259,6 +273,21 @@ func convertToTFValue(_ context.Context, val reflect.Value) (reflect.Value, bool
 
 	case reflect.Float32, reflect.Float64:
 		return reflect.ValueOf(types.Float64Value(val.Float())), true
+
+	case reflect.Slice:
+		// Handle []string → types.List conversion.
+		if val.Type().Elem().Kind() == reflect.String {
+			strs := make([]string, val.Len())
+			for i := 0; i < val.Len(); i++ {
+				strs[i] = val.Index(i).String()
+			}
+			listVal, diags := types.ListValueFrom(ctx, types.StringType, strs)
+			if diags.HasError() {
+				return reflect.Value{}, false
+			}
+			return reflect.ValueOf(listVal), true
+		}
+		return reflect.Value{}, false
 
 	default:
 		// Unsupported return type — skip silently.
