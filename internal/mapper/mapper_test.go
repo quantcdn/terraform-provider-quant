@@ -312,6 +312,107 @@ func TestToSDK_WarnsOnTypeMismatch(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// FromSDK test doubles
+// ---------------------------------------------------------------------------
+
+type testSDKResponse struct {
+	id               int32
+	uuid             string
+	name             string
+	allowQueryParams bool
+}
+
+func (r *testSDKResponse) GetId() int32             { return r.id }
+func (r *testSDKResponse) GetUuid() string           { return r.uuid }
+func (r *testSDKResponse) GetName() string           { return r.name }
+func (r *testSDKResponse) GetAllowQueryParams() bool { return r.allowQueryParams }
+
+type testFromSDKModel struct {
+	Id               types.Int64  `tfsdk:"id"`
+	Uuid             types.String `tfsdk:"uuid"`
+	Name             types.String `tfsdk:"name"`
+	AllowQueryParams types.Bool   `tfsdk:"allow_query_params"`
+}
+
+// ---------------------------------------------------------------------------
+// FromSDK tests
+// ---------------------------------------------------------------------------
+
+func TestFromSDK_MapsResponseFields(t *testing.T) {
+	resp := &testSDKResponse{
+		id:               123,
+		uuid:             "abc-def-ghi",
+		name:             "my-project",
+		allowQueryParams: true,
+	}
+
+	model := &testFromSDKModel{}
+	diags := FromSDK(context.Background(), resp, model)
+
+	if diags.HasError() {
+		t.Fatalf("unexpected errors: %v", diags.Errors())
+	}
+
+	if model.Id.ValueInt64() != 123 {
+		t.Errorf("expected id = 123, got %d", model.Id.ValueInt64())
+	}
+	if model.Uuid.ValueString() != "abc-def-ghi" {
+		t.Errorf("expected uuid = %q, got %q", "abc-def-ghi", model.Uuid.ValueString())
+	}
+	if model.Name.ValueString() != "my-project" {
+		t.Errorf("expected name = %q, got %q", "my-project", model.Name.ValueString())
+	}
+	if model.AllowQueryParams.ValueBool() != true {
+		t.Errorf("expected allowQueryParams = true, got %v", model.AllowQueryParams.ValueBool())
+	}
+}
+
+func TestFromSDK_SkipsMissingGetters(t *testing.T) {
+	// Model has a field "extra" that the SDK response has no GetExtra() for.
+	type modelWithExtra struct {
+		Name  types.String `tfsdk:"name"`
+		Extra types.String `tfsdk:"extra"`
+	}
+
+	resp := &testSDKResponse{name: "hello"}
+	model := &modelWithExtra{}
+	diags := FromSDK(context.Background(), resp, model)
+
+	if diags.HasError() {
+		t.Fatalf("unexpected errors: %v", diags.Errors())
+	}
+
+	// The known field should still be mapped.
+	if model.Name.ValueString() != "hello" {
+		t.Errorf("expected name = %q, got %q", "hello", model.Name.ValueString())
+	}
+
+	// Extra should remain its zero value (null string).
+	if !model.Extra.IsNull() {
+		t.Errorf("expected Extra to remain null, got %q", model.Extra.ValueString())
+	}
+}
+
+func TestFromSDK_MapsInt32ToInt64(t *testing.T) {
+	resp := &testSDKResponse{id: 42}
+
+	type intModel struct {
+		Id types.Int64 `tfsdk:"id"`
+	}
+
+	model := &intModel{}
+	diags := FromSDK(context.Background(), resp, model)
+
+	if diags.HasError() {
+		t.Fatalf("unexpected errors: %v", diags.Errors())
+	}
+
+	if model.Id.ValueInt64() != 42 {
+		t.Errorf("expected id = 42, got %d", model.Id.ValueInt64())
+	}
+}
+
+// ---------------------------------------------------------------------------
 // snakeToPascal unit tests
 // ---------------------------------------------------------------------------
 

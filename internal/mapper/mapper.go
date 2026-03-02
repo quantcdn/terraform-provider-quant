@@ -177,6 +177,95 @@ func isNullOrUnknown(fieldVal reflect.Value) bool {
 	}
 }
 
+// FromSDK maps fields from an SDK response object (sdkResp) back to a Terraform
+// model struct (tfModel) using reflection. For each exported field in tfModel
+// that has a `tfsdk` struct tag, it looks for a corresponding Get{PascalCase}()
+// method on sdkResp. If the getter exists and returns a supported type, the
+// return value is converted to the appropriate Terraform Plugin Framework type
+// and set on the model field.
+//
+// Supported getter return types: string, bool, int32/int/int64, float32/float64.
+// Getters must take no arguments and return a single value.
+//
+// tfModel must be a pointer so that fields can be set via reflection.
+func FromSDK(ctx context.Context, sdkResp any, tfModel any) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	modelVal := reflect.ValueOf(tfModel)
+	if modelVal.Kind() != reflect.Ptr {
+		diags.AddError("FromSDK: tfModel must be a pointer",
+			fmt.Sprintf("got %s", modelVal.Kind()))
+		return diags
+	}
+
+	modelVal = modelVal.Elem()
+	modelType := modelVal.Type()
+
+	if modelVal.Kind() != reflect.Struct {
+		diags.AddError("FromSDK: tfModel must be a pointer to struct",
+			fmt.Sprintf("got pointer to %s", modelType.Kind()))
+		return diags
+	}
+
+	sdkVal := reflect.ValueOf(sdkResp)
+
+	for i := 0; i < modelType.NumField(); i++ {
+		field := modelType.Field(i)
+		tag := field.Tag.Get("tfsdk")
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		getterName := "Get" + snakeToPascal(tag)
+		getter := sdkVal.MethodByName(getterName)
+		if !getter.IsValid() {
+			// No matching getter — skip silently.
+			continue
+		}
+
+		// Ensure the getter takes no arguments and returns exactly one value.
+		if getter.Type().NumIn() != 0 || getter.Type().NumOut() != 1 {
+			continue
+		}
+
+		result := getter.Call(nil)[0]
+		tfVal, ok := convertToTFValue(ctx, result)
+		if !ok {
+			continue
+		}
+
+		fieldVal := modelVal.Field(i)
+		if fieldVal.CanSet() {
+			fieldVal.Set(tfVal)
+		}
+	}
+
+	return diags
+}
+
+// convertToTFValue converts a Go-native value returned by an SDK getter into
+// the corresponding Terraform Plugin Framework attribute value. Returns the
+// converted reflect.Value and a bool indicating success (false = skip).
+func convertToTFValue(_ context.Context, val reflect.Value) (reflect.Value, bool) {
+	switch val.Kind() {
+	case reflect.String:
+		return reflect.ValueOf(types.StringValue(val.String())), true
+
+	case reflect.Bool:
+		return reflect.ValueOf(types.BoolValue(val.Bool())), true
+
+	case reflect.Int32, reflect.Int, reflect.Int64:
+		return reflect.ValueOf(types.Int64Value(val.Int())), true
+
+	case reflect.Float32, reflect.Float64:
+		return reflect.ValueOf(types.Float64Value(val.Float())), true
+
+	default:
+		// Unsupported return type — skip silently.
+		return reflect.Value{}, false
+	}
+}
+
 // snakeToPascal converts a snake_case string to PascalCase.
 // Example: "allow_query_params" → "AllowQueryParams"
 func snakeToPascal(s string) string {
