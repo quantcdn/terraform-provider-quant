@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/mapper"
 	"terraform-provider-quant/internal/resource_rule_custom_response"
 	"terraform-provider-quant/internal/utils"
 
@@ -46,90 +47,72 @@ func (r *ruleCustomResponseResource) Configure(_ context.Context, req resource.C
 	if req.ProviderData == nil {
 		return
 	}
-
 	client, ok := req.ProviderData.(*client.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			"Expected *internal.Client, got: %T. Please report this issue to the provider developers",
 		)
 	}
-
 	r.client = client
 }
 
 func (r *ruleCustomResponseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	// Serialise rule modifications to avoid backend JSON races
 	if r.client != nil && r.client.RulesMutex != nil {
 		r.client.RulesMutex.Lock()
 		defer r.client.RulesMutex.Unlock()
 	}
+
 	var data resource_rule_custom_response.RuleCustomResponseModel
-
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	diags := callRuleCustomResponseCreateAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-
+	resp.Diagnostics.Append(callRuleCustomResponseCreateAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// No need to read immediately after create - we have all the data from the create response
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ruleCustomResponseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data resource_rule_custom_response.RuleCustomResponseModel
-
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	diags := callRuleCustomResponseReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
-
+	resp.Diagnostics.Append(callRuleCustomResponseReadAPI(ctx, r, &data)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Serialise rule modifications to avoid backend JSON races
 	if r.client != nil && r.client.RulesMutex != nil {
 		r.client.RulesMutex.Lock()
 		defer r.client.RulesMutex.Unlock()
 	}
+
 	var plan resource_rule_custom_response.RuleCustomResponseModel
-
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	// Preserve UUID and RuleId from state (needed for update API call)
 	var state resource_rule_custom_response.RuleCustomResponseModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
-	// Preserve UUID and RuleId from state (needed for update API call)
 	plan.Uuid = state.Uuid
 	plan.RuleId = state.RuleId
 
-	diags := callRuleCustomResponseUpdateAPI(ctx, r, &plan)
-	resp.Diagnostics.Append(diags...)
-
+	resp.Diagnostics.Append(callRuleCustomResponseUpdateAPI(ctx, r, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Read after update to populate computed fields correctly
-	diags = callRuleCustomResponseReadAPI(ctx, r, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callRuleCustomResponseReadAPI(ctx, r, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -138,15 +121,13 @@ func (r *ruleCustomResponseResource) Update(ctx context.Context, req resource.Up
 }
 
 func (r *ruleCustomResponseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Serialise rule modifications to avoid backend JSON races
 	if r.client != nil && r.client.RulesMutex != nil {
 		r.client.RulesMutex.Lock()
 		defer r.client.RulesMutex.Unlock()
 	}
+
 	var data resource_rule_custom_response.RuleCustomResponseModel
-
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -157,18 +138,13 @@ func (r *ruleCustomResponseResource) Delete(ctx context.Context, req resource.De
 func (r *ruleCustomResponseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data resource_rule_custom_response.RuleCustomResponseModel
 	var err error
-	data.Project, data.RuleId, err = utils.GetRuleImportId(req.ID)
-
+	data.Project, data.Uuid, err = utils.GetRuleImportId(req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Invalid import ID",
-			err.Error(),
-		)
+		resp.Diagnostics.AddError("Invalid import ID", err.Error())
 		return
 	}
 
 	resp.Diagnostics.Append(callRuleCustomResponseReadAPI(ctx, r, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -176,170 +152,117 @@ func (r *ruleCustomResponseResource) ImportState(ctx context.Context, req resour
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// callRuleCustomResponseCreateAPI creates a custom response rule via the API.
 func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseResource, rule *resource_rule_custom_response.RuleCustomResponseModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewV2RuleCustomResponseRequestWithDefaults()
-	req.SetName(rule.Name.ValueString())
+	req := quantadmingo.NewV2RuleCustomResponseRequestWithDefaults()
 
-	var domains []string
-	for _, domain := range rule.Domain.Elements() {
-		if strVal, ok := domain.(types.String); ok {
-			domains = append(domains, strVal.ValueString())
-		}
-	}
-	req.SetDomain(domains)
-
-	var urls []string
-	for _, url := range rule.Url.Elements() {
-		if strVal, ok := url.(types.String); ok {
-			urls = append(urls, strVal.ValueString())
-		}
-	}
-	req.SetUrl(urls)
-
-	if !rule.Country.IsNull() {
-		req.SetCountry(rule.Country.ValueString())
-		var countryList []string
-		if rule.Country.ValueString() == "country_is" {
-			for _, country := range rule.CountryIs.Elements() {
-				if strVal, ok := country.(types.String); ok {
-					countryList = append(countryList, strVal.ValueString())
-				}
-			}
-			req.SetCountryIs(countryList)
-		} else if rule.Country.ValueString() == "country_is_not" {
-			for _, country := range rule.CountryIsNot.Elements() {
-				if strVal, ok := country.(types.String); ok {
-					countryList = append(countryList, strVal.ValueString())
-				}
-			}
-			req.SetCountryIsNot(countryList)
-		}
+	// Map simple fields: name, disabled, weight, domain, url
+	diags.Append(mapper.ToSDK(ctx, rule, req)...)
+	if diags.HasError() {
+		return
 	}
 
-	if !rule.Ip.IsNull() {
-		req.SetIp(rule.Ip.ValueString())
-		var iplist []string
-		if rule.Ip.ValueString() == "ip_is" {
-			for _, ip := range rule.IpIs.Elements() {
-				if strVal, ok := ip.(types.String); ok {
-					iplist = append(iplist, strVal.ValueString())
-				}
-			}
-			req.SetIpIs(iplist)
-		} else if rule.Ip.ValueString() == "ip_is_not" {
-			for _, ip := range rule.IpIsNot.Elements() {
-				if strVal, ok := ip.(types.String); ok {
-					iplist = append(iplist, strVal.ValueString())
-				}
-			}
-			req.SetIpIsNot(iplist)
-		}
-	}
-
-	if !rule.Method.IsNull() {
-		req.SetMethod(rule.Method.ValueString())
-		var methodList []string
-		if rule.Method.ValueString() == "method_is" {
-			for _, method := range rule.MethodIs.Elements() {
-				if strVal, ok := method.(types.String); ok {
-					methodList = append(methodList, strVal.ValueString())
-				}
-			}
-			req.SetMethodIs(methodList)
-		} else if rule.Method.ValueString() == "method_is_not" {
-			for _, method := range rule.MethodIsNot.Elements() {
-				if strVal, ok := method.(types.String); ok {
-					methodList = append(methodList, strVal.ValueString())
-				}
-			}
-			req.SetMethodIsNot(methodList)
-		}
-	}
-
-	req.SetCustomResponseStatusCode(int32(rule.CustomResponseStatusCode.ValueInt64()))
+	// Custom response specific fields (map to ActionConfig in the response)
 	req.SetCustomResponseBody(rule.CustomResponseBody.ValueString())
+	req.SetCustomResponseStatusCode(int32(rule.CustomResponseStatusCode.ValueInt64()))
 
-	// Weight handling
-	if !rule.Weight.IsNull() && !rule.Weight.IsUnknown() {
-		weight := int32(rule.Weight.ValueInt64())
-		req.SetWeight(weight)
+	// Conditional list fields: country, ip, method
+	diags.Append(buildConditionalListsForRequest(ctx,
+		rule.Country, rule.CountryIs, rule.CountryIsNot,
+		rule.Ip, rule.IpIs, rule.IpIsNot,
+		rule.Method, rule.MethodIs, rule.MethodIsNot,
+		req.SetCountry, req.SetCountryIs, req.SetCountryIsNot,
+		req.SetIp, req.SetIpIs, req.SetIpIsNot,
+		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
+	)...)
+	if diags.HasError() {
+		return
 	}
 
-	res, _, err := r.client.Instance.RulesAPI.RulesCustomResponseCreate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString()).V2RuleCustomResponseRequest(req).Execute()
+	res, httpResp, err := r.client.Instance.RulesAPI.RulesCustomResponseCreate(
+		r.client.AuthContext, r.client.Organization, rule.Project.ValueString(),
+	).V2RuleCustomResponseRequest(*req).Execute()
 
 	if err != nil {
+		if msg := parseAPIError(httpResp); msg != "" {
+			diags.AddError("Failed to create rule", msg)
+			return
+		}
 		diags.AddError("Failed to create rule", err.Error())
 		return
 	}
 
+	// Capture UUID and RuleId from create response
 	rule.Uuid = types.StringValue(res.GetUuid())
 	rule.RuleId = types.StringValue(res.GetRuleId())
 	rule.Organization = types.StringValue(r.client.Organization)
+
+	// Set constants
 	rule.Action = types.StringValue("custom_response")
 	rule.Rule = types.StringValue("")
 
-	// Set only_with_cookie from API response or null if not provided
+	// Set weight from response (may differ from request)
+	if res.Weight != nil {
+		rule.Weight = types.Int64Value(int64(*res.Weight))
+	} else {
+		rule.Weight = types.Int64Value(0)
+	}
+
+	// Set only_with_cookie from response
 	if res.OnlyWithCookie != nil && *res.OnlyWithCookie != "" {
 		rule.OnlyWithCookie = types.StringValue(*res.OnlyWithCookie)
 	} else {
 		rule.OnlyWithCookie = types.StringNull()
 	}
 
-	// Set conditional fields to null if not used
-	if rule.Method.IsNull() || rule.Method.IsUnknown() {
-		rule.Method = types.StringNull()
-		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
-		rule.MethodIs = emptyList
-		rule.MethodIsNot = emptyList
+	// Normalize domain list from response
+	domainList, d := types.ListValueFrom(ctx, types.StringType, res.GetDomain())
+	diags.Append(d...)
+	if diags.HasError() {
+		return
 	}
+	rule.Domain = domainList
 
-	if rule.Country.IsNull() || rule.Country.IsUnknown() {
-		rule.Country = types.StringNull()
-		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
-		rule.CountryIs = emptyList
-		rule.CountryIsNot = emptyList
-	}
-
-	if rule.Ip.IsNull() || rule.Ip.IsUnknown() {
-		rule.Ip = types.StringNull()
-		emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
-		rule.IpIs = emptyList
-		rule.IpIsNot = emptyList
-	}
+	// Ensure conditional list fields have proper values (empty lists for null selectors)
+	diags.Append(setConditionalListsFromAPI(ctx,
+		res.Country, res.CountryIs, res.CountryIsNot,
+		res.Ip, res.IpIs, res.IpIsNot,
+		res.Method, res.MethodIs, res.MethodIsNot,
+		&rule.Country, &rule.CountryIs, &rule.CountryIsNot,
+		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
+		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
+	)...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
-	// This prevents "unknown value" errors
 	rule.ActionConfig = resource_rule_custom_response.NewActionConfigValueNull()
 
-	// Set body and status_code to null if unknown
-	if rule.Body.IsUnknown() {
-		rule.Body = types.StringNull()
-	}
-	if rule.StatusCode.IsUnknown() {
-		rule.StatusCode = types.Int64Null()
-	}
+	// Set legacy computed fields to null
+	rule.Body = types.StringNull()
+	rule.StatusCode = types.Int64Null()
 
-	// Read back from API to get computed fields and ensure state consistency
-	// The DB-backed API has eliminated eventual consistency, so this is safe
+	// Read back from API to ensure full state consistency
 	readDiags := callRuleCustomResponseReadAPI(ctx, r, rule)
 	diags.Append(readDiags...)
 
 	return
 }
 
+// callRuleCustomResponseReadAPI reads a custom response rule from the API.
 func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseResource, rule *resource_rule_custom_response.RuleCustomResponseModel) (diags diag.Diagnostics) {
-	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
+	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
-			"Missing rule.uuid attribute",
-			"Unable to update unkown rule, please update terraform state.",
+			"Missing rule UUID",
+			"Unable to read rule without a UUID. Please update terraform state.",
 		)
 		return
 	}
 
-	// Use shared retry logic for eventual consistency
 	api, res, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleCustomResponse, *http.Response, error) {
-		return r.client.Instance.RulesAPI.RulesCustomResponseRead(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+		return r.client.Instance.RulesAPI.RulesCustomResponseRead(
+			r.client.AuthContext, r.client.Organization,
+			rule.Project.ValueString(), rule.Uuid.ValueString(),
+		).Execute()
 	}, "rule_custom_response")
 
 	if err != nil {
@@ -348,205 +271,88 @@ func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseRes
 		return
 	}
 
-	// Set required fields
-	rule.Name = types.StringValue(*api.Name)
+	// Map simple response fields: name, disabled, weight, domain, url, only_with_cookie
+	diags.Append(mapper.FromSDK(ctx, api, rule)...)
+
+	// Override fields that need special handling
 	rule.Uuid = types.StringValue(api.Uuid)
 	rule.RuleId = types.StringValue(api.GetRuleId())
 	rule.Organization = types.StringValue(r.client.Organization)
-	if api.Weight != nil {
-		rule.Weight = types.Int64Value(int64(*api.Weight))
-	} else {
-		rule.Weight = types.Int64Value(0)
-	}
-	rule.Action = types.StringValue("custom_response")
-	rule.OnlyWithCookie = types.StringValue(api.GetOnlyWithCookie())
 
-	// Values for fields that are not present in the API response
+	// Constants
+	rule.Action = types.StringValue("custom_response")
 	rule.Rule = types.StringValue("")
 
-	// Initialize empty lists for all optional fields
-	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
-
-	domainList, diag := types.ListValueFrom(ctx, types.StringType, api.Domain)
-	if diag.HasError() {
-		diags.Append(diag...)
-		return
-	}
-	rule.Domain = domainList
-
-	// Handle Method fields
-	if api.Method != nil && *api.Method != "" {
-		rule.Method = types.StringValue(*api.Method)
-		if len(api.MethodIs) > 0 {
-			rule.MethodIs, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIs)
+	// Custom response specific fields from ActionConfig
+	if api.ActionConfig != nil {
+		if api.ActionConfig.CustomResponseStatusCode != nil {
+			rule.CustomResponseStatusCode = types.Int64Value(int64(*api.ActionConfig.CustomResponseStatusCode))
 		} else {
-			rule.MethodIs = emptyList
+			rule.CustomResponseStatusCode = types.Int64Null()
 		}
-		if len(api.MethodIsNot) > 0 {
-			rule.MethodIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.MethodIsNot)
-		} else {
-			rule.MethodIsNot = emptyList
-		}
-	} else {
-		rule.Method = types.StringNull()
-		rule.MethodIs = emptyList
-		rule.MethodIsNot = emptyList
+		rule.CustomResponseBody = types.StringValue(api.ActionConfig.CustomResponseBody)
 	}
 
-	// Handle Country fields
-	if api.Country != nil && *api.Country != "" {
-		rule.Country = types.StringValue(*api.Country)
-		if len(api.CountryIs) > 0 {
-			rule.CountryIs, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIs)
-		} else {
-			rule.CountryIs = emptyList
-		}
-		if len(api.CountryIsNot) > 0 {
-			rule.CountryIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.CountryIsNot)
-		} else {
-			rule.CountryIsNot = emptyList
-		}
-	} else {
-		rule.Country = types.StringNull()
-		rule.CountryIs = emptyList
-		rule.CountryIsNot = emptyList
-	}
-
-	// Handle IP fields
-	if api.Ip != nil && *api.Ip != "" {
-		rule.Ip = types.StringValue(*api.Ip)
-		if len(api.IpIs) > 0 {
-			rule.IpIs, _ = types.ListValueFrom(ctx, types.StringType, api.IpIs)
-		} else {
-			rule.IpIs = emptyList
-		}
-		if len(api.IpIsNot) > 0 {
-			rule.IpIsNot, _ = types.ListValueFrom(ctx, types.StringType, api.IpIsNot)
-		} else {
-			rule.IpIsNot = emptyList
-		}
-	} else {
-		rule.Ip = types.StringNull()
-		rule.IpIs = emptyList
-		rule.IpIsNot = emptyList
-	}
-
-	// Handle boolean fields
-	rule.Disabled = types.BoolValue(api.GetDisabled())
-
-	// Handle required fields
-	domains, _ := types.ListValueFrom(ctx, types.StringType, api.Domain)
-	rule.Domain = domains
-
-	urls, _ := types.ListValueFrom(ctx, types.StringType, api.Url)
-	rule.Url = urls
-
-	// Handle custom response specific fields
-	if api.ActionConfig.CustomResponseStatusCode != nil {
-		rule.CustomResponseStatusCode = types.Int64Value(int64(*api.ActionConfig.CustomResponseStatusCode))
-	} else {
-		rule.CustomResponseStatusCode = types.Int64Null()
-	}
-	rule.CustomResponseBody = types.StringValue(api.ActionConfig.CustomResponseBody)
+	// Conditional list fields
+	diags.Append(setConditionalListsFromAPI(ctx,
+		api.Country, api.CountryIs, api.CountryIsNot,
+		api.Ip, api.IpIs, api.IpIsNot,
+		api.Method, api.MethodIs, api.MethodIsNot,
+		&rule.Country, &rule.CountryIs, &rule.CountryIsNot,
+		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
+		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
+	)...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
-	// This prevents "unknown value" errors
 	rule.ActionConfig = resource_rule_custom_response.NewActionConfigValueNull()
 
-	// Set body and status_code to null (these are schema-level computed fields)
+	// Set legacy computed fields to null
 	rule.Body = types.StringNull()
 	rule.StatusCode = types.Int64Null()
 
 	return
 }
 
+// callRuleCustomResponseUpdateAPI updates a custom response rule via the API.
 func callRuleCustomResponseUpdateAPI(ctx context.Context, r *ruleCustomResponseResource, rule *resource_rule_custom_response.RuleCustomResponseModel) (diags diag.Diagnostics) {
 	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("uuid"),
 			"Missing rule.uuid attribute",
-			"Unable to update unkown rule, please update terraform state.",
+			"Unable to update unknown rule, please update terraform state.",
 		)
 		return
 	}
 
-	req := *quantadmingo.NewV2RuleCustomResponseRequestWithDefaults()
-	req.SetName(rule.Name.ValueString())
+	req := quantadmingo.NewV2RuleCustomResponseRequestWithDefaults()
 
-	var domains []string
-	for _, domain := range rule.Domain.Elements() {
-		if strVal, ok := domain.(types.String); ok {
-			domains = append(domains, strVal.ValueString())
-		}
+	// Map simple fields: name, disabled, weight, domain, url
+	diags.Append(mapper.ToSDK(ctx, rule, req)...)
+	if diags.HasError() {
+		return
 	}
-	req.SetDomain(domains)
 
-	var urls []string
-	for _, url := range rule.Url.Elements() {
-		if strVal, ok := url.(types.String); ok {
-			urls = append(urls, strVal.ValueString())
-		}
-	}
-	req.SetUrl(urls)
-
-	req.SetCountry(rule.Country.ValueString())
-	var countryList []string
-	for _, country := range rule.CountryIs.Elements() {
-		if strVal, ok := country.(types.String); ok {
-			countryList = append(countryList, strVal.ValueString())
-		}
-	}
-	req.SetCountryIs(countryList)
-	countryList = []string{}
-	for _, country := range rule.CountryIsNot.Elements() {
-		if strVal, ok := country.(types.String); ok {
-			countryList = append(countryList, strVal.ValueString())
-		}
-	}
-	req.SetCountryIsNot(countryList)
-
-	req.SetIp(rule.Ip.ValueString())
-	var iplist []string
-	for _, ip := range rule.IpIs.Elements() {
-		if strVal, ok := ip.(types.String); ok {
-			iplist = append(iplist, strVal.ValueString())
-		}
-	}
-	req.SetIpIs(iplist)
-	iplist = []string{}
-	for _, ip := range rule.IpIsNot.Elements() {
-		if strVal, ok := ip.(types.String); ok {
-			iplist = append(iplist, strVal.ValueString())
-		}
-	}
-	req.SetIpIsNot(iplist)
-
-	req.SetMethod(rule.Method.ValueString())
-	var methodList []string
-	for _, method := range rule.MethodIs.Elements() {
-		if strVal, ok := method.(types.String); ok {
-			methodList = append(methodList, strVal.ValueString())
-		}
-	}
-	req.SetMethodIs(methodList)
-	methodList = []string{}
-	for _, method := range rule.MethodIsNot.Elements() {
-		if strVal, ok := method.(types.String); ok {
-			methodList = append(methodList, strVal.ValueString())
-		}
-	}
-	req.SetMethodIsNot(methodList)
-
-	req.SetCustomResponseStatusCode(int32(rule.CustomResponseStatusCode.ValueInt64()))
+	// Custom response specific fields
 	req.SetCustomResponseBody(rule.CustomResponseBody.ValueString())
+	req.SetCustomResponseStatusCode(int32(rule.CustomResponseStatusCode.ValueInt64()))
 
-	// Weight handling
-	if !rule.Weight.IsNull() && !rule.Weight.IsUnknown() {
-		weight := int32(rule.Weight.ValueInt64())
-		req.SetWeight(weight)
+	// Conditional list fields: country, ip, method
+	diags.Append(buildConditionalListsForRequest(ctx,
+		rule.Country, rule.CountryIs, rule.CountryIsNot,
+		rule.Ip, rule.IpIs, rule.IpIsNot,
+		rule.Method, rule.MethodIs, rule.MethodIsNot,
+		req.SetCountry, req.SetCountryIs, req.SetCountryIsNot,
+		req.SetIp, req.SetIpIs, req.SetIpIsNot,
+		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
+	)...)
+	if diags.HasError() {
+		return
 	}
 
-	api, res, err := r.client.Instance.RulesAPI.RulesCustomResponseUpdate(r.client.AuthContext, r.client.Organization, rule.Project.ValueString(), rule.Uuid.ValueString()).V2RuleCustomResponseRequest(req).Execute()
+	api, res, err := r.client.Instance.RulesAPI.RulesCustomResponseUpdate(
+		r.client.AuthContext, r.client.Organization,
+		rule.Project.ValueString(), rule.Uuid.ValueString(),
+	).V2RuleCustomResponseRequest(*req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to update rule", err.Error())
@@ -554,13 +360,14 @@ func callRuleCustomResponseUpdateAPI(ctx context.Context, r *ruleCustomResponseR
 		return
 	}
 
-	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
+	// CRITICAL: UUID changes after every update — must capture the new UUID
 	rule.Uuid = types.StringValue(api.GetUuid())
 	rule.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
 
+// callRuleCustomResponseDeleteAPI deletes a custom response rule via the API.
 func callRuleCustomResponseDeleteAPI(ctx context.Context, r *ruleCustomResponseResource, rule *resource_rule_custom_response.RuleCustomResponseModel) (diags diag.Diagnostics) {
 	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
@@ -568,10 +375,13 @@ func callRuleCustomResponseDeleteAPI(ctx context.Context, r *ruleCustomResponseR
 			"Missing rule.uuid attribute",
 			"Unable to delete unknown rule, please update terraform state.",
 		)
+		return
 	}
 
-	org := r.client.Organization
-	_, err := r.client.Instance.RulesAPI.RulesCustomResponseDelete(r.client.AuthContext, org, rule.Project.ValueString(), rule.Uuid.ValueString()).Execute()
+	_, err := r.client.Instance.RulesAPI.RulesCustomResponseDelete(
+		r.client.AuthContext, r.client.Organization,
+		rule.Project.ValueString(), rule.Uuid.ValueString(),
+	).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to delete rule", err.Error())
