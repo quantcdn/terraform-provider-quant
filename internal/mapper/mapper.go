@@ -257,6 +257,11 @@ func FromSDK(ctx context.Context, sdkResp any, tfModel any) diag.Diagnostics {
 	return diags
 }
 
+// listValueFromFunc is the function used to convert []string to types.List.
+// It defaults to types.ListValueFrom and can be overridden in tests to simulate
+// errors.
+var listValueFromFunc = types.ListValueFrom
+
 // convertToTFValue converts a Go-native value returned by an SDK getter into
 // the corresponding Terraform Plugin Framework attribute value. Returns the
 // converted reflect.Value and a bool indicating success (false = skip).
@@ -281,7 +286,7 @@ func convertToTFValue(ctx context.Context, val reflect.Value) (reflect.Value, bo
 			for i := 0; i < val.Len(); i++ {
 				strs[i] = val.Index(i).String()
 			}
-			listVal, diags := types.ListValueFrom(ctx, types.StringType, strs)
+			listVal, diags := listValueFromFunc(ctx, types.StringType, strs)
 			if diags.HasError() {
 				return reflect.Value{}, false
 			}
