@@ -248,5 +248,10 @@ func (p *quantProvider) Resources(ctx context.Context) []func() resource.Resourc
 		NewCrawlerScheduleResource,
 		NewHeaderResource,
 		NewApplicationResource,
+		NewEnvironmentResource,
+		NewVolumeResource,
+		NewCronJobResource,
+		NewKVStoreResource,
+		NewKVItemResource,
 	}
 }
