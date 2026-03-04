@@ -12,19 +12,6 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
-// KV item create response has a simple string value.
-var kvItemCreateResponse = map[string]interface{}{
-	"success": true,
-	"key":     "mykey",
-	"value":   "myval",
-}
-
-// KV item show response has a union-typed value; plain string matches the String variant.
-var kvItemShowResponse = map[string]interface{}{
-	"key":   "mykey",
-	"value": "myval",
-}
-
 func mockKVItemServer(t *testing.T, org string, project string, storeId string, key string) {
 	httpmock.Activate()
 	baseUrl := "https://dashboard.quantcdn.io/api/v2"

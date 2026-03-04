@@ -626,7 +626,7 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	} else if data.StaticErrorPage.IsUnknown() {
 		data.StaticErrorPage = types.StringNull()
 	}
-	if codes := actionConfig.GetStaticErrorPageStatusCodes(); codes != nil && len(codes) > 0 {
+	if codes := actionConfig.GetStaticErrorPageStatusCodes(); len(codes) > 0 {
 		diags.Append(setStringListFromAPI(ctx, codes, &data.StaticErrorPageStatusCodes)...)
 	} else if data.StaticErrorPageStatusCodes.IsUnknown() {
 		data.StaticErrorPageStatusCodes = types.ListNull(types.StringType)

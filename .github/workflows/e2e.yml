@@ -1,0 +1,54 @@
+name: Pulumi E2E Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      stacks:
+        description: 'Stacks to test (comma-separated or "all")'
+        required: false
+        default: 'all'
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Pulumi E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'pulumi/go.mod'
+          cache: true
+          cache-dependency-path: pulumi/go.sum
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: latest
+
+      - run: go mod download
+        working-directory: pulumi
+
+      - name: Run E2E tests
+        working-directory: pulumi
+        env:
+          QUANTCDN_API_TOKEN: ${{ secrets.QUANTCDN_API_TOKEN }}
+          QUANTCDN_ORGANIZATION: ${{ secrets.QUANTCDN_ORGANIZATION }}
+        run: |
+          STACKS="${{ inputs.stacks || 'all' }}"
+          if [ "$STACKS" = "all" ]; then
+            go test -v -tags=e2e -timeout=30m ./e2e/
+          else
+            # Convert comma-separated stack names to -run regex
+            # e.g. "project,domain" → "TestE2E_(Project|Domain)"
+            PATTERN=$(echo "$STACKS" | sed 's/\b\w/\U&/g; s/,/|/g; s/app-stack/AppStack/g')
+            go test -v -tags=e2e -timeout=30m -run "TestE2E_($PATTERN)" ./e2e/
+          fi
