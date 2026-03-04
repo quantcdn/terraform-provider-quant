@@ -199,6 +199,7 @@ func callCronJobCreateAPI(ctx context.Context, r *cronJobResource, data *resourc
 	}
 
 	mapCronResponse(cron, data)
+	data.Organization = types.StringValue(org)
 
 	return
 }
@@ -232,6 +233,7 @@ func callCronJobReadAPI(ctx context.Context, r *cronJobResource, data *resource_
 	}
 
 	mapCronResponse(cron, data)
+	data.Organization = types.StringValue(org)
 
 	return
 }

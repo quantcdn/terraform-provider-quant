@@ -32,9 +32,10 @@ type headerResource struct {
 }
 
 type headerResourceModel struct {
-	Id      types.String `tfsdk:"id"`
-	Headers types.Map    `tfsdk:"headers"`
-	Project types.String `tfsdk:"project"`
+	Id           types.String `tfsdk:"id"`
+	Headers      types.Map    `tfsdk:"headers"`
+	Organization types.String `tfsdk:"organization"`
+	Project      types.String `tfsdk:"project"`
 }
 
 func (r *headerResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -45,6 +46,10 @@ func (r *headerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
+				Computed: true,
+			},
+			"organization": schema.StringAttribute{
+				Optional: true,
 				Computed: true,
 			},
 			"project": schema.StringAttribute{
@@ -137,6 +142,13 @@ func (r *headerResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+func (r *headerResource) getOrg(data *headerResourceModel) string {
+	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
+		return data.Organization.ValueString()
+	}
+	return r.client.Organization
+}
+
 // generateID produces a deterministic hash from header key-value pairs.
 func generateID(headers map[string]string) string {
 	var keys []string
@@ -180,8 +192,9 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, data *hea
 
 	req := *quantadmingo.NewV2CustomHeaderRequest(headers)
 
+	org := h.getOrg(data)
 	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(
-		h.client.AuthContext, h.client.Organization, data.Project.ValueString(),
+		h.client.AuthContext, org, data.Project.ValueString(),
 	).V2CustomHeaderRequest(req).Execute()
 
 	if err != nil {
@@ -190,13 +203,15 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, data *hea
 	}
 
 	data.Id = types.StringValue(generateID(headers))
+	data.Organization = types.StringValue(org)
 	return
 }
 
 // callHeaderReadAPI reads custom headers from the API.
 func callHeaderReadAPI(ctx context.Context, h *headerResource, data *headerResourceModel) (diags diag.Diagnostics) {
+	org := h.getOrg(data)
 	allHeaders, _, err := h.client.Instance.HeadersAPI.HeadersList(
-		h.client.AuthContext, h.client.Organization, data.Project.ValueString(),
+		h.client.AuthContext, org, data.Project.ValueString(),
 	).Execute()
 
 	if err != nil {
@@ -217,6 +232,7 @@ func callHeaderReadAPI(ctx context.Context, h *headerResource, data *headerResou
 
 	data.Id = types.StringValue(generateID(allHeaders))
 	data.Headers = headers
+	data.Organization = types.StringValue(org)
 	return
 }
 
@@ -228,8 +244,9 @@ func callHeaderDeleteAPI(ctx context.Context, h *headerResource, data *headerRes
 	}
 	req := *quantadmingo.NewV2CustomHeaderRequest(headersToDelete)
 
+	org := h.getOrg(data)
 	_, err := h.client.Instance.HeadersAPI.HeadersDelete(
-		h.client.AuthContext, h.client.Organization, data.Project.ValueString(),
+		h.client.AuthContext, org, data.Project.ValueString(),
 	).V2CustomHeaderRequest(req).Execute()
 
 	if err != nil {

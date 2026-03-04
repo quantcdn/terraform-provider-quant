@@ -242,6 +242,7 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 	}
 
 	data.EnvName = types.StringValue(envResp.GetEnvName())
+	data.Organization = types.StringValue(org)
 
 	// Poll until environment is ready
 	createStateConf := retry.StateChangeConf{
@@ -316,6 +317,7 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 	}
 
 	data.EnvName = types.StringValue(env.GetEnvName())
+	data.Organization = types.StringValue(org)
 
 	if env.Status != nil {
 		data.Status = types.StringValue(*env.Status)

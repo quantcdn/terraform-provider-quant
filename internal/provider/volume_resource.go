@@ -176,6 +176,7 @@ func callVolumeCreateAPI(ctx context.Context, r *volumeResource, data *resource_
 
 	// Map response to model
 	mapVolumeResponse(vol, data)
+	data.Organization = types.StringValue(org)
 
 	return
 }
@@ -209,6 +210,7 @@ func callVolumeReadAPI(ctx context.Context, r *volumeResource, data *resource_vo
 	}
 
 	mapVolumeResponse(vol, data)
+	data.Organization = types.StringValue(org)
 
 	return
 }

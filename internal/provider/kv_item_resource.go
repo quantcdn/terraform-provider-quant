@@ -193,6 +193,7 @@ func callKVItemCreateAPI(ctx context.Context, r *kvItemResource, data *resource_
 	if result.Value != nil && !data.Secret.ValueBool() {
 		data.Value = types.StringValue(*result.Value)
 	}
+	data.Organization = types.StringValue(org)
 
 	return
 }
@@ -243,6 +244,8 @@ func callKVItemReadAPI(ctx context.Context, r *kvItemResource, data *resource_kv
 		}
 	}
 
+	data.Organization = types.StringValue(org)
+
 	// Resolve unknown optional/computed fields
 	if data.Secret.IsUnknown() {
 		data.Secret = types.BoolValue(false)
@@ -274,6 +277,11 @@ func callKVItemUpdateAPI(ctx context.Context, r *kvItemResource, data *resource_
 			}
 		}
 		diags.AddError("Unable to update KV item", fmt.Sprintf("Error: %s", err.Error()))
+	}
+
+	data.Organization = types.StringValue(org)
+	if data.Secret.IsUnknown() {
+		data.Secret = types.BoolValue(false)
 	}
 
 	return

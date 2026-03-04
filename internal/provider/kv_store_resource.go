@@ -171,6 +171,7 @@ func callKVStoreCreateAPI(ctx context.Context, r *kvStoreResource, data *resourc
 
 	data.StoreId = types.StringValue(store.GetId())
 	data.Name = types.StringValue(store.GetName())
+	data.Organization = types.StringValue(org)
 
 	return
 }
@@ -205,6 +206,7 @@ func callKVStoreReadAPI(ctx context.Context, r *kvStoreResource, data *resource_
 
 	data.StoreId = types.StringValue(store.GetId())
 	data.Name = types.StringValue(store.GetName())
+	data.Organization = types.StringValue(r.getOrg(data))
 
 	return
 }
