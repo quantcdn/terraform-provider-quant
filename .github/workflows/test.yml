@@ -75,3 +75,62 @@ jobs:
           TF_ACC: "1"
         run: go test -v -cover ./internal/provider/
         timeout-minutes: 10
+
+  # Pulumi bridge jobs — run in parallel with Terraform jobs
+  pulumi-build:
+    name: Pulumi Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'pulumi/go.mod'
+          cache: true
+          cache-dependency-path: pulumi/go.sum
+      - run: go mod download
+        working-directory: pulumi
+      - run: go build ./...
+        working-directory: pulumi
+
+  pulumi-test:
+    name: Pulumi Acceptance Tests
+    needs: pulumi-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'pulumi/go.mod'
+          cache: true
+          cache-dependency-path: pulumi/go.sum
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: latest
+      - run: go mod download
+        working-directory: pulumi
+      - run: go test -v -cover ./provider/
+        working-directory: pulumi
+        timeout-minutes: 10
+
+  pulumi-generate-check:
+    name: Pulumi Generate Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'pulumi/go.mod'
+          cache: true
+          cache-dependency-path: pulumi/go.sum
+      - run: go mod download
+        working-directory: pulumi
+      - run: make generate
+        working-directory: pulumi
+      - name: git diff
+        run: |
+          git diff --compact-summary --exit-code || \
+            (echo; echo "Unexpected difference after Pulumi schema generation. Run 'cd pulumi && make generate' and commit."; exit 1)

@@ -1,4 +1,4 @@
-.PHONY: build test testacc clean fmt lint coverage help
+.PHONY: build test testacc clean fmt lint coverage help pulumi-build pulumi-generate pulumi-test
 
 # Default target
 help: ## Show this help message
@@ -55,4 +55,14 @@ dev-setup: deps build ## Set up development environment
 	@echo "Development environment ready!"
 
 check: fmt lint test ## Run all checks (format, lint, test)
-	@echo "All checks passed!" 
+	@echo "All checks passed!"
+
+# Pulumi bridge targets
+pulumi-build: ## Build the Pulumi provider
+	$(MAKE) -C pulumi build
+
+pulumi-generate: ## Generate Pulumi schema from TF provider
+	$(MAKE) -C pulumi generate
+
+pulumi-test: ## Run Pulumi mock acceptance tests
+	$(MAKE) -C pulumi test
