@@ -35,7 +35,9 @@ func (r *ruleServeStaticResource) Metadata(ctx context.Context, req resource.Met
 }
 
 func (r *ruleServeStaticResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_serve_static.RuleServeStaticResourceSchema(ctx)
+	s := resource_rule_serve_static.RuleServeStaticResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *ruleServeStaticResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

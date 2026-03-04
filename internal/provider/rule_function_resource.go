@@ -35,7 +35,9 @@ func (r *ruleFunctionResource) Metadata(ctx context.Context, req resource.Metada
 }
 
 func (r *ruleFunctionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_function.RuleFunctionResourceSchema(ctx)
+	s := resource_rule_function.RuleFunctionResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *ruleFunctionResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

@@ -7,6 +7,14 @@ import (
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/float64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -155,6 +163,61 @@ func setConditionalListsFromAPI(
 	)...)
 
 	return diags
+}
+
+// addUseStateForUnknown adds UseStateForUnknown plan modifiers to all Computed
+// attributes in the schema. Without these, every plan cycle treats unconfigured
+// Optional+Computed fields as Unknown, causing perpetual drift.
+func addUseStateForUnknown(attrs map[string]schema.Attribute) {
+	for name, attr := range attrs {
+		switch a := attr.(type) {
+		case schema.StringAttribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, stringplanmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		case schema.BoolAttribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, boolplanmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		case schema.Int64Attribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, int64planmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		case schema.ListAttribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, listplanmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		case schema.MapAttribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, mapplanmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		case schema.Float64Attribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, float64planmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		case schema.SingleNestedAttribute:
+			if a.Computed {
+				addUseStateForUnknown(a.Attributes)
+				attrs[name] = a
+			}
+		case schema.ListNestedAttribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, listplanmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		case schema.ObjectAttribute:
+			if a.Computed {
+				a.PlanModifiers = append(a.PlanModifiers, objectplanmodifier.UseStateForUnknown())
+				attrs[name] = a
+			}
+		}
+	}
 }
 
 // buildConditionalListsForRequest is a convenience wrapper that applies

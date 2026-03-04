@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
@@ -56,8 +57,11 @@ func (r *ruleProxyResource) Metadata(ctx context.Context, req resource.MetadataR
 }
 
 func (r *ruleProxyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_proxy.RuleProxyResourceSchema(ctx)
+	s := resource_rule_proxy.RuleProxyResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
+
 
 func (r *ruleProxyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -223,6 +227,16 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 		return nil, diags
 	}
 
+	// Inject headers (map field — not handled by mapper)
+	if !data.InjectHeaders.IsNull() && !data.InjectHeaders.IsUnknown() {
+		hdrs := make(map[string]string)
+		diags.Append(data.InjectHeaders.ElementsAs(ctx, &hdrs, false)...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		req.SetInjectHeaders(hdrs)
+	}
+
 	// WAF configuration (nested object — not handled by mapper)
 	if data.WafEnabled.ValueBool() && !data.WafConfig.IsNull() && !data.WafConfig.IsUnknown() {
 		wafConfig := quantadmingo.NewWafConfig()
@@ -236,6 +250,7 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 		setWafStringList(ctx, data.WafConfig.BlockUa, wafConfig.SetBlockUa, &diags)
 		setWafStringList(ctx, data.WafConfig.BlockReferer, wafConfig.SetBlockReferer, &diags)
 		setWafStringList(ctx, data.WafConfig.NotifyEmail, wafConfig.SetNotifyEmail, &diags)
+		setWafStringList(ctx, data.WafConfig.BlockAsn, wafConfig.SetBlockAsn, &diags)
 		if diags.HasError() {
 			return nil, diags
 		}
@@ -245,6 +260,74 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 		}
 		if !data.WafConfig.NotifySlackHitsRpm.IsNull() && !data.WafConfig.NotifySlackHitsRpm.IsUnknown() {
 			wafConfig.SetNotifySlackHitsRpm(int32(data.WafConfig.NotifySlackHitsRpm.ValueInt64()))
+		}
+
+		// Block lists
+		if !data.WafConfig.BlockLists.IsNull() && !data.WafConfig.BlockLists.IsUnknown() {
+			var blockListsObj resource_rule_proxy.BlockListsValue
+			diags.Append(data.WafConfig.BlockLists.As(ctx, &blockListsObj, basetypes.ObjectAsOptions{})...)
+			if !diags.HasError() {
+				blockLists := quantadmingo.NewWafConfigBlockLists()
+				blockLists.SetAi(blockListsObj.Ai.ValueBool())
+				blockLists.SetIp(blockListsObj.Ip.ValueBool())
+				blockLists.SetReferer(blockListsObj.Referer.ValueBool())
+				blockLists.SetUserAgent(blockListsObj.UserAgent.ValueBool())
+				wafConfig.SetBlockLists(*blockLists)
+			}
+		}
+
+		// Thresholds
+		if !data.WafConfig.Thresholds.IsNull() && !data.WafConfig.Thresholds.IsUnknown() {
+			var thresholdObjs []resource_rule_proxy.ThresholdsValue
+			diags.Append(data.WafConfig.Thresholds.ElementsAs(ctx, &thresholdObjs, false)...)
+			if !diags.HasError() {
+				sdkThresholds := make([]quantadmingo.WafConfigThresholdsInner, len(thresholdObjs))
+				for i, t := range thresholdObjs {
+					th := quantadmingo.NewWafConfigThresholdsInner()
+					if !t.ThresholdsType.IsNull() && !t.ThresholdsType.IsUnknown() {
+						th.SetType(t.ThresholdsType.ValueString())
+					}
+					if !t.Mode.IsNull() && !t.Mode.IsUnknown() {
+						th.SetMode(t.Mode.ValueString())
+					}
+					if !t.Rps.IsNull() && !t.Rps.IsUnknown() {
+						th.SetRps(int32(t.Rps.ValueInt64()))
+					}
+					if !t.Cooldown.IsNull() && !t.Cooldown.IsUnknown() {
+						th.SetCooldown(int32(t.Cooldown.ValueInt64()))
+					}
+					if !t.Hits.IsNull() && !t.Hits.IsUnknown() {
+						th.SetHits(int32(t.Hits.ValueInt64()))
+					}
+					if !t.Minutes.IsNull() && !t.Minutes.IsUnknown() {
+						th.SetMinutes(int32(t.Minutes.ValueInt64()))
+					}
+					if !t.Value.IsNull() && !t.Value.IsUnknown() {
+						th.SetValue(t.Value.ValueString())
+					}
+					if !t.NotifySlack.IsNull() && !t.NotifySlack.IsUnknown() {
+						th.SetNotifySlack(t.NotifySlack.ValueString())
+					}
+					sdkThresholds[i] = *th
+				}
+				wafConfig.SetThresholds(sdkThresholds)
+			}
+		}
+
+		// HTTPBL
+		if !data.WafConfig.Httpbl.IsNull() && !data.WafConfig.Httpbl.IsUnknown() {
+			var httpblObj resource_rule_proxy.HttpblValue
+			diags.Append(data.WafConfig.Httpbl.As(ctx, &httpblObj, basetypes.ObjectAsOptions{})...)
+			if !diags.HasError() {
+				httpbl := quantadmingo.NewWafConfigHttpbl()
+				httpbl.SetHttpblEnabled(httpblObj.HttpblEnabled.ValueBool())
+				httpbl.SetHttpblKey(httpblObj.HttpblKey.ValueString())
+				httpbl.SetBlockHarvester(httpblObj.BlockHarvester.ValueBool())
+				httpbl.SetBlockSearchEngine(httpblObj.BlockSearchEngine.ValueBool())
+				httpbl.SetBlockSpam(httpblObj.BlockSpam.ValueBool())
+				httpbl.SetBlockSuspicious(httpblObj.BlockSuspicious.ValueBool())
+				wafConfig.SetHttpbl(*httpbl)
+			}
 		}
 
 		req.SetWafConfig(*wafConfig)
@@ -360,7 +443,22 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	data.Organization = types.StringValue(r.client.Organization)
 	data.Action = types.StringValue(api.GetAction())
 	data.Rule = types.StringNull()
-	data.InjectHeaders = types.MapNull(types.StringType)
+
+	// InjectHeaders: read from action config
+	if actionConfig.HasInjectHeaders() {
+		hdrs := actionConfig.GetInjectHeaders()
+		if len(hdrs) > 0 {
+			hdrMap := make(map[string]attr.Value, len(hdrs))
+			for k, v := range hdrs {
+				hdrMap[k] = types.StringValue(v)
+			}
+			data.InjectHeaders, _ = types.MapValue(types.StringType, hdrMap)
+		} else {
+			data.InjectHeaders = types.MapNull(types.StringType)
+		}
+	} else {
+		data.InjectHeaders = types.MapNull(types.StringType)
+	}
 
 	// OnlyWithCookie: mapper sets it from API, but we need null for empty string
 	if api.OnlyWithCookie == nil || *api.OnlyWithCookie == "" {
@@ -374,7 +472,11 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 	} else {
 		data.To = types.StringValue(actionConfig.GetTo())
 	}
-	data.Host = types.StringValue(actionConfig.GetHost())
+	if h := actionConfig.GetHost(); h != "" {
+		data.Host = types.StringValue(h)
+	} else {
+		data.Host = types.StringNull()
+	}
 
 	// Origin timeout
 	if v, ok := actionConfig.GetOriginTimeoutOk(); ok {
@@ -441,7 +543,16 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 
 	// Failover configuration from ActionConfig
 	data.FailoverMode = types.BoolValue(actionConfig.GetFailoverMode())
-	data.FailoverOriginTtfb = types.StringValue(actionConfig.GetFailoverOriginTtfb())
+	if v := actionConfig.GetFailoverLifetime(); v != "" && v != "0" {
+		data.FailoverLifetime = types.StringValue(v)
+	} else if data.FailoverLifetime.IsUnknown() {
+		data.FailoverLifetime = types.StringNull()
+	}
+	if v := actionConfig.GetFailoverOriginTtfb(); v != "" && v != "0" {
+		data.FailoverOriginTtfb = types.StringValue(v)
+	} else if data.FailoverOriginTtfb.IsUnknown() {
+		data.FailoverOriginTtfb = types.StringNull()
+	}
 	failoverStatusCodes := actionConfig.GetFailoverOriginStatusCodes()
 	if failoverStatusCodes == nil {
 		data.FailoverOriginStatusCodes = types.ListNull(types.StringType)
@@ -470,13 +581,22 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		data.WafConfig.NotifySlack = types.StringValue(wafConfig.GetNotifySlack())
 		data.WafConfig.NotifySlackHitsRpm = types.Int64Value(int64(wafConfig.GetNotifySlackHitsRpm()))
 
-		// Nested objects set to null — these can be handled if users configure them
-		data.WafConfig.Httpbl = types.ObjectNull(resource_rule_proxy.HttpblValue{}.AttributeTypes(ctx))
-		data.WafConfig.BlockLists = types.ObjectNull(resource_rule_proxy.BlockListsValue{}.AttributeTypes(ctx))
+		// Block lists: preserve from prior state to avoid custom type conversion issues.
+		// User-configured block_lists will round-trip via the Plan, not the Read.
+		if data.WafConfig.BlockLists.IsUnknown() {
+			data.WafConfig.BlockLists = types.ObjectNull(resource_rule_proxy.BlockListsValue{}.AttributeTypes(ctx))
+		}
 
-		// Thresholds: empty list
-		emptyThresholdsList, _ := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: resource_rule_proxy.ThresholdsValue{}.AttributeTypes(ctx)}, []resource_rule_proxy.ThresholdsValue{})
-		data.WafConfig.Thresholds = emptyThresholdsList
+		// HTTPBL: preserve from prior state
+		if data.WafConfig.Httpbl.IsUnknown() {
+			data.WafConfig.Httpbl = types.ObjectNull(resource_rule_proxy.HttpblValue{}.AttributeTypes(ctx))
+		}
+
+		// Thresholds: preserve from prior state
+		if data.WafConfig.Thresholds.IsUnknown() {
+			thObjType := types.ObjectType{AttrTypes: resource_rule_proxy.ThresholdsValue{}.AttributeTypes(ctx)}
+			data.WafConfig.Thresholds, _ = types.ListValue(thObjType, []attr.Value{})
+		}
 	} else {
 		// WAF disabled: if waf_config block exists in config, populate with defaults
 		if !data.WafConfig.Mode.IsNull() && !data.WafConfig.Mode.IsUnknown() {
@@ -492,19 +612,23 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 			data.WafConfig.BlockAsn = emptyStringList
 			data.WafConfig.Httpbl = types.ObjectNull(resource_rule_proxy.HttpblValue{}.AttributeTypes(ctx))
 			data.WafConfig.BlockLists = types.ObjectNull(resource_rule_proxy.BlockListsValue{}.AttributeTypes(ctx))
-			emptyThresholdsList, _ := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: resource_rule_proxy.ThresholdsValue{}.AttributeTypes(ctx)}, []resource_rule_proxy.ThresholdsValue{})
-			data.WafConfig.Thresholds = emptyThresholdsList
+			thObjTypeDisabled := types.ObjectType{AttrTypes: resource_rule_proxy.ThresholdsValue{}.AttributeTypes(ctx)}
+			data.WafConfig.Thresholds, _ = types.ListValue(thObjTypeDisabled, []attr.Value{})
 			if data.WafConfig.ParanoiaLevel.IsNull() || data.WafConfig.ParanoiaLevel.IsUnknown() {
 				data.WafConfig.ParanoiaLevel = types.Int64Value(1)
 			}
 		}
 	}
 
-	// Static error page fields
-	if data.StaticErrorPage.IsUnknown() {
+	// Static error page fields from ActionConfig
+	if v := actionConfig.GetStaticErrorPage(); v != "" {
+		data.StaticErrorPage = types.StringValue(v)
+	} else if data.StaticErrorPage.IsUnknown() {
 		data.StaticErrorPage = types.StringNull()
 	}
-	if data.StaticErrorPageStatusCodes.IsUnknown() {
+	if codes := actionConfig.GetStaticErrorPageStatusCodes(); codes != nil && len(codes) > 0 {
+		diags.Append(setStringListFromAPI(ctx, codes, &data.StaticErrorPageStatusCodes)...)
+	} else if data.StaticErrorPageStatusCodes.IsUnknown() {
 		data.StaticErrorPageStatusCodes = types.ListNull(types.StringType)
 	}
 

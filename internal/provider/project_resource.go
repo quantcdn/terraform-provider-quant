@@ -72,7 +72,9 @@ func (r *projectResource) Metadata(ctx context.Context, req resource.MetadataReq
 }
 
 func (r *projectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_project.ProjectResourceSchema(ctx)
+	s := resource_project.ProjectResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *projectResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

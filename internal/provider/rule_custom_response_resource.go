@@ -36,7 +36,9 @@ func (r *ruleCustomResponseResource) Metadata(ctx context.Context, req resource.
 }
 
 func (r *ruleCustomResponseResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_custom_response.RuleCustomResponseResourceSchema(ctx)
+	s := resource_rule_custom_response.RuleCustomResponseResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *ruleCustomResponseResource) ConfigValidators(ctx context.Context) []resource.ConfigValidator {

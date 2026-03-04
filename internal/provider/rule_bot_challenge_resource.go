@@ -35,7 +35,9 @@ func (r *ruleBotChallengeResource) Metadata(ctx context.Context, req resource.Me
 }
 
 func (r *ruleBotChallengeResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_bot_challenge.RuleBotChallengeResourceSchema(ctx)
+	s := resource_rule_bot_challenge.RuleBotChallengeResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *ruleBotChallengeResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

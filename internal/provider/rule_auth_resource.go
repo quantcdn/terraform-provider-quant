@@ -35,7 +35,9 @@ func (r *ruleAuthResource) Metadata(ctx context.Context, req resource.MetadataRe
 }
 
 func (r *ruleAuthResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_auth.RuleAuthResourceSchema(ctx)
+	s := resource_rule_auth.RuleAuthResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *ruleAuthResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

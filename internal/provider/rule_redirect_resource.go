@@ -36,7 +36,9 @@ func (r *ruleRedirectResource) Metadata(ctx context.Context, req resource.Metada
 }
 
 func (r *ruleRedirectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_redirect.RuleRedirectResourceSchema(ctx)
+	s := resource_rule_redirect.RuleRedirectResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *ruleRedirectResource) ConfigValidators(ctx context.Context) []resource.ConfigValidator {
