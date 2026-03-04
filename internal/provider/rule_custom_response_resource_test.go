@@ -172,6 +172,14 @@ func TestAccRuleCustomResponseResource_Update(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_rule_custom_response.test", "custom_response_body", "<h1>Internal Server Error</h1>"),
 				),
 			},
+			// Import
+			{
+				ResourceName:                         "quant_rule_custom_response.test",
+				ImportState:                          true,
+				ImportStateId:                        "test-organization/96e4f4f6-211a-4f4b-b7fb-03985df56dad",
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "uuid",
+			},
 		},
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -182,4 +183,111 @@ resource "quant_kv_item" "test" {
   value        = %[5]q
 }
 `, org, project, storeId, key, value)
+}
+
+// ---------- KV Item HTTP error-path tests ----------
+
+func setupKVItemErrorResponder(t *testing.T, org string, project string, storeId string, statusCode int, body map[string]interface{}) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST",
+		fmt.Sprintf("%s/organizations/%s/projects/%s/kv/%s/items", baseUrl, org, project, storeId),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(statusCode, body)
+		})
+}
+
+func testKVItemErrorConfig() string {
+	return `
+provider "quant" {
+  organization = "test-org"
+  bearer = "testtoken"
+}
+
+resource "quant_kv_item" "test" {
+  organization = "test-org"
+  project      = "test-project"
+  store_id     = "store-123"
+  key          = "error-key"
+  value        = "error-val"
+}
+`
+}
+
+func TestAccKVItemResource_CreateAuth401(t *testing.T) {
+	setupKVItemErrorResponder(t, "test-org", "test-project", "store-123", 401, map[string]interface{}{
+		"error":   true,
+		"message": "Invalid API token",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testKVItemErrorConfig(),
+				ExpectError: regexp.MustCompile(`Authentication Failed`),
+			},
+		},
+	})
+}
+
+func TestAccKVItemResource_CreateForbidden403(t *testing.T) {
+	setupKVItemErrorResponder(t, "test-org", "test-project", "store-123", 403, map[string]interface{}{
+		"error":   true,
+		"message": "Insufficient permissions",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testKVItemErrorConfig(),
+				ExpectError: regexp.MustCompile(`Authorization Failed`),
+			},
+		},
+	})
+}
+
+func TestAccKVItemResource_CreateBadRequest400(t *testing.T) {
+	setupKVItemErrorResponder(t, "test-org", "test-project", "store-123", 400, map[string]interface{}{
+		"error":   true,
+		"message": "Invalid item configuration",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testKVItemErrorConfig(),
+				ExpectError: regexp.MustCompile(`Invalid KV Item Configuration`),
+			},
+		},
+	})
+}
+
+func TestAccKVItemResource_CreateServerError500(t *testing.T) {
+	setupKVItemErrorResponder(t, "test-org", "test-project", "store-123", 500, map[string]interface{}{
+		"error":   true,
+		"message": "Internal server error",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testKVItemErrorConfig(),
+				ExpectError: regexp.MustCompile(`Unable to Create KV Item`),
+			},
+		},
+	})
 }

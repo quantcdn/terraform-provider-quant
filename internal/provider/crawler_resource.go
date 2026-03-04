@@ -487,30 +487,24 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 	}
 
 	// Assets — network_intercept nested object.
+	niAttrTypes := resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)
+	parserAttrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
+	assetsAttrTypes := resource_crawler.AssetsValue{}.AttributeTypes(ctx)
+
 	if cfg.Assets.NetworkIntercept.Enabled || cfg.Assets.NetworkIntercept.Timeout > 0 {
 		networkInterceptObj, _ := types.ObjectValue(
-			map[string]attr.Type{
-				"enabled": types.BoolType,
-				"timeout": types.Int64Type,
-			},
+			niAttrTypes,
 			map[string]attr.Value{
-				"enabled": types.BoolValue(cfg.Assets.NetworkIntercept.Enabled),
-				"timeout": types.Int64Value(int64(cfg.Assets.NetworkIntercept.Timeout)),
+				"enabled":    types.BoolValue(cfg.Assets.NetworkIntercept.Enabled),
+				"execute_js": types.BoolValue(cfg.Assets.NetworkIntercept.ExecuteJs),
+				"timeout":    types.Int64Value(int64(cfg.Assets.NetworkIntercept.Timeout)),
 			},
 		)
 		crawler.Assets = resource_crawler.NewAssetsValueMust(
-			map[string]attr.Type{
-				"network_intercept": types.ObjectType{
-					AttrTypes: map[string]attr.Type{
-						"enabled": types.BoolType,
-						"timeout": types.Int64Type,
-					},
-				},
-				"parser": types.ObjectType{AttrTypes: map[string]attr.Type{}},
-			},
+			assetsAttrTypes,
 			map[string]attr.Value{
 				"network_intercept": networkInterceptObj,
-				"parser":            types.ObjectNull(map[string]attr.Type{}),
+				"parser":            types.ObjectNull(parserAttrTypes),
 			},
 		)
 	} else if crawler.Assets.IsNull() || crawler.Assets.IsUnknown() {

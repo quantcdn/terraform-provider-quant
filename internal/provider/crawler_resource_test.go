@@ -3,10 +3,10 @@ package provider_test
 import (
 	"fmt"
 	"io"
+	"net/http"
+	"regexp"
 	"strings"
 	"testing"
-
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -306,6 +306,13 @@ func TestAccCrawlerResourceMock(t *testing.T) {
 				),
 			},
 			{
+				ResourceName:            "quant_crawler.test",
+				ImportState:             true,
+				ImportStateId:           "default:29f1141b-ded6-483b-9a14-4439db01bc22",
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"urls"},
+			},
+			{
 				// Test update
 				Config: testAccCrawlerResourceConfigUpdateMock(),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -503,4 +510,227 @@ func testAccCheckCrawlerExists(n string) resource.TestCheckFunc {
 		// Instead, we'll just return nil since we're mocking
 		return nil
 	}
+}
+
+// ---------- Full config integration test ----------
+// Exercises: headers, status_ok, sitemap, assets.network_intercept, urls
+
+var crawlerFullConfigResponse = map[string]interface{}{
+	"id":         7,
+	"project_id": 17,
+	"uuid":       "fc12ab34-de56-7890-abcd-ef1234567890",
+	"name":       "Full config crawler",
+	"config": "config:\n" +
+		"    user_agent: 'FullBot/2.0'\n" +
+		"    browser_mode: true\n" +
+		"    workers: 4\n" +
+		"    depth: 3\n" +
+		"    max_hits: 1000\n" +
+		"    max_html: 200\n" +
+		"    cache: false\n" +
+		"    delay: 2\n" +
+		"    status_ok: [200, 301]\n" +
+		"    quant: { options: { enabled: true, max_errors: 50 } }\n" +
+		"    start_url: [/]\n" +
+		"    headers:\n" +
+		"        X-Custom: value\n" +
+		"        Authorization: Bearer test\n" +
+		"    sitemap:\n" +
+		"        - url: https://example.com/sitemap.xml\n" +
+		"          recursive: true\n" +
+		"    assets:\n" +
+		"        network_intercept:\n" +
+		"            enabled: true\n" +
+		"            timeout: 5000\n" +
+		"domain: 'https://example.com'\n" +
+		"headers: {}\n",
+	"urls_list":           "single_url:\n    - https://example.com/page1\n    - https://example.com/page2\n",
+	"created_at":          "2024-07-01T10:00:00.000000Z",
+	"updated_at":          "2024-07-01T10:30:00.000000Z",
+	"domain":              "https://example.com",
+	"domain_verified":     0,
+	"webhook_url":         nil,
+	"webhook_auth_header": nil,
+	"webhook_extra_vars":  nil,
+}
+
+func setupCrawlerFullConfigServer(t *testing.T, organizationID string, projectID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	// List crawlers
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, []map[string]interface{}{crawlerFullConfigResponse})
+		})
+
+	// Create crawler
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Create full-config crawler request received")
+			return httpmock.NewJsonResponse(200, crawlerFullConfigResponse)
+		})
+
+	// Get crawler by UUID
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/fc12ab34-de56-7890-abcd-ef1234567890", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, crawlerFullConfigResponse)
+		})
+
+	// Update crawler
+	httpmock.RegisterResponder("PUT", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/fc12ab34-de56-7890-abcd-ef1234567890", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, crawlerFullConfigResponse)
+		})
+
+	// Delete crawler
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/fc12ab34-de56-7890-abcd-ef1234567890", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, crawlerFullConfigResponse)
+		})
+}
+
+func TestAccCrawlerResource_FullConfig(t *testing.T) {
+	setupCrawlerFullConfigServer(t, "test-organization", "default")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCrawlerResourceFullConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "name", "Full config crawler"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "project", "default"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "domain", "https://example.com"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "browser_mode", "true"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "domain_verified", "0"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "workers", "4"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "depth", "3"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "delay", "2"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "max_html", "200"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "user_agent", "FullBot/2.0"),
+
+					// Headers — map field
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "headers.X-Custom", "value"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "headers.Authorization", "Bearer test"),
+
+					// StatusOk — int list
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "status_ok.#", "2"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "status_ok.0", "200"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "status_ok.1", "301"),
+
+					// Sitemap — nested list
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "sitemap.#", "1"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "sitemap.0.url", "https://example.com/sitemap.xml"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "sitemap.0.recursive", "true"),
+
+					// Assets — nested object
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "assets.network_intercept.enabled", "true"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "assets.network_intercept.timeout", "5000"),
+
+					// Urls — string list (preserved from config, not from API response)
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "urls.#", "2"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "urls.0", "https://example.com/page1"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "urls.1", "https://example.com/page2"),
+
+					// Start URLs from config
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "start_urls.#", "1"),
+					resource.TestCheckResourceAttr("quant_crawler.fulltest", "start_urls.0", "/"),
+
+					testAccCheckCrawlerExists("quant_crawler.fulltest"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCrawlerResourceFullConfig() string {
+	return `
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_crawler" "fulltest" {
+	name         = "Full config crawler"
+	project      = "default"
+	domain       = "https://example.com"
+	browser_mode = true
+	user_agent   = "FullBot/2.0"
+	workers      = 4
+	depth        = 3
+	delay        = 2
+	max_html     = 200
+
+	headers = {
+		"X-Custom"      = "value"
+		"Authorization" = "Bearer test"
+	}
+
+	status_ok = [200, 301]
+
+	urls = ["https://example.com/page1", "https://example.com/page2"]
+
+	sitemap = [{
+		url       = "https://example.com/sitemap.xml"
+		recursive = true
+	}]
+}
+`
+}
+
+// ---------- HTTP error-path integration tests ----------
+
+func setupCrawlerErrorResponder(t *testing.T, org, project string, statusCode int, body map[string]interface{}) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, org, project),
+		func(req *http.Request) (*http.Response, error) {
+			t.Logf("Crawler create request received — returning %d", statusCode)
+			return httpmock.NewJsonResponse(statusCode, body)
+		})
+}
+
+func TestAccCrawlerResource_CreateError401(t *testing.T) {
+	setupCrawlerErrorResponder(t, "test-org", "test-project", 401, map[string]interface{}{
+		"error":   true,
+		"message": "Invalid API token",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "quant" {
+	bearer       = "bad-token"
+	organization = "test-org"
+}
+
+resource "quant_crawler" "test" {
+	name         = "error-test-crawler"
+	project      = "test-project"
+	domain       = "https://www.example.com"
+	browser_mode = true
+	urls         = ["/"]
+}
+`,
+				ExpectError: regexp.MustCompile(`Unable to create crawler`),
+			},
+		},
+	})
 }

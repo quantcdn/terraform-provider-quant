@@ -12,6 +12,8 @@ import (
 	"terraform-provider-quant/internal/resource_cron_job"
 	"terraform-provider-quant/internal/resource_volume"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	fwdatasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
@@ -1351,4 +1353,275 @@ func TestUnitVolumeResourceUpdate_NotSupported(t *testing.T) {
 	if !found {
 		t.Error("expected 'Update Not Supported' error not found")
 	}
+}
+
+// ===================================================================
+// generateID
+// ===================================================================
+
+func TestUnitGenerateID(t *testing.T) {
+	t.Run("same input same hash", func(t *testing.T) {
+		h1 := generateID(map[string]string{"X-Foo": "bar"})
+		h2 := generateID(map[string]string{"X-Foo": "bar"})
+		if h1 != h2 {
+			t.Errorf("expected same hash, got %q vs %q", h1, h2)
+		}
+	})
+
+	t.Run("different input different hash", func(t *testing.T) {
+		h1 := generateID(map[string]string{"X-Foo": "bar"})
+		h2 := generateID(map[string]string{"X-Foo": "baz"})
+		if h1 == h2 {
+			t.Error("expected different hashes for different values")
+		}
+	})
+
+	t.Run("empty map valid hash", func(t *testing.T) {
+		h := generateID(map[string]string{})
+		if len(h) != 64 { // sha256 hex = 64 chars
+			t.Errorf("expected 64-char hex hash, got len %d: %q", len(h), h)
+		}
+	})
+
+	t.Run("order independent", func(t *testing.T) {
+		h1 := generateID(map[string]string{"A": "1", "B": "2"})
+		h2 := generateID(map[string]string{"B": "2", "A": "1"})
+		if h1 != h2 {
+			t.Errorf("expected same hash regardless of insertion order, got %q vs %q", h1, h2)
+		}
+	})
+}
+
+// ===================================================================
+// extractHeadersMap
+// ===================================================================
+
+func TestUnitExtractHeadersMap(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("valid map", func(t *testing.T) {
+		mapVal, d := types.MapValueFrom(ctx, types.StringType, map[string]string{
+			"X-Custom": "value1",
+			"X-Other":  "value2",
+		})
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		model := &headerResourceModel{Headers: mapVal}
+		result, diags := extractHeadersMap(model)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if result["X-Custom"] != "value1" || result["X-Other"] != "value2" {
+			t.Errorf("unexpected result: %v", result)
+		}
+	})
+
+	t.Run("empty map", func(t *testing.T) {
+		mapVal, d := types.MapValueFrom(ctx, types.StringType, map[string]string{})
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		model := &headerResourceModel{Headers: mapVal}
+		result, diags := extractHeadersMap(model)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if len(result) != 0 {
+			t.Errorf("expected empty map, got %v", result)
+		}
+	})
+
+	t.Run("non-string element type causes error", func(t *testing.T) {
+		// Build a map with a non-string attr.Value to trigger the type assertion failure
+		badMap, d := types.MapValue(types.Int64Type, map[string]attr.Value{
+			"key": types.Int64Value(42),
+		})
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		model := &headerResourceModel{Headers: badMap}
+		_, diags := extractHeadersMap(model)
+		if !diags.HasError() {
+			t.Error("expected error for non-string element type")
+		}
+	})
+}
+
+// ===================================================================
+// headersMapToSDK
+// ===================================================================
+
+func TestUnitHeadersMapToSDK(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("valid map", func(t *testing.T) {
+		mapVal, d := types.MapValueFrom(ctx, types.StringType, map[string]string{
+			"X-Foo": "bar",
+		})
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		result, diags := headersMapToSDK(ctx, mapVal)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if result["X-Foo"] != "bar" {
+			t.Errorf("expected X-Foo=bar, got %v", result)
+		}
+	})
+
+	t.Run("null map returns empty", func(t *testing.T) {
+		result, diags := headersMapToSDK(ctx, types.MapNull(types.StringType))
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if len(result) != 0 {
+			t.Errorf("expected empty map for null, got %v", result)
+		}
+	})
+
+	t.Run("unknown map returns empty", func(t *testing.T) {
+		result, diags := headersMapToSDK(ctx, types.MapUnknown(types.StringType))
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if len(result) != 0 {
+			t.Errorf("expected empty map for unknown, got %v", result)
+		}
+	})
+
+	t.Run("empty map returns empty", func(t *testing.T) {
+		mapVal, d := types.MapValueFrom(ctx, types.StringType, map[string]string{})
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		result, diags := headersMapToSDK(ctx, mapVal)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if len(result) != 0 {
+			t.Errorf("expected empty map, got %v", result)
+		}
+	})
+}
+
+// ===================================================================
+// setWafStringList
+// ===================================================================
+
+func TestUnitSetWafStringList(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("null list skips setter", func(t *testing.T) {
+		called := false
+		var diags diag.Diagnostics
+		setWafStringList(ctx, types.ListNull(types.StringType), func([]string) { called = true }, &diags)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if called {
+			t.Error("setter should not be called for null list")
+		}
+	})
+
+	t.Run("unknown list skips setter", func(t *testing.T) {
+		called := false
+		var diags diag.Diagnostics
+		setWafStringList(ctx, types.ListUnknown(types.StringType), func([]string) { called = true }, &diags)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if called {
+			t.Error("setter should not be called for unknown list")
+		}
+	})
+
+	t.Run("valid list calls setter", func(t *testing.T) {
+		list, d := types.ListValueFrom(ctx, types.StringType, []string{"a", "b"})
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		var got []string
+		var diags diag.Diagnostics
+		setWafStringList(ctx, list, func(v []string) { got = v }, &diags)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if len(got) != 2 || got[0] != "a" || got[1] != "b" {
+			t.Errorf("expected [a b], got %v", got)
+		}
+	})
+
+	t.Run("empty list calls setter with empty slice", func(t *testing.T) {
+		list, d := types.ListValueFrom(ctx, types.StringType, []string{})
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		called := false
+		var diags diag.Diagnostics
+		setWafStringList(ctx, list, func(v []string) { called = true }, &diags)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		// extractStringList returns non-nil []string{} for empty list, so setter IS called
+		if !called {
+			t.Error("setter should be called for empty (non-null) list")
+		}
+	})
+}
+
+// ===================================================================
+// setStringListFromAPI
+// ===================================================================
+
+func TestUnitSetStringListFromAPI(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("nil apiVal sets null list", func(t *testing.T) {
+		var target types.List
+		diags := setStringListFromAPI(ctx, nil, &target)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if !target.IsNull() {
+			t.Error("expected null list for nil apiVal")
+		}
+	})
+
+	t.Run("non-nil apiVal sets list value", func(t *testing.T) {
+		var target types.List
+		diags := setStringListFromAPI(ctx, []string{"x", "y"}, &target)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if target.IsNull() || target.IsUnknown() {
+			t.Fatal("expected non-null list")
+		}
+		elems, d := extractStringList(ctx, target)
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		if len(elems) != 2 || elems[0] != "x" || elems[1] != "y" {
+			t.Errorf("expected [x y], got %v", elems)
+		}
+	})
+
+	t.Run("empty slice sets empty list", func(t *testing.T) {
+		var target types.List
+		diags := setStringListFromAPI(ctx, []string{}, &target)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %s", diags.Errors())
+		}
+		if target.IsNull() {
+			t.Error("expected non-null list for empty slice")
+		}
+		elems, d := extractStringList(ctx, target)
+		if d.HasError() {
+			t.Fatal(d.Errors())
+		}
+		if len(elems) != 0 {
+			t.Errorf("expected empty list, got %v", elems)
+		}
+	})
 }

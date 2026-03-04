@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -154,4 +155,75 @@ resource "quant_environment" "test" {
   max_capacity = %[5]d
 }
 `, org, app, envName, minCap, maxCap)
+}
+
+// ---------- HTTP error-path integration tests ----------
+
+func setupEnvironmentErrorResponder(t *testing.T, org string, app string, statusCode int, body map[string]interface{}) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v3"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST",
+		fmt.Sprintf("%s/organizations/%s/applications/%s/environments", baseUrl, org, app),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(statusCode, body)
+		})
+}
+
+func testEnvironmentErrorConfig() string {
+	return `
+provider "quant" {
+  organization = "test-org"
+  bearer = "testtoken"
+}
+
+resource "quant_environment" "test" {
+  organization = "test-org"
+  application  = "test-app"
+  env_name     = "error-test"
+  min_capacity = 1
+  max_capacity = 2
+}
+`
+}
+
+func TestAccEnvironmentResource_CreateError401(t *testing.T) {
+	setupEnvironmentErrorResponder(t, "test-org", "test-app", 401, map[string]interface{}{
+		"error":   true,
+		"message": "Invalid API token",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testEnvironmentErrorConfig(),
+				ExpectError: regexp.MustCompile(`Authentication Failed`),
+			},
+		},
+	})
+}
+
+func TestAccEnvironmentResource_CreateError500(t *testing.T) {
+	setupEnvironmentErrorResponder(t, "test-org", "test-app", 500, map[string]interface{}{
+		"error":   true,
+		"message": "Internal server error",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testEnvironmentErrorConfig(),
+				ExpectError: regexp.MustCompile(`Unable to Create Environment`),
+			},
+		},
+	})
 }

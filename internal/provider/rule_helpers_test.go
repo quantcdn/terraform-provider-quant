@@ -8,6 +8,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -697,6 +701,155 @@ func TestBuildConditionalListsForRequest(t *testing.T) {
 		}
 		if len(gotMethodIs) != 1 || gotMethodIs[0] != "GET" {
 			t.Errorf("methodIs = %v, want [GET]", gotMethodIs)
+		}
+	})
+}
+
+// ---------- addUseStateForUnknown ----------
+
+func TestAddUseStateForUnknown(t *testing.T) {
+	t.Run("StringAttribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.StringAttribute{Computed: true},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.StringAttribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("BoolAttribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.BoolAttribute{Computed: true},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.BoolAttribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("Int64Attribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.Int64Attribute{Computed: true},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.Int64Attribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("Float64Attribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.Float64Attribute{Computed: true},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.Float64Attribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("ListAttribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.ListAttribute{Computed: true, ElementType: types.StringType},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.ListAttribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("MapAttribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.MapAttribute{Computed: true, ElementType: types.StringType},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.MapAttribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("ListNestedAttribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"inner": schema.StringAttribute{Optional: true},
+					},
+				},
+			},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.ListNestedAttribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("ObjectAttribute computed gets modifier", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.ObjectAttribute{
+				Computed:       true,
+				AttributeTypes: map[string]attr.Type{"name": types.StringType},
+			},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.ObjectAttribute)
+		if len(a.PlanModifiers) != 1 {
+			t.Fatalf("expected 1 plan modifier, got %d", len(a.PlanModifiers))
+		}
+	})
+
+	t.Run("SingleNestedAttribute recurses into children", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"parent": schema.SingleNestedAttribute{
+				Computed: true,
+				Attributes: map[string]schema.Attribute{
+					"child": schema.StringAttribute{Computed: true},
+				},
+			},
+		}
+		addUseStateForUnknown(attrs)
+		parent := attrs["parent"].(schema.SingleNestedAttribute)
+		child := parent.Attributes["child"].(schema.StringAttribute)
+		if len(child.PlanModifiers) != 1 {
+			t.Fatalf("expected child to have 1 plan modifier, got %d", len(child.PlanModifiers))
+		}
+	})
+
+	t.Run("non-computed attributes unchanged", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"required_str": schema.StringAttribute{Required: true},
+			"optional_bool": schema.BoolAttribute{Optional: true},
+		}
+		addUseStateForUnknown(attrs)
+		s := attrs["required_str"].(schema.StringAttribute)
+		if len(s.PlanModifiers) != 0 {
+			t.Errorf("required string should have 0 modifiers, got %d", len(s.PlanModifiers))
+		}
+		b := attrs["optional_bool"].(schema.BoolAttribute)
+		if len(b.PlanModifiers) != 0 {
+			t.Errorf("optional bool should have 0 modifiers, got %d", len(b.PlanModifiers))
+		}
+	})
+
+	t.Run("preserves existing modifiers", func(t *testing.T) {
+		attrs := map[string]schema.Attribute{
+			"test": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+		}
+		addUseStateForUnknown(attrs)
+		a := attrs["test"].(schema.StringAttribute)
+		if len(a.PlanModifiers) != 2 {
+			t.Fatalf("expected 2 plan modifiers (existing + UseStateForUnknown), got %d", len(a.PlanModifiers))
 		}
 	})
 }

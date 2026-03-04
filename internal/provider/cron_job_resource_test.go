@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -151,4 +152,76 @@ resource "quant_cron_job" "test" {
   command             = %[6]q
 }
 `, org, app, env, name, schedule, command)
+}
+
+// ---------- HTTP error-path integration tests ----------
+
+func setupCronJobErrorResponder(t *testing.T, org string, app string, env string, statusCode int, body map[string]interface{}) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v3"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST",
+		fmt.Sprintf("%s/organizations/%s/applications/%s/environments/%s/cron", baseUrl, org, app, env),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(statusCode, body)
+		})
+}
+
+func testCronJobErrorConfig() string {
+	return `
+provider "quant" {
+  organization = "test-org"
+  bearer = "testtoken"
+}
+
+resource "quant_cron_job" "test" {
+  organization        = "test-org"
+  application         = "test-app"
+  environment         = "production"
+  name                = "error-test"
+  schedule_expression = "0 * * * *"
+  command             = "[\"echo\",\"hello\"]"
+}
+`
+}
+
+func TestAccCronJobResource_CreateError401(t *testing.T) {
+	setupCronJobErrorResponder(t, "test-org", "test-app", "production", 401, map[string]interface{}{
+		"error":   true,
+		"message": "Invalid API token",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testCronJobErrorConfig(),
+				ExpectError: regexp.MustCompile(`Authentication Failed`),
+			},
+		},
+	})
+}
+
+func TestAccCronJobResource_CreateError500(t *testing.T) {
+	setupCronJobErrorResponder(t, "test-org", "test-app", "production", 500, map[string]interface{}{
+		"error":   true,
+		"message": "Internal server error",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testCronJobErrorConfig(),
+				ExpectError: regexp.MustCompile(`Unable to Create Cron Job`),
+			},
+		},
+	})
 }

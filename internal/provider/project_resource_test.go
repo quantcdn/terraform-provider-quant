@@ -235,3 +235,87 @@ resource "quant_project" "test" {
 }
 `
 }
+
+// ---------- HTTP error-path integration tests ----------
+
+func setupProjectErrorResponder(t *testing.T, orgID string, statusCode int, body map[string]interface{}) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects", baseUrl, orgID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(statusCode, body)
+		})
+}
+
+func testProjectErrorConfig() string {
+	return `
+provider "quant" {
+	bearer = "testtoken"
+	organization = "test-organization"
+}
+
+resource "quant_project" "test" {
+	name = "error-test"
+}
+`
+}
+
+func TestProjectResource_CreateAuth401(t *testing.T) {
+	setupProjectErrorResponder(t, "test-organization", 401, map[string]interface{}{
+		"error":   true,
+		"message": "Invalid API token",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testProjectErrorConfig(),
+				ExpectError: regexp.MustCompile(`Authentication Failed`),
+			},
+		},
+	})
+}
+
+func TestProjectResource_CreateForbidden403(t *testing.T) {
+	setupProjectErrorResponder(t, "test-organization", 403, map[string]interface{}{
+		"error":   true,
+		"message": "Insufficient permissions",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testProjectErrorConfig(),
+				ExpectError: regexp.MustCompile(`Authorization Failed`),
+			},
+		},
+	})
+}
+
+func TestProjectResource_CreateConflict409(t *testing.T) {
+	setupProjectErrorResponder(t, "test-organization", 409, map[string]interface{}{
+		"error":   true,
+		"message": "Project already exists",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testProjectErrorConfig(),
+				ExpectError: regexp.MustCompile(`Project Already Exists`),
+			},
+		},
+	})
+}
