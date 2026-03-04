@@ -1,0 +1,31 @@
+name: e2e-crawler
+runtime: yaml
+description: E2E test for Crawler and CrawlerSchedule resources
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-crawler-test
+  region:
+    type: string
+    default: au-govt
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: ${region}
+  testCrawler:
+    type: quant:index:Crawler
+    properties:
+      project: ${testProject.machineName}
+      domain: https://example.com
+  testSchedule:
+    type: quant:index:CrawlerSchedule
+    properties:
+      project: ${testProject.machineName}
+      crawler: ${testCrawler.uuid}
+      name: e2e-test-schedule
+      scheduleCronString: "0 0 * * 0"
+outputs:
+  crawlerId: ${testCrawler.id}
+  scheduleId: ${testSchedule.id}

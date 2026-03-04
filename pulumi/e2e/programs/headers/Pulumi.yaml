@@ -1,0 +1,25 @@
+name: e2e-headers
+runtime: yaml
+description: E2E test for Header resource
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-headers-test
+  region:
+    type: string
+    default: au-govt
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: ${region}
+  testHeader:
+    type: quant:index:Header
+    properties:
+      project: ${testProject.machineName}
+      headers:
+        X-Frame-Options: DENY
+        X-Content-Type-Options: nosniff
+outputs:
+  headerId: ${testHeader.id}

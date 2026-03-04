@@ -1,0 +1,27 @@
+name: e2e-domain
+runtime: yaml
+description: E2E test for Domain resource
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-domain-test
+  domainName:
+    type: string
+    default: pulumi-e2e-test.example.com
+  region:
+    type: string
+    default: au-govt
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: ${region}
+  testDomain:
+    type: quant:index:Domain
+    properties:
+      domain: ${domainName}
+      project: ${testProject.machineName}
+outputs:
+  domainId: ${testDomain.id}
+  domain: ${testDomain.domain}

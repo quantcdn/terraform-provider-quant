@@ -1,0 +1,34 @@
+name: e2e-kv
+runtime: yaml
+description: E2E test for KvStore and KvItem resources
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-kv-test
+  itemValue:
+    type: string
+    default: e2e-test-value
+  region:
+    type: string
+    default: au-govt
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: ${region}
+  testStore:
+    type: quant:index:KvStore
+    properties:
+      project: ${testProject.machineName}
+      name: e2e-test-store
+  testItem:
+    type: quant:index:KvItem
+    properties:
+      project: ${testProject.machineName}
+      storeId: ${testStore.id}
+      key: e2e-test-key
+      value: ${itemValue}
+outputs:
+  storeId: ${testStore.id}
+  itemId: ${testItem.id}
