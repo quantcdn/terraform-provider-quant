@@ -105,8 +105,10 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Crawler configuration (YAML)",
 			},
 			"crawler": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "The UUID of the crawler",
+				MarkdownDescription: "The UUID of the crawler",
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
