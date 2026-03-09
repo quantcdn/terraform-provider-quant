@@ -686,7 +686,7 @@ func callRuleProxyUpdateAPI(ctx context.Context, r *ruleProxyResource, data *res
 		return
 	}
 
-	// CRITICAL: UUID changes after every update — must capture the new UUID
+	// Capture UUID and RuleId from response
 	data.Uuid = types.StringValue(api.GetUuid())
 	data.RuleId = types.StringValue(api.GetRuleId())
 

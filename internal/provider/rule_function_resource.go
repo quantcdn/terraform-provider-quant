@@ -340,7 +340,7 @@ func callRuleFunctionUpdateAPI(ctx context.Context, r *ruleFunctionResource, rul
 		return
 	}
 
-	// CRITICAL: UUID changes after every update — must capture the new UUID
+	// Capture UUID and RuleId from response
 	rule.Uuid = types.StringValue(api.GetUuid())
 	rule.RuleId = types.StringValue(api.GetRuleId())
 
