@@ -1,4 +1,0 @@
-encryptionsalt: v1:jBFgVHG8g6g=:v1:cfZGEdjK313NPXnz:ejyp6jRbPHZK8PG9WW2YgLrcnSrQSQ==
-config:
-  e2e-app-stack:projectName: pulumi-e2e-app-stack-45783-9711
-  e2e-app-stack:appName: pulumi-e2e-app-45783-9710
