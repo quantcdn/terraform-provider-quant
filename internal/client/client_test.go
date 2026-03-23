@@ -136,8 +136,8 @@ func TestNewWithOptions_CustomTransport(t *testing.T) {
 		t.Fatalf("expected bearer 'tok', got %q", c.Bearer)
 	}
 	// Verify it uses default timeout (120s) since HTTPClient.Timeout is 0
-	if c.httpClient.Client.Timeout != 120*time.Second {
-		t.Fatalf("expected default timeout 120s, got %v", c.httpClient.Client.Timeout)
+	if c.httpClient.Timeout != 120*time.Second {
+		t.Fatalf("expected default timeout 120s, got %v", c.httpClient.Timeout)
 	}
 }
 
@@ -152,8 +152,8 @@ func TestNewWithOptions_CustomTimeout(t *testing.T) {
 	c := NewWithOptions("tok", "org", opts)
 	t.Cleanup(c.Close)
 
-	if c.httpClient.Client.Timeout != customTimeout {
-		t.Fatalf("expected timeout %v, got %v", customTimeout, c.httpClient.Client.Timeout)
+	if c.httpClient.Timeout != customTimeout {
+		t.Fatalf("expected timeout %v, got %v", customTimeout, c.httpClient.Timeout)
 	}
 }
 
@@ -173,8 +173,8 @@ func TestNewWithOptions_CustomTransportAndTimeout(t *testing.T) {
 	c := NewWithOptions("tok", "org", opts)
 	t.Cleanup(c.Close)
 
-	if c.httpClient.Client.Timeout != customTimeout {
-		t.Fatalf("expected timeout %v, got %v", customTimeout, c.httpClient.Client.Timeout)
+	if c.httpClient.Timeout != customTimeout {
+		t.Fatalf("expected timeout %v, got %v", customTimeout, c.httpClient.Timeout)
 	}
 }
 
@@ -231,7 +231,7 @@ func TestNewRateLimitedRoundTripper_ZeroRPS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -318,7 +318,7 @@ func TestRoundTrip_PerRequestTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -392,7 +392,7 @@ func TestRoundTrip_ResponseBodyClosedBeforeRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if !closeCalled {
 		t.Fatal("expected response body to be closed before retry")
@@ -683,7 +683,7 @@ func TestRoundTrip_NoRateLimiting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // --- Test that all retries exhausted returns last response/error ---
@@ -718,7 +718,7 @@ func TestRoundTrip_AllRetriesExhausted(t *testing.T) {
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestRoundTrip_SuccessOnRetry(t *testing.T) {
@@ -748,7 +748,7 @@ func TestRoundTrip_SuccessOnRetry(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestRoundTrip_RetryWithRetryAfterHeader(t *testing.T) {
@@ -780,7 +780,7 @@ func TestRoundTrip_RetryWithRetryAfterHeader(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Should have waited at least ~1 second due to Retry-After: 1
 	if elapsed < 900*time.Millisecond {
@@ -815,7 +815,7 @@ func TestRoundTrip_RetryWithNilResponse(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // Test per-request timeout with retry — exercises the RequestTimeout + retry path together
@@ -846,7 +846,7 @@ func TestRoundTrip_PerRequestTimeoutWithRetry(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // --- Test for Close with nil httpClient ---

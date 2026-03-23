@@ -34,37 +34,37 @@ func TestGetRuleImportId(t *testing.T) {
 		{
 			name:    "no slash — single segment",
 			input:   "noslashhere",
-			wantErr: "The ID must follow the pattern project/uuid to import",
+			wantErr: "the ID must follow the pattern project/uuid to import",
 		},
 		{
 			name:    "too many slashes",
 			input:   "a/b/c",
-			wantErr: "The ID must follow the pattern project/uuid to import",
+			wantErr: "the ID must follow the pattern project/uuid to import",
 		},
 		{
 			name:    "empty string",
 			input:   "",
-			wantErr: "The ID must follow the pattern project/uuid to import",
+			wantErr: "the ID must follow the pattern project/uuid to import",
 		},
 		{
 			name:    "invalid UUID format",
 			input:   "project/not-a-uuid",
-			wantErr: "Invalid UUID format",
+			wantErr: "invalid UUID format",
 		},
 		{
 			name:    "UUID missing hyphens",
 			input:   "project/550e8400e29b41d4a716446655440000",
-			wantErr: "Invalid UUID format",
+			wantErr: "invalid UUID format",
 		},
 		{
 			name:    "UUID with bad version digit (0)",
 			input:   "project/550e8400-e29b-01d4-a716-446655440000",
-			wantErr: "Invalid UUID format",
+			wantErr: "invalid UUID format",
 		},
 		{
 			name:    "UUID with bad variant nibble (0)",
 			input:   "project/550e8400-e29b-41d4-0716-446655440000",
-			wantErr: "Invalid UUID format",
+			wantErr: "invalid UUID format",
 		},
 	}
 
@@ -134,27 +134,27 @@ func TestGetDomainImportId(t *testing.T) {
 		{
 			name:    "no slash",
 			input:   "noslash",
-			wantErr: "The ID must follow the pattern project/uuid to import",
+			wantErr: "the ID must follow the pattern project/uuid to import",
 		},
 		{
 			name:    "too many slashes",
 			input:   "a/b/c",
-			wantErr: "The ID must follow the pattern project/uuid to import",
+			wantErr: "the ID must follow the pattern project/uuid to import",
 		},
 		{
 			name:    "empty string",
 			input:   "",
-			wantErr: "The ID must follow the pattern project/uuid to import",
+			wantErr: "the ID must follow the pattern project/uuid to import",
 		},
 		{
 			name:    "non-numeric id",
 			input:   "project/abc",
-			wantErr: "Invalid domain ID format",
+			wantErr: "invalid domain ID format",
 		},
 		{
 			name:    "float id",
 			input:   "project/1.5",
-			wantErr: "Invalid domain ID format",
+			wantErr: "invalid domain ID format",
 		},
 	}
 
