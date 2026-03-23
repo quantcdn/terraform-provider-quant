@@ -14,7 +14,7 @@ import (
 
 var environmentResponse = map[string]interface{}{
 	"envName":      "staging",
-	"status":       "active",
+	"status":       "ACTIVE",
 	"runningCount": 1,
 	"desiredCount": 1,
 	"minCapacity":  1,
@@ -106,7 +106,7 @@ func TestAccEnvironmentResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_environment.test", "env_name", "staging"),
 					resource.TestCheckResourceAttr("quant_environment.test", "application", "test-app"),
-					resource.TestCheckResourceAttr("quant_environment.test", "status", "active"),
+					resource.TestCheckResourceAttr("quant_environment.test", "status", "ACTIVE"),
 					resource.TestCheckResourceAttr("quant_environment.test", "running_count", "1"),
 					resource.TestCheckResourceAttr("quant_environment.test", "desired_count", "1"),
 					resource.TestCheckResourceAttr("quant_environment.test", "min_capacity", "1"),

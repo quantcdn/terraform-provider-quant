@@ -15,7 +15,7 @@ import (
 var cronJobResponse = map[string]interface{}{
 	"name":     "backup",
 	"schedule": "0 * * * *",
-	"command":  "[\"echo\",\"hello\"]",
+	"command":  []string{"echo", "hello"},
 }
 
 func mockCronJobServer(t *testing.T, org string, app string, env string, cronName string) {

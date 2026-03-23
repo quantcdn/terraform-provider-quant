@@ -26,7 +26,7 @@ func mockApplicationServer(t *testing.T, org string, appName string) {
 		return map[string]interface{}{
 			"appName":           appName,
 			"organisation":      org,
-			"status":            "active",
+			"status":            "ACTIVE",
 			"runningCount":      1,
 			"desiredCount":      1,
 			"minCapacity":       currentMinCapacity,
@@ -108,7 +108,7 @@ func TestAccApplicationResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_application.test", "app_name", "test-app"),
 					resource.TestCheckResourceAttr("quant_application.test", "organization", "test-org"),
-					resource.TestCheckResourceAttr("quant_application.test", "status", "active"),
+					resource.TestCheckResourceAttr("quant_application.test", "status", "ACTIVE"),
 					resource.TestCheckResourceAttr("quant_application.test", "running_count", "1"),
 					resource.TestCheckResourceAttr("quant_application.test", "desired_count", "1"),
 					resource.TestCheckResourceAttr("quant_application.test", "min_capacity", "1"),
