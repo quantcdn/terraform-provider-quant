@@ -148,11 +148,12 @@ provider "quant" {
 }
 
 resource "quant_environment" "test" {
-  organization = %[1]q
-  application  = %[2]q
-  env_name     = %[3]q
-  min_capacity = %[4]d
-  max_capacity = %[5]d
+  organization       = %[1]q
+  application        = %[2]q
+  env_name           = %[3]q
+  min_capacity       = %[4]d
+  max_capacity       = %[5]d
+  compose_definition = "{\"services\":{}}"
 }
 `, org, app, envName, minCap, maxCap)
 }

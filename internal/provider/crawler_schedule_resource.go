@@ -36,6 +36,11 @@ func (r *crawlerScheduleResource) Metadata(ctx context.Context, req resource.Met
 func (r *crawlerScheduleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	s := resource_crawler_schedule.CrawlerScheduleResourceSchema(ctx)
 	addUseStateForUnknown(s.Attributes)
+
+	// crawler_schedule and updated_at change on every update, so they must
+	// NOT carry over the previous state value during planning.
+	clearStringPlanModifiers(s.Attributes, "crawler_schedule", "updated_at")
+
 	resp.Schema = s
 }
 

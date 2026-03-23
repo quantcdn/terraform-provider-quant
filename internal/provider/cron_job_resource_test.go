@@ -13,9 +13,9 @@ import (
 )
 
 var cronJobResponse = map[string]interface{}{
-	"name":     "backup",
-	"schedule": "0 * * * *",
-	"command":  []string{"echo", "hello"},
+	"name":               "backup",
+	"scheduleExpression": "0 * * * *",
+	"command":            []string{"echo", "hello"},
 }
 
 func mockCronJobServer(t *testing.T, org string, app string, env string, cronName string) {
@@ -66,11 +66,10 @@ func mockCronJobServer(t *testing.T, org string, app string, env string, cronNam
 			}
 
 			if v, ok := requestBody["scheduleExpression"]; ok {
-				cronJobResponse["schedule"] = v
+				cronJobResponse["scheduleExpression"] = v
 			}
 			if v, ok := requestBody["command"]; ok {
-				cmdJSON, _ := json.Marshal(v)
-				cronJobResponse["command"] = string(cmdJSON)
+				cronJobResponse["command"] = v
 			}
 
 			return httpmock.NewJsonResponse(200, cronJobResponse)

@@ -221,6 +221,20 @@ func addUseStateForUnknown(attrs map[string]schema.Attribute) {
 	}
 }
 
+// clearStringPlanModifiers strips all plan modifiers from the named string
+// attributes. Use this after addUseStateForUnknown to exempt volatile computed
+// fields (e.g. updated_at, crawler_schedule) that change on every update.
+func clearStringPlanModifiers(attrs map[string]schema.Attribute, names ...string) {
+	for _, name := range names {
+		if attr, ok := attrs[name]; ok {
+			if sa, ok := attr.(schema.StringAttribute); ok {
+				sa.PlanModifiers = nil
+				attrs[name] = sa
+			}
+		}
+	}
+}
+
 // buildConditionalListsForRequest is a convenience wrapper that applies
 // buildConditionalList for all three standard conditional triplets (country,
 // ip, method) in one call.
