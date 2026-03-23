@@ -229,12 +229,8 @@ func TestE2E_RulesProxyAdvanced(t *testing.T) {
 		t.Logf("Proxy %s: id=%v", key, result.outputs[key].Value)
 	}
 
-	// Test update: change the failover proxy's cache lifetime
+	// Verify that preview shows no unexpected drift after create
 	ctx := context.Background()
-	_ = result.stack.SetConfig(ctx, "e2e-rules-proxy-advanced:projectName",
-		auto.ConfigValue{Value: result.outputs["proxyFailoverId"].Value.(string)})
-	// Can't easily update individual resource properties via config in YAML programs,
-	// so we verify that preview shows no unexpected drift
 	previewResult, err := result.stack.Preview(ctx)
 	if err == nil {
 		t.Logf("Preview after create (should be clean): %v", previewResult.ChangeSummary)

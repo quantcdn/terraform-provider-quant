@@ -246,8 +246,8 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 
 	// Poll until environment is ready
 	createStateConf := retry.StateChangeConf{
-		Pending: []string{"creating", "pending", "PROVISIONING", "not_found"},
-		Target:  []string{"ready", "active", "ACTIVE", "RUNNING"},
+		Pending: []string{"CREATING", "not_found"},
+		Target:  []string{"ACTIVE"},
 		Refresh: func() (interface{}, string, error) {
 			result, resp, err := r.client.Instance.EnvironmentsAPI.GetEnvironment(r.client.AuthContext, org, data.Application.ValueString(), data.EnvName.ValueString()).Execute()
 			if err != nil {
@@ -257,14 +257,15 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 				return nil, "", fmt.Errorf("error checking environment status: %v", err)
 			}
 
-			status := "ready"
+			status := "ACTIVE"
 			if result.Status != nil {
 				status = *result.Status
 			}
-			upperStatus := strings.ToUpper(status)
-			if upperStatus == "ACTIVE" || upperStatus == "RUNNING" || status == "ready" {
-				return result, status, nil
+
+			if status == "FAILED" {
+				return result, status, fmt.Errorf("environment creation failed")
 			}
+
 			return result, status, nil
 		},
 		Timeout:      15 * time.Minute,

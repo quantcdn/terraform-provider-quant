@@ -122,9 +122,10 @@ func (r *crawlerScheduleResource) Delete(ctx context.Context, req resource.Delet
 // ---------------------------------------------------------------------------
 func callCrawlerScheduleCreateAPI(ctx context.Context, r *crawlerScheduleResource, schedule *resource_crawler_schedule.CrawlerScheduleModel) (diags diag.Diagnostics) {
 	req := quantadmingo.NewV2CrawlerScheduleRequest(
-		schedule.Name.ValueString(),
 		schedule.ScheduleCronString.ValueString(),
 	)
+	name := schedule.Name.ValueString()
+	req.Name = &name
 
 	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesAdd(
 		r.client.AuthContext, r.client.Organization,
@@ -229,9 +230,10 @@ func callCrawlerScheduleUpdateAPI(ctx context.Context, r *crawlerScheduleResourc
 	}
 
 	req := quantadmingo.NewV2CrawlerScheduleRequest(
-		schedule.Name.ValueString(),
 		schedule.ScheduleCronString.ValueString(),
 	)
+	updateName := schedule.Name.ValueString()
+	req.Name = &updateName
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
 	_, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesEdit(

@@ -17,6 +17,7 @@ resources:
     properties:
       application: ${testApp.appName}
       envName: e2e-staging
+      cloneConfigurationFrom: production
   testVolume:
     type: quant:index:Volume
     properties:
@@ -26,10 +27,11 @@ resources:
   testCron:
     type: quant:index:CronJob
     properties:
+      name: e2e-test-cron
       application: ${testApp.appName}
       environment: ${testEnv.envName}
       command: '["echo","e2e-test"]'
-      scheduleExpression: "0 0 * * 0"
+      scheduleExpression: "cron(0 0 ? * SUN *)"
 outputs:
   appId: ${testApp.id}
   envId: ${testEnv.id}

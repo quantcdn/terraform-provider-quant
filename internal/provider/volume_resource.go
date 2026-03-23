@@ -216,13 +216,13 @@ func callVolumeReadAPI(ctx context.Context, r *volumeResource, data *resource_vo
 }
 
 func callVolumeDeleteAPI(ctx context.Context, r *volumeResource, data *resource_volume.VolumeModel) (diags diag.Diagnostics) {
-	if data.VolumeId.IsNull() || data.VolumeId.IsUnknown() {
-		diags.AddAttributeError(path.Root("volume_id"), "Missing volume_id", "To delete a volume the volume_id must be known.")
+	if data.VolumeName.IsNull() || data.VolumeName.IsUnknown() {
+		diags.AddAttributeError(path.Root("volume_name"), "Missing volume_name", "To delete a volume the volume_name must be known.")
 		return
 	}
 
 	org := r.getOrg(data)
-	resp, err := r.client.Instance.VolumesAPI.DeleteVolume(r.client.AuthContext, org, data.Application.ValueString(), data.Environment.ValueString(), data.VolumeId.ValueString()).Execute()
+	resp, err := r.client.Instance.VolumesAPI.DeleteVolume(r.client.AuthContext, org, data.Application.ValueString(), data.Environment.ValueString(), data.VolumeName.ValueString()).Execute()
 
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {

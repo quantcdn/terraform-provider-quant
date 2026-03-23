@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"terraform-provider-quant/internal/client"
 	"terraform-provider-quant/internal/resource_application"
 	"time"
@@ -274,8 +273,8 @@ func callApplicationCreateAPI(ctx context.Context, r *applicationResource, data 
 
 	// Application creation is asynchronous — poll until it becomes available.
 	createStateConf := retry.StateChangeConf{
-		Pending: []string{"creating", "pending", "PROVISIONING", "not_found"},
-		Target:  []string{"ready", "active", "ACTIVE", "RUNNING"},
+		Pending: []string{"CREATING", "not_found"},
+		Target:  []string{"ACTIVE"},
 		Refresh: func() (interface{}, string, error) {
 			appResult, resp, err := r.client.Instance.ApplicationsAPI.GetApplication(r.client.AuthContext, org, data.AppName.ValueString()).Execute()
 			if err != nil {
@@ -289,15 +288,13 @@ func callApplicationCreateAPI(ctx context.Context, r *applicationResource, data 
 				return nil, "", fmt.Errorf("error checking application status (HTTP %d): %v", statusCode, err)
 			}
 
-			status := "ready"
+			status := "ACTIVE"
 			if appResult.HasStatus() {
 				status = appResult.GetStatus()
 			}
 
-			// Normalize status to our expected values
-			upperStatus := strings.ToUpper(status)
-			if upperStatus == "ACTIVE" || upperStatus == "RUNNING" || status == "ready" {
-				return appResult, status, nil
+			if status == "FAILED" {
+				return appResult, status, fmt.Errorf("application creation failed")
 			}
 
 			return appResult, status, nil

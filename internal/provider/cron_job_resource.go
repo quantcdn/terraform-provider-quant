@@ -305,23 +305,38 @@ func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobMod
 	if cron.Name != nil {
 		data.Name = types.StringValue(*cron.Name)
 	}
-	if cron.Schedule != nil {
-		data.Schedule = types.StringValue(*cron.Schedule)
-	} else {
-		data.Schedule = types.StringNull()
+	if cron.ScheduleExpression != nil {
+		data.ScheduleExpression = types.StringValue(*cron.ScheduleExpression)
+		// schedule is a computed alias for the resolved expression
+		data.Schedule = types.StringValue(*cron.ScheduleExpression)
 	}
-	if cron.Command != nil {
-		data.Command = types.StringValue(*cron.Command)
+	if len(cron.Command) > 0 {
+		cmdJSON, err := json.Marshal(cron.Command)
+		if err == nil {
+			data.Command = types.StringValue(string(cmdJSON))
+		}
+	}
+	if cron.Description.IsSet() && cron.Description.Get() != nil {
+		data.Description = types.StringValue(*cron.Description.Get())
+	}
+	if cron.TargetContainerName.IsSet() && cron.TargetContainerName.Get() != nil {
+		data.TargetContainerName = types.StringValue(*cron.TargetContainerName.Get())
+	}
+	if cron.IsEnabled != nil {
+		data.IsEnabled = types.BoolValue(*cron.IsEnabled)
 	}
 
-	// Resolve unknown optional/computed fields to null
+	// Resolve any remaining unknown fields to null to prevent bridge panics
 	if data.Description.IsUnknown() {
 		data.Description = types.StringNull()
 	}
 	if data.TargetContainerName.IsUnknown() {
 		data.TargetContainerName = types.StringNull()
 	}
-	if data.ScheduleExpression.IsUnknown() {
-		data.ScheduleExpression = types.StringNull()
+	if data.Schedule.IsUnknown() {
+		data.Schedule = types.StringNull()
+	}
+	if data.IsEnabled.IsUnknown() {
+		data.IsEnabled = types.BoolValue(true)
 	}
 }
