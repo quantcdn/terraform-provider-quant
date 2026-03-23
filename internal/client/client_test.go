@@ -714,6 +714,7 @@ func TestRoundTrip_AllRetriesExhausted(t *testing.T) {
 	}
 	if resp == nil {
 		t.Fatal("expected last response to be returned")
+		return // unreachable, but satisfies staticcheck
 	}
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", resp.StatusCode)

@@ -142,7 +142,7 @@ func TestRateLimitedHTTPClientRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should have succeeded after retries
 	if resp.StatusCode != http.StatusOK {
@@ -286,7 +286,7 @@ func TestDeadlockScenario(t *testing.T) {
 			t.Errorf("Expected duration >= %v due to retries, got %v", expectedMinDuration/2, duration)
 		}
 	} else {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		t.Logf("Request succeeded after %d attempts in %v", attemptCount, duration)
 
 		if resp.StatusCode != http.StatusOK {
