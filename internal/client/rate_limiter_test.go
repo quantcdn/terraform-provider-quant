@@ -93,7 +93,7 @@ func TestRateLimitedHTTPClient(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request %d failed: %v", i, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	duration := time.Since(start)
@@ -223,8 +223,8 @@ func TestTimeoutConfiguration(t *testing.T) {
 		rateLimiter: NewRateLimitedRoundTripper(nil, config),
 	}
 
-	if client.Client.Timeout != customTimeout {
-		t.Errorf("Expected timeout %v, got %v", customTimeout, client.Client.Timeout)
+	if client.Timeout != customTimeout {
+		t.Errorf("Expected timeout %v, got %v", customTimeout, client.Timeout)
 	}
 }
 

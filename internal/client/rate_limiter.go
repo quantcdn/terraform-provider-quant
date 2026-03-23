@@ -189,14 +189,14 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 				// Continue to next attempt
 			case <-req.Context().Done():
 				if resp != nil {
-					resp.Body.Close()
+					_ = resp.Body.Close()
 				}
 				return nil, req.Context().Err()
 			}
 
 			// Close the response body before retrying
 			if resp != nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 
 			continue
