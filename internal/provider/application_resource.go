@@ -477,6 +477,10 @@ func callApplicationDeleteAPI(ctx context.Context, r *applicationResource, data 
 			// Already deleted — not an error
 			return
 		}
+		if resp != nil && resp.StatusCode == http.StatusBadRequest {
+			diags.AddError("Unable to delete application", extractAPIErrorMessage(resp, err))
+			return
+		}
 		diags.AddError(
 			"Unable to delete application",
 			fmt.Sprintf("Error: %s", err.Error()),
