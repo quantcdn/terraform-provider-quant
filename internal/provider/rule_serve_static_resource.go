@@ -48,7 +48,7 @@ func (r *ruleServeStaticResource) Configure(_ context.Context, req resource.Conf
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			"Expected *internal.Client, got: %T. Please report this issue to the provider developers",
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 	r.client = client
@@ -82,6 +82,10 @@ func (r *ruleServeStaticResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	resp.Diagnostics.Append(callRuleServeStaticReadAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

@@ -208,6 +208,7 @@ func addUseStateForUnknown(attrs map[string]schema.Attribute) {
 			}
 		case schema.ListNestedAttribute:
 			if a.Computed {
+				addUseStateForUnknown(a.NestedObject.Attributes)
 				a.PlanModifiers = append(a.PlanModifiers, listplanmodifier.UseStateForUnknown())
 				attrs[name] = a
 			}

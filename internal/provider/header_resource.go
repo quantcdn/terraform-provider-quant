@@ -13,6 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 )
@@ -47,10 +49,16 @@ func (r *headerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"organization": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"project": schema.StringAttribute{
 				Required: true,
@@ -73,7 +81,7 @@ func (r *headerResource) Configure(_ context.Context, req resource.ConfigureRequ
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 
@@ -89,6 +97,9 @@ func (r *headerResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	resp.Diagnostics.Append(callHeaderCreateUpdateAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -102,6 +113,9 @@ func (r *headerResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	resp.Diagnostics.Append(callHeaderReadAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -115,6 +129,9 @@ func (r *headerResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	resp.Diagnostics.Append(callHeaderCreateUpdateAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

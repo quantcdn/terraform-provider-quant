@@ -48,7 +48,7 @@ func (r *ruleHeadersResource) Configure(_ context.Context, req resource.Configur
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			"Expected *internal.Client, got: %T. Please report this issue to the provider developers",
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 	r.client = client
@@ -82,6 +82,10 @@ func (r *ruleHeadersResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	resp.Diagnostics.Append(callRuleHeadersReadAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -287,6 +291,8 @@ func callRuleHeadersReadAPI(ctx context.Context, r *ruleHeadersResource, rule *r
 		headersMap, d := types.MapValueFrom(ctx, types.StringType, api.ActionConfig.Headers)
 		diags.Append(d...)
 		rule.Headers = headersMap
+	} else {
+		rule.Headers = types.MapNull(types.StringType)
 	}
 
 	diags.Append(setConditionalListsFromAPI(ctx,

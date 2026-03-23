@@ -336,7 +336,10 @@ func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobMod
 	if data.Schedule.IsUnknown() {
 		data.Schedule = types.StringNull()
 	}
+	if data.ScheduleExpression.IsUnknown() {
+		data.ScheduleExpression = types.StringNull()
+	}
 	if data.IsEnabled.IsUnknown() {
-		data.IsEnabled = types.BoolValue(true)
+		data.IsEnabled = types.BoolNull()
 	}
 }

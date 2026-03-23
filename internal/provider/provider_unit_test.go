@@ -872,23 +872,28 @@ func TestUnitStrPtr(t *testing.T) {
 func TestUnitMapCronResponse_AllFieldsSet(t *testing.T) {
 	name := "my-cron"
 	schedule := "0 * * * *"
-	command := `["echo","hello"]`
+	command := []string{"echo", "hello"}
 
 	cron := &quantadmingo.Cron{
-		Name:     &name,
-		Schedule: &schedule,
-		Command:  &command,
+		Name:               &name,
+		ScheduleExpression: &schedule,
+		Command:            command,
 	}
 
 	data := &resource_cron_job.CronJobModel{
 		Description:         types.StringUnknown(),
 		TargetContainerName: types.StringUnknown(),
 		ScheduleExpression:  types.StringUnknown(),
+		Schedule:            types.StringUnknown(),
+		IsEnabled:           types.BoolUnknown(),
 	}
 	mapCronResponse(cron, data)
 
 	if data.Name.ValueString() != "my-cron" {
 		t.Errorf("expected name 'my-cron', got %q", data.Name.ValueString())
+	}
+	if data.ScheduleExpression.ValueString() != "0 * * * *" {
+		t.Errorf("expected schedule_expression '0 * * * *', got %q", data.ScheduleExpression.ValueString())
 	}
 	if data.Schedule.ValueString() != "0 * * * *" {
 		t.Errorf("expected schedule '0 * * * *', got %q", data.Schedule.ValueString())
@@ -903,8 +908,8 @@ func TestUnitMapCronResponse_AllFieldsSet(t *testing.T) {
 	if !data.TargetContainerName.IsNull() {
 		t.Error("expected TargetContainerName to be null after mapping (was unknown)")
 	}
-	if !data.ScheduleExpression.IsNull() {
-		t.Error("expected ScheduleExpression to be null after mapping (was unknown)")
+	if !data.IsEnabled.IsNull() {
+		t.Error("expected IsEnabled to be null after mapping (was unknown, API returned nil)")
 	}
 }
 
@@ -940,11 +945,16 @@ func TestUnitMapCronResponse_AllNilFields(t *testing.T) {
 		Description:         types.StringUnknown(),
 		TargetContainerName: types.StringUnknown(),
 		ScheduleExpression:  types.StringUnknown(),
+		Schedule:            types.StringUnknown(),
+		IsEnabled:           types.BoolUnknown(),
 	}
 	mapCronResponse(cron, data)
 
 	if !data.Schedule.IsNull() {
 		t.Error("expected Schedule to be null")
+	}
+	if !data.IsEnabled.IsNull() {
+		t.Error("expected IsEnabled to be null")
 	}
 	if !data.Description.IsNull() {
 		t.Error("expected Description to be null")

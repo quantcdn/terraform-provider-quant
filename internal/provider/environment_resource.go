@@ -388,13 +388,15 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 }
 
 func callEnvironmentUpdateAPI(ctx context.Context, r *environmentResource, data *resource_environment.EnvironmentModel) (diags diag.Diagnostics) {
-	// Parse compose definition for the update request (required field)
+	if data.ComposeDefinition.IsNull() || data.ComposeDefinition.IsUnknown() {
+		diags.AddAttributeError(path.Root("compose_definition"), "Missing compose_definition", "Cannot update an environment without a compose_definition.")
+		return
+	}
+
 	var compose quantadmingo.Compose
-	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
-		if err := json.Unmarshal([]byte(data.ComposeDefinition.ValueString()), &compose); err != nil {
-			diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition JSON", err.Error())
-			return
-		}
+	if err := json.Unmarshal([]byte(data.ComposeDefinition.ValueString()), &compose); err != nil {
+		diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition JSON", err.Error())
+		return
 	}
 
 	sdkReq := quantadmingo.NewUpdateEnvironmentRequest(compose)

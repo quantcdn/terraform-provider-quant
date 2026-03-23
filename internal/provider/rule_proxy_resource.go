@@ -71,7 +71,7 @@ func (r *ruleProxyResource) Configure(_ context.Context, req resource.ConfigureR
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			"Expected *client.Client, got: %T. Please report this issue to the provider developers",
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 	r.client = client

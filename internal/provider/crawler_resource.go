@@ -42,7 +42,9 @@ func (r *crawlerResource) Metadata(ctx context.Context, req resource.MetadataReq
 }
 
 func (r *crawlerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_crawler.CrawlerResourceSchema(ctx)
+	s := resource_crawler.CrawlerResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *crawlerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -53,7 +55,7 @@ func (r *crawlerResource) Configure(_ context.Context, req resource.ConfigureReq
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unepxected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 	r.client = client
@@ -255,7 +257,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	}
 
 	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(
-		ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString(),
+		r.client.AuthContext, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {
@@ -530,7 +532,7 @@ func callCrawlerDeleteAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	}
 
 	_, err := r.client.Instance.CrawlersAPI.CrawlersDelete(
-		ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString(),
+		r.client.AuthContext, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {
@@ -550,7 +552,7 @@ func callCrawlerUpdateAPI(ctx context.Context, r *crawlerResource, crawler *reso
 	}
 
 	_, _, err := r.client.Instance.CrawlersAPI.CrawlersUpdate(
-		ctx, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString(),
+		r.client.AuthContext, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString(),
 	).V2CrawlerRequest(*req).Execute()
 
 	if err != nil {

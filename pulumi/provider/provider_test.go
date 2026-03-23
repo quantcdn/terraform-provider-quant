@@ -458,15 +458,6 @@ func TestProviderInfo_StringIDResources(t *testing.T) {
 	info := Provider()
 	// Resources with native string IDs that need no ComputeID
 	stringIDResources := []string{
-		"quant_rule_proxy",
-		"quant_rule_redirect",
-		"quant_rule_custom_response",
-		"quant_rule_content_filter",
-		"quant_rule_function",
-		"quant_rule_auth",
-		"quant_rule_bot_challenge",
-		"quant_rule_headers",
-		"quant_rule_serve_static",
 		"quant_header",
 	}
 	for _, name := range stringIDResources {
@@ -480,6 +471,15 @@ func TestProviderInfo_FieldIDResources(t *testing.T) {
 	info := Provider()
 	// Resources that use a named field as ID (no native "id" attribute)
 	fieldIDResources := []string{
+		"quant_rule_proxy",
+		"quant_rule_redirect",
+		"quant_rule_custom_response",
+		"quant_rule_content_filter",
+		"quant_rule_function",
+		"quant_rule_auth",
+		"quant_rule_bot_challenge",
+		"quant_rule_headers",
+		"quant_rule_serve_static",
 		"quant_application",
 		"quant_environment",
 		"quant_volume",

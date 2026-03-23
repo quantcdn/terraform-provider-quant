@@ -34,7 +34,9 @@ func (r *crawlerScheduleResource) Metadata(ctx context.Context, req resource.Met
 }
 
 func (r *crawlerScheduleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_crawler_schedule.CrawlerScheduleResourceSchema(ctx)
+	s := resource_crawler_schedule.CrawlerScheduleResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *crawlerScheduleResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -45,7 +47,7 @@ func (r *crawlerScheduleResource) Configure(_ context.Context, req resource.Conf
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 	r.client = client
@@ -159,7 +161,7 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
 	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesShow(
-		ctx, r.client.Organization,
+		r.client.AuthContext, r.client.Organization,
 		schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId,
 	).Execute()
 
@@ -204,7 +206,7 @@ func callCrawlerScheduleDeleteAPI(ctx context.Context, r *crawlerScheduleResourc
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
 	_, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesDelete(
-		ctx, r.client.Organization,
+		r.client.AuthContext, r.client.Organization,
 		schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId,
 	).Execute()
 
@@ -237,7 +239,7 @@ func callCrawlerScheduleUpdateAPI(ctx context.Context, r *crawlerScheduleResourc
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
 	_, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesEdit(
-		ctx, r.client.Organization,
+		r.client.AuthContext, r.client.Organization,
 		schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId,
 	).V2CrawlerScheduleRequest(*req).Execute()
 

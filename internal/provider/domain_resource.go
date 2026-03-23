@@ -37,7 +37,9 @@ func (r *domainResource) Metadata(ctx context.Context, req resource.MetadataRequ
 }
 
 func (r *domainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_domain.DomainResourceSchema(ctx)
+	s := resource_domain.DomainResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *domainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -49,7 +51,7 @@ func (r *domainResource) Configure(_ context.Context, req resource.ConfigureRequ
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 
@@ -186,9 +188,12 @@ func callDomainCreateAPI(ctx context.Context, r *domainResource, domain *resourc
 		Pending: []string{"pending", "creating"},
 		Target:  []string{"ready"},
 		Refresh: func() (interface{}, string, error) {
-			apiResp, resp, _ := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, project, strconv.FormatInt(int64(apiResp.GetId()), 10)).Execute()
-			if resp.StatusCode == 404 {
-				return nil, "pending", nil
+			apiResp, resp, err := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, project, strconv.FormatInt(int64(apiResp.GetId()), 10)).Execute()
+			if err != nil {
+				if resp != nil && resp.StatusCode == 404 {
+					return nil, "pending", nil
+				}
+				return nil, "", fmt.Errorf("error checking domain status: %v", err)
 			}
 			return apiResp, "ready", nil
 		},

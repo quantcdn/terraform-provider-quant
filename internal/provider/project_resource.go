@@ -86,7 +86,7 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 
