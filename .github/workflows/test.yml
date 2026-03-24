@@ -15,10 +15,6 @@ on:
 permissions:
   contents: read
 
-# Force Node.js 24 for all actions (eliminates Node.js 20 deprecation warnings)
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   # Ensure project builds before running testing matrix
   build:
