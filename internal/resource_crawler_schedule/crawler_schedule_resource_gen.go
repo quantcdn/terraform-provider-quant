@@ -50,9 +50,10 @@ func CrawlerScheduleResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Schedule ID",
 			},
 			"name": schema.StringAttribute{
-				Required:            true,
-				Description:         "Schedule name",
-				MarkdownDescription: "Schedule name",
+				Optional:            true,
+				Computed:            true,
+				Description:         "Schedule name. If not provided, defaults to 'Schedule {crawler_name}'.",
+				MarkdownDescription: "Schedule name. If not provided, defaults to 'Schedule {crawler_name}'.",
 			},
 			"organization": schema.StringAttribute{
 				Optional:            true,
@@ -73,8 +74,8 @@ func CrawlerScheduleResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"schedule_cron_string": schema.StringAttribute{
 				Required:            true,
-				Description:         "Cron schedule string",
-				MarkdownDescription: "Cron schedule string",
+				Description:         "Standard Unix cron expression with 5 space-separated fields: minute, hour, day-of-month, month, day-of-week. Example: 0 2 * * * for daily at 2 AM.",
+				MarkdownDescription: "Standard Unix cron expression with 5 space-separated fields: minute, hour, day-of-month, month, day-of-week. Example: 0 2 * * * for daily at 2 AM.",
 			},
 			"updated_at": schema.StringAttribute{
 				Computed:            true,

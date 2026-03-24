@@ -19,12 +19,16 @@ func CustomHeadersResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Custom headers",
 			},
 			"organization": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 		},
 	}
