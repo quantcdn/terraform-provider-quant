@@ -1407,7 +1407,8 @@
                     "description": "Crawler configuration (YAML)"
                 },
                 "crawler": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The UUID of the crawler"
                 },
                 "createdAt": {
                     "type": "string",
@@ -1595,7 +1596,8 @@
                     "description": "Enable browser mode"
                 },
                 "crawler": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The UUID of the crawler"
                 },
                 "delay": {
                     "type": "number",
@@ -1729,7 +1731,8 @@
                         "description": "Crawler configuration (YAML)"
                     },
                     "crawler": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The UUID of the crawler"
                     },
                     "createdAt": {
                         "type": "string",
@@ -1896,7 +1899,7 @@
                 },
                 "name": {
                     "type": "string",
-                    "description": "Schedule name"
+                    "description": "Schedule name. If not provided, defaults to 'Schedule {crawler_name}'."
                 },
                 "organization": {
                     "type": "string",
@@ -1912,7 +1915,7 @@
                 },
                 "scheduleCronString": {
                     "type": "string",
-                    "description": "Cron schedule string"
+                    "description": "Standard Unix cron expression with 5 space-separated fields: minute, hour, day-of-month, month, day-of-week. Example: 0 2 * * * for daily at 2 AM."
                 },
                 "updatedAt": {
                     "type": "string",
@@ -1944,7 +1947,7 @@
                 },
                 "name": {
                     "type": "string",
-                    "description": "Schedule name"
+                    "description": "Schedule name. If not provided, defaults to 'Schedule {crawler_name}'."
                 },
                 "organization": {
                     "type": "string",
@@ -1956,7 +1959,7 @@
                 },
                 "scheduleCronString": {
                     "type": "string",
-                    "description": "Cron schedule string"
+                    "description": "Standard Unix cron expression with 5 space-separated fields: minute, hour, day-of-month, month, day-of-week. Example: 0 2 * * * for daily at 2 AM."
                 }
             },
             "requiredInputs": [
@@ -1991,7 +1994,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Schedule name"
+                        "description": "Schedule name. If not provided, defaults to 'Schedule {crawler_name}'."
                     },
                     "organization": {
                         "type": "string",
@@ -2007,7 +2010,7 @@
                     },
                     "scheduleCronString": {
                         "type": "string",
-                        "description": "Cron schedule string"
+                        "description": "Standard Unix cron expression with 5 space-separated fields: minute, hour, day-of-month, month, day-of-week. Example: 0 2 * * * for daily at 2 AM."
                     },
                     "updatedAt": {
                         "type": "string",
@@ -2730,10 +2733,12 @@
                     "description": "Project name"
                 },
                 "organization": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Organization identifier"
                 },
                 "project": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Project identifier"
                 },
                 "region": {
                     "type": "string",
@@ -2796,10 +2801,12 @@
                     "description": "Project name"
                 },
                 "organization": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Organization identifier"
                 },
                 "project": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Project identifier"
                 },
                 "region": {
                     "type": "string",
@@ -2841,10 +2848,12 @@
                         "description": "Project name"
                     },
                     "organization": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Organization identifier"
                     },
                     "project": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Project identifier"
                     },
                     "region": {
                         "type": "string",
