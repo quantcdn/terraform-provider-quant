@@ -27,5 +27,10 @@ terraform.tfstate*
 openapi.yaml
 spec.json
 
-# Compiled binary
+# Compiled binaries
 terraform-provider-quant
+pulumi/bin/
+
+# Test artifacts
+coverage.out
+coverage2.out
