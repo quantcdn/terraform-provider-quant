@@ -46,6 +46,14 @@ func TestAccRuleContentFilterResourceUpdate(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_rule_content_filter.test", "disabled", "true"),
 				),
 			},
+			// Import
+			{
+				ResourceName:                         "quant_rule_content_filter.test",
+				ImportState:                          true,
+				ImportStateId:                        "default/5bf0b98f-d2f6-49dd-b5f6-5908623a9bc0",
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "uuid",
+			},
 		},
 	})
 }

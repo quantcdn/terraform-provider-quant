@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/mapper"
 	"terraform-provider-quant/internal/resource_project"
 	"time"
 
@@ -71,7 +72,9 @@ func (r *projectResource) Metadata(ctx context.Context, req resource.MetadataReq
 }
 
 func (r *projectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_project.ProjectResourceSchema(ctx)
+	s := resource_project.ProjectResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *projectResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -83,7 +86,7 @@ func (r *projectResource) Configure(_ context.Context, req resource.ConfigureReq
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 
@@ -202,8 +205,6 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // Create project request.
 func callProjectCreateAPI(ctx context.Context, r *projectResource, project *resource_project.ProjectModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewV2ProjectRequestWithDefaults()
-
 	if project.Name.IsNull() || project.Name.IsUnknown() {
 		diags.AddAttributeError(
 			path.Root("name"),
@@ -229,29 +230,19 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 		return
 	}
 
-	req.SetName(project.Name.ValueString())
-
-	// Only set optional fields if they have values
-	if !project.AllowQueryParams.IsNull() && !project.AllowQueryParams.IsUnknown() {
-		req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
-	}
-	if !project.BasicAuthPassword.IsNull() && !project.BasicAuthPassword.IsUnknown() {
-		req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
-	}
-	if !project.BasicAuthUsername.IsNull() && !project.BasicAuthUsername.IsUnknown() {
-		req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
-	}
-	if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
-		req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueBool())
-	}
-
+	// Default region to "au" if not set.
 	if project.Region.IsNull() || project.Region.IsUnknown() {
 		project.Region = types.StringValue("au")
 	}
 
-	req.SetRegion(project.Region.ValueString())
+	// Map TF model fields to SDK request via reflection.
+	req := quantadmingo.NewV2ProjectRequestWithDefaults()
+	diags.Append(mapper.ToSDK(ctx, project, req)...)
+	if diags.HasError() {
+		return
+	}
 
-	res, resp, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).V2ProjectRequest(req).Execute()
+	res, resp, err := r.client.Instance.ProjectsAPI.ProjectsCreate(r.client.AuthContext, r.client.Organization).V2ProjectRequest(*req).Execute()
 
 	if err != nil {
 		if resp != nil {
@@ -356,9 +347,6 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 		return diags
 	}
 
-	org := r.client.Organization
-	req := *quantadmingo.NewV2ProjectRequestWithDefaults()
-
 	if project.BasicAuthUsername.IsNull() && !project.BasicAuthPassword.IsNull() {
 		diags.AddError(
 			"Missing basic authentication username",
@@ -375,27 +363,15 @@ func callProjectUpdateAPI(ctx context.Context, r *projectResource, project *reso
 		return diags
 	}
 
-	req.SetName(project.Name.ValueString())
-
-	// Only set optional fields if they have values
-	if !project.AllowQueryParams.IsNull() && !project.AllowQueryParams.IsUnknown() {
-		req.SetAllowQueryParams(project.AllowQueryParams.ValueBool())
-	}
-	if !project.BasicAuthPassword.IsNull() && !project.BasicAuthPassword.IsUnknown() {
-		req.SetBasicAuthPassword(project.BasicAuthPassword.ValueString())
-	}
-	if !project.BasicAuthUsername.IsNull() && !project.BasicAuthUsername.IsUnknown() {
-		req.SetBasicAuthUsername(project.BasicAuthUsername.ValueString())
-	}
-	if !project.BasicAuthPreviewOnly.IsNull() && !project.BasicAuthPreviewOnly.IsUnknown() {
-		req.SetBasicAuthPreviewOnly(project.BasicAuthPreviewOnly.ValueBool())
-	}
-	if !project.DisableRevisions.IsNull() && !project.DisableRevisions.IsUnknown() {
-		req.SetDisableRevisions(project.DisableRevisions.ValueBool())
+	// Map TF model fields to SDK request via reflection.
+	req := quantadmingo.NewV2ProjectRequestWithDefaults()
+	diags.Append(mapper.ToSDK(ctx, project, req)...)
+	if diags.HasError() {
+		return diags
 	}
 
-	api := r.client.Instance.ProjectsAPI.ProjectsUpdate(r.client.AuthContext, org, project.MachineName.ValueString())
-	_, _, err := api.V2ProjectRequest(req).Execute()
+	api := r.client.Instance.ProjectsAPI.ProjectsUpdate(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString())
+	_, _, err := api.V2ProjectRequest(*req).Execute()
 
 	if err != nil {
 		diags.AddError("Unable to update project", fmt.Sprintf("Error: %s", err.Error()))
@@ -413,12 +389,11 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 		return
 	}
 
-	org := r.client.Organization
 	withToken := false
 	if !project.WithToken.IsNull() {
 		withToken = project.WithToken.ValueBool()
 	}
-	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, org, project.MachineName.ValueString()).WithToken(withToken).Execute()
+	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).WithToken(withToken).Execute()
 
 	if err != nil {
 		diags.Append(diag.NewErrorDiagnostic(
@@ -428,19 +403,16 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 		return diags
 	}
 
-	project.Id = types.Int64Value(int64(api.GetId()))
-	project.Uuid = types.StringValue(api.GetUuid())
-	project.Name = types.StringValue(api.GetName())
-	project.MachineName = types.StringValue(api.GetMachineName())
+	// Map SDK response fields to TF model via reflection.
+	// This covers: Id, Uuid, Name, MachineName, WriteToken.
+	diags.Append(mapper.FromSDK(ctx, api, project)...)
 
-	// write_token is only returned when with_token=true query param is used
-	if api.WriteToken != nil {
-		project.WriteToken = types.StringValue(api.GetWriteToken())
-	} else {
+	// WriteToken is optional in the API response — set to null when not returned.
+	if api.WriteToken == nil {
 		project.WriteToken = types.StringNull()
 	}
 
-	// Set optional fields to null if not returned by API
+	// Resolve any unknown optional/computed fields to null so Terraform state is consistent.
 	if project.AllowQueryParams.IsUnknown() {
 		project.AllowQueryParams = types.BoolNull()
 	}
@@ -473,8 +445,7 @@ func callProjectDeleteAPI(ctx context.Context, r *projectResource, project *reso
 		return
 	}
 
-	org := r.client.Organization
-	_, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, org, project.MachineName.ValueString()).Execute()
+	_, err := r.client.Instance.ProjectsAPI.ProjectsDelete(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).Execute()
 
 	if err != nil {
 		diags.AddError(

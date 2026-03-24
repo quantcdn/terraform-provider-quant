@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"terraform-provider-quant/internal/provider"
 	"testing"
@@ -143,4 +144,54 @@ resource "quant_domain" "test" {
   project = "default"
 }
 `, organization, name, domain)
+}
+
+// ---------- Domain HTTP error-path tests ----------
+
+func setupDomainErrorResponder(t *testing.T, org string, project string, statusCode int, body map[string]interface{}) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST",
+		fmt.Sprintf("%s/organizations/%s/projects/%s/domains", baseUrl, org, project),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(statusCode, body)
+		})
+}
+
+func testDomainErrorConfig() string {
+	return `
+provider "quant" {
+  organization = "test-organization"
+  bearer = "testtoken"
+}
+
+resource "quant_domain" "test" {
+  domain  = "error-test.example.com"
+  project = "default"
+}
+`
+}
+
+func TestDomainResource_CreateError(t *testing.T) {
+	setupDomainErrorResponder(t, "test-organization", "default", 500, map[string]interface{}{
+		"error":   true,
+		"message": "Internal server error",
+	})
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testDomainResourceFactories(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      testDomainErrorConfig(),
+				ExpectError: regexp.MustCompile(`Error creating domain`),
+			},
+		},
+	})
 }

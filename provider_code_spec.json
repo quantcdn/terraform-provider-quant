@@ -2626,6 +2626,131 @@
 					}
 				]
 			}
+		},
+		{
+			"name": "application",
+			"schema": {
+				"attributes": [
+					{
+						"name": "app_name",
+						"string": {
+							"computed_optional_required": "required",
+							"description": "Application name"
+						}
+					},
+					{
+						"name": "compose_definition",
+						"string": {
+							"computed_optional_required": "required",
+							"description": "Compose definition as a JSON string"
+						}
+					},
+					{
+						"name": "min_capacity",
+						"int64": {
+							"computed_optional_required": "computed_optional",
+							"description": "Minimum task count for auto-scaling",
+							"default": {
+								"static": 1
+							}
+						}
+					},
+					{
+						"name": "max_capacity",
+						"int64": {
+							"computed_optional_required": "computed_optional",
+							"description": "Maximum task count for auto-scaling",
+							"default": {
+								"static": 1
+							}
+						}
+					},
+					{
+						"name": "database_engine",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"description": "Database engine type (mysql, postgres)"
+						}
+					},
+					{
+						"name": "database_instance_class",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"description": "RDS instance class"
+						}
+					},
+					{
+						"name": "database_storage_gb",
+						"int64": {
+							"computed_optional_required": "computed_optional",
+							"description": "Database allocated storage in GiB"
+						}
+					},
+					{
+						"name": "database_multi_az",
+						"bool": {
+							"computed_optional_required": "computed_optional",
+							"description": "Enable Multi-AZ database deployment"
+						}
+					},
+					{
+						"name": "filesystem_required",
+						"bool": {
+							"computed_optional_required": "computed_optional",
+							"description": "Whether to create a shared filesystem"
+						}
+					},
+					{
+						"name": "filesystem_mount_path",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"description": "Mount path inside containers for the shared filesystem"
+						}
+					},
+					{
+						"name": "environment",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"description": "Initial environment variables as a JSON array of {name, value} objects"
+						}
+					},
+					{
+						"name": "status",
+						"string": {
+							"computed_optional_required": "computed",
+							"description": "Application status"
+						}
+					},
+					{
+						"name": "running_count",
+						"int64": {
+							"computed_optional_required": "computed",
+							"description": "Currently running task count"
+						}
+					},
+					{
+						"name": "desired_count",
+						"int64": {
+							"computed_optional_required": "computed",
+							"description": "Desired task count"
+						}
+					},
+					{
+						"name": "container_names",
+						"string": {
+							"computed_optional_required": "computed",
+							"description": "List of container names as a JSON array"
+						}
+					},
+					{
+						"name": "organization",
+						"string": {
+							"computed_optional_required": "computed_optional",
+							"description": "Organization machine name"
+						}
+					}
+				]
+			}
 		}
 	],
 	"version": "0.1"

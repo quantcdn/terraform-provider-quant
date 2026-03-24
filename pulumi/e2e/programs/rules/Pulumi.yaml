@@ -1,0 +1,89 @@
+name: e2e-rules
+runtime: yaml
+description: E2E test for all Rule* resources
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-rules-test
+  region:
+    type: string
+    default: au-govt
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: ${region}
+  ruleProxy:
+    type: quant:index:RuleProxy
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/proxy/*"
+      to: "https://httpbin.org"
+  ruleRedirect:
+    type: quant:index:RuleRedirect
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/old-path"
+      redirectTo: "https://example.com/new-path"
+  ruleCustomResponse:
+    type: quant:index:RuleCustomResponse
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/maintenance"
+      customResponseBody: "<h1>Under Maintenance</h1>"
+  ruleAuth:
+    type: quant:index:RuleAuth
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/admin/*"
+      authUser: e2euser
+      authPass: e2epass
+  ruleBotChallenge:
+    type: quant:index:RuleBotChallenge
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/protected/*"
+      robotChallengeType: invisible
+  ruleHeaders:
+    type: quant:index:RuleHeaders
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/*"
+      headers:
+        X-E2E-Test: "true"
+  ruleServeStatic:
+    type: quant:index:RuleServeStatic
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/static/*"
+      staticFilePath: "/index.html"
+outputs:
+  proxyId: ${ruleProxy.id}
+  redirectId: ${ruleRedirect.id}
+  customResponseId: ${ruleCustomResponse.id}
+  authId: ${ruleAuth.id}
+  botChallengeId: ${ruleBotChallenge.id}
+  headersId: ${ruleHeaders.id}
+  serveStaticId: ${ruleServeStatic.id}

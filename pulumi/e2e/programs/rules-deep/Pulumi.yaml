@@ -1,0 +1,325 @@
+name: e2e-rules-deep
+runtime: yaml
+description: E2E test for deep rule type coverage — redirect codes, custom response statuses, bot TTLs, filters
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-rules-deep
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: au-govt
+
+  # ═══════════════════════ Redirect Variations ═══════════════════════
+
+  # Redirect 301 (permanent — explicit code)
+  redirect301:
+    type: quant:index:RuleRedirect
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/old-page-301"
+      redirectTo: "https://example.com/new-page"
+      redirectCode: "301"
+      name: e2e-redirect-301
+      weight: 5
+
+  # Redirect 302 (temporary)
+  redirect302:
+    type: quant:index:RuleRedirect
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/temp-redirect"
+      redirectTo: "https://example.com/temporary"
+      redirectCode: "302"
+      name: e2e-redirect-302
+
+  # Redirect 307 (temporary, preserves method)
+  redirect307:
+    type: quant:index:RuleRedirect
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/temp-redirect-307"
+      redirectTo: "https://example.com/temp307"
+      redirectCode: "307"
+      name: e2e-redirect-307
+
+  # Redirect with IP filter (block private ranges)
+  redirectIpFilter:
+    type: quant:index:RuleRedirect
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/geo-redirect"
+      redirectTo: "https://blocked.example.com"
+      redirectCode: "302"
+      ip: ip_is_not
+      ipIsNots:
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+      name: e2e-redirect-ip-filter
+
+  # Disabled redirect (should create but be inactive)
+  disabledRedirect:
+    type: quant:index:RuleRedirect
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/disabled-rule"
+      redirectTo: "https://example.com/disabled"
+      disabled: true
+      name: e2e-disabled-redirect
+
+  # ═══════════════════════ Custom Response Variations ═══════════════════════
+
+  # Custom response 403 Forbidden
+  customResponse403:
+    type: quant:index:RuleCustomResponse
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/forbidden"
+      customResponseBody: "<h1>403 Forbidden</h1><p>Access denied.</p>"
+      customResponseStatusCode: 403
+      name: e2e-custom-403
+
+  # Custom response 503 maintenance with high weight
+  customResponse503:
+    type: quant:index:RuleCustomResponse
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/maintenance"
+      customResponseBody: "<h1>Maintenance Mode</h1><p>We will be back shortly.</p>"
+      customResponseStatusCode: 503
+      name: e2e-custom-503
+      weight: 100
+
+  # Custom response 200 with JSON body
+  customResponseJson:
+    type: quant:index:RuleCustomResponse
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/health"
+      customResponseBody: '{"status":"ok","service":"e2e-test"}'
+      customResponseStatusCode: 200
+      name: e2e-custom-json
+
+  # Custom response with method filter (block non-GET)
+  customResponseMethodBlock:
+    type: quant:index:RuleCustomResponse
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/readonly/*"
+      customResponseBody: "<h1>405 Method Not Allowed</h1>"
+      customResponseStatusCode: 405
+      method: method_is
+      methodIs:
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+      name: e2e-custom-method-block
+
+  # ═══════════════════════ Bot Challenge Variations ═══════════════════════
+
+  # Bot challenge — checkbox type with custom TTLs
+  botChallengeCheckbox:
+    type: quant:index:RuleBotChallenge
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/checkbox-challenge/*"
+      robotChallengeType: checkbox
+      robotChallengeVerificationTtl: 7200
+      robotChallengeChallengeTtl: 60
+      name: e2e-bot-checkbox
+
+  # Bot challenge — invisible with default TTLs and weight
+  botChallengeInvisible:
+    type: quant:index:RuleBotChallenge
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/invisible-challenge/*"
+      robotChallengeType: invisible
+      name: e2e-bot-invisible
+      weight: 15
+
+  # Bot challenge with country filter (AU only)
+  botChallengeCountry:
+    type: quant:index:RuleBotChallenge
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/au-bot-check/*"
+      robotChallengeType: invisible
+      country: country_is
+      countryIs:
+        - AU
+        - NZ
+      name: e2e-bot-country
+      weight: 25
+
+  # ═══════════════════════ Auth Variations ═══════════════════════
+
+  # Auth with country filter
+  authCountryFilter:
+    type: quant:index:RuleAuth
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/restricted-au/*"
+      authUser: admin
+      authPass: secret123
+      country: country_is
+      countryIs:
+        - AU
+        - NZ
+      name: e2e-auth-country
+
+  # Auth with IP allow-list
+  authIpFilter:
+    type: quant:index:RuleAuth
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/office-only/*"
+      authUser: office-user
+      authPass: office-pass
+      ip: ip_is
+      ipIs:
+        - "203.0.113.0/24"
+        - "198.51.100.0/24"
+      name: e2e-auth-ip-filter
+      weight: 40
+
+  # ═══════════════════════ Headers Variations ═══════════════════════
+
+  # Security headers (multiple headers with weight)
+  headersSecuritySet:
+    type: quant:index:RuleHeaders
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/*"
+      headers:
+        X-Frame-Options: DENY
+        X-Content-Type-Options: nosniff
+        X-XSS-Protection: "1; mode=block"
+        Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+        Referrer-Policy: strict-origin-when-cross-origin
+      name: e2e-security-headers
+      weight: 50
+
+  # CORS headers on API paths
+  headersCors:
+    type: quant:index:RuleHeaders
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/api/*"
+      headers:
+        Access-Control-Allow-Origin: "*"
+        Access-Control-Allow-Methods: "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers: "Content-Type, Authorization"
+        Access-Control-Max-Age: "86400"
+      name: e2e-cors-headers
+      method: method_is
+      methodIs:
+        - GET
+        - POST
+        - OPTIONS
+
+  # ═══════════════════════ ServeStatic Variations ═══════════════════════
+
+  # ServeStatic with method filter (GET+HEAD only)
+  serveStaticMethodFilter:
+    type: quant:index:RuleServeStatic
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/static-get/*"
+      staticFilePath: "/maintenance.html"
+      method: method_is
+      methodIs:
+        - GET
+        - HEAD
+      name: e2e-serve-static-method
+
+  # ServeStatic with country filter
+  serveStaticCountryFilter:
+    type: quant:index:RuleServeStatic
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/geo-static/*"
+      staticFilePath: "/geo-blocked.html"
+      country: country_is
+      countryIs:
+        - US
+        - GB
+      name: e2e-serve-static-country
+      weight: 60
+
+outputs:
+  redirect301Id: ${redirect301.id}
+  redirect302Id: ${redirect302.id}
+  redirect307Id: ${redirect307.id}
+  redirectIpFilterId: ${redirectIpFilter.id}
+  disabledRedirectId: ${disabledRedirect.id}
+  customResponse403Id: ${customResponse403.id}
+  customResponse503Id: ${customResponse503.id}
+  customResponseJsonId: ${customResponseJson.id}
+  customResponseMethodBlockId: ${customResponseMethodBlock.id}
+  botChallengeCheckboxId: ${botChallengeCheckbox.id}
+  botChallengeInvisibleId: ${botChallengeInvisible.id}
+  botChallengeCountryId: ${botChallengeCountry.id}
+  authCountryFilterId: ${authCountryFilter.id}
+  authIpFilterId: ${authIpFilter.id}
+  headersSecuritySetId: ${headersSecuritySet.id}
+  headersCorsId: ${headersCors.id}
+  serveStaticMethodFilterId: ${serveStaticMethodFilter.id}
+  serveStaticCountryFilterId: ${serveStaticCountryFilter.id}

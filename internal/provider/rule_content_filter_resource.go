@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"terraform-provider-quant/internal/client"
+	"terraform-provider-quant/internal/mapper"
 	"terraform-provider-quant/internal/resource_rule_content_filter"
 	"terraform-provider-quant/internal/utils"
 
@@ -34,149 +35,117 @@ func (r *ruleContentFilterResource) Metadata(ctx context.Context, req resource.M
 }
 
 func (r *ruleContentFilterResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_rule_content_filter.RuleContentFilterResourceSchema(ctx)
+	s := resource_rule_content_filter.RuleContentFilterResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	resp.Schema = s
 }
 
 func (r *ruleContentFilterResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
-
 	client, ok := req.ProviderData.(*client.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
+			"Unexpected resource configure type",
 			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
-		return
 	}
-
 	r.client = client
 }
 
 func (r *ruleContentFilterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	// Serialise rule modifications to avoid backend JSON races
 	if r.client != nil && r.client.RulesMutex != nil {
 		r.client.RulesMutex.Lock()
 		defer r.client.RulesMutex.Unlock()
 	}
-	var data resource_rule_content_filter.RuleContentFilterModel
 
-	// Read Terraform plan data into the model
+	var data resource_rule_content_filter.RuleContentFilterModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Create API call logic
-	diags := callRuleContentFilterCreateAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callRuleContentFilterCreateAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// No need to read immediately after create - we have all the data from the create response
-
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ruleContentFilterResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data resource_rule_content_filter.RuleContentFilterModel
-
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Read API call logic
-	diags := callRuleContentFilterReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callRuleContentFilterReadAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ruleContentFilterResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Serialise rule modifications to avoid backend JSON races
 	if r.client != nil && r.client.RulesMutex != nil {
 		r.client.RulesMutex.Lock()
 		defer r.client.RulesMutex.Unlock()
 	}
-	var plan resource_rule_content_filter.RuleContentFilterModel
 
-	// Read Terraform plan data into the model
+	var plan resource_rule_content_filter.RuleContentFilterModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	// Preserve UUID and RuleId from state (needed for update API call)
 	var state resource_rule_content_filter.RuleContentFilterModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	plan.Uuid = state.Uuid
 	plan.RuleId = state.RuleId
 
-	// Update API call logic
-	diags := callRuleContentFilterUpdateAPI(ctx, r, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callRuleContentFilterUpdateAPI(ctx, r, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Read after update to populate computed fields correctly
-	diags = callRuleContentFilterReadAPI(ctx, r, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callRuleContentFilterReadAPI(ctx, r, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ruleContentFilterResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// Serialise rule modifications to avoid backend JSON races
 	if r.client != nil && r.client.RulesMutex != nil {
 		r.client.RulesMutex.Lock()
 		defer r.client.RulesMutex.Unlock()
 	}
-	var data resource_rule_content_filter.RuleContentFilterModel
 
-	// Read Terraform prior state data into the model
+	var data resource_rule_content_filter.RuleContentFilterModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Delete API call logic
-	diags := callRuleContentFilterDeleteAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callRuleContentFilterDeleteAPI(ctx, r, &data)...)
 }
 
 func (r *ruleContentFilterResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data resource_rule_content_filter.RuleContentFilterModel
 	var err error
-	data.Project, data.RuleId, err = utils.GetRuleImportId(req.ID)
-
+	data.Project, data.Uuid, err = utils.GetRuleImportId(req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Invalid Import ID",
-			fmt.Sprintf("Could not parse import ID. Error: %s", err.Error()),
-		)
+		resp.Diagnostics.AddError("Invalid import ID", err.Error())
 		return
 	}
 
-	// Read API call logic
-	diags := callRuleContentFilterReadAPI(ctx, r, &data)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(callRuleContentFilterReadAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -184,534 +153,222 @@ func (r *ruleContentFilterResource) ImportState(ctx context.Context, req resourc
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterResource, data *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
-	req.SetName(data.Name.ValueString())
+// callRuleContentFilterCreateAPI creates a content filter rule via the API.
+func callRuleContentFilterCreateAPI(ctx context.Context, r *ruleContentFilterResource, rule *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
+	req := quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
 
-	// Domain handling
-	if !data.Domain.IsNull() {
-		var domains []string
-		if !data.Domain.IsUnknown() {
-			diags.Append(data.Domain.ElementsAs(ctx, &domains, false)...)
-			if diags.HasError() {
-				return
-			}
-		}
-		req.SetDomain(domains)
-	}
-
-	// URL handling
-	if !data.Url.IsNull() {
-		var urls []string
-		if !data.Url.IsUnknown() {
-			diags.Append(data.Url.ElementsAs(ctx, &urls, false)...)
-			if diags.HasError() {
-				return
-			}
-		}
-		req.SetUrl(urls)
-	}
-
-	// Country handling
-	if !data.Country.IsNull() {
-		req.SetCountry(data.Country.ValueString())
-		if data.Country.ValueString() == "country_is" && !data.CountryIs.IsNull() {
-			var countryList []string
-			if !data.CountryIs.IsUnknown() {
-				diags.Append(data.CountryIs.ElementsAs(ctx, &countryList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetCountryIs(countryList)
-		} else if data.Country.ValueString() == "country_is_not" && !data.CountryIsNot.IsNull() {
-			var countryList []string
-			if !data.CountryIsNot.IsUnknown() {
-				diags.Append(data.CountryIsNot.ElementsAs(ctx, &countryList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetCountryIsNot(countryList)
-		}
-	}
-
-	// IP handling
-	if !data.Ip.IsNull() {
-		req.SetIp(data.Ip.ValueString())
-		if data.Ip.ValueString() == "ip_is" && !data.IpIs.IsNull() {
-			var ipList []string
-			if !data.IpIs.IsUnknown() {
-				diags.Append(data.IpIs.ElementsAs(ctx, &ipList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetIpIs(ipList)
-		} else if data.Ip.ValueString() == "ip_is_not" && !data.IpIsNot.IsNull() {
-			var ipList []string
-			if !data.IpIsNot.IsUnknown() {
-				diags.Append(data.IpIsNot.ElementsAs(ctx, &ipList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetIpIsNot(ipList)
-		}
-	}
-
-	// Method handling
-	if !data.Method.IsNull() {
-		req.SetMethod(data.Method.ValueString())
-		if data.Method.ValueString() == "method_is" && !data.MethodIs.IsNull() {
-			var methodList []string
-			if !data.MethodIs.IsUnknown() {
-				diags.Append(data.MethodIs.ElementsAs(ctx, &methodList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetMethodIs(methodList)
-		} else if data.Method.ValueString() == "method_is_not" && !data.MethodIsNot.IsNull() {
-			var methodList []string
-			if !data.MethodIsNot.IsUnknown() {
-				diags.Append(data.MethodIsNot.ElementsAs(ctx, &methodList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetMethodIsNot(methodList)
-		}
-	}
-
-	// Content filter specific configuration
-	req.SetFnUuid(data.FnUuid.ValueString())
-	req.SetDisabled(data.Disabled.ValueBool())
-
-	// Weight handling
-	if !data.Weight.IsNull() && !data.Weight.IsUnknown() {
-		weight := int32(data.Weight.ValueInt64())
-		req.SetWeight(weight)
-	}
-
-	// Make the API call
-	api, _, err := r.client.Instance.RulesAPI.RulesContentFilterCreate(r.client.AuthContext, r.client.Organization, data.Project.ValueString()).V2RuleContentFilterRequest(req).Execute()
-	if err != nil {
-		diags.AddError(
-			"Error creating rule content filter",
-			fmt.Sprintf("Could not create rule content filter, unexpected error: %s", err.Error()),
-		)
+	// Map simple fields: name, disabled, weight, domain, url
+	diags.Append(mapper.ToSDK(ctx, rule, req)...)
+	if diags.HasError() {
 		return
 	}
 
-	data.Uuid = types.StringValue(api.GetUuid())
-	data.RuleId = types.StringValue(api.GetRuleId())
-	data.Organization = types.StringValue(r.client.Organization)
-	data.Action = types.StringValue("content_filter")
+	// Content filter specific field (maps to ActionConfig in response, not handled by mapper)
+	req.SetFnUuid(rule.FnUuid.ValueString())
 
-	// Set computed fields to null if unknown
-	if data.Rule.IsUnknown() {
-		data.Rule = types.StringNull()
-	}
-	if data.OnlyWithCookie.IsUnknown() {
-		data.OnlyWithCookie = types.StringNull()
-	}
-	if data.Method.IsUnknown() {
-		data.Method = types.StringNull()
-	}
-	if data.Country.IsUnknown() {
-		data.Country = types.StringNull()
-	}
-	if data.Ip.IsUnknown() {
-		data.Ip = types.StringNull()
+	// Conditional list fields: country, ip, method
+	diags.Append(buildConditionalListsForRequest(ctx,
+		rule.Country, rule.CountryIs, rule.CountryIsNot,
+		rule.Ip, rule.IpIs, rule.IpIsNot,
+		rule.Method, rule.MethodIs, rule.MethodIsNot,
+		req.SetCountry, req.SetCountryIs, req.SetCountryIsNot,
+		req.SetIp, req.SetIpIs, req.SetIpIsNot,
+		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
+	)...)
+	if diags.HasError() {
+		return
 	}
 
-	// Set conditional lists to empty if unknown
-	emptyList, _ := types.ListValueFrom(ctx, types.StringType, []string{})
-	if data.MethodIs.IsUnknown() {
-		data.MethodIs = emptyList
+	res, httpResp, err := r.client.Instance.RulesAPI.RulesContentFilterCreate(
+		r.client.AuthContext, r.client.Organization, rule.Project.ValueString(),
+	).V2RuleContentFilterRequest(*req).Execute()
+
+	if err != nil {
+		if msg := parseAPIError(httpResp); msg != "" {
+			diags.AddError("Failed to create rule", msg)
+			return
+		}
+		diags.AddError("Failed to create rule", err.Error())
+		return
 	}
-	if data.MethodIsNot.IsUnknown() {
-		data.MethodIsNot = emptyList
+
+	// Capture UUID and RuleId from create response
+	rule.Uuid = types.StringValue(res.GetUuid())
+	rule.RuleId = types.StringValue(res.GetRuleId())
+	rule.Organization = types.StringValue(r.client.Organization)
+
+	// Set constants
+	rule.Action = types.StringValue("content_filter")
+	rule.Rule = types.StringNull()
+
+	// Set weight from response (may differ from request)
+	if res.Weight != nil {
+		rule.Weight = types.Int64Value(int64(*res.Weight))
+	} else {
+		rule.Weight = types.Int64Value(0)
 	}
-	if data.CountryIs.IsUnknown() {
-		data.CountryIs = emptyList
+
+	// Set only_with_cookie from response
+	if res.OnlyWithCookie != nil && *res.OnlyWithCookie != "" {
+		rule.OnlyWithCookie = types.StringValue(*res.OnlyWithCookie)
+	} else {
+		rule.OnlyWithCookie = types.StringNull()
 	}
-	if data.CountryIsNot.IsUnknown() {
-		data.CountryIsNot = emptyList
+
+	// Normalize domain list from response
+	domainList, d := types.ListValueFrom(ctx, types.StringType, res.GetDomain())
+	diags.Append(d...)
+	if diags.HasError() {
+		return
 	}
-	if data.IpIs.IsUnknown() {
-		data.IpIs = emptyList
-	}
-	if data.IpIsNot.IsUnknown() {
-		data.IpIsNot = emptyList
-	}
+	rule.Domain = domainList
+
+	// Ensure conditional list fields have proper values (empty lists for null selectors)
+	diags.Append(setConditionalListsFromAPI(ctx,
+		res.Country, res.CountryIs, res.CountryIsNot,
+		res.Ip, res.IpIs, res.IpIsNot,
+		res.Method, res.MethodIs, res.MethodIsNot,
+		&rule.Country, &rule.CountryIs, &rule.CountryIsNot,
+		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
+		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
+	)...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
-	// This prevents "unknown value" errors
-	data.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
+	rule.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
 
-	// Read back from API to get computed fields and ensure state consistency
-	// The DB-backed API has eliminated eventual consistency, so this is safe
-	readDiags := callRuleContentFilterReadAPI(ctx, r, data)
+	// Read back from API to ensure full state consistency
+	readDiags := callRuleContentFilterReadAPI(ctx, r, rule)
 	diags.Append(readDiags...)
 
 	return
 }
 
-func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterResource, data *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
-	if data.RuleId.IsNull() || data.RuleId.IsUnknown() {
+// callRuleContentFilterReadAPI reads a content filter rule from the API.
+func callRuleContentFilterReadAPI(ctx context.Context, r *ruleContentFilterResource, rule *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
+	if rule.Uuid.IsNull() || rule.Uuid.IsUnknown() {
 		diags.AddAttributeError(
-			path.Root("rule_id"),
-			"Missing rule.rule_id attribute",
+			path.Root("uuid"),
+			"Missing rule UUID",
+			"Unable to read rule without a UUID. Please update terraform state.",
+		)
+		return
+	}
+
+	api, res, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleContentFilter, *http.Response, error) {
+		return r.client.Instance.RulesAPI.RulesContentFilterRead(
+			r.client.AuthContext, r.client.Organization,
+			rule.Project.ValueString(), rule.Uuid.ValueString(),
+		).Execute()
+	}, "rule_content_filter")
+
+	if err != nil {
+		diags.AddError("Failed to read rule", err.Error())
+		diags.AddError("Response", fmt.Sprintf("%v", res))
+		return
+	}
+
+	// Map simple response fields: name, disabled, weight, domain, url, only_with_cookie
+	diags.Append(mapper.FromSDK(ctx, api, rule)...)
+
+	// Override fields that need special handling
+	rule.Uuid = types.StringValue(api.Uuid)
+	rule.RuleId = types.StringValue(api.GetRuleId())
+	rule.Organization = types.StringValue(r.client.Organization)
+
+	// Constants
+	rule.Action = types.StringValue("content_filter")
+	rule.Rule = types.StringNull()
+
+	// Content filter specific field from ActionConfig
+	rule.FnUuid = types.StringValue(api.ActionConfig.GetFnUuid())
+
+	// Conditional list fields
+	diags.Append(setConditionalListsFromAPI(ctx,
+		api.Country, api.CountryIs, api.CountryIsNot,
+		api.Ip, api.IpIs, api.IpIsNot,
+		api.Method, api.MethodIs, api.MethodIsNot,
+		&rule.Country, &rule.CountryIs, &rule.CountryIsNot,
+		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
+		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
+	)...)
+
+	// Set action_config to null since we expose its fields as top-level attributes
+	rule.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
+
+	return
+}
+
+// callRuleContentFilterUpdateAPI updates a content filter rule via the API.
+func callRuleContentFilterUpdateAPI(ctx context.Context, r *ruleContentFilterResource, rule *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
+	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
+		diags.AddAttributeError(
+			path.Root("uuid"),
+			"Missing rule.uuid attribute",
 			"Unable to update unknown rule, please update terraform state.",
 		)
 		return
 	}
 
-	req := *quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
-	req.SetName(data.Name.ValueString())
+	req := quantadmingo.NewV2RuleContentFilterRequestWithDefaults()
 
-	// Domain handling
-	if !data.Domain.IsNull() {
-		var domains []string
-		if !data.Domain.IsUnknown() {
-			diags.Append(data.Domain.ElementsAs(ctx, &domains, false)...)
-			if diags.HasError() {
-				return
-			}
-		}
-		req.SetDomain(domains)
-	}
-
-	// URL handling
-	if !data.Url.IsNull() {
-		var urls []string
-		if !data.Url.IsUnknown() {
-			diags.Append(data.Url.ElementsAs(ctx, &urls, false)...)
-			if diags.HasError() {
-				return
-			}
-		}
-		req.SetUrl(urls)
-	}
-
-	// Country handling
-	if !data.Country.IsNull() {
-		req.SetCountry(data.Country.ValueString())
-		if data.Country.ValueString() == "country_is" {
-			var countryList []string
-			if !data.CountryIs.IsUnknown() {
-				diags.Append(data.CountryIs.ElementsAs(ctx, &countryList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetCountryIs(countryList)
-		} else if data.Country.ValueString() == "country_is_not" {
-			var countryList []string
-			if !data.CountryIsNot.IsUnknown() {
-				diags.Append(data.CountryIsNot.ElementsAs(ctx, &countryList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetCountryIsNot(countryList)
-		}
-	}
-
-	// IP handling
-	if !data.Ip.IsNull() {
-		req.SetIp(data.Ip.ValueString())
-		if data.Ip.ValueString() == "ip_is" {
-			var ipList []string
-			if !data.IpIs.IsUnknown() {
-				diags.Append(data.IpIs.ElementsAs(ctx, &ipList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetIpIs(ipList)
-		} else if data.Ip.ValueString() == "ip_is_not" {
-			var ipList []string
-			if !data.IpIsNot.IsUnknown() {
-				diags.Append(data.IpIsNot.ElementsAs(ctx, &ipList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetIpIsNot(ipList)
-		}
-	}
-
-	// Method handling
-	if !data.Method.IsNull() {
-		req.SetMethod(data.Method.ValueString())
-		if data.Method.ValueString() == "method_is" {
-			var methodList []string
-			if !data.MethodIs.IsUnknown() {
-				diags.Append(data.MethodIs.ElementsAs(ctx, &methodList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetMethodIs(methodList)
-		} else if data.Method.ValueString() == "method_is_not" {
-			var methodList []string
-			if !data.MethodIsNot.IsUnknown() {
-				diags.Append(data.MethodIsNot.ElementsAs(ctx, &methodList, false)...)
-				if diags.HasError() {
-					return
-				}
-			}
-			req.SetMethodIsNot(methodList)
-		}
-	}
-
-	// Content filter specific configuration
-	req.SetFnUuid(data.FnUuid.ValueString())
-	req.SetDisabled(data.Disabled.ValueBool())
-
-	// Weight handling
-	if !data.Weight.IsNull() && !data.Weight.IsUnknown() {
-		weight := int32(data.Weight.ValueInt64())
-		req.SetWeight(weight)
-	}
-
-	// Make the API call
-	api, _, err := r.client.Instance.RulesAPI.RulesContentFilterUpdate(
-		r.client.AuthContext,
-		r.client.Organization,
-		data.Project.ValueString(),
-		data.Uuid.ValueString(),
-	).V2RuleContentFilterRequest(req).Execute()
-
-	if err != nil {
-		diags.AddError(
-			"Error updating rule content filter",
-			fmt.Sprintf("Could not update rule content filter, unexpected error: %s", err.Error()),
-		)
+	// Map simple fields: name, disabled, weight, domain, url
+	diags.Append(mapper.ToSDK(ctx, rule, req)...)
+	if diags.HasError() {
 		return
 	}
 
-	// CRITICAL: UUID changes after every update - must capture the new UUID from the response
-	data.Uuid = types.StringValue(api.GetUuid())
-	data.RuleId = types.StringValue(api.GetRuleId())
+	// Content filter specific field
+	req.SetFnUuid(rule.FnUuid.ValueString())
+
+	// Conditional list fields: country, ip, method
+	diags.Append(buildConditionalListsForRequest(ctx,
+		rule.Country, rule.CountryIs, rule.CountryIsNot,
+		rule.Ip, rule.IpIs, rule.IpIsNot,
+		rule.Method, rule.MethodIs, rule.MethodIsNot,
+		req.SetCountry, req.SetCountryIs, req.SetCountryIsNot,
+		req.SetIp, req.SetIpIs, req.SetIpIsNot,
+		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
+	)...)
+	if diags.HasError() {
+		return
+	}
+
+	api, res, err := r.client.Instance.RulesAPI.RulesContentFilterUpdate(
+		r.client.AuthContext, r.client.Organization,
+		rule.Project.ValueString(), rule.Uuid.ValueString(),
+	).V2RuleContentFilterRequest(*req).Execute()
+
+	if err != nil {
+		diags.AddError("Failed to update rule", err.Error())
+		diags.AddError("Response", fmt.Sprintf("%v", res))
+		return
+	}
+
+	// Capture UUID and RuleId from response
+	rule.Uuid = types.StringValue(api.GetUuid())
+	rule.RuleId = types.StringValue(api.GetRuleId())
 
 	return
 }
 
-func callRuleContentFilterReadAPI(ctx context.Context, r *ruleContentFilterResource, data *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
-	if data.RuleId.IsNull() || data.RuleId.IsUnknown() {
+// callRuleContentFilterDeleteAPI deletes a content filter rule via the API.
+func callRuleContentFilterDeleteAPI(ctx context.Context, r *ruleContentFilterResource, rule *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
+	if rule.RuleId.IsNull() || rule.RuleId.IsUnknown() {
 		diags.AddAttributeError(
-			path.Root("rule_id"),
-			"Missing rule.rule_id attribute",
-			"Unable to read unknown rule, please update terraform state.",
-		)
-		return
-	}
-
-	// Use shared retry logic for eventual consistency
-	api, resp, err := utils.RetryRuleRead(ctx, func() (*quantadmingo.V2RuleContentFilter, *http.Response, error) {
-		return r.client.Instance.RulesAPI.RulesContentFilterRead(
-			r.client.AuthContext,
-			r.client.Organization,
-			data.Project.ValueString(),
-			data.Uuid.ValueString(),
-		).Execute()
-	}, "rule_content_filter")
-
-	if err != nil {
-		// Check if it's a 404 error, which might indicate the rule was deleted
-		if resp != nil && resp.StatusCode == 404 {
-			diags.AddError(
-				"Rule content filter not found",
-				fmt.Sprintf("The rule content filter with ID %s no longer exists. It may have been deleted outside of Terraform.",
-					data.RuleId.ValueString()),
-			)
-			return
-		}
-
-		diags.AddError(
-			"Error reading rule content filter",
-			fmt.Sprintf("Could not read rule content filter, unexpected error: %s", err.Error()),
-		)
-		return
-	}
-
-	// Get the rules action config
-	actionConfig := api.GetActionConfig()
-
-	// Set basic fields
-	data.Uuid = types.StringValue(api.GetUuid())
-	data.RuleId = types.StringValue(api.GetRuleId())
-	data.Name = types.StringValue(api.GetName())
-	data.Organization = types.StringValue(r.client.Organization)
-	data.Action = types.StringValue(api.GetAction())
-	data.OnlyWithCookie = types.StringNull()
-	if api.Weight != nil {
-		data.Weight = types.Int64Value(int64(*api.Weight))
-	} else {
-		data.Weight = types.Int64Value(0)
-	}
-
-	// Convert API lists to types.List - handle nil values
-	domains := api.GetDomain()
-	if domains == nil {
-		data.Domain = types.ListNull(types.StringType)
-	} else {
-		domainList, diag := types.ListValueFrom(ctx, types.StringType, domains)
-		if diag.HasError() {
-			diags.Append(diag...)
-			return
-		}
-		data.Domain = domainList
-	}
-
-	urls := api.GetUrl()
-	if urls == nil {
-		data.Url = types.ListNull(types.StringType)
-	} else {
-		urlList, diag := types.ListValueFrom(ctx, types.StringType, urls)
-		if diag.HasError() {
-			diags.Append(diag...)
-			return
-		}
-		data.Url = urlList
-	}
-
-	// Handle content filter specific configuration
-	data.FnUuid = types.StringValue(actionConfig.GetFnUuid())
-	data.Disabled = types.BoolValue(api.GetDisabled())
-
-	// Handle country, IP, and method selection criteria
-	data.Country = types.StringValue(api.GetCountry())
-	if api.GetCountry() == "country_is" {
-		countries := api.GetCountryIs()
-		if countries == nil {
-			data.CountryIs = types.ListNull(types.StringType)
-		} else {
-			countriesList, diag := types.ListValueFrom(ctx, types.StringType, countries)
-			if diag.HasError() {
-				diags.Append(diag...)
-				return
-			}
-			data.CountryIs = countriesList
-		}
-		data.CountryIsNot = types.ListNull(types.StringType)
-	} else if api.GetCountry() == "country_is_not" {
-		countriesNot := api.GetCountryIsNot()
-		if countriesNot == nil {
-			data.CountryIsNot = types.ListNull(types.StringType)
-		} else {
-			countriesNotList, diag := types.ListValueFrom(ctx, types.StringType, countriesNot)
-			if diag.HasError() {
-				diags.Append(diag...)
-				return
-			}
-			data.CountryIsNot = countriesNotList
-		}
-		data.CountryIs = types.ListNull(types.StringType)
-	} else {
-		data.CountryIs = types.ListNull(types.StringType)
-		data.CountryIsNot = types.ListNull(types.StringType)
-	}
-
-	data.Ip = types.StringValue(api.GetIp())
-	if api.GetIp() == "ip_is" {
-		ips := api.GetIpIs()
-		if ips == nil {
-			data.IpIs = types.ListNull(types.StringType)
-		} else {
-			isList, diag := types.ListValueFrom(ctx, types.StringType, ips)
-			if diag.HasError() {
-				diags.Append(diag...)
-				return
-			}
-			data.IpIs = isList
-		}
-		data.IpIsNot = types.ListNull(types.StringType)
-	} else if api.GetIp() == "ip_is_not" {
-		ipsNot := api.GetIpIsNot()
-		if ipsNot == nil {
-			data.IpIsNot = types.ListNull(types.StringType)
-		} else {
-			isNotList, diag := types.ListValueFrom(ctx, types.StringType, ipsNot)
-			if diag.HasError() {
-				diags.Append(diag...)
-				return
-			}
-			data.IpIsNot = isNotList
-		}
-		data.IpIs = types.ListNull(types.StringType)
-	} else {
-		data.IpIs = types.ListNull(types.StringType)
-		data.IpIsNot = types.ListNull(types.StringType)
-	}
-
-	data.Method = types.StringValue(api.GetMethod())
-	if api.GetMethod() == "method_is" {
-		methods := api.GetMethodIs()
-		if methods == nil {
-			data.MethodIs = types.ListNull(types.StringType)
-		} else {
-			methodIsList, diag := types.ListValueFrom(ctx, types.StringType, methods)
-			if diag.HasError() {
-				diags.Append(diag...)
-				return
-			}
-			data.MethodIs = methodIsList
-		}
-		data.MethodIsNot = types.ListNull(types.StringType)
-	} else if api.GetMethod() == "method_is_not" {
-		methodsNot := api.GetMethodIsNot()
-		if methodsNot == nil {
-			data.MethodIsNot = types.ListNull(types.StringType)
-		} else {
-			methodIsNotList, diag := types.ListValueFrom(ctx, types.StringType, methodsNot)
-			if diag.HasError() {
-				diags.Append(diag...)
-				return
-			}
-			data.MethodIsNot = methodIsNotList
-		}
-		data.MethodIs = types.ListNull(types.StringType)
-	} else {
-		data.MethodIs = types.ListNull(types.StringType)
-		data.MethodIsNot = types.ListNull(types.StringType)
-	}
-
-	data.Rule = types.StringNull() // Obsolete field
-
-	// Set action_config to null since we expose its fields as top-level attributes
-	// This prevents "unknown value" errors
-	data.ActionConfig = resource_rule_content_filter.NewActionConfigValueNull()
-
-	return
-}
-
-func callRuleContentFilterDeleteAPI(ctx context.Context, r *ruleContentFilterResource, data *resource_rule_content_filter.RuleContentFilterModel) (diags diag.Diagnostics) {
-	if data.RuleId.IsNull() || data.RuleId.IsUnknown() {
-		diags.AddAttributeError(
-			path.Root("rule_id"),
-			"Missing rule.rule_id attribute",
+			path.Root("uuid"),
+			"Missing rule.uuid attribute",
 			"Unable to delete unknown rule, please update terraform state.",
 		)
 		return
 	}
 
 	_, err := r.client.Instance.RulesAPI.RulesContentFilterDelete(
-		r.client.AuthContext,
-		r.client.Organization,
-		data.Project.ValueString(),
-		data.Uuid.ValueString(),
+		r.client.AuthContext, r.client.Organization,
+		rule.Project.ValueString(), rule.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {
-		diags.AddError(
-			"Error deleting rule content filter",
-			fmt.Sprintf("Could not delete rule content filter, unexpected error: %s", err.Error()),
-		)
+		diags.AddError("Failed to delete rule", err.Error())
 		return
 	}
 

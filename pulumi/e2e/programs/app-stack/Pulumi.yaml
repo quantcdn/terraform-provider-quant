@@ -1,0 +1,39 @@
+name: e2e-app-stack
+runtime: yaml
+description: E2E test for Application, Environment, Volume, and CronJob resources
+config:
+  appName:
+    type: string
+    default: pulumi-e2e-app-test
+resources:
+  testApp:
+    type: quant:index:Application
+    properties:
+      appName: ${appName}
+      composeDefinition: |
+        {"containers":[{"name":"web","imageReference":{"type":"external","identifier":"nginx:latest"},"exposedPorts":[80]}],"taskCpu":256,"taskMemory":512,"architecture":"X86_64"}
+  testEnv:
+    type: quant:index:Environment
+    properties:
+      application: ${testApp.appName}
+      envName: e2e-staging
+      cloneConfigurationFrom: production
+  testVolume:
+    type: quant:index:Volume
+    properties:
+      application: ${testApp.appName}
+      environment: ${testEnv.envName}
+      volumeName: e2e-data
+  testCron:
+    type: quant:index:CronJob
+    properties:
+      name: e2e-test-cron
+      application: ${testApp.appName}
+      environment: ${testEnv.envName}
+      command: '["echo","e2e-test"]'
+      scheduleExpression: "cron(0 0 ? * SUN *)"
+outputs:
+  appId: ${testApp.id}
+  envId: ${testEnv.id}
+  volumeId: ${testVolume.id}
+  cronId: ${testCron.id}

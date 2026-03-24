@@ -53,7 +53,7 @@ func (d *projectDataSource) Configure(_ context.Context, req datasource.Configur
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected data source configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 	d.client = client

@@ -1,0 +1,30 @@
+name: e2e-project
+runtime: yaml
+description: E2E test for Project resource + data sources
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-project-test
+  region:
+    type: string
+    default: au-govt
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: ${region}
+variables:
+  lookedUp:
+    fn::invoke:
+      function: quant:index:getProject
+      arguments:
+        machineName: ${testProject.machineName}
+  allProjects:
+    fn::invoke:
+      function: quant:index:getProjects
+      arguments: {}
+outputs:
+  projectId: ${testProject.id}
+  machineName: ${testProject.machineName}
+  lookedUpName: ${lookedUp.name}

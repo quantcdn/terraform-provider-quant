@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"encoding/json"
@@ -156,4 +157,58 @@ func testAccHeaderResourceExists(n string) resource.TestCheckFunc {
 
 		return nil
 	}
+}
+
+// ---------- HTTP error-path integration tests ----------
+
+func TestAccHeaderResource_CreateError500(t *testing.T) {
+	httpmock.Activate()
+	defer httpmock.DeactivateAndReset()
+
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+	org := "test-org"
+	project := "test-project"
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST",
+		fmt.Sprintf("%s/organizations/%s/projects/%s/custom-headers", baseUrl, org, project),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(500, map[string]interface{}{
+				"error":   true,
+				"message": "Internal server error",
+			})
+		})
+
+	// Register DELETE so the test framework's cleanup phase does not fail.
+	httpmock.RegisterResponder("DELETE",
+		fmt.Sprintf("%s/organizations/%s/projects/%s/custom-headers", baseUrl, org, project),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, map[string]string{})
+		})
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "quant" {
+  organization = "test-org"
+  bearer = "testtoken"
+}
+
+resource "quant_header" "test" {
+  project = "test-project"
+  headers = {
+    "X-Test" = "value"
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`Failed to add custom headers`),
+			},
+		},
+	})
 }

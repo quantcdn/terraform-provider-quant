@@ -13,6 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 )
@@ -32,9 +34,10 @@ type headerResource struct {
 }
 
 type headerResourceModel struct {
-	Id      types.String `tfsdk:"id"`
-	Headers types.Map    `tfsdk:"headers"`
-	Project types.String `tfsdk:"project"`
+	Id           types.String `tfsdk:"id"`
+	Headers      types.Map    `tfsdk:"headers"`
+	Organization types.String `tfsdk:"organization"`
+	Project      types.String `tfsdk:"project"`
 }
 
 func (r *headerResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -46,6 +49,13 @@ func (r *headerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true,
+			},
+			"organization": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"project": schema.StringAttribute{
 				Required: true,
@@ -68,7 +78,7 @@ func (r *headerResource) Configure(_ context.Context, req resource.ConfigureRequ
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *internal.Client, got: %T. Please report this issue to the provider developers", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 	}
 
@@ -78,76 +88,67 @@ func (r *headerResource) Configure(_ context.Context, req resource.ConfigureRequ
 func (r *headerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data headerResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Create API call logic
 	resp.Diagnostics.Append(callHeaderCreateUpdateAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *headerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data headerResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Read API call logic
 	resp.Diagnostics.Append(callHeaderReadAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *headerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data headerResourceModel
 
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Update API call logic
 	resp.Diagnostics.Append(callHeaderCreateUpdateAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *headerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data headerResourceModel
 
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Delete API call logic
 	resp.Diagnostics.Append(callHeaderDeleteAPI(ctx, r, &data)...)
 }
 
 func (r *headerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data headerResourceModel
-
 	data.Project = types.StringValue(req.ID)
 
-	// Read API call logic
 	resp.Diagnostics.Append(callHeaderReadAPI(ctx, r, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -155,7 +156,14 @@ func (r *headerResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Generate the ID from the header value.
+func (r *headerResource) getOrg(data *headerResourceModel) string {
+	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
+		return data.Organization.ValueString()
+	}
+	return r.client.Organization
+}
+
+// generateID produces a deterministic hash from header key-value pairs.
 func generateID(headers map[string]string) string {
 	var keys []string
 	for k := range headers {
@@ -163,88 +171,100 @@ func generateID(headers map[string]string) string {
 	}
 	sort.Strings(keys)
 
-	// Create a string builder to concatenate key-value pairs
 	var sb strings.Builder
 	for _, k := range keys {
 		sb.WriteString(k)
 		sb.WriteString(headers[k])
 	}
 
-	// Compute SHA-256 hash
 	hash := sha256.Sum256([]byte(sb.String()))
 	return hex.EncodeToString(hash[:])
 }
 
-// Create headers with the API.
-func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	req := *quantadmingo.NewV2CustomHeaderRequest(make(map[string]string))
-
-	if req.Headers == nil {
-		req.Headers = make(map[string]string)
-	}
-
-	headers := resource.Headers.Elements()
-	for k, v := range headers {
+// extractHeadersMap converts the TF map attribute to a Go map[string]string.
+func extractHeadersMap(data *headerResourceModel) (map[string]string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	headers := make(map[string]string, len(data.Headers.Elements()))
+	for k, v := range data.Headers.Elements() {
 		strVal, ok := v.(types.String)
 		if !ok {
 			diags.AddError("Invalid header value type", "Expected string value")
-			return
+			return nil, diags
 		}
-		req.Headers[k] = strVal.ValueString()
+		headers[k] = strVal.ValueString()
+	}
+	return headers, diags
+}
+
+// callHeaderCreateUpdateAPI creates or updates custom headers via the API.
+func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, data *headerResourceModel) (diags diag.Diagnostics) {
+	headers, d := extractHeadersMap(data)
+	diags.Append(d...)
+	if diags.HasError() {
+		return
 	}
 
-	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).V2CustomHeaderRequest(req).Execute()
+	req := *quantadmingo.NewV2CustomHeaderRequest(headers)
+
+	org := h.getOrg(data)
+	_, _, err := h.client.Instance.HeadersAPI.HeadersCreate(
+		h.client.AuthContext, org, data.Project.ValueString(),
+	).V2CustomHeaderRequest(req).Execute()
 
 	if err != nil {
 		diags.AddError("Failed to add custom headers", err.Error())
 		return
 	}
 
-	resource.Id = types.StringValue(generateID(req.Headers))
+	data.Id = types.StringValue(generateID(headers))
+	data.Organization = types.StringValue(org)
 	return
 }
 
-// Load headers from the API.
-func callHeaderReadAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	api, _, err := h.client.Instance.HeadersAPI.HeadersList(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).Execute()
+// callHeaderReadAPI reads custom headers from the API.
+func callHeaderReadAPI(ctx context.Context, h *headerResource, data *headerResourceModel) (diags diag.Diagnostics) {
+	org := h.getOrg(data)
+	allHeaders, _, err := h.client.Instance.HeadersAPI.HeadersList(
+		h.client.AuthContext, org, data.Project.ValueString(),
+	).Execute()
 
 	if err != nil {
 		diags.AddError("Error getting custom headers", err.Error())
 		return
 	}
 
-	// V2 API returns a single map[string]string, not an array
-	allHeaders := api
-	
-	a := make(map[string]attr.Value)
+	a := make(map[string]attr.Value, len(allHeaders))
 	for k, v := range allHeaders {
 		a[k] = types.StringValue(v)
 	}
 
 	headers, d := types.MapValue(types.StringType, a)
-
 	if d.HasError() {
 		diags.Append(d...)
 		return
 	}
 
-	resource.Id = types.StringValue(generateID(allHeaders))
-	resource.Headers = headers
+	data.Id = types.StringValue(generateID(allHeaders))
+	data.Headers = headers
+	data.Organization = types.StringValue(org)
 	return
 }
 
-// To delete headers we remove just update with an empty map.
-func callHeaderDeleteAPI(ctx context.Context, h *headerResource, resource *headerResourceModel) (diags diag.Diagnostics) {
-	// V2CustomHeaderRequest expects headers map, not array of header names
-	headersToDelete := make(map[string]string)
-	for k := range resource.Headers.Elements() {
-		headersToDelete[k] = "" // Empty value to indicate deletion
+// callHeaderDeleteAPI deletes custom headers via the API.
+func callHeaderDeleteAPI(ctx context.Context, h *headerResource, data *headerResourceModel) (diags diag.Diagnostics) {
+	headersToDelete := make(map[string]string, len(data.Headers.Elements()))
+	for k := range data.Headers.Elements() {
+		headersToDelete[k] = ""
 	}
 	req := *quantadmingo.NewV2CustomHeaderRequest(headersToDelete)
-	_, err := h.client.Instance.HeadersAPI.HeadersDelete(h.client.AuthContext, h.client.Organization, resource.Project.ValueString()).V2CustomHeaderRequest(req).Execute()
+
+	org := h.getOrg(data)
+	_, err := h.client.Instance.HeadersAPI.HeadersDelete(
+		h.client.AuthContext, org, data.Project.ValueString(),
+	).V2CustomHeaderRequest(req).Execute()
+
 	if err != nil {
 		diags.AddError("Error removing custom headers", err.Error())
-		return
 	}
 	return
 }

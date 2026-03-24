@@ -1,0 +1,147 @@
+name: e2e-rules-proxy-advanced
+runtime: yaml
+description: E2E test for advanced RuleProxy configurations (WAF, failover, headers, auth, error pages)
+config:
+  projectName:
+    type: string
+    default: pulumi-e2e-proxy-adv
+resources:
+  testProject:
+    type: quant:index:Project
+    properties:
+      name: ${projectName}
+      region: au-govt
+
+  # ── Proxy with failover mode, inject/strip headers, host override, cache ──
+  proxyFailover:
+    type: quant:index:RuleProxy
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/api/*"
+      to: "https://httpbin.org"
+      name: e2e-proxy-failover
+      weight: 10
+      failoverMode: true
+      failoverLifetime: "600"
+      failoverOriginStatusCodes:
+        - "500"
+        - "502"
+        - "503"
+      failoverOriginTtfb: "3000"
+      injectHeaders:
+        X-Forwarded-For: "$remote_addr"
+        X-Custom-Header: "e2e-test"
+      proxyStripHeaders:
+        - "X-Powered-By"
+        - "Server"
+      proxyStripRequestHeaders:
+        - "X-Debug"
+      host: "custom-host.example.com"
+      cacheLifetime: "3600"
+
+  # ── Proxy with WAF enabled (basic WAF — block_lists/thresholds excluded due to
+  #    code-gen type mismatch in SingleNestedAttribute custom types) ──
+  proxyWaf:
+    type: quant:index:RuleProxy
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/waf-protected/*"
+      to: "https://httpbin.org"
+      name: e2e-proxy-waf
+      weight: 20
+      wafEnabled: true
+      wafConfig:
+        mode: report
+        paranoiaLevel: 2
+        blockIps:
+          - "192.168.1.100"
+          - "10.0.0.50"
+        allowIps:
+          - "192.168.1.1"
+        blockUas:
+          - "BadBot/*"
+          - "Scraper/1.0"
+        blockReferers:
+          - "spam-site.example.com"
+
+  # ── Proxy with basic auth and SSL options ──
+  proxyAuthSsl:
+    type: quant:index:RuleProxy
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/protected-proxy/*"
+      to: "https://httpbin.org"
+      name: e2e-proxy-auth-ssl
+      authUser: testuser
+      authPass: testpass123
+      disableSslVerify: true
+      originTimeout: "30"
+
+  # ── Proxy with only_proxy_404 and static error page ──
+  proxyErrorPage:
+    type: quant:index:RuleProxy
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/fallback/*"
+      to: "https://httpbin.org"
+      name: e2e-proxy-error-page
+      onlyProxy404: true
+      staticErrorPage: "<html><body><h1>Service Unavailable</h1></body></html>"
+      staticErrorPageStatusCodes:
+        - "500"
+        - "502"
+        - "503"
+        - "504"
+
+  # ── Proxy with country exclusion filter ──
+  proxyCountryExclude:
+    type: quant:index:RuleProxy
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/non-embargoed/*"
+      to: "https://httpbin.org"
+      country: country_is_not
+      countryIsNots:
+        - CN
+        - RU
+      name: e2e-proxy-country-exclude
+
+  # ── Proxy with method filter (POST only) ──
+  proxyMethodFilter:
+    type: quant:index:RuleProxy
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/api/webhook"
+      to: "https://httpbin.org/post"
+      method: method_is
+      methodIs:
+        - POST
+        - PUT
+      name: e2e-proxy-method-filter
+      weight: 30
+
+outputs:
+  proxyFailoverId: ${proxyFailover.id}
+  proxyWafId: ${proxyWaf.id}
+  proxyAuthSslId: ${proxyAuthSsl.id}
+  proxyErrorPageId: ${proxyErrorPage.id}
+  proxyCountryExcludeId: ${proxyCountryExclude.id}
+  proxyMethodFilterId: ${proxyMethodFilter.id}
