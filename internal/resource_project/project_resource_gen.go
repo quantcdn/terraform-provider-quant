@@ -62,12 +62,16 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Project name",
 			},
 			"organization": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 			"region": schema.StringAttribute{
 				Optional:            true,
