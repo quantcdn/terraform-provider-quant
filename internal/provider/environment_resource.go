@@ -7,8 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"terraform-provider-quant/internal/client"
-	"terraform-provider-quant/internal/resource_environment"
+	"github.com/quantcdn/terraform-provider-quant/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/internal/resource_environment"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"terraform-provider-quant/internal/client"
-	"terraform-provider-quant/internal/resource_kv_item"
+	"github.com/quantcdn/terraform-provider-quant/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/internal/resource_kv_item"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"

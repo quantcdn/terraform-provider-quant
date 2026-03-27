@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"terraform-provider-quant/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"

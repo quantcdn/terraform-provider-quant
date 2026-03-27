@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"terraform-provider-quant/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/internal/client"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"

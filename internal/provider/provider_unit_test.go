@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"testing"
 
-	"terraform-provider-quant/internal/resource_cron_job"
-	"terraform-provider-quant/internal/resource_volume"
+	"github.com/quantcdn/terraform-provider-quant/internal/resource_cron_job"
+	"github.com/quantcdn/terraform-provider-quant/internal/resource_volume"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
