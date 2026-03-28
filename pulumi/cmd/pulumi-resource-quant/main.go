@@ -6,7 +6,7 @@ import (
 
 	"github.com/pulumi/pulumi-terraform-bridge/v3/pkg/pf/tfbridge"
 
-	quant "github.com/quantcdn/terraform-provider-quant/pulumi/provider"
+	quant "github.com/quantcdn/terraform-provider-quant/v5/pulumi/provider"
 )
 
 //go:embed schema.json

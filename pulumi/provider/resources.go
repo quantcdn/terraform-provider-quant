@@ -9,7 +9,7 @@ import (
 	"github.com/pulumi/pulumi-terraform-bridge/v3/pkg/tfbridge"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 
-	"github.com/quantcdn/terraform-provider-quant/shim"
+	"github.com/quantcdn/terraform-provider-quant/v5/shim"
 )
 
 //go:embed bridge-metadata.json

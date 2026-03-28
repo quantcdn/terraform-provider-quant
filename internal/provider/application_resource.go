@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"github.com/quantcdn/terraform-provider-quant/internal/client"
-	"github.com/quantcdn/terraform-provider-quant/internal/resource_application"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_application"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"

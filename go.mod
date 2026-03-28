@@ -1,4 +1,4 @@
-module github.com/quantcdn/terraform-provider-quant
+module github.com/quantcdn/terraform-provider-quant/v5
 
 go 1.24.0
 

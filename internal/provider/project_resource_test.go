@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-	"github.com/quantcdn/terraform-provider-quant/internal/provider"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/provider"
 	"testing"
 )
 

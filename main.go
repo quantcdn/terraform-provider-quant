@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/quantcdn/terraform-provider-quant/internal/provider"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/provider"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
