@@ -13,7 +13,7 @@ import (
 	"github.com/jarcoal/httpmock"
 	"io"
 	"net/http"
-	"github.com/quantcdn/terraform-provider-quant/internal/provider"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/provider"
 )
 
 var customHeaderResponse = map[string]string{}
