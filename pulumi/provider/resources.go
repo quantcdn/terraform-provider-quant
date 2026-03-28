@@ -57,7 +57,7 @@ func Provider() tfbridge.ProviderInfo {
 		Keywords:    []string{"pulumi", "quant", "quantcdn", "cdn", "category/cloud"},
 		License:     "Apache-2.0",
 		Homepage:    "https://www.quantcdn.io",
-		Repository:  "https://github.com/quantcdn/github.com/quantcdn/terraform-provider-quant",
+		Repository:  "https://github.com/quantcdn/terraform-provider-quant",
 		GitHubOrg:   "quantcdn",
 
 		MetadataInfo: tfbridge.NewProviderMetadata(bridgeMetadata),
