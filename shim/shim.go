@@ -1,7 +1,7 @@
 package shim
 
 import (
-	"terraform-provider-quant/internal/provider"
+	"github.com/quantcdn/terraform-provider-quant/internal/provider"
 
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 )

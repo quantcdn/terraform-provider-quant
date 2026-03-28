@@ -1,4 +1,4 @@
-module terraform-provider-quant
+module github.com/quantcdn/terraform-provider-quant
 
 go 1.24.0
 

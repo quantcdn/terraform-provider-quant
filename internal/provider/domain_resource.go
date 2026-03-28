@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"terraform-provider-quant/internal/client"
-	"terraform-provider-quant/internal/mapper"
-	"terraform-provider-quant/internal/resource_domain"
+	"github.com/quantcdn/terraform-provider-quant/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/internal/mapper"
+	"github.com/quantcdn/terraform-provider-quant/internal/resource_domain"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
-	"terraform-provider-quant/internal/utils"
+	"github.com/quantcdn/terraform-provider-quant/internal/utils"
 )
 
 var (

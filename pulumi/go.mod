@@ -1,4 +1,4 @@
-module terraform-provider-quant/pulumi
+module github.com/quantcdn/terraform-provider-quant/pulumi
 
 go 1.24.0
 
@@ -8,7 +8,7 @@ require (
 	github.com/pulumi/pulumi-terraform-bridge/v3 v3.116.0
 	github.com/pulumi/pulumi/sdk/v3 v3.190.0
 	github.com/stretchr/testify v1.11.1
-	terraform-provider-quant v0.0.0
+	github.com/quantcdn/terraform-provider-quant v0.0.0
 )
 
 require (
@@ -199,6 +199,6 @@ require (
 	lukechampine.com/frand v1.4.2 // indirect
 )
 
-replace terraform-provider-quant => ../
+replace github.com/quantcdn/terraform-provider-quant => ../
 
 replace github.com/hashicorp/terraform-plugin-sdk/v2 => github.com/pulumi/terraform-plugin-sdk/v2 v2.0.0-20250923233607-7f1981c8674a

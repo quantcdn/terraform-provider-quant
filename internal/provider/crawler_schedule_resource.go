@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"terraform-provider-quant/internal/client"
-	"terraform-provider-quant/internal/mapper"
-	"terraform-provider-quant/internal/resource_crawler_schedule"
+	"github.com/quantcdn/terraform-provider-quant/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/internal/mapper"
+	"github.com/quantcdn/terraform-provider-quant/internal/resource_crawler_schedule"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"

@@ -3,7 +3,7 @@ package provider_test
 import (
 	"fmt"
 	"net/http"
-	"terraform-provider-quant/internal/provider"
+	"github.com/quantcdn/terraform-provider-quant/internal/provider"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
