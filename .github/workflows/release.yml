@@ -39,3 +39,16 @@ jobs:
           # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+
+  notify-pulumi:
+    name: Notify pulumi-quant
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch upstream-release event
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PULUMI_QUANT_DISPATCH_TOKEN }}
+          repository: quantcdn/pulumi-quant
+          event-type: upstream-release
+          client-payload: '{"version": "${{ github.ref_name }}"}'
