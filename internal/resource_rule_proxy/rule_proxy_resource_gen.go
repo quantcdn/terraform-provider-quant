@@ -477,6 +477,26 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Enable Quant Cloud application proxy mode",
 				Default:             booldefault.StaticBool(false),
 			},
+			"asn": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "ASN filter type (asn_is, asn_is_not, any)",
+				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any)",
+			},
+			"asn_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed AS numbers",
+				MarkdownDescription: "Allowed AS numbers",
+			},
+			"asn_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded AS numbers",
+				MarkdownDescription: "Excluded AS numbers",
+			},
 			"auth_pass": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -1006,6 +1026,9 @@ type RuleProxyModel struct {
 	ApplicationName            types.String      `tfsdk:"application_name"`
 	ApplicationPort            types.Int64       `tfsdk:"application_port"`
 	ApplicationProxy           types.Bool        `tfsdk:"application_proxy"`
+	Asn                        types.String      `tfsdk:"asn"`
+	AsnIs                      types.List        `tfsdk:"asn_is"`
+	AsnIsNot                   types.List        `tfsdk:"asn_is_not"`
 	AuthPass                   types.String      `tfsdk:"auth_pass"`
 	AuthUser                   types.String      `tfsdk:"auth_user"`
 	CacheLifetime              types.String      `tfsdk:"cache_lifetime"`
