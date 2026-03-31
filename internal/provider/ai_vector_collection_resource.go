@@ -90,6 +90,12 @@ func (r *aiVectorCollectionResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
+	// If the collection was not found, remove from state so Terraform plans recreation.
+	if data.Id.IsNull() {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -170,8 +176,8 @@ func callVectorCollectionReadAPI(ctx context.Context, r *aiVectorCollectionResou
 	sdkResp, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.GetVectorCollection(r.client.AuthContext, org, data.Id.ValueString()).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			diags.AddError("Vector collection not found",
-				fmt.Sprintf("Collection '%s' not found.", data.Id.ValueString()))
+			// Signal "not found" by nulling Id — caller handles state removal.
+			data.Id = types.StringNull()
 			return
 		}
 		if httpResp != nil {
