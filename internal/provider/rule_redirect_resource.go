@@ -182,6 +182,11 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	// ASN conditional list
+	diags.Append(buildConditionalList(ctx,
+		rule.Asn, rule.AsnIs, rule.AsnIsNot,
+		req.SetAsn, req.SetAsnIs, req.SetAsnIsNot,
+	)...)
 	if diags.HasError() {
 		return
 	}
@@ -238,6 +243,11 @@ func callRuleRedirectCreateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		&rule.Country, &rule.CountryIs, &rule.CountryIsNot,
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
+	)...)
+	// ASN conditional list
+	diags.Append(setConditionalList(ctx,
+		res.Asn, res.AsnIs, res.AsnIsNot,
+		&rule.Asn, &rule.AsnIs, &rule.AsnIsNot,
 	)...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
@@ -306,6 +316,11 @@ func callRuleRedirectReadAPI(ctx context.Context, r *ruleRedirectResource, rule 
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	// ASN conditional list
+	diags.Append(setConditionalList(ctx,
+		api.Asn, api.AsnIs, api.AsnIsNot,
+		&rule.Asn, &rule.AsnIs, &rule.AsnIsNot,
+	)...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
 	rule.ActionConfig = resource_rule_redirect.NewActionConfigValueNull()
@@ -344,6 +359,11 @@ func callRuleRedirectUpdateAPI(ctx context.Context, r *ruleRedirectResource, rul
 		req.SetCountry, req.SetCountryIs, req.SetCountryIsNot,
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
+	)...)
+	// ASN conditional list
+	diags.Append(buildConditionalList(ctx,
+		rule.Asn, rule.AsnIs, rule.AsnIsNot,
+		req.SetAsn, req.SetAsnIs, req.SetAsnIsNot,
 	)...)
 	if diags.HasError() {
 		return
