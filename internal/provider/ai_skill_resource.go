@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_ai_skill"
 )
@@ -188,15 +189,20 @@ func (r *aiSkillResource) ImportState(ctx context.Context, req resource.ImportSt
 func callSkillCreateInlineAPI(ctx context.Context, r *aiSkillResource, data *resource_ai_skill.AiSkillModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	body := map[string]interface{}{
-		"name":    data.Name.ValueString(),
-		"content": data.Content.ValueString(),
-	}
-	if !data.Description.IsNull() && !data.Description.IsUnknown() {
-		body["description"] = data.Description.ValueString()
-	}
+	triggerCondition := ""
 	if !data.TriggerCondition.IsNull() && !data.TriggerCondition.IsUnknown() {
-		body["triggerCondition"] = data.TriggerCondition.ValueString()
+		triggerCondition = data.TriggerCondition.ValueString()
+	}
+
+	sdkReq := quantadmingo.NewCreateSkillRequest(
+		data.Name.ValueString(),
+		data.Content.ValueString(),
+		triggerCondition,
+	)
+
+	if !data.Description.IsNull() && !data.Description.IsUnknown() {
+		desc := data.Description.ValueString()
+		sdkReq.Description = &desc
 	}
 	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
 		var tags []string
@@ -204,25 +210,25 @@ func callSkillCreateInlineAPI(ctx context.Context, r *aiSkillResource, data *res
 		if diags.HasError() {
 			return
 		}
-		body["tags"] = tags
+		sdkReq.Tags = tags
 	}
 
-	apiResp, err := doAIRequest(r.client, http.MethodPost,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/skills", org), body)
+	// The SDK response type CreateSkill201Response has .Skill as map[string]interface{},
+	// so we parse the HTTP response body directly for consistent mapping.
+	_, httpResp, err := r.client.Instance.AISkillsAPI.CreateSkill(r.client.AuthContext, org).
+		CreateSkillRequest(*sdkReq).Execute()
 	if err != nil {
-		diags.AddError("Unable to create AI skill", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to create AI skill",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to create AI skill",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to create AI skill", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseSkillResponse(ctx, apiResp, org, data)...)
+	diags.Append(parseSkillResponse(ctx, httpResp, org, data)...)
 	return
 }
 
@@ -236,58 +242,61 @@ func callSkillImportAPI(ctx context.Context, r *aiSkillResource, data *resource_
 		return
 	}
 
-	sourceMap := map[string]interface{}{
-		"type":    src.Type.ValueString(),
-		"version": src.Version.ValueString(),
-	}
+	sdkSource := quantadmingo.NewImportSkillRequestSource(src.Type.ValueString())
 	if !src.Repo.IsNull() && !src.Repo.IsUnknown() {
-		sourceMap["repo"] = src.Repo.ValueString()
+		repo := src.Repo.ValueString()
+		sdkSource.Repo = &repo
 	}
 	if !src.Path.IsNull() && !src.Path.IsUnknown() {
-		sourceMap["path"] = src.Path.ValueString()
+		path := src.Path.ValueString()
+		sdkSource.Path = &path
 	}
 	if !src.Url.IsNull() && !src.Url.IsUnknown() {
-		sourceMap["url"] = src.Url.ValueString()
+		url := src.Url.ValueString()
+		sdkSource.Url = &url
+	}
+	if !src.Version.IsNull() && !src.Version.IsUnknown() {
+		version := src.Version.ValueString()
+		sdkSource.Version = &version
 	}
 
-	body := map[string]interface{}{
-		"source": sourceMap,
-	}
+	sdkReq := quantadmingo.NewImportSkillRequest(*sdkSource)
 
-	apiResp, err := doAIRequest(r.client, http.MethodPost,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/skills/import", org), body)
+	_, httpResp, err := r.client.Instance.AISkillsAPI.ImportSkill(r.client.AuthContext, org).
+		ImportSkillRequest(*sdkReq).Execute()
 	if err != nil {
-		diags.AddError("Unable to import AI skill", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to import AI skill",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to import AI skill",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to import AI skill", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseSkillResponse(ctx, apiResp, org, data)...)
+	diags.Append(parseSkillResponse(ctx, httpResp, org, data)...)
 	if diags.HasError() {
 		return
 	}
 
 	// After import, PUT to set name/description/tags if provided.
 	needsUpdate := false
-	updateBody := map[string]interface{}{}
+	updateReq := quantadmingo.NewUpdateSkillRequest()
 
 	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		updateBody["name"] = data.Name.ValueString()
+		name := data.Name.ValueString()
+		updateReq.Name = &name
 		needsUpdate = true
 	}
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
-		updateBody["description"] = data.Description.ValueString()
+		desc := data.Description.ValueString()
+		updateReq.Description = &desc
 		needsUpdate = true
 	}
 	if !data.TriggerCondition.IsNull() && !data.TriggerCondition.IsUnknown() {
-		updateBody["triggerCondition"] = data.TriggerCondition.ValueString()
+		tc := data.TriggerCondition.ValueString()
+		updateReq.TriggerCondition = &tc
 		needsUpdate = true
 	}
 	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
@@ -296,23 +305,21 @@ func callSkillImportAPI(ctx context.Context, r *aiSkillResource, data *resource_
 		if diags.HasError() {
 			return
 		}
-		updateBody["tags"] = tags
+		updateReq.Tags = tags
 		needsUpdate = true
 	}
 
 	if needsUpdate {
-		putResp, err := doAIRequest(r.client, http.MethodPut,
-			fmt.Sprintf("/api/v3/organisations/%s/ai/skills/%s", org, data.Id.ValueString()), updateBody)
-		if err != nil {
-			diags.AddError("Unable to update AI skill after import", fmt.Sprintf("Error: %s", err.Error()))
-			return
-		}
-		defer putResp.Body.Close()
-
-		if putResp.StatusCode >= 300 {
-			respBody, _ := io.ReadAll(putResp.Body)
-			diags.AddError("Unable to update AI skill after import",
-				fmt.Sprintf("API returned %d: %s", putResp.StatusCode, string(respBody)))
+		_, putResp, putErr := r.client.Instance.AISkillsAPI.UpdateSkill(r.client.AuthContext, org, data.Id.ValueString()).
+			UpdateSkillRequest(*updateReq).Execute()
+		if putErr != nil {
+			if putResp != nil {
+				respBody, _ := io.ReadAll(putResp.Body)
+				diags.AddError("Unable to update AI skill after import",
+					fmt.Sprintf("API returned %d: %s", putResp.StatusCode, string(respBody)))
+			} else {
+				diags.AddError("Unable to update AI skill after import", fmt.Sprintf("Error: %s", putErr.Error()))
+			}
 			return
 		}
 
@@ -325,43 +332,44 @@ func callSkillImportAPI(ctx context.Context, r *aiSkillResource, data *resource_
 func callSkillReadAPI(ctx context.Context, r *aiSkillResource, data *resource_ai_skill.AiSkillModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	apiResp, err := doAIRequest(r.client, http.MethodGet,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/skills/%s", org, data.Id.ValueString()), nil)
+	sdkResp, httpResp, err := r.client.Instance.AISkillsAPI.GetSkill(r.client.AuthContext, org, data.Id.ValueString()).Execute()
 	if err != nil {
-		diags.AddError("Unable to read AI skill", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode == http.StatusNotFound {
-		diags.AddError("AI skill not found",
-			fmt.Sprintf("Skill '%s' not found.", data.Id.ValueString()))
-		return
-	}
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to read AI skill",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			diags.AddError("AI skill not found",
+				fmt.Sprintf("Skill '%s' not found.", data.Id.ValueString()))
+			return
+		}
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to read AI skill",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to read AI skill", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseSkillResponse(ctx, apiResp, org, data)...)
+	// Map the typed GetSkill200Response to Terraform model.
+	diags.Append(mapGetSkillResponse(ctx, sdkResp, org, data)...)
 	return
 }
 
 func callSkillUpdateInlineAPI(ctx context.Context, r *aiSkillResource, data *resource_ai_skill.AiSkillModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	body := map[string]interface{}{
-		"name":    data.Name.ValueString(),
-		"content": data.Content.ValueString(),
-	}
+	updateReq := quantadmingo.NewUpdateSkillRequest()
+	name := data.Name.ValueString()
+	updateReq.Name = &name
+	content := data.Content.ValueString()
+	updateReq.Content = &content
+
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
-		body["description"] = data.Description.ValueString()
+		desc := data.Description.ValueString()
+		updateReq.Description = &desc
 	}
 	if !data.TriggerCondition.IsNull() && !data.TriggerCondition.IsUnknown() {
-		body["triggerCondition"] = data.TriggerCondition.ValueString()
+		tc := data.TriggerCondition.ValueString()
+		updateReq.TriggerCondition = &tc
 	}
 	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
 		var tags []string
@@ -369,25 +377,23 @@ func callSkillUpdateInlineAPI(ctx context.Context, r *aiSkillResource, data *res
 		if diags.HasError() {
 			return
 		}
-		body["tags"] = tags
+		updateReq.Tags = tags
 	}
 
-	apiResp, err := doAIRequest(r.client, http.MethodPut,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/skills/%s", org, data.Id.ValueString()), body)
+	_, httpResp, err := r.client.Instance.AISkillsAPI.UpdateSkill(r.client.AuthContext, org, data.Id.ValueString()).
+		UpdateSkillRequest(*updateReq).Execute()
 	if err != nil {
-		diags.AddError("Unable to update AI skill", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to update AI skill",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to update AI skill",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to update AI skill", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseSkillResponse(ctx, apiResp, org, data)...)
+	diags.Append(parseSkillResponse(ctx, httpResp, org, data)...)
 	return
 }
 
@@ -414,18 +420,15 @@ func callSkillUpdateImportAPI(ctx context.Context, r *aiSkillResource, data *res
 	}
 
 	if versionChanged {
-		syncResp, err := doAIRequest(r.client, http.MethodPost,
-			fmt.Sprintf("/api/v3/organisations/%s/ai/skills/%s/sync", org, data.Id.ValueString()), nil)
-		if err != nil {
-			diags.AddError("Unable to sync AI skill", fmt.Sprintf("Error: %s", err.Error()))
-			return
-		}
-		defer syncResp.Body.Close()
-
-		if syncResp.StatusCode >= 300 {
-			respBody, _ := io.ReadAll(syncResp.Body)
-			diags.AddError("Unable to sync AI skill",
-				fmt.Sprintf("API returned %d: %s", syncResp.StatusCode, string(respBody)))
+		_, syncResp, syncErr := r.client.Instance.AISkillsAPI.SyncSkill(r.client.AuthContext, org, data.Id.ValueString()).Execute()
+		if syncErr != nil {
+			if syncResp != nil {
+				respBody, _ := io.ReadAll(syncResp.Body)
+				diags.AddError("Unable to sync AI skill",
+					fmt.Sprintf("API returned %d: %s", syncResp.StatusCode, string(respBody)))
+			} else {
+				diags.AddError("Unable to sync AI skill", fmt.Sprintf("Error: %s", syncErr.Error()))
+			}
 			return
 		}
 
@@ -436,19 +439,22 @@ func callSkillUpdateImportAPI(ctx context.Context, r *aiSkillResource, data *res
 	}
 
 	// Also PUT to update name/description/tags if provided.
-	updateBody := map[string]interface{}{}
+	updateReq := quantadmingo.NewUpdateSkillRequest()
 	needsUpdate := false
 
 	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		updateBody["name"] = data.Name.ValueString()
+		name := data.Name.ValueString()
+		updateReq.Name = &name
 		needsUpdate = true
 	}
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
-		updateBody["description"] = data.Description.ValueString()
+		desc := data.Description.ValueString()
+		updateReq.Description = &desc
 		needsUpdate = true
 	}
 	if !data.TriggerCondition.IsNull() && !data.TriggerCondition.IsUnknown() {
-		updateBody["triggerCondition"] = data.TriggerCondition.ValueString()
+		tc := data.TriggerCondition.ValueString()
+		updateReq.TriggerCondition = &tc
 		needsUpdate = true
 	}
 	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
@@ -457,23 +463,21 @@ func callSkillUpdateImportAPI(ctx context.Context, r *aiSkillResource, data *res
 		if diags.HasError() {
 			return
 		}
-		updateBody["tags"] = tags
+		updateReq.Tags = tags
 		needsUpdate = true
 	}
 
 	if needsUpdate {
-		putResp, err := doAIRequest(r.client, http.MethodPut,
-			fmt.Sprintf("/api/v3/organisations/%s/ai/skills/%s", org, data.Id.ValueString()), updateBody)
-		if err != nil {
-			diags.AddError("Unable to update AI skill", fmt.Sprintf("Error: %s", err.Error()))
-			return
-		}
-		defer putResp.Body.Close()
-
-		if putResp.StatusCode >= 300 {
-			respBody, _ := io.ReadAll(putResp.Body)
-			diags.AddError("Unable to update AI skill",
-				fmt.Sprintf("API returned %d: %s", putResp.StatusCode, string(respBody)))
+		_, putResp, putErr := r.client.Instance.AISkillsAPI.UpdateSkill(r.client.AuthContext, org, data.Id.ValueString()).
+			UpdateSkillRequest(*updateReq).Execute()
+		if putErr != nil {
+			if putResp != nil {
+				respBody, _ := io.ReadAll(putResp.Body)
+				diags.AddError("Unable to update AI skill",
+					fmt.Sprintf("API returned %d: %s", putResp.StatusCode, string(respBody)))
+			} else {
+				diags.AddError("Unable to update AI skill", fmt.Sprintf("Error: %s", putErr.Error()))
+			}
 			return
 		}
 
@@ -489,29 +493,107 @@ func callSkillUpdateImportAPI(ctx context.Context, r *aiSkillResource, data *res
 func callSkillDeleteAPI(ctx context.Context, r *aiSkillResource, data *resource_ai_skill.AiSkillModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	apiResp, err := doAIRequest(r.client, http.MethodDelete,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/skills/%s", org, data.Id.ValueString()), nil)
+	_, httpResp, err := r.client.Instance.AISkillsAPI.DeleteSkill(r.client.AuthContext, org, data.Id.ValueString()).Execute()
 	if err != nil {
-		diags.AddError("Unable to delete AI skill", fmt.Sprintf("Error: %s", err.Error()))
-		return
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return // Already deleted
+		}
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to delete AI skill",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to delete AI skill", fmt.Sprintf("Error: %s", err.Error()))
+		}
 	}
-	defer apiResp.Body.Close()
 
-	if apiResp.StatusCode == http.StatusNotFound {
-		return // Already deleted
+	return
+}
+
+// mapGetSkillResponse maps the typed GetSkill200Response onto the Terraform model.
+// Used for Read where the SDK provides fully typed response.
+func mapGetSkillResponse(ctx context.Context, resp *quantadmingo.GetSkill200Response, org string, data *resource_ai_skill.AiSkillModel) (diags diag.Diagnostics) {
+	sk := resp.GetSkill()
+
+	data.Id = types.StringValue(sk.GetSkillId())
+	data.Organization = types.StringValue(org)
+	data.Name = types.StringValue(sk.GetName())
+
+	// description
+	if desc, ok := sk.GetDescriptionOk(); ok && desc != nil && *desc != "" {
+		data.Description = types.StringValue(*desc)
+	} else if data.Description.IsNull() || data.Description.IsUnknown() {
+		data.Description = types.StringNull()
 	}
 
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to delete AI skill",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+	// tags
+	if tags := sk.GetTags(); len(tags) > 0 {
+		tl, d := types.ListValueFrom(ctx, types.StringType, tags)
+		diags.Append(d...)
+		data.Tags = tl
+	} else if data.Tags.IsNull() || data.Tags.IsUnknown() {
+		data.Tags = types.ListNull(types.StringType)
+	}
+
+	// trigger_condition
+	if tc, ok := sk.GetTriggerConditionOk(); ok && tc != nil && *tc != "" {
+		data.TriggerCondition = types.StringValue(*tc)
+	} else if data.TriggerCondition.IsNull() || data.TriggerCondition.IsUnknown() {
+		data.TriggerCondition = types.StringNull()
+	}
+
+	// content
+	if content, ok := sk.GetContentOk(); ok && content != nil && *content != "" {
+		data.Content = types.StringValue(*content)
+	} else if data.Content.IsNull() || data.Content.IsUnknown() {
+		data.Content = types.StringNull()
+	}
+
+	// source
+	if src := sk.GetSource(); len(src) > 0 {
+		srcModel := resource_ai_skill.SourceModel{
+			Type:    optionalStringFromMap(src, "type"),
+			Repo:    optionalStringFromMap(src, "repo"),
+			Path:    optionalStringFromMap(src, "path"),
+			Url:     optionalStringFromMap(src, "url"),
+			Version: optionalStringFromMap(src, "version"),
+		}
+		objVal, d := types.ObjectValueFrom(ctx, resource_ai_skill.SourceAttrTypes(), srcModel)
+		diags.Append(d...)
+		data.Source = objVal
+	} else if data.Source.IsNull() || data.Source.IsUnknown() {
+		data.Source = types.ObjectNull(resource_ai_skill.SourceAttrTypes())
+	}
+
+	// namespace
+	if ns, ok := sk.GetNamespaceOk(); ok && ns != nil && *ns != "" {
+		data.Namespace = types.StringValue(*ns)
+	} else {
+		data.Namespace = types.StringNull()
+	}
+
+	// installed_at
+	if installedAt, ok := sk.GetInstalledAtOk(); ok && installedAt != nil {
+		data.InstalledAt = types.StringValue(installedAt.Format("2006-01-02T15:04:05Z07:00"))
+	} else {
+		data.InstalledAt = types.StringNull()
+	}
+
+	// updated_at
+	if updatedAt, ok := sk.GetUpdatedAtOk(); ok && updatedAt != nil {
+		data.UpdatedAt = types.StringValue(updatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	} else {
+		data.UpdatedAt = types.StringNull()
 	}
 
 	return
 }
 
 // parseSkillResponse reads the JSON response from the skills API and maps it
-// back onto the Terraform model.
+// back onto the Terraform model. Used for Create/Update/Import/Sync responses
+// where the SDK response type has .Skill as map[string]interface{}.
+//
+// The SDK re-buffers the response body so we can read it.
 //
 // Expected response shape:
 //

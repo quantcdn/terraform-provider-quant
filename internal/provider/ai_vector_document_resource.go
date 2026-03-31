@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_ai_vector_document"
 )
@@ -157,6 +157,8 @@ func contentSha256(content string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// callVectorDocumentUpsertAPI uploads a document via doAIRequest because the
+// SDK does not have an UploadVectorDocuments method.
 func callVectorDocumentUpsertAPI(ctx context.Context, r *aiVectorDocumentResource, data *resource_ai_vector_document.AiVectorDocumentModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
@@ -190,7 +192,7 @@ func callVectorDocumentUpsertAPI(ctx context.Context, r *aiVectorDocumentResourc
 	}
 
 	apiResp, err := doAIRequest(r.client, http.MethodPost,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/vector-db/collections/%s/documents",
+		fmt.Sprintf("/api/v3/organizations/%s/ai/vector-db/collections/%s/documents",
 			org, data.CollectionId.ValueString()), body)
 	if err != nil {
 		diags.AddError("Unable to create vector document", fmt.Sprintf("Error: %s", err.Error()))
@@ -213,56 +215,48 @@ func callVectorDocumentUpsertAPI(ctx context.Context, r *aiVectorDocumentResourc
 func callVectorDocumentReadAPI(ctx context.Context, r *aiVectorDocumentResource, data *resource_ai_vector_document.AiVectorDocumentModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	apiResp, err := doAIRequest(r.client, http.MethodGet,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/vector-db/collections/%s/documents?key=%s",
-			org, data.CollectionId.ValueString(), url.QueryEscape(data.Key.ValueString())), nil)
+	// ListVectorDocuments returns (*http.Response, error) — no typed body.
+	httpResp, err := r.client.Instance.AIVectorDatabaseAPI.ListVectorDocuments(r.client.AuthContext, org, data.CollectionId.ValueString()).
+		Key(data.Key.ValueString()).Execute()
 	if err != nil {
-		diags.AddError("Unable to read vector document", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode == http.StatusNotFound {
-		diags.AddError("Vector document not found",
-			fmt.Sprintf("Document with key '%s' not found.", data.Key.ValueString()))
-		return
-	}
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to read vector document",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			diags.AddError("Vector document not found",
+				fmt.Sprintf("Document with key '%s' not found.", data.Key.ValueString()))
+			return
+		}
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to read vector document",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to read vector document", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseVectorDocumentReadResponse(ctx, apiResp, org, data)...)
+	diags.Append(parseVectorDocumentReadResponse(ctx, httpResp, org, data)...)
 	return
 }
 
 func callVectorDocumentDeleteAPI(ctx context.Context, r *aiVectorDocumentResource, data *resource_ai_vector_document.AiVectorDocumentModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	body := map[string]interface{}{
-		"keys": []string{data.Key.ValueString()},
-	}
+	sdkReq := quantadmingo.NewDeleteVectorDocumentsRequest()
+	sdkReq.Keys = []string{data.Key.ValueString()}
 
-	apiResp, err := doAIRequest(r.client, http.MethodDelete,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/vector-db/collections/%s/documents",
-			org, data.CollectionId.ValueString()), body)
+	_, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.DeleteVectorDocuments(r.client.AuthContext, org, data.CollectionId.ValueString()).
+		DeleteVectorDocumentsRequest(*sdkReq).Execute()
 	if err != nil {
-		diags.AddError("Unable to delete vector document", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode == http.StatusNotFound {
-		return // Already deleted
-	}
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to delete vector document",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return // Already deleted
+		}
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to delete vector document",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to delete vector document", fmt.Sprintf("Error: %s", err.Error()))
+		}
 	}
 
 	return
