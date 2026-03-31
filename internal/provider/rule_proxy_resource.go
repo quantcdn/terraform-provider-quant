@@ -223,6 +223,11 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	// ASN conditional list
+	diags.Append(buildConditionalList(ctx,
+		data.Asn, data.AsnIs, data.AsnIsNot,
+		req.SetAsn, req.SetAsnIs, req.SetAsnIsNot,
+	)...)
 	if diags.HasError() {
 		return nil, diags
 	}
@@ -535,6 +540,11 @@ func callRuleProxyReadAPI(ctx context.Context, r *ruleProxyResource, data *resou
 		&data.Country, &data.CountryIs, &data.CountryIsNot,
 		&data.Ip, &data.IpIs, &data.IpIsNot,
 		&data.Method, &data.MethodIs, &data.MethodIsNot,
+	)...)
+	// ASN conditional list
+	diags.Append(setConditionalList(ctx,
+		api.Asn, api.AsnIs, api.AsnIsNot,
+		&data.Asn, &data.AsnIs, &data.AsnIsNot,
 	)...)
 
 	// ProxyStripHeaders / ProxyStripRequestHeaders from ActionConfig
