@@ -254,5 +254,7 @@ func (p *quantProvider) Resources(ctx context.Context) []func() resource.Resourc
 		NewKVStoreResource,
 		NewKVItemResource,
 		NewAiGovernanceResource,
+		NewAiVectorCollectionResource,
+		NewAiVectorDocumentResource,
 	}
 }
