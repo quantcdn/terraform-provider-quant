@@ -29,6 +29,9 @@ func AiVectorDocumentResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "Organization machine name (defaults to provider organization)",
 				MarkdownDescription: "Organization machine name (defaults to provider organization)",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"key": schema.StringAttribute{
 				Required:            true,

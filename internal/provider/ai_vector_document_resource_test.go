@@ -53,13 +53,9 @@ func mockAiVectorDocumentServer(t *testing.T, org string, collectionId string, d
 				}
 			}
 
-			respDoc := map[string]interface{}{
-				"documentId": documentId,
-				"key":        currentKey,
-			}
-
 			return httpmock.NewJsonResponse(200, map[string]interface{}{
-				"documents": []interface{}{respDoc},
+				"success":     true,
+				"documentIds": []string{documentId},
 			})
 		})
 

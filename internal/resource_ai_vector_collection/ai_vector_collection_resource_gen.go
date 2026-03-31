@@ -29,6 +29,9 @@ func AiVectorCollectionResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "Organization machine name (defaults to provider organization)",
 				MarkdownDescription: "Organization machine name (defaults to provider organization)",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
@@ -42,6 +45,9 @@ func AiVectorCollectionResourceSchema(ctx context.Context) schema.Schema {
 				Optional:            true,
 				Description:         "Collection description",
 				MarkdownDescription: "Collection description",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,

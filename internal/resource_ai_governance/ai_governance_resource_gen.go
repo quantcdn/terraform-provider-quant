@@ -5,8 +5,12 @@ package resource_ai_governance
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -20,6 +24,9 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "Organization machine name (defaults to provider organization)",
 				MarkdownDescription: "Organization machine name (defaults to provider organization)",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"ai_enabled": schema.BoolAttribute{
 				Required:            true,
@@ -30,6 +37,9 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 				Required:            true,
 				Description:         "Model access policy: unrestricted, allowlist, or blocklist",
 				MarkdownDescription: "Model access policy: `unrestricted`, `allowlist`, or `blocklist`",
+				Validators: []validator.String{
+					stringvalidator.OneOf("unrestricted", "allowlist", "blocklist"),
+				},
 			},
 			"model_list": schema.ListAttribute{
 				Optional:            true,

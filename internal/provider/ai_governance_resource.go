@@ -92,6 +92,12 @@ func (r *aiGovernanceResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	// If the governance config was not found, remove from state so Terraform plans recreation.
+	if data.Organization.IsNull() {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -231,9 +237,7 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		sdkReq.SetVersion(int32(data.Version.ValueInt64()))
 	}
 
-	// The UpdateGovernanceConfig200Response has .Config as map[string]interface{},
-	// so we still need to parse it like the old code did for the response mapping.
-	_, httpResp, err := r.client.Instance.AIGovernanceAPI.UpdateGovernanceConfig(r.client.AuthContext, org).
+	sdkResp, httpResp, err := r.client.Instance.AIGovernanceAPI.UpdateGovernanceConfig(r.client.AuthContext, org).
 		UpdateGovernanceConfigRequest(*sdkReq).Execute()
 	if err != nil {
 		if httpResp != nil {
@@ -246,9 +250,8 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		return
 	}
 
-	// Parse response to get updated version and server-side defaults.
-	// The SDK re-buffers the body, so we can read it.
-	diags.Append(parseGovernanceResponse(ctx, httpResp, org, data)...)
+	// Map the typed SDK response directly — no HTTP body re-read needed.
+	diags.Append(mapGovernanceConfigFromMap(ctx, sdkResp.GetConfig(), org, data)...)
 	return
 }
 
@@ -258,8 +261,8 @@ func callGovernanceReadAPI(ctx context.Context, r *aiGovernanceResource, data *r
 	sdkResp, httpResp, err := r.client.Instance.AIGovernanceAPI.GetGovernanceConfig(r.client.AuthContext, org).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			diags.AddError("AI governance not found",
-				fmt.Sprintf("No AI governance configuration found for organization '%s'.", org))
+			// Signal "not found" by nulling Organization — caller handles state removal.
+			data.Organization = types.StringNull()
 			return
 		}
 		if httpResp != nil {
@@ -337,98 +340,100 @@ func nullableInt32ToInt64(n quantadmingo.NullableInt32) types.Int64 {
 	return types.Int64Null()
 }
 
-// parseGovernanceResponse reads the JSON response from the governance PUT API
-// and maps it back onto the Terraform model. The PUT response has a different
-// shape (config is map[string]interface{}) than GET (typed fields), so we
-// still need manual parsing here.
-//
-// Expected response shape:
-//
-//	{
-//	  "config": {
-//	    "aiEnabled": true,
-//	    "modelPolicy": "unrestricted",
-//	    "modelList": ["gpt-4"],
-//	    "mandatoryGuardrailPreset": "strict",
-//	    "mandatoryFilterPolicies": ["toxicity"],
-//	    "spendLimits": { ... },
-//	    "version": 3
-//	  }
-//	}
-func parseGovernanceResponse(ctx context.Context, apiResp *http.Response, org string, data *resource_ai_governance.AiGovernanceModel) (diags diag.Diagnostics) {
-	respBody, err := io.ReadAll(apiResp.Body)
-	if err != nil {
-		diags.AddError("Unable to read AI governance response", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-
-	var envelope struct {
-		Config struct {
-			AiEnabled                bool                   `json:"aiEnabled"`
-			ModelPolicy              string                 `json:"modelPolicy"`
-			ModelList                []string               `json:"modelList"`
-			MandatoryGuardrailPreset *string                `json:"mandatoryGuardrailPreset"`
-			MandatoryFilterPolicies  []string               `json:"mandatoryFilterPolicies"`
-			SpendLimits              map[string]interface{} `json:"spendLimits"`
-			Version                  int64                  `json:"version"`
-		} `json:"config"`
-	}
-
-	if err := json.Unmarshal(respBody, &envelope); err != nil {
-		diags.AddError("Unable to parse AI governance response",
-			fmt.Sprintf("Error: %s\nBody: %s", err.Error(), string(respBody)))
-		return
-	}
-
-	cfg := envelope.Config
-
+// mapGovernanceConfigFromMap maps the config map from the UpdateGovernanceConfig
+// SDK response onto the Terraform model. The PUT response returns config as
+// map[string]interface{}, so we extract fields using helper functions.
+func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interface{}, org string, data *resource_ai_governance.AiGovernanceModel) (diags diag.Diagnostics) {
 	data.Organization = types.StringValue(org)
-	data.AiEnabled = types.BoolValue(cfg.AiEnabled)
-	data.ModelPolicy = types.StringValue(cfg.ModelPolicy)
-	data.Version = types.Int64Value(cfg.Version)
+
+	if v, ok := configMap["aiEnabled"]; ok {
+		if b, ok := v.(bool); ok {
+			data.AiEnabled = types.BoolValue(b)
+		}
+	}
+
+	data.ModelPolicy = optionalStringFromConfigMap(configMap, "modelPolicy")
+	data.Version = optionalInt64FromMap(configMap, "version")
 
 	// model_list
-	if len(cfg.ModelList) > 0 {
-		ml, d := types.ListValueFrom(ctx, types.StringType, cfg.ModelList)
-		diags.Append(d...)
-		data.ModelList = ml
+	if v, ok := configMap["modelList"]; ok && v != nil {
+		if arr, ok := v.([]interface{}); ok && len(arr) > 0 {
+			models := make([]string, 0, len(arr))
+			for _, item := range arr {
+				if s, ok := item.(string); ok {
+					models = append(models, s)
+				}
+			}
+			ml, d := types.ListValueFrom(ctx, types.StringType, models)
+			diags.Append(d...)
+			data.ModelList = ml
+		} else {
+			data.ModelList = types.ListNull(types.StringType)
+		}
 	} else {
 		data.ModelList = types.ListNull(types.StringType)
 	}
 
 	// mandatory_guardrail_preset
-	if cfg.MandatoryGuardrailPreset != nil && *cfg.MandatoryGuardrailPreset != "" {
-		data.MandatoryGuardrailPreset = types.StringValue(*cfg.MandatoryGuardrailPreset)
+	if s := optionalStringFromConfigMap(configMap, "mandatoryGuardrailPreset"); !s.IsNull() {
+		data.MandatoryGuardrailPreset = s
 	} else {
 		data.MandatoryGuardrailPreset = types.StringNull()
 	}
 
 	// mandatory_filter_policies
-	if len(cfg.MandatoryFilterPolicies) > 0 {
-		mfp, d := types.ListValueFrom(ctx, types.StringType, cfg.MandatoryFilterPolicies)
-		diags.Append(d...)
-		data.MandatoryFilterPolicies = mfp
+	if v, ok := configMap["mandatoryFilterPolicies"]; ok && v != nil {
+		if arr, ok := v.([]interface{}); ok && len(arr) > 0 {
+			policies := make([]string, 0, len(arr))
+			for _, item := range arr {
+				if s, ok := item.(string); ok {
+					policies = append(policies, s)
+				}
+			}
+			mfp, d := types.ListValueFrom(ctx, types.StringType, policies)
+			diags.Append(d...)
+			data.MandatoryFilterPolicies = mfp
+		} else {
+			data.MandatoryFilterPolicies = types.ListNull(types.StringType)
+		}
 	} else {
 		data.MandatoryFilterPolicies = types.ListNull(types.StringType)
 	}
 
 	// spend_limits
-	if cfg.SpendLimits != nil && len(cfg.SpendLimits) > 0 {
-		sl := resource_ai_governance.SpendLimitsModel{
-			MonthlyBudgetCents:        optionalInt64FromMap(cfg.SpendLimits, "monthlyBudgetCents"),
-			DailyBudgetCents:          optionalInt64FromMap(cfg.SpendLimits, "dailyBudgetCents"),
-			PerUserMonthlyBudgetCents: optionalInt64FromMap(cfg.SpendLimits, "perUserMonthlyBudgetCents"),
-			PerUserDailyBudgetCents:   optionalInt64FromMap(cfg.SpendLimits, "perUserDailyBudgetCents"),
-			WarningThresholdPercent:   optionalInt64FromMap(cfg.SpendLimits, "warningThresholdPercent"),
+	if v, ok := configMap["spendLimits"]; ok && v != nil {
+		if slMap, ok := v.(map[string]interface{}); ok && len(slMap) > 0 {
+			sl := resource_ai_governance.SpendLimitsModel{
+				MonthlyBudgetCents:        optionalInt64FromMap(slMap, "monthlyBudgetCents"),
+				DailyBudgetCents:          optionalInt64FromMap(slMap, "dailyBudgetCents"),
+				PerUserMonthlyBudgetCents: optionalInt64FromMap(slMap, "perUserMonthlyBudgetCents"),
+				PerUserDailyBudgetCents:   optionalInt64FromMap(slMap, "perUserDailyBudgetCents"),
+				WarningThresholdPercent:   optionalInt64FromMap(slMap, "warningThresholdPercent"),
+			}
+			objVal, d := types.ObjectValueFrom(ctx, resource_ai_governance.SpendLimitsAttrTypes(), sl)
+			diags.Append(d...)
+			data.SpendLimits = objVal
+		} else {
+			data.SpendLimits = types.ObjectNull(resource_ai_governance.SpendLimitsAttrTypes())
 		}
-		objVal, d := types.ObjectValueFrom(ctx, resource_ai_governance.SpendLimitsAttrTypes(), sl)
-		diags.Append(d...)
-		data.SpendLimits = objVal
 	} else {
 		data.SpendLimits = types.ObjectNull(resource_ai_governance.SpendLimitsAttrTypes())
 	}
 
 	return
+}
+
+// optionalStringFromConfigMap extracts a string from a map[string]interface{},
+// returning types.StringNull() if absent or empty.
+func optionalStringFromConfigMap(m map[string]interface{}, key string) types.String {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return types.StringNull()
+	}
+	if s, ok := v.(string); ok && s != "" {
+		return types.StringValue(s)
+	}
+	return types.StringNull()
 }
 
 // optionalInt64FromMap extracts an int64 value from a JSON-decoded map.
