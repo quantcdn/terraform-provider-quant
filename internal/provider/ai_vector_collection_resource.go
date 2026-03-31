@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_ai_vector_collection"
 )
@@ -141,133 +141,120 @@ func (r *aiVectorCollectionResource) ImportState(ctx context.Context, req resour
 func callVectorCollectionCreateAPI(ctx context.Context, r *aiVectorCollectionResource, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	body := map[string]interface{}{
-		"name": data.Name.ValueString(),
-	}
+	sdkReq := quantadmingo.NewCreateVectorCollectionRequest(data.Name.ValueString())
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
-		body["description"] = data.Description.ValueString()
+		desc := data.Description.ValueString()
+		sdkReq.Description = &desc
 	}
 
-	apiResp, err := doAIRequest(r.client, http.MethodPost,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/vector-db/collections", org), body)
+	sdkResp, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.CreateVectorCollection(r.client.AuthContext, org).
+		CreateVectorCollectionRequest(*sdkReq).Execute()
 	if err != nil {
-		diags.AddError("Unable to create vector collection", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to create vector collection",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to create vector collection",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to create vector collection", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseVectorCollectionResponse(apiResp, org, data)...)
+	diags.Append(mapCreateVectorCollectionResponse(sdkResp, org, data)...)
 	return
 }
 
 func callVectorCollectionReadAPI(ctx context.Context, r *aiVectorCollectionResource, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	apiResp, err := doAIRequest(r.client, http.MethodGet,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/vector-db/collections/%s", org, data.Id.ValueString()), nil)
+	sdkResp, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.GetVectorCollection(r.client.AuthContext, org, data.Id.ValueString()).Execute()
 	if err != nil {
-		diags.AddError("Unable to read vector collection", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode == http.StatusNotFound {
-		diags.AddError("Vector collection not found",
-			fmt.Sprintf("Collection '%s' not found.", data.Id.ValueString()))
-		return
-	}
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to read vector collection",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			diags.AddError("Vector collection not found",
+				fmt.Sprintf("Collection '%s' not found.", data.Id.ValueString()))
+			return
+		}
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to read vector collection",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to read vector collection", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseVectorCollectionResponse(apiResp, org, data)...)
+	diags.Append(mapGetVectorCollectionResponse(sdkResp, org, data)...)
 	return
 }
 
 func callVectorCollectionDeleteAPI(ctx context.Context, r *aiVectorCollectionResource, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	apiResp, err := doAIRequest(r.client, http.MethodDelete,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/vector-db/collections/%s", org, data.Id.ValueString()), nil)
+	_, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.DeleteVectorCollection(r.client.AuthContext, org, data.Id.ValueString()).Execute()
 	if err != nil {
-		diags.AddError("Unable to delete vector collection", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode == http.StatusNotFound {
-		return // Already deleted
-	}
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to delete vector collection",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return // Already deleted
+		}
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to delete vector collection",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to delete vector collection", fmt.Sprintf("Error: %s", err.Error()))
+		}
 	}
 
 	return
 }
 
-// parseVectorCollectionResponse reads the JSON response and maps it onto the
-// Terraform model.
-//
-// Expected response shape:
-//
-//	{
-//	  "collection": {
-//	    "collectionId": "uuid",
-//	    "name": "my-collection",
-//	    "description": "...",
-//	    "createdAt": "2026-03-30T..."
-//	  }
-//	}
-func parseVectorCollectionResponse(apiResp *http.Response, org string, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
-	respBody, err := io.ReadAll(apiResp.Body)
-	if err != nil {
-		diags.AddError("Unable to read vector collection response", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
+// mapCreateVectorCollectionResponse maps the SDK CreateVectorCollection201Response
+// onto the Terraform model.
+func mapCreateVectorCollectionResponse(resp *quantadmingo.CreateVectorCollection201Response, org string, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
+	col := resp.GetCollection()
 
-	var envelope struct {
-		Collection struct {
-			CollectionId string  `json:"collectionId"`
-			Name         string  `json:"name"`
-			Description  *string `json:"description"`
-			CreatedAt    *string `json:"createdAt"`
-		} `json:"collection"`
-	}
-
-	if err := json.Unmarshal(respBody, &envelope); err != nil {
-		diags.AddError("Unable to parse vector collection response",
-			fmt.Sprintf("Error: %s\nBody: %s", err.Error(), string(respBody)))
-		return
-	}
-
-	col := envelope.Collection
-
-	data.Id = types.StringValue(col.CollectionId)
-	data.Name = types.StringValue(col.Name)
+	data.Id = types.StringValue(col.GetCollectionId())
+	data.Name = types.StringValue(col.GetName())
 	data.Organization = types.StringValue(org)
 
-	if col.Description != nil && *col.Description != "" {
-		data.Description = types.StringValue(*col.Description)
+	if desc, ok := col.GetDescriptionOk(); ok && desc != nil && *desc != "" {
+		data.Description = types.StringValue(*desc)
 	} else if data.Description.IsNull() || data.Description.IsUnknown() {
 		data.Description = types.StringNull()
 	}
 
-	if col.CreatedAt != nil && *col.CreatedAt != "" {
-		data.CreatedAt = types.StringValue(*col.CreatedAt)
+	// createdAt is not a typed field in CreateVectorCollection201ResponseCollection
+	// but may appear in AdditionalProperties.
+	if ca, ok := col.AdditionalProperties["createdAt"]; ok {
+		if s, ok := ca.(string); ok && s != "" {
+			data.CreatedAt = types.StringValue(s)
+		} else {
+			data.CreatedAt = types.StringNull()
+		}
+	} else {
+		data.CreatedAt = types.StringNull()
+	}
+
+	return
+}
+
+// mapGetVectorCollectionResponse maps the SDK GetVectorCollection200Response
+// onto the Terraform model.
+func mapGetVectorCollectionResponse(resp *quantadmingo.GetVectorCollection200Response, org string, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
+	col := resp.GetCollection()
+
+	data.Id = types.StringValue(col.GetCollectionId())
+	data.Name = types.StringValue(col.GetName())
+	data.Organization = types.StringValue(org)
+
+	if desc, ok := col.GetDescriptionOk(); ok && desc != nil && *desc != "" {
+		data.Description = types.StringValue(*desc)
+	} else if data.Description.IsNull() || data.Description.IsUnknown() {
+		data.Description = types.StringNull()
+	}
+
+	if createdAt, ok := col.GetCreatedAtOk(); ok && createdAt != nil {
+		data.CreatedAt = types.StringValue(createdAt.Format("2006-01-02T15:04:05Z07:00"))
 	} else {
 		data.CreatedAt = types.StringNull()
 	}

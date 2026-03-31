@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_ai_governance"
 )
@@ -128,23 +129,19 @@ func (r *aiGovernanceResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	org := r.getOrg(&data)
-	resetBody := map[string]interface{}{
-		"aiEnabled":   true,
-		"modelPolicy": "unrestricted",
-	}
 
-	apiResp, err := doAIRequest(r.client, http.MethodPut,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/governance", org), resetBody)
+	resetReq := quantadmingo.NewUpdateGovernanceConfigRequest(true, "unrestricted")
+
+	_, httpResp, err := r.client.Instance.AIGovernanceAPI.UpdateGovernanceConfig(r.client.AuthContext, org).
+		UpdateGovernanceConfigRequest(*resetReq).Execute()
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to reset AI governance", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode >= 300 {
-		body, _ := io.ReadAll(apiResp.Body)
-		resp.Diagnostics.AddError("Unable to reset AI governance",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(body)))
+		if httpResp != nil {
+			body, _ := io.ReadAll(httpResp.Body)
+			resp.Diagnostics.AddError("Unable to reset AI governance",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(body)))
+		} else {
+			resp.Diagnostics.AddError("Unable to reset AI governance", fmt.Sprintf("Error: %s", err.Error()))
+		}
 	}
 }
 
@@ -173,10 +170,10 @@ func (r *aiGovernanceResource) ImportState(ctx context.Context, req resource.Imp
 func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *resource_ai_governance.AiGovernanceModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	body := map[string]interface{}{
-		"aiEnabled":   data.AiEnabled.ValueBool(),
-		"modelPolicy": data.ModelPolicy.ValueString(),
-	}
+	sdkReq := quantadmingo.NewUpdateGovernanceConfigRequest(
+		data.AiEnabled.ValueBool(),
+		data.ModelPolicy.ValueString(),
+	)
 
 	// model_list
 	if !data.ModelList.IsNull() && !data.ModelList.IsUnknown() {
@@ -185,12 +182,12 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		if diags.HasError() {
 			return
 		}
-		body["modelList"] = models
+		sdkReq.SetModelList(models)
 	}
 
 	// mandatory_guardrail_preset
 	if !data.MandatoryGuardrailPreset.IsNull() && !data.MandatoryGuardrailPreset.IsUnknown() {
-		body["mandatoryGuardrailPreset"] = data.MandatoryGuardrailPreset.ValueString()
+		sdkReq.SetMandatoryGuardrailPreset(data.MandatoryGuardrailPreset.ValueString())
 	}
 
 	// mandatory_filter_policies
@@ -200,7 +197,7 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		if diags.HasError() {
 			return
 		}
-		body["mandatoryFilterPolicies"] = policies
+		sdkReq.SetMandatoryFilterPolicies(policies)
 	}
 
 	// spend_limits
@@ -226,64 +223,124 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		if !sl.WarningThresholdPercent.IsNull() && !sl.WarningThresholdPercent.IsUnknown() {
 			slMap["warningThresholdPercent"] = sl.WarningThresholdPercent.ValueInt64()
 		}
-		body["spendLimits"] = slMap
+		sdkReq.SetSpendLimits(slMap)
 	}
 
 	// version (optimistic concurrency)
 	if !data.Version.IsNull() && !data.Version.IsUnknown() {
-		body["version"] = data.Version.ValueInt64()
+		sdkReq.SetVersion(int32(data.Version.ValueInt64()))
 	}
 
-	apiResp, err := doAIRequest(r.client, http.MethodPut,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/governance", org), body)
+	// The UpdateGovernanceConfig200Response has .Config as map[string]interface{},
+	// so we still need to parse it like the old code did for the response mapping.
+	_, httpResp, err := r.client.Instance.AIGovernanceAPI.UpdateGovernanceConfig(r.client.AuthContext, org).
+		UpdateGovernanceConfigRequest(*sdkReq).Execute()
 	if err != nil {
-		diags.AddError("Unable to update AI governance", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to update AI governance",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to update AI governance",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to update AI governance", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
 	// Parse response to get updated version and server-side defaults.
-	diags.Append(parseGovernanceResponse(ctx, apiResp, org, data)...)
+	// The SDK re-buffers the body, so we can read it.
+	diags.Append(parseGovernanceResponse(ctx, httpResp, org, data)...)
 	return
 }
 
 func callGovernanceReadAPI(ctx context.Context, r *aiGovernanceResource, data *resource_ai_governance.AiGovernanceModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	apiResp, err := doAIRequest(r.client, http.MethodGet,
-		fmt.Sprintf("/api/v3/organisations/%s/ai/governance", org), nil)
+	sdkResp, httpResp, err := r.client.Instance.AIGovernanceAPI.GetGovernanceConfig(r.client.AuthContext, org).Execute()
 	if err != nil {
-		diags.AddError("Unable to read AI governance", fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-	defer apiResp.Body.Close()
-
-	if apiResp.StatusCode == http.StatusNotFound {
-		diags.AddError("AI governance not found",
-			fmt.Sprintf("No AI governance configuration found for organization '%s'.", org))
-		return
-	}
-
-	if apiResp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(apiResp.Body)
-		diags.AddError("Unable to read AI governance",
-			fmt.Sprintf("API returned %d: %s", apiResp.StatusCode, string(respBody)))
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			diags.AddError("AI governance not found",
+				fmt.Sprintf("No AI governance configuration found for organization '%s'.", org))
+			return
+		}
+		if httpResp != nil {
+			respBody, _ := io.ReadAll(httpResp.Body)
+			diags.AddError("Unable to read AI governance",
+				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(respBody)))
+		} else {
+			diags.AddError("Unable to read AI governance", fmt.Sprintf("Error: %s", err.Error()))
+		}
 		return
 	}
 
-	diags.Append(parseGovernanceResponse(ctx, apiResp, org, data)...)
+	// Map the typed SDK response to the Terraform model.
+	diags.Append(mapGovernanceGetResponse(ctx, sdkResp, org, data)...)
 	return
 }
 
-// parseGovernanceResponse reads the JSON response from the governance API and
-// maps it back onto the Terraform model.
+// mapGovernanceGetResponse maps the typed GetGovernanceConfig200Response onto
+// the Terraform model. This is used for Read and ImportState.
+func mapGovernanceGetResponse(ctx context.Context, resp *quantadmingo.GetGovernanceConfig200Response, org string, data *resource_ai_governance.AiGovernanceModel) (diags diag.Diagnostics) {
+	data.Organization = types.StringValue(org)
+	data.AiEnabled = types.BoolValue(resp.GetAiEnabled())
+	data.ModelPolicy = types.StringValue(resp.GetModelPolicy())
+	data.Version = types.Int64Value(int64(resp.GetVersion()))
+
+	// model_list
+	if ml := resp.GetModelList(); len(ml) > 0 {
+		mlVal, d := types.ListValueFrom(ctx, types.StringType, ml)
+		diags.Append(d...)
+		data.ModelList = mlVal
+	} else {
+		data.ModelList = types.ListNull(types.StringType)
+	}
+
+	// mandatory_guardrail_preset
+	if preset, ok := resp.GetMandatoryGuardrailPresetOk(); ok && preset != nil && *preset != "" {
+		data.MandatoryGuardrailPreset = types.StringValue(*preset)
+	} else {
+		data.MandatoryGuardrailPreset = types.StringNull()
+	}
+
+	// mandatory_filter_policies
+	if mfp := resp.GetMandatoryFilterPolicies(); len(mfp) > 0 {
+		mfpVal, d := types.ListValueFrom(ctx, types.StringType, mfp)
+		diags.Append(d...)
+		data.MandatoryFilterPolicies = mfpVal
+	} else {
+		data.MandatoryFilterPolicies = types.ListNull(types.StringType)
+	}
+
+	// spend_limits
+	if slPtr, ok := resp.GetSpendLimitsOk(); ok && slPtr != nil {
+		sl := resource_ai_governance.SpendLimitsModel{
+			MonthlyBudgetCents:        nullableInt32ToInt64(slPtr.MonthlyBudgetCents),
+			DailyBudgetCents:          nullableInt32ToInt64(slPtr.DailyBudgetCents),
+			PerUserMonthlyBudgetCents: nullableInt32ToInt64(slPtr.PerUserMonthlyBudgetCents),
+			PerUserDailyBudgetCents:   nullableInt32ToInt64(slPtr.PerUserDailyBudgetCents),
+			WarningThresholdPercent:   nullableInt32ToInt64(slPtr.WarningThresholdPercent),
+		}
+		objVal, d := types.ObjectValueFrom(ctx, resource_ai_governance.SpendLimitsAttrTypes(), sl)
+		diags.Append(d...)
+		data.SpendLimits = objVal
+	} else {
+		data.SpendLimits = types.ObjectNull(resource_ai_governance.SpendLimitsAttrTypes())
+	}
+
+	return
+}
+
+// nullableInt32ToInt64 converts an SDK NullableInt32 to a Terraform Int64 value.
+func nullableInt32ToInt64(n quantadmingo.NullableInt32) types.Int64 {
+	if n.IsSet() && n.Get() != nil {
+		return types.Int64Value(int64(*n.Get()))
+	}
+	return types.Int64Null()
+}
+
+// parseGovernanceResponse reads the JSON response from the governance PUT API
+// and maps it back onto the Terraform model. The PUT response has a different
+// shape (config is map[string]interface{}) than GET (typed fields), so we
+// still need manual parsing here.
 //
 // Expected response shape:
 //

@@ -19,7 +19,7 @@ func mockAiVectorCollectionServer(t *testing.T, org string, collectionId string)
 	currentName := ""
 	currentDescription := ""
 
-	collectionsURL := fmt.Sprintf("%s/api/v3/organisations/%s/ai/vector-db/collections", baseUrl, org)
+	collectionsURL := fmt.Sprintf("%s/api/v3/organizations/%s/ai/vector-db/collections", baseUrl, org)
 	collectionURL := fmt.Sprintf("%s/%s", collectionsURL, collectionId)
 
 	createResponse := func() map[string]interface{} {
