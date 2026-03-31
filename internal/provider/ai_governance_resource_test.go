@@ -22,19 +22,17 @@ func mockAiGovernanceServer(t *testing.T, org string) {
 		"version":     float64(1),
 	}
 
-	governanceURL := fmt.Sprintf("%s/api/v3/organisations/%s/ai/governance", baseUrl, org)
+	governanceURL := fmt.Sprintf("%s/api/v3/organizations/%s/ai/governance", baseUrl, org)
 
 	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
 		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
 		return httpmock.NewStringResponse(404, "Not Found"), nil
 	})
 
-	// GET governance config
+	// GET governance config — SDK expects flat response (not nested under "config")
 	httpmock.RegisterResponder("GET", governanceURL,
 		func(req *http.Request) (*http.Response, error) {
-			return httpmock.NewJsonResponse(200, map[string]interface{}{
-				"config": currentConfig,
-			})
+			return httpmock.NewJsonResponse(200, currentConfig)
 		})
 
 	// PUT governance config

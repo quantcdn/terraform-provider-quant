@@ -24,7 +24,7 @@ func mockAiSkillServer(t *testing.T, org string, skillId string) {
 	var currentSource map[string]interface{}
 	synced := false
 
-	skillsURL := fmt.Sprintf("%s/api/v3/organisations/%s/ai/skills", baseUrl, org)
+	skillsURL := fmt.Sprintf("%s/api/v3/organizations/%s/ai/skills", baseUrl, org)
 	skillURL := fmt.Sprintf("%s/%s", skillsURL, skillId)
 	importURL := fmt.Sprintf("%s/import", skillsURL)
 	syncURL := fmt.Sprintf("%s/sync", skillURL)
@@ -32,6 +32,7 @@ func mockAiSkillServer(t *testing.T, org string, skillId string) {
 	buildSkillResponse := func() map[string]interface{} {
 		sk := map[string]interface{}{
 			"id":          skillId,
+			"skillId":     skillId,
 			"name":        currentName,
 			"namespace":   fmt.Sprintf("%s/%s", org, currentName),
 			"installedAt": "2026-03-30T10:00:00Z",

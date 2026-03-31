@@ -22,7 +22,7 @@ func mockAiVectorDocumentServer(t *testing.T, org string, collectionId string, d
 	var currentSearchableFields []string
 	documentDeleted := false
 
-	documentsURL := fmt.Sprintf("%s/api/v3/organisations/%s/ai/vector-db/collections/%s/documents",
+	documentsURL := fmt.Sprintf("%s/api/v3/organizations/%s/ai/vector-db/collections/%s/documents",
 		baseUrl, org, collectionId)
 
 	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
