@@ -47,6 +47,26 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 				},
 				Computed: true,
 			},
+			"asn": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "ASN filter type (asn_is, asn_is_not, any)",
+				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any)",
+			},
+			"asn_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed AS numbers",
+				MarkdownDescription: "Allowed AS numbers",
+			},
+			"asn_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded AS numbers",
+				MarkdownDescription: "Excluded AS numbers",
+			},
 			"country": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -186,6 +206,9 @@ func RuleRedirectResourceSchema(ctx context.Context) schema.Schema {
 type RuleRedirectModel struct {
 	Action         types.String      `tfsdk:"action"`
 	ActionConfig   ActionConfigValue `tfsdk:"action_config"`
+	Asn            types.String      `tfsdk:"asn"`
+	AsnIs          types.List        `tfsdk:"asn_is"`
+	AsnIsNot       types.List        `tfsdk:"asn_is_not"`
 	Country        types.String      `tfsdk:"country"`
 	CountryIs      types.List        `tfsdk:"country_is"`
 	CountryIsNot   types.List        `tfsdk:"country_is_not"`

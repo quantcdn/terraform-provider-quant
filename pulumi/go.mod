@@ -7,8 +7,8 @@ toolchain go1.24.1
 require (
 	github.com/pulumi/pulumi-terraform-bridge/v3 v3.116.0
 	github.com/pulumi/pulumi/sdk/v3 v3.190.0
-	github.com/stretchr/testify v1.11.1
 	github.com/quantcdn/terraform-provider-quant/v5 v5.0.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
@@ -140,7 +140,7 @@ require (
 	github.com/pulumi/pulumi-yaml v1.19.1 // indirect
 	github.com/pulumi/pulumi/pkg/v3 v3.190.0 // indirect
 	github.com/pulumi/schema-tools v0.1.2 // indirect
-	github.com/quantcdn/quant-admin-go/v4 v4.13.0 // indirect
+	github.com/quantcdn/quant-admin-go/v4 v4.14.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect

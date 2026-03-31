@@ -181,6 +181,11 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	// ASN conditional list
+	diags.Append(buildConditionalList(ctx,
+		rule.Asn, rule.AsnIs, rule.AsnIsNot,
+		req.SetAsn, req.SetAsnIs, req.SetAsnIsNot,
+	)...)
 	if diags.HasError() {
 		return
 	}
@@ -237,6 +242,11 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 		&rule.Country, &rule.CountryIs, &rule.CountryIsNot,
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
+	)...)
+	// ASN conditional list
+	diags.Append(setConditionalList(ctx,
+		res.Asn, res.AsnIs, res.AsnIsNot,
+		&rule.Asn, &rule.AsnIs, &rule.AsnIsNot,
 	)...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
@@ -308,6 +318,11 @@ func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseRes
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	// ASN conditional list
+	diags.Append(setConditionalList(ctx,
+		api.Asn, api.AsnIs, api.AsnIsNot,
+		&rule.Asn, &rule.AsnIs, &rule.AsnIsNot,
+	)...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
 	rule.ActionConfig = resource_rule_custom_response.NewActionConfigValueNull()
@@ -350,6 +365,11 @@ func callRuleCustomResponseUpdateAPI(ctx context.Context, r *ruleCustomResponseR
 		req.SetCountry, req.SetCountryIs, req.SetCountryIsNot,
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
+	)...)
+	// ASN conditional list
+	diags.Append(buildConditionalList(ctx,
+		rule.Asn, rule.AsnIs, rule.AsnIsNot,
+		req.SetAsn, req.SetAsnIs, req.SetAsnIsNot,
 	)...)
 	if diags.HasError() {
 		return
