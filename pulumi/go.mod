@@ -140,7 +140,7 @@ require (
 	github.com/pulumi/pulumi-yaml v1.19.1 // indirect
 	github.com/pulumi/pulumi/pkg/v3 v3.190.0 // indirect
 	github.com/pulumi/schema-tools v0.1.2 // indirect
-	github.com/quantcdn/quant-admin-go/v4 v4.14.0 // indirect
+	github.com/quantcdn/quant-admin-go/v4 v4.15.3 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect

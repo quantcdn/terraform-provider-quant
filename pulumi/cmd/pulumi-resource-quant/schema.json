@@ -98,6 +98,60 @@
         }
     },
     "types": {
+        "quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits": {
+            "properties": {
+                "dailyBudgetCents": {
+                    "type": "integer",
+                    "description": "Daily budget in cents\n"
+                },
+                "monthlyBudgetCents": {
+                    "type": "integer",
+                    "description": "Monthly budget in cents\n"
+                },
+                "perUserDailyBudgetCents": {
+                    "type": "integer",
+                    "description": "Per-user daily budget in cents\n"
+                },
+                "perUserMonthlyBudgetCents": {
+                    "type": "integer",
+                    "description": "Per-user monthly budget in cents\n"
+                },
+                "warningThresholdPercent": {
+                    "type": "integer",
+                    "description": "Warning threshold as a percentage of budget (0-100)\n"
+                }
+            },
+            "type": "object"
+        },
+        "quant:index/AiSkillSource:AiSkillSource": {
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path within the repository\n"
+                },
+                "repo": {
+                    "type": "string",
+                    "description": "GitHub repository in `org/repo` format\n"
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Source type: \u003cspan pulumi-lang-nodejs=\"`github`\" pulumi-lang-dotnet=\"`Github`\" pulumi-lang-go=\"`github`\" pulumi-lang-python=\"`github`\" pulumi-lang-yaml=\"`github`\" pulumi-lang-java=\"`github`\"\u003e`github`\u003c/span\u003e or `skills.sh`\n"
+                },
+                "url": {
+                    "type": "string",
+                    "description": "skills.sh URL\n"
+                },
+                "version": {
+                    "type": "string",
+                    "description": "Pinned version tag\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "type",
+                "version"
+            ]
+        },
         "quant:index/CrawlerAssets:CrawlerAssets": {
             "properties": {
                 "networkIntercept": {
@@ -1175,6 +1229,466 @@
         }
     },
     "resources": {
+        "quant:index:AiGovernance": {
+            "properties": {
+                "aiEnabled": {
+                    "type": "boolean",
+                    "description": "Whether AI features are enabled for the organization"
+                },
+                "mandatoryFilterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of mandatory content filter policy identifiers"
+                },
+                "mandatoryGuardrailPreset": {
+                    "type": "string",
+                    "description": "Mandatory guardrail preset to enforce on all AI requests"
+                },
+                "modelLists": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of model identifiers for the allowlist or blocklist policy"
+                },
+                "modelPolicy": {
+                    "type": "string",
+                    "description": "Model access policy: \u003cspan pulumi-lang-nodejs=\"`unrestricted`\" pulumi-lang-dotnet=\"`Unrestricted`\" pulumi-lang-go=\"`unrestricted`\" pulumi-lang-python=\"`unrestricted`\" pulumi-lang-yaml=\"`unrestricted`\" pulumi-lang-java=\"`unrestricted`\"\u003e`unrestricted`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`allowlist`\" pulumi-lang-dotnet=\"`Allowlist`\" pulumi-lang-go=\"`allowlist`\" pulumi-lang-python=\"`allowlist`\" pulumi-lang-yaml=\"`allowlist`\" pulumi-lang-java=\"`allowlist`\"\u003e`allowlist`\u003c/span\u003e, or \u003cspan pulumi-lang-nodejs=\"`blocklist`\" pulumi-lang-dotnet=\"`Blocklist`\" pulumi-lang-go=\"`blocklist`\" pulumi-lang-python=\"`blocklist`\" pulumi-lang-yaml=\"`blocklist`\" pulumi-lang-java=\"`blocklist`\"\u003e`blocklist`\u003c/span\u003e"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                },
+                "spendLimits": {
+                    "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits",
+                    "description": "Spend limit configuration for AI usage"
+                },
+                "version": {
+                    "type": "integer",
+                    "description": "Configuration version for optimistic concurrency control"
+                }
+            },
+            "required": [
+                "aiEnabled",
+                "modelPolicy",
+                "organization",
+                "version"
+            ],
+            "inputProperties": {
+                "aiEnabled": {
+                    "type": "boolean",
+                    "description": "Whether AI features are enabled for the organization"
+                },
+                "mandatoryFilterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of mandatory content filter policy identifiers"
+                },
+                "mandatoryGuardrailPreset": {
+                    "type": "string",
+                    "description": "Mandatory guardrail preset to enforce on all AI requests"
+                },
+                "modelLists": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of model identifiers for the allowlist or blocklist policy"
+                },
+                "modelPolicy": {
+                    "type": "string",
+                    "description": "Model access policy: \u003cspan pulumi-lang-nodejs=\"`unrestricted`\" pulumi-lang-dotnet=\"`Unrestricted`\" pulumi-lang-go=\"`unrestricted`\" pulumi-lang-python=\"`unrestricted`\" pulumi-lang-yaml=\"`unrestricted`\" pulumi-lang-java=\"`unrestricted`\"\u003e`unrestricted`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`allowlist`\" pulumi-lang-dotnet=\"`Allowlist`\" pulumi-lang-go=\"`allowlist`\" pulumi-lang-python=\"`allowlist`\" pulumi-lang-yaml=\"`allowlist`\" pulumi-lang-java=\"`allowlist`\"\u003e`allowlist`\u003c/span\u003e, or \u003cspan pulumi-lang-nodejs=\"`blocklist`\" pulumi-lang-dotnet=\"`Blocklist`\" pulumi-lang-go=\"`blocklist`\" pulumi-lang-python=\"`blocklist`\" pulumi-lang-yaml=\"`blocklist`\" pulumi-lang-java=\"`blocklist`\"\u003e`blocklist`\u003c/span\u003e"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                },
+                "spendLimits": {
+                    "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits",
+                    "description": "Spend limit configuration for AI usage"
+                }
+            },
+            "requiredInputs": [
+                "aiEnabled",
+                "modelPolicy"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiGovernance resources.\n",
+                "properties": {
+                    "aiEnabled": {
+                        "type": "boolean",
+                        "description": "Whether AI features are enabled for the organization"
+                    },
+                    "mandatoryFilterPolicies": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of mandatory content filter policy identifiers"
+                    },
+                    "mandatoryGuardrailPreset": {
+                        "type": "string",
+                        "description": "Mandatory guardrail preset to enforce on all AI requests"
+                    },
+                    "modelLists": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of model identifiers for the allowlist or blocklist policy"
+                    },
+                    "modelPolicy": {
+                        "type": "string",
+                        "description": "Model access policy: \u003cspan pulumi-lang-nodejs=\"`unrestricted`\" pulumi-lang-dotnet=\"`Unrestricted`\" pulumi-lang-go=\"`unrestricted`\" pulumi-lang-python=\"`unrestricted`\" pulumi-lang-yaml=\"`unrestricted`\" pulumi-lang-java=\"`unrestricted`\"\u003e`unrestricted`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`allowlist`\" pulumi-lang-dotnet=\"`Allowlist`\" pulumi-lang-go=\"`allowlist`\" pulumi-lang-python=\"`allowlist`\" pulumi-lang-yaml=\"`allowlist`\" pulumi-lang-java=\"`allowlist`\"\u003e`allowlist`\u003c/span\u003e, or \u003cspan pulumi-lang-nodejs=\"`blocklist`\" pulumi-lang-dotnet=\"`Blocklist`\" pulumi-lang-go=\"`blocklist`\" pulumi-lang-python=\"`blocklist`\" pulumi-lang-yaml=\"`blocklist`\" pulumi-lang-java=\"`blocklist`\"\u003e`blocklist`\u003c/span\u003e"
+                    },
+                    "organization": {
+                        "type": "string",
+                        "description": "Organization machine name (defaults to provider organization)"
+                    },
+                    "spendLimits": {
+                        "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits",
+                        "description": "Spend limit configuration for AI usage"
+                    },
+                    "version": {
+                        "type": "integer",
+                        "description": "Configuration version for optimistic concurrency control"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "quant:index:AiSkill": {
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "Inline skill content. Conflicts with \u003cspan pulumi-lang-nodejs=\"`source`\" pulumi-lang-dotnet=\"`Source`\" pulumi-lang-go=\"`source`\" pulumi-lang-python=\"`source`\" pulumi-lang-yaml=\"`source`\" pulumi-lang-java=\"`source`\"\u003e`source`\u003c/span\u003e."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Skill description"
+                },
+                "installedAt": {
+                    "type": "string",
+                    "description": "Timestamp when the skill was installed"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Skill name"
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "Skill namespace"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                },
+                "source": {
+                    "$ref": "#/types/quant:index/AiSkillSource:AiSkillSource",
+                    "description": "External source for importing a skill. Conflicts with \u003cspan pulumi-lang-nodejs=\"`content`\" pulumi-lang-dotnet=\"`Content`\" pulumi-lang-go=\"`content`\" pulumi-lang-python=\"`content`\" pulumi-lang-yaml=\"`content`\" pulumi-lang-java=\"`content`\"\u003e`content`\u003c/span\u003e."
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tags for categorizing the skill"
+                },
+                "triggerCondition": {
+                    "type": "string",
+                    "description": "Condition that triggers the skill"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "description": "Timestamp when the skill was last updated"
+                }
+            },
+            "required": [
+                "installedAt",
+                "name",
+                "namespace",
+                "organization",
+                "updatedAt"
+            ],
+            "inputProperties": {
+                "content": {
+                    "type": "string",
+                    "description": "Inline skill content. Conflicts with \u003cspan pulumi-lang-nodejs=\"`source`\" pulumi-lang-dotnet=\"`Source`\" pulumi-lang-go=\"`source`\" pulumi-lang-python=\"`source`\" pulumi-lang-yaml=\"`source`\" pulumi-lang-java=\"`source`\"\u003e`source`\u003c/span\u003e."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Skill description"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Skill name"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                },
+                "source": {
+                    "$ref": "#/types/quant:index/AiSkillSource:AiSkillSource",
+                    "description": "External source for importing a skill. Conflicts with \u003cspan pulumi-lang-nodejs=\"`content`\" pulumi-lang-dotnet=\"`Content`\" pulumi-lang-go=\"`content`\" pulumi-lang-python=\"`content`\" pulumi-lang-yaml=\"`content`\" pulumi-lang-java=\"`content`\"\u003e`content`\u003c/span\u003e."
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tags for categorizing the skill"
+                },
+                "triggerCondition": {
+                    "type": "string",
+                    "description": "Condition that triggers the skill"
+                }
+            },
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiSkill resources.\n",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Inline skill content. Conflicts with \u003cspan pulumi-lang-nodejs=\"`source`\" pulumi-lang-dotnet=\"`Source`\" pulumi-lang-go=\"`source`\" pulumi-lang-python=\"`source`\" pulumi-lang-yaml=\"`source`\" pulumi-lang-java=\"`source`\"\u003e`source`\u003c/span\u003e."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Skill description"
+                    },
+                    "installedAt": {
+                        "type": "string",
+                        "description": "Timestamp when the skill was installed"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Skill name"
+                    },
+                    "namespace": {
+                        "type": "string",
+                        "description": "Skill namespace"
+                    },
+                    "organization": {
+                        "type": "string",
+                        "description": "Organization machine name (defaults to provider organization)"
+                    },
+                    "source": {
+                        "$ref": "#/types/quant:index/AiSkillSource:AiSkillSource",
+                        "description": "External source for importing a skill. Conflicts with \u003cspan pulumi-lang-nodejs=\"`content`\" pulumi-lang-dotnet=\"`Content`\" pulumi-lang-go=\"`content`\" pulumi-lang-python=\"`content`\" pulumi-lang-yaml=\"`content`\" pulumi-lang-java=\"`content`\"\u003e`content`\u003c/span\u003e."
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Tags for categorizing the skill"
+                    },
+                    "triggerCondition": {
+                        "type": "string",
+                        "description": "Condition that triggers the skill"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "description": "Timestamp when the skill was last updated"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "quant:index:AiVectorCollection": {
+            "properties": {
+                "createdAt": {
+                    "type": "string",
+                    "description": "Timestamp when the collection was created"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Collection description"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Collection name (immutable after creation)"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                }
+            },
+            "required": [
+                "createdAt",
+                "name",
+                "organization"
+            ],
+            "inputProperties": {
+                "description": {
+                    "type": "string",
+                    "description": "Collection description"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Collection name (immutable after creation)"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                }
+            },
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiVectorCollection resources.\n",
+                "properties": {
+                    "createdAt": {
+                        "type": "string",
+                        "description": "Timestamp when the collection was created"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Collection description"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Collection name (immutable after creation)"
+                    },
+                    "organization": {
+                        "type": "string",
+                        "description": "Organization machine name (defaults to provider organization)"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "quant:index:AiVectorDocument": {
+            "properties": {
+                "collectionId": {
+                    "type": "string",
+                    "description": "Vector collection UUID"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Document text content"
+                },
+                "contentSha256": {
+                    "type": "string",
+                    "description": "SHA256 hash of content for drift detection"
+                },
+                "documentId": {
+                    "type": "string",
+                    "description": "Auto-assigned document UUID"
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Stable document key (max 512 characters)"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Key-value metadata attached to the document"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                },
+                "searchableFields": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of searchable field names"
+                }
+            },
+            "required": [
+                "collectionId",
+                "content",
+                "contentSha256",
+                "documentId",
+                "key",
+                "organization"
+            ],
+            "inputProperties": {
+                "collectionId": {
+                    "type": "string",
+                    "description": "Vector collection UUID"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Document text content"
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Stable document key (max 512 characters)"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Key-value metadata attached to the document"
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Organization machine name (defaults to provider organization)"
+                },
+                "searchableFields": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of searchable field names"
+                }
+            },
+            "requiredInputs": [
+                "collectionId",
+                "content",
+                "key"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiVectorDocument resources.\n",
+                "properties": {
+                    "collectionId": {
+                        "type": "string",
+                        "description": "Vector collection UUID"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Document text content"
+                    },
+                    "contentSha256": {
+                        "type": "string",
+                        "description": "SHA256 hash of content for drift detection"
+                    },
+                    "documentId": {
+                        "type": "string",
+                        "description": "Auto-assigned document UUID"
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "Stable document key (max 512 characters)"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Key-value metadata attached to the document"
+                    },
+                    "organization": {
+                        "type": "string",
+                        "description": "Organization machine name (defaults to provider organization)"
+                    },
+                    "searchableFields": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of searchable field names"
+                    }
+                },
+                "type": "object"
+            }
+        },
         "quant:index:Application": {
             "properties": {
                 "appName": {

@@ -88,6 +88,12 @@ func Provider() tfbridge.ProviderInfo {
 			"quant_cron_job":             {Tok: "quant:index:CronJob", ComputeID: fieldComputeID("name")},
 			"quant_kv_store":             {Tok: "quant:index:KvStore", ComputeID: fieldComputeID("storeId")},
 			"quant_kv_item":              {Tok: "quant:index:KvItem", ComputeID: fieldComputeID("key")},
+
+			// AI resources
+			"quant_ai_governance":        {Tok: "quant:index:AiGovernance"},
+			"quant_ai_vector_collection": {Tok: "quant:index:AiVectorCollection", ComputeID: fieldComputeID("id")},
+			"quant_ai_vector_document":   {Tok: "quant:index:AiVectorDocument", ComputeID: fieldComputeID("documentId")},
+			"quant_ai_skill":             {Tok: "quant:index:AiSkill", ComputeID: fieldComputeID("id")},
 		},
 
 		DataSources: map[string]*tfbridge.DataSourceInfo{

@@ -757,8 +757,8 @@ github.com/pulumi/terraform-diff-reader v0.0.2 h1:kTE4nEXU3/SYXESvAIem+wyHMI3abq
 github.com/pulumi/terraform-diff-reader v0.0.2/go.mod h1:sZ9FUzGO+yM41hsQHs/yIcj/Y993qMdBxBU5mpDmAfQ=
 github.com/pulumi/terraform-plugin-sdk/v2 v2.0.0-20250923233607-7f1981c8674a h1:bTwou+tt2fyfuuCp9+VQOlgEJk/xKEaYeoX2HCtp2es=
 github.com/pulumi/terraform-plugin-sdk/v2 v2.0.0-20250923233607-7f1981c8674a/go.mod h1:rpW/bFN645nI+o0jth9hyIs/eWi3GP3B1J39fWZKC0Y=
-github.com/quantcdn/quant-admin-go/v4 v4.14.0 h1:x+p9lH1wi8taaTVjABSoNRMkRxDINxMmoofa49vX6S4=
-github.com/quantcdn/quant-admin-go/v4 v4.14.0/go.mod h1:IHW0nqZIs1meRihtfkKedVrmjl8iuKqVxM9i9lExoAw=
+github.com/quantcdn/quant-admin-go/v4 v4.15.3 h1:RbzkqvGLmiCZBD68/vtSf6AEOAHITwKGf5OSFGqBquY=
+github.com/quantcdn/quant-admin-go/v4 v4.15.3/go.mod h1:IHW0nqZIs1meRihtfkKedVrmjl8iuKqVxM9i9lExoAw=
 github.com/rhysd/go-fakeio v1.0.0 h1:+TjiKCOs32dONY7DaoVz/VPOdvRkPfBkEyUDIpM8FQY=
 github.com/rhysd/go-fakeio v1.0.0/go.mod h1:joYxF906trVwp2JLrE4jlN7A0z6wrz8O6o1UjarbFzE=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
