@@ -94,11 +94,11 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p dist/pulumi
-          cd pulumi/provider
+          cd pulumi
           BINARY_NAME="pulumi-resource-quant"
           if [ "$GOOS" = "windows" ]; then BINARY_NAME="${BINARY_NAME}.exe"; fi
           go build -ldflags "-s -w -X github.com/quantcdn/terraform-provider-quant/v5/pulumi/provider/pkg/version.Version=${VERSION}" \
-            -o "../../dist/pulumi/${BINARY_NAME}" ./cmd/pulumi-resource-quant
+            -o "../dist/pulumi/${BINARY_NAME}" ./provider/cmd/pulumi-resource-quant
 
       - name: Package Pulumi tarball
         env:
@@ -156,12 +156,12 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          cd pulumi/provider
+          cd pulumi
           go build -ldflags "-X github.com/quantcdn/terraform-provider-quant/v5/pulumi/provider/pkg/version.Version=${VERSION}" \
-            -o ../../bin/pulumi-tfgen-quant ./cmd/pulumi-tfgen-quant
+            -o ../bin/pulumi-tfgen-quant ./provider/cmd/pulumi-tfgen-quant
 
       - name: Generate Node.js SDK
-        run: ./bin/pulumi-tfgen-quant nodejs --out pulumi/sdk/nodejs
+        run: cd pulumi && ../bin/pulumi-tfgen-quant nodejs --out sdk/nodejs
 
       - name: Set SDK version
         env:

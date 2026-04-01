@@ -28,7 +28,7 @@ func ensureProvider(t *testing.T) {
 		// Tests run from pulumi/provider/, so .. is pulumi/
 		pulumiDir, _ := filepath.Abs("..")
 		binDir = filepath.Join(pulumiDir, "bin")
-		cmd := exec.Command("go", "build", "-o", filepath.Join(binDir, "pulumi-resource-quant"), "./cmd/pulumi-resource-quant")
+		cmd := exec.Command("go", "build", "-o", filepath.Join(binDir, "pulumi-resource-quant"), "./provider/cmd/pulumi-resource-quant")
 		cmd.Dir = pulumiDir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -415,9 +415,9 @@ func TestDataSource_GetProjectsToken(t *testing.T) {
 
 func TestProviderInfo_ResourceCount(t *testing.T) {
 	info := Provider()
-	// Verify resource count matches generated registration list
-	// (both are generated from generator_config.yml, so they must be equal)
-	assert.GreaterOrEqual(t, len(info.Resources), 1, "should have at least 1 resource mapping")
+	// Both Resources() and bridge mappings are generated from generator_config.yml.
+	// If this count changes, update it — but it should match the registrations section.
+	assert.Equal(t, 24, len(info.Resources), "resource count must match generator_config.yml registrations")
 }
 
 func TestProviderInfo_DataSourceCount(t *testing.T) {
