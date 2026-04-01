@@ -325,6 +325,40 @@ func mapGetSkillResponse(ctx context.Context, resp *quantadmingo.GetSkill200Resp
 		data.Namespace = types.StringNull()
 	}
 
+	// allowed_tools
+	if at := sk.GetAllowedTools(); len(at) > 0 {
+		atl, d := types.ListValueFrom(ctx, types.StringType, at)
+		diags.Append(d...)
+		data.AllowedTools = atl
+	} else {
+		data.AllowedTools = types.ListNull(types.StringType)
+	}
+
+	// required_tools
+	if rt := sk.GetRequiredTools(); len(rt) > 0 {
+		rtl, d := types.ListValueFrom(ctx, types.StringType, rt)
+		diags.Append(d...)
+		data.RequiredTools = rtl
+	} else {
+		data.RequiredTools = types.ListNull(types.StringType)
+	}
+
+	// disable_model_invocation
+	if dmi, ok := sk.GetDisableModelInvocationOk(); ok && dmi != nil {
+		data.DisableModelInvocation = types.BoolValue(*dmi)
+	} else {
+		data.DisableModelInvocation = types.BoolNull()
+	}
+
+	// installed_by
+	data.InstalledBy = types.StringNull()
+
+	// Computed-only response metadata.
+	data.Message = types.StringNull()
+	data.Success = types.BoolValue(true) // GET succeeded
+	data.Files = resource_ai_skill.NewFilesValueNull()
+	data.Skill = resource_ai_skill.NewSkillValueNull()
+
 	return
 }
 
@@ -381,6 +415,69 @@ func mapSkillFromMap(ctx context.Context, skillMap map[string]interface{}, org s
 	} else {
 		data.Namespace = types.StringNull()
 	}
+
+	// allowed_tools
+	if v, ok := skillMap["allowedTools"]; ok && v != nil {
+		if arr, ok := v.([]interface{}); ok && len(arr) > 0 {
+			tools := make([]string, 0, len(arr))
+			for _, item := range arr {
+				if s, ok := item.(string); ok {
+					tools = append(tools, s)
+				}
+			}
+			tl, d := types.ListValueFrom(ctx, types.StringType, tools)
+			diags.Append(d...)
+			data.AllowedTools = tl
+		} else {
+			data.AllowedTools = types.ListNull(types.StringType)
+		}
+	} else {
+		data.AllowedTools = types.ListNull(types.StringType)
+	}
+
+	// required_tools
+	if v, ok := skillMap["requiredTools"]; ok && v != nil {
+		if arr, ok := v.([]interface{}); ok && len(arr) > 0 {
+			tools := make([]string, 0, len(arr))
+			for _, item := range arr {
+				if s, ok := item.(string); ok {
+					tools = append(tools, s)
+				}
+			}
+			tl, d := types.ListValueFrom(ctx, types.StringType, tools)
+			diags.Append(d...)
+			data.RequiredTools = tl
+		} else {
+			data.RequiredTools = types.ListNull(types.StringType)
+		}
+	} else {
+		data.RequiredTools = types.ListNull(types.StringType)
+	}
+
+	// disable_model_invocation
+	if v, ok := skillMap["disableModelInvocation"]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			data.DisableModelInvocation = types.BoolValue(b)
+		} else {
+			data.DisableModelInvocation = types.BoolNull()
+		}
+	} else {
+		data.DisableModelInvocation = types.BoolNull()
+	}
+
+	// installed_by
+	if s := optionalStringFromMap(skillMap, "installedBy"); !s.IsNull() {
+		data.InstalledBy = s
+	} else {
+		data.InstalledBy = types.StringNull()
+	}
+
+	// Computed-only fields: must always be set (even to null) to avoid "unknown"
+	// values that crash the Pulumi bridge during state serialization.
+	data.Message = types.StringNull()
+	data.Success = types.BoolNull()
+	data.Files = resource_ai_skill.NewFilesValueNull()
+	data.Skill = resource_ai_skill.NewSkillValueNull()
 
 	return
 }

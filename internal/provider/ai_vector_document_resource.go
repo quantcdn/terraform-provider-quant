@@ -192,6 +192,23 @@ func callVectorDocumentUpsertAPI(ctx context.Context, r *aiVectorDocumentResourc
 
 	data.Organisation = types.StringValue(org)
 	data.ChunksCreated = types.Int64Value(int64(result.GetChunksCreated()))
+	data.Success = types.BoolValue(result.GetSuccess())
+	if msg, ok := result.GetMessageOk(); ok && msg != nil && *msg != "" {
+		data.Message = types.StringValue(*msg)
+	} else {
+		data.Message = types.StringNull()
+	}
+
+	// Key, Limit, Offset — preserve from plan (user-supplied); null if unknown.
+	if data.Key.IsUnknown() {
+		data.Key = types.StringNull()
+	}
+	if data.Limit.IsUnknown() {
+		data.Limit = types.Int64Null()
+	}
+	if data.Offset.IsUnknown() {
+		data.Offset = types.Int64Null()
+	}
 
 	return
 }
@@ -312,6 +329,24 @@ func parseVectorDocumentReadResponse(ctx context.Context, apiResp *http.Response
 	}
 
 	data.Organisation = types.StringValue(org)
+
+	// Computed-only response metadata — not available from the list endpoint.
+	if data.ChunksCreated.IsUnknown() {
+		data.ChunksCreated = types.Int64Null()
+	}
+	data.Success = types.BoolValue(true) // GET succeeded
+	data.Message = types.StringNull()
+
+	// Key, Limit, Offset — preserve from state; null if unknown.
+	if data.Key.IsUnknown() {
+		data.Key = types.StringNull()
+	}
+	if data.Limit.IsUnknown() {
+		data.Limit = types.Int64Null()
+	}
+	if data.Offset.IsUnknown() {
+		data.Offset = types.Int64Null()
+	}
 
 	return
 }

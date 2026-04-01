@@ -241,6 +241,24 @@ func mapCreateVectorCollectionResponse(resp *quantadmingo.CreateVectorCollection
 		data.EmbeddingModel = types.StringValue(*em)
 	}
 
+	// dimensions
+	if dim, ok := col.GetDimensionsOk(); ok && dim != nil {
+		data.Dimensions = types.Int64Value(int64(*dim))
+	} else {
+		data.Dimensions = types.Int64Null()
+	}
+
+	// Computed-only response metadata.
+	data.Success = types.BoolValue(resp.GetSuccess())
+	if msg, ok := resp.GetMessageOk(); ok && msg != nil && *msg != "" {
+		data.Message = types.StringValue(*msg)
+	} else {
+		data.Message = types.StringNull()
+	}
+
+	// collection nested object — set null (data is already in top-level fields).
+	data.Collection = resource_ai_vector_collection.NewCollectionValueNull()
+
 	return
 }
 
@@ -262,6 +280,20 @@ func mapGetVectorCollectionResponse(resp *quantadmingo.GetVectorCollection200Res
 	if em, ok := col.GetEmbeddingModelOk(); ok && em != nil && *em != "" {
 		data.EmbeddingModel = types.StringValue(*em)
 	}
+
+	// dimensions
+	if dim, ok := col.GetDimensionsOk(); ok && dim != nil {
+		data.Dimensions = types.Int64Value(int64(*dim))
+	} else {
+		data.Dimensions = types.Int64Null()
+	}
+
+	// Computed-only response metadata.
+	data.Success = types.BoolValue(true) // GET succeeded
+	data.Message = types.StringNull()
+
+	// collection nested object — set null (data is already in top-level fields).
+	data.Collection = resource_ai_vector_collection.NewCollectionValueNull()
 
 	return
 }

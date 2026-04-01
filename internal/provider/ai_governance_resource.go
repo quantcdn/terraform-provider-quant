@@ -248,6 +248,10 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 
 	// Map the typed SDK response directly — no HTTP body re-read needed.
 	diags.Append(mapGovernanceConfigFromMap(ctx, sdkResp.GetConfig(), org, data)...)
+
+	// Computed-only fields from the response envelope.
+	data.Success = types.BoolValue(sdkResp.GetSuccess())
+
 	return
 }
 
@@ -283,6 +287,17 @@ func mapGovernanceGetResponse(ctx context.Context, resp *quantadmingo.GetGoverna
 	data.AiEnabled = types.BoolValue(resp.GetAiEnabled())
 	data.ModelPolicy = types.StringValue(resp.GetModelPolicy())
 	data.Version = types.Int64Value(int64(resp.GetVersion()))
+
+	// org_id — from the response or fall back to the org parameter.
+	if orgId, ok := resp.GetOrgIdOk(); ok && orgId != nil && *orgId != "" {
+		data.OrgId = types.StringValue(*orgId)
+	} else {
+		data.OrgId = types.StringValue(org)
+	}
+
+	// Computed-only response metadata.
+	data.Success = types.BoolValue(true) // GET succeeded
+	data.Config = resource_ai_governance.NewConfigValueNull()
 
 	// model_list
 	if ml := resp.GetModelList(); len(ml) > 0 {
@@ -351,6 +366,16 @@ func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interf
 
 	data.ModelPolicy = optionalStringFromConfigMap(configMap, "modelPolicy")
 	data.Version = optionalInt64FromMap(configMap, "version")
+
+	// org_id — from the config map or fall back to the org parameter.
+	if s := optionalStringFromConfigMap(configMap, "orgId"); !s.IsNull() {
+		data.OrgId = s
+	} else {
+		data.OrgId = types.StringValue(org)
+	}
+
+	// Computed-only: config is an opaque empty object, set null.
+	data.Config = resource_ai_governance.NewConfigValueNull()
 
 	// model_list
 	if v, ok := configMap["modelList"]; ok && v != nil {
