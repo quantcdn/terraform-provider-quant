@@ -215,17 +215,25 @@ func buildCreateApplicationRequest(ctx context.Context, data *resource_applicati
 		}
 	}
 
-	// Environment variables — now a types.List of nested objects.
+	// Environment variables — now a types.List of nested EnvironmentValue objects.
 	if !data.Environment.IsNull() && !data.Environment.IsUnknown() {
-		envJSON, err := json.Marshal(data.Environment)
-		if err != nil {
-			diags.AddError("Unable to serialize environment variables", err.Error())
+		var envValues []resource_application.EnvironmentValue
+		diags.Append(data.Environment.ElementsAs(ctx, &envValues, false)...)
+		if diags.HasError() {
 			return nil, diags
 		}
 		var envVars []quantadmingo.CreateApplicationRequestEnvironmentInner
-		if err := json.Unmarshal(envJSON, &envVars); err != nil {
-			diags.AddError("Unable to parse environment variables", err.Error())
-			return nil, diags
+		for _, ev := range envValues {
+			item := quantadmingo.NewCreateApplicationRequestEnvironmentInner()
+			if !ev.Name.IsNull() && !ev.Name.IsUnknown() {
+				v := ev.Name.ValueString()
+				item.Name = &v
+			}
+			if !ev.Value.IsNull() && !ev.Value.IsUnknown() {
+				v := ev.Value.ValueString()
+				item.Value = &v
+			}
+			envVars = append(envVars, *item)
 		}
 		if len(envVars) > 0 {
 			sdkReq.SetEnvironment(envVars)

@@ -237,6 +237,10 @@ func mapCreateVectorCollectionResponse(resp *quantadmingo.CreateVectorCollection
 		data.Description = types.StringNull()
 	}
 
+	if em, ok := col.GetEmbeddingModelOk(); ok && em != nil && *em != "" {
+		data.EmbeddingModel = types.StringValue(*em)
+	}
+
 	return
 }
 
@@ -253,6 +257,10 @@ func mapGetVectorCollectionResponse(resp *quantadmingo.GetVectorCollection200Res
 		data.Description = types.StringValue(*desc)
 	} else if data.Description.IsNull() || data.Description.IsUnknown() {
 		data.Description = types.StringNull()
+	}
+
+	if em, ok := col.GetEmbeddingModelOk(); ok && em != nil && *em != "" {
+		data.EmbeddingModel = types.StringValue(*em)
 	}
 
 	return

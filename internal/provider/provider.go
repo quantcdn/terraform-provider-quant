@@ -130,7 +130,7 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		resp.Diagnostics.AddAttributeError(
 			path.Root("bearer"),
 			"Missing QuantCDN API bearer token",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the QuantCDN API bearer token. "+
+			"The provider cannot create the QuantCDN API client as there is a missing or empty value for the QuantCDN API bearer token. "+
 				"Set the host value in the configuration or use the QUANTCDN_API_TOKEN environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
@@ -139,7 +139,7 @@ func (p *quantProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		resp.Diagnostics.AddAttributeError(
 			path.Root("organization"),
 			"Missing QuantCDN organization",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the QuantCDN API organization. "+
+			"The provider cannot create the QuantCDN API client as there is a missing or empty value for the QuantCDN API organization. "+
 				"Set the host value in the configuration or use the QUANTCDN_ORGANIZATION environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
