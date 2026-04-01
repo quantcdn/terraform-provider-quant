@@ -132,8 +132,8 @@ func (r *volumeResource) ImportState(ctx context.Context, req resource.ImportSta
 }
 
 func (r *volumeResource) getOrg(data *resource_volume.VolumeModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -176,7 +176,7 @@ func callVolumeCreateAPI(ctx context.Context, r *volumeResource, data *resource_
 
 	// Map response to model
 	mapVolumeResponse(vol, data)
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	return
 }
@@ -210,7 +210,7 @@ func callVolumeReadAPI(ctx context.Context, r *volumeResource, data *resource_vo
 	}
 
 	mapVolumeResponse(vol, data)
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	return
 }

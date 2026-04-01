@@ -2,13 +2,10 @@ package provider
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -58,8 +55,8 @@ func (r *aiVectorDocumentResource) Configure(_ context.Context, req resource.Con
 }
 
 func (r *aiVectorDocumentResource) getOrg(data *resource_ai_vector_document.AiVectorDocumentModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -90,12 +87,6 @@ func (r *aiVectorDocumentResource) Read(ctx context.Context, req resource.ReadRe
 
 	resp.Diagnostics.Append(callVectorDocumentReadAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// If the document was not found, remove from state so Terraform plans recreation.
-	if data.DocumentId.IsNull() {
-		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -131,20 +122,10 @@ func (r *aiVectorDocumentResource) Delete(ctx context.Context, req resource.Dele
 	resp.Diagnostics.Append(callVectorDocumentDeleteAPI(ctx, r, &data)...)
 }
 
-// ImportState imports a vector document. Format: "collection-id/document-key"
+// ImportState imports vector documents. Format: "collection-id" or "collection-id/key"
 func (r *aiVectorDocumentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	parts := strings.SplitN(req.ID, "/", 2)
-	if len(parts) != 2 {
-		resp.Diagnostics.AddError(
-			"Invalid import ID",
-			"Import ID must be in the format 'collection-id/document-key'.",
-		)
-		return
-	}
-
 	var data resource_ai_vector_document.AiVectorDocumentModel
-	data.CollectionId = types.StringValue(parts[0])
-	data.Key = types.StringValue(parts[1])
+	data.CollectionId = types.StringValue(req.ID)
 
 	resp.Diagnostics.Append(callVectorDocumentReadAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -158,34 +139,27 @@ func (r *aiVectorDocumentResource) ImportState(ctx context.Context, req resource
 // API helpers
 // ---------------------------------------------------------------------------
 
-func contentSha256(content string) string {
-	h := sha256.Sum256([]byte(content))
-	return hex.EncodeToString(h[:])
-}
-
-// callVectorDocumentUpsertAPI uploads a document via the SDK's UploadVectorDocuments.
+// callVectorDocumentUpsertAPI uploads documents via the SDK's UploadVectorDocuments.
 func callVectorDocumentUpsertAPI(ctx context.Context, r *aiVectorDocumentResource, data *resource_ai_vector_document.AiVectorDocumentModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	doc := quantadmingo.NewUploadVectorDocumentsRequestDocumentsInner(data.Content.ValueString())
-	doc.SetKey(data.Key.ValueString())
-
-	// metadata
-	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
-		var meta map[string]string
-		diags.Append(data.Metadata.ElementsAs(ctx, &meta, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkMeta := quantadmingo.NewUploadVectorDocumentsRequestDocumentsInnerMetadata()
-		sdkMeta.AdditionalProperties = make(map[string]interface{})
-		for k, v := range meta {
-			sdkMeta.AdditionalProperties[k] = v
-		}
-		doc.SetMetadata(*sdkMeta)
+	// Extract documents from the model.
+	var docElements []resource_ai_vector_document.DocumentsValue
+	diags.Append(data.Documents.ElementsAs(ctx, &docElements, false)...)
+	if diags.HasError() {
+		return
 	}
 
-	req := quantadmingo.NewUploadVectorDocumentsRequest([]quantadmingo.UploadVectorDocumentsRequestDocumentsInner{*doc})
+	sdkDocs := make([]quantadmingo.UploadVectorDocumentsRequestDocumentsInner, 0, len(docElements))
+	for _, elem := range docElements {
+		doc := quantadmingo.NewUploadVectorDocumentsRequestDocumentsInner(elem.Content.ValueString())
+		if !elem.Key.IsNull() && !elem.Key.IsUnknown() {
+			doc.SetKey(elem.Key.ValueString())
+		}
+		sdkDocs = append(sdkDocs, *doc)
+	}
+
+	req := quantadmingo.NewUploadVectorDocumentsRequest(sdkDocs)
 
 	result, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.UploadVectorDocuments(
 		r.client.AuthContext, org, data.CollectionId.ValueString(),
@@ -201,26 +175,32 @@ func callVectorDocumentUpsertAPI(ctx context.Context, r *aiVectorDocumentResourc
 		return
 	}
 
-	// Map response — the SDK returns DocumentIds as a string slice.
+	// Map response — DocumentIds from API.
 	if docIds := result.GetDocumentIds(); len(docIds) > 0 {
-		data.DocumentId = types.StringValue(docIds[0])
+		dl, d := types.ListValueFrom(ctx, types.StringType, docIds)
+		diags.Append(d...)
+		data.DocumentIds = dl
+	} else {
+		data.DocumentIds = types.ListNull(types.StringType)
 	}
 
-	data.Organization = types.StringValue(org)
-	data.ContentSha256 = types.StringValue(contentSha256(data.Content.ValueString()))
+	data.Organisation = types.StringValue(org)
+	data.ChunksCreated = types.Int64Value(int64(result.GetChunksCreated()))
+
 	return
 }
 
 func callVectorDocumentReadAPI(ctx context.Context, r *aiVectorDocumentResource, data *resource_ai_vector_document.AiVectorDocumentModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	// ListVectorDocuments returns (*http.Response, error) — no typed body.
-	httpResp, err := r.client.Instance.AIVectorDatabaseAPI.ListVectorDocuments(r.client.AuthContext, org, data.CollectionId.ValueString()).
-		Key(data.Key.ValueString()).Execute()
+	listReq := r.client.Instance.AIVectorDatabaseAPI.ListVectorDocuments(r.client.AuthContext, org, data.CollectionId.ValueString())
+	if !data.Key.IsNull() && !data.Key.IsUnknown() {
+		listReq = listReq.Key(data.Key.ValueString())
+	}
+
+	httpResp, err := listReq.Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			// Signal "not found" by nulling DocumentId — caller handles state removal.
-			data.DocumentId = types.StringNull()
 			return
 		}
 		if httpResp != nil {
@@ -240,8 +220,26 @@ func callVectorDocumentReadAPI(ctx context.Context, r *aiVectorDocumentResource,
 func callVectorDocumentDeleteAPI(ctx context.Context, r *aiVectorDocumentResource, data *resource_ai_vector_document.AiVectorDocumentModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
+	// Collect keys from documents for deletion.
+	var docElements []resource_ai_vector_document.DocumentsValue
+	diags.Append(data.Documents.ElementsAs(ctx, &docElements, false)...)
+	if diags.HasError() {
+		return
+	}
+
+	keys := make([]string, 0, len(docElements))
+	for _, elem := range docElements {
+		if !elem.Key.IsNull() && !elem.Key.IsUnknown() {
+			keys = append(keys, elem.Key.ValueString())
+		}
+	}
+
+	if len(keys) == 0 {
+		return
+	}
+
 	sdkReq := quantadmingo.NewDeleteVectorDocumentsRequest()
-	sdkReq.Keys = []string{data.Key.ValueString()}
+	sdkReq.Keys = keys
 
 	_, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.DeleteVectorDocuments(r.client.AuthContext, org, data.CollectionId.ValueString()).
 		DeleteVectorDocumentsRequest(*sdkReq).Execute()
@@ -261,14 +259,13 @@ func callVectorDocumentDeleteAPI(ctx context.Context, r *aiVectorDocumentResourc
 	return
 }
 
-// parseVectorDocumentReadResponse reads the GET documents response and finds
-// the document matching the key.
+// parseVectorDocumentReadResponse reads the GET documents response.
 //
 // Expected response shape:
 //
 //	{
 //	  "documents": [
-//	    { "documentId": "uuid", "key": "...", "content": "...", "metadata": {...}, "searchableFields": [...] }
+//	    { "documentId": "uuid", "key": "...", "content": "..." }
 //	  ]
 //	}
 func parseVectorDocumentReadResponse(ctx context.Context, apiResp *http.Response, org string, data *resource_ai_vector_document.AiVectorDocumentModel) (diags diag.Diagnostics) {
@@ -280,11 +277,9 @@ func parseVectorDocumentReadResponse(ctx context.Context, apiResp *http.Response
 
 	var envelope struct {
 		Documents []struct {
-			DocumentId       string            `json:"documentId"`
-			Key              string            `json:"key"`
-			Content          string            `json:"content"`
-			Metadata         map[string]string `json:"metadata"`
-			SearchableFields []string          `json:"searchableFields"`
+			DocumentId string `json:"documentId"`
+			Key        string `json:"key"`
+			Content    string `json:"content"`
 		} `json:"documents"`
 	}
 
@@ -294,45 +289,21 @@ func parseVectorDocumentReadResponse(ctx context.Context, apiResp *http.Response
 		return
 	}
 
-	// Find the document matching our key
-	targetKey := data.Key.ValueString()
-	var found bool
+	// Collect document IDs.
+	docIds := make([]string, 0, len(envelope.Documents))
 	for _, doc := range envelope.Documents {
-		if doc.Key == targetKey {
-			found = true
-			data.DocumentId = types.StringValue(doc.DocumentId)
-			data.Content = types.StringValue(doc.Content)
-			data.ContentSha256 = types.StringValue(contentSha256(doc.Content))
-
-			// metadata
-			if len(doc.Metadata) > 0 {
-				m, d := types.MapValueFrom(ctx, types.StringType, doc.Metadata)
-				diags.Append(d...)
-				data.Metadata = m
-			} else if data.Metadata.IsNull() || data.Metadata.IsUnknown() {
-				data.Metadata = types.MapNull(types.StringType)
-			}
-
-			// searchable_fields
-			if len(doc.SearchableFields) > 0 {
-				sf, d := types.ListValueFrom(ctx, types.StringType, doc.SearchableFields)
-				diags.Append(d...)
-				data.SearchableFields = sf
-			} else if data.SearchableFields.IsNull() || data.SearchableFields.IsUnknown() {
-				data.SearchableFields = types.ListNull(types.StringType)
-			}
-
-			break
-		}
+		docIds = append(docIds, doc.DocumentId)
 	}
 
-	if !found {
-		diags.AddError("Vector document not found",
-			fmt.Sprintf("Document with key '%s' not found in API response.", targetKey))
-		return
+	if len(docIds) > 0 {
+		dl, d := types.ListValueFrom(ctx, types.StringType, docIds)
+		diags.Append(d...)
+		data.DocumentIds = dl
+	} else {
+		data.DocumentIds = types.ListNull(types.StringType)
 	}
 
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	return
 }

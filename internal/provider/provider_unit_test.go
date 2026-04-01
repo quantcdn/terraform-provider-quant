@@ -884,7 +884,7 @@ func TestUnitMapCronResponse_AllFieldsSet(t *testing.T) {
 		Description:         types.StringUnknown(),
 		TargetContainerName: types.StringUnknown(),
 		ScheduleExpression:  types.StringUnknown(),
-		Schedule:            types.StringUnknown(),
+		Cron:                types.StringUnknown(),
 		IsEnabled:           types.BoolUnknown(),
 	}
 	mapCronResponse(cron, data)
@@ -895,11 +895,14 @@ func TestUnitMapCronResponse_AllFieldsSet(t *testing.T) {
 	if data.ScheduleExpression.ValueString() != "0 * * * *" {
 		t.Errorf("expected schedule_expression '0 * * * *', got %q", data.ScheduleExpression.ValueString())
 	}
-	if data.Schedule.ValueString() != "0 * * * *" {
-		t.Errorf("expected schedule '0 * * * *', got %q", data.Schedule.ValueString())
+	if data.Cron.ValueString() != "0 * * * *" {
+		t.Errorf("expected cron '0 * * * *', got %q", data.Cron.ValueString())
 	}
-	if data.Command.ValueString() != `["echo","hello"]` {
-		t.Errorf("expected command '%s', got %q", `["echo","hello"]`, data.Command.ValueString())
+	// Command is now a types.List
+	var cmdElems []string
+	data.Command.ElementsAs(context.Background(), &cmdElems, false)
+	if len(cmdElems) != 2 || cmdElems[0] != "echo" || cmdElems[1] != "hello" {
+		t.Errorf("expected command [echo, hello], got %v", cmdElems)
 	}
 	// Unknown fields should be resolved to null
 	if !data.Description.IsNull() {
@@ -929,8 +932,8 @@ func TestUnitMapCronResponse_NilSchedule(t *testing.T) {
 	if data.Name.ValueString() != "cron-no-schedule" {
 		t.Errorf("expected name 'cron-no-schedule', got %q", data.Name.ValueString())
 	}
-	if !data.Schedule.IsNull() {
-		t.Error("expected Schedule to be null when API returns nil")
+	if !data.Cron.IsNull() {
+		t.Error("expected Cron to be null when API returns nil")
 	}
 	// Non-unknown fields should be preserved as-is
 	if data.Description.ValueString() != "existing" {
@@ -945,13 +948,13 @@ func TestUnitMapCronResponse_AllNilFields(t *testing.T) {
 		Description:         types.StringUnknown(),
 		TargetContainerName: types.StringUnknown(),
 		ScheduleExpression:  types.StringUnknown(),
-		Schedule:            types.StringUnknown(),
+		Cron:                types.StringUnknown(),
 		IsEnabled:           types.BoolUnknown(),
 	}
 	mapCronResponse(cron, data)
 
-	if !data.Schedule.IsNull() {
-		t.Error("expected Schedule to be null")
+	if !data.Cron.IsNull() {
+		t.Error("expected Cron to be null")
 	}
 	if !data.IsEnabled.IsNull() {
 		t.Error("expected IsEnabled to be null")

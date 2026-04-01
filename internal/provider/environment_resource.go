@@ -151,8 +151,8 @@ func (r *environmentResource) ImportState(ctx context.Context, req resource.Impo
 }
 
 func (r *environmentResource) getOrg(data *resource_environment.EnvironmentModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -190,34 +190,45 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 		sdkReq.MergeEnvironment = &v
 	}
 
-	// Parse compose definition if provided
+	// ComposeDefinition and SpotConfiguration are now nested objects.
+	// Serialize to JSON then unmarshal into SDK types.
 	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
-		var compose quantadmingo.Compose
-		if err := json.Unmarshal([]byte(data.ComposeDefinition.ValueString()), &compose); err != nil {
-			diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition JSON", err.Error())
-			return
+		objVal, d := data.ComposeDefinition.ToObjectValue(ctx)
+		diags.Append(d...)
+		if !diags.HasError() {
+			composeJSON, err := json.Marshal(objVal)
+			if err == nil {
+				var compose quantadmingo.Compose
+				if err := json.Unmarshal(composeJSON, &compose); err == nil {
+					sdkReq.ComposeDefinition = &compose
+				}
+			}
 		}
-		sdkReq.ComposeDefinition = &compose
 	}
 
-	// Parse spot configuration if provided
 	if !data.SpotConfiguration.IsNull() && !data.SpotConfiguration.IsUnknown() {
-		var spot quantadmingo.SpotConfiguration
-		if err := json.Unmarshal([]byte(data.SpotConfiguration.ValueString()), &spot); err != nil {
-			diags.AddAttributeError(path.Root("spot_configuration"), "Invalid spot_configuration JSON", err.Error())
-			return
+		objVal, d := data.SpotConfiguration.ToObjectValue(ctx)
+		diags.Append(d...)
+		if !diags.HasError() {
+			spotJSON, err := json.Marshal(objVal)
+			if err == nil {
+				var spot quantadmingo.SpotConfiguration
+				if err := json.Unmarshal(spotJSON, &spot); err == nil {
+					sdkReq.SpotConfiguration = &spot
+				}
+			}
 		}
-		sdkReq.SpotConfiguration = &spot
 	}
 
-	// Parse environment variables if provided
-	if !data.EnvironmentVariables.IsNull() && !data.EnvironmentVariables.IsUnknown() {
-		var envVars []quantadmingo.CreateEnvironmentRequestEnvironmentInner
-		if err := json.Unmarshal([]byte(data.EnvironmentVariables.ValueString()), &envVars); err != nil {
-			diags.AddAttributeError(path.Root("environment_variables"), "Invalid environment_variables JSON", err.Error())
-			return
+	// Environment variables — now a types.List of nested objects.
+	if !data.Environment.IsNull() && !data.Environment.IsUnknown() {
+		envJSON, err := json.Marshal(data.Environment)
+		if err == nil {
+			var envVars []quantadmingo.CreateEnvironmentRequestEnvironmentInner
+			if err := json.Unmarshal(envJSON, &envVars); err == nil {
+				sdkReq.Environment = envVars
+			}
 		}
-		sdkReq.Environment = envVars
 	}
 
 	org := r.getOrg(data)
@@ -242,7 +253,7 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 	}
 
 	data.EnvName = types.StringValue(envResp.GetEnvName())
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	// Poll until environment is ready
 	createStateConf := retry.StateChangeConf{
@@ -318,7 +329,7 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 	}
 
 	data.EnvName = types.StringValue(env.GetEnvName())
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	if env.Status != nil {
 		data.Status = types.StringValue(*env.Status)
@@ -372,16 +383,13 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 		data.ImageSuffix = types.StringNull()
 	}
 	if data.SpotConfiguration.IsUnknown() {
-		data.SpotConfiguration = types.StringNull()
-	}
-	if data.EnvironmentVariables.IsUnknown() {
-		data.EnvironmentVariables = types.StringNull()
+		data.SpotConfiguration = resource_environment.NewSpotConfigurationValueNull()
 	}
 	if data.MergeEnvironment.IsUnknown() {
 		data.MergeEnvironment = types.BoolNull()
 	}
 	if data.ComposeDefinition.IsUnknown() {
-		data.ComposeDefinition = types.StringNull()
+		data.ComposeDefinition = resource_environment.NewComposeDefinitionValueNull()
 	}
 
 	return
@@ -394,8 +402,18 @@ func callEnvironmentUpdateAPI(ctx context.Context, r *environmentResource, data 
 	}
 
 	var compose quantadmingo.Compose
-	if err := json.Unmarshal([]byte(data.ComposeDefinition.ValueString()), &compose); err != nil {
-		diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition JSON", err.Error())
+	objVal, d := data.ComposeDefinition.ToObjectValue(ctx)
+	diags.Append(d...)
+	if diags.HasError() {
+		return
+	}
+	composeJSON, err := json.Marshal(objVal)
+	if err != nil {
+		diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition", err.Error())
+		return
+	}
+	if err := json.Unmarshal(composeJSON, &compose); err != nil {
+		diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition", err.Error())
 		return
 	}
 
