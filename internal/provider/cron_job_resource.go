@@ -313,6 +313,8 @@ func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobMod
 	if len(cron.Command) > 0 {
 		cmdList, _ := types.ListValueFrom(ctx, types.StringType, cron.Command)
 		data.Command = cmdList
+	} else if data.Command.IsUnknown() {
+		data.Command = types.ListNull(types.StringType)
 	}
 	if cron.Description.IsSet() && cron.Description.Get() != nil {
 		data.Description = types.StringValue(*cron.Description.Get())
@@ -339,5 +341,14 @@ func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobMod
 	}
 	if data.IsEnabled.IsUnknown() {
 		data.IsEnabled = types.BoolNull()
+	}
+	if data.Application.IsUnknown() {
+		data.Application = types.StringNull()
+	}
+	if data.Environment.IsUnknown() {
+		data.Environment = types.StringNull()
+	}
+	if data.Organisation.IsUnknown() {
+		data.Organisation = types.StringNull()
 	}
 }

@@ -169,9 +169,13 @@ func callKVStoreCreateAPI(ctx context.Context, r *kvStoreResource, data *resourc
 		return
 	}
 
-	data.StoreId = types.StringValue(store.GetId())
+	storeId := store.GetId()
+	data.StoreId = types.StringValue(storeId)
+	data.Id = types.StringValue(storeId)
 	data.Name = types.StringValue(store.GetName())
 	data.Organization = types.StringValue(org)
+	// Project is user-provided (Required); preserve the plan value.
+	// No need to set it here — it's already populated from the plan.
 
 	return
 }
@@ -204,9 +208,16 @@ func callKVStoreReadAPI(ctx context.Context, r *kvStoreResource, data *resource_
 		return
 	}
 
-	data.StoreId = types.StringValue(store.GetId())
+	storeId := store.GetId()
+	data.StoreId = types.StringValue(storeId)
+	data.Id = types.StringValue(storeId)
 	data.Name = types.StringValue(store.GetName())
 	data.Organization = types.StringValue(r.getOrg(data))
+
+	// Resolve any remaining unknown Computed fields
+	if data.Project.IsUnknown() {
+		data.Project = types.StringNull()
+	}
 
 	return
 }

@@ -195,6 +195,24 @@ func callKVItemCreateAPI(ctx context.Context, r *kvItemResource, data *resource_
 	}
 	data.Organization = types.StringValue(org)
 
+	// Map success from response
+	if result.Success != nil {
+		data.Success = types.BoolValue(*result.Success)
+	} else {
+		data.Success = types.BoolValue(true) // API call succeeded
+	}
+
+	// Resolve any remaining unknown Computed fields
+	if data.Secret.IsUnknown() {
+		data.Secret = types.BoolValue(false)
+	}
+	if data.StoreId.IsUnknown() {
+		data.StoreId = types.StringNull()
+	}
+	if data.Project.IsUnknown() {
+		data.Project = types.StringNull()
+	}
+
 	return
 }
 
@@ -246,9 +264,18 @@ func callKVItemReadAPI(ctx context.Context, r *kvItemResource, data *resource_kv
 
 	data.Organization = types.StringValue(org)
 
+	// Read succeeded — mark success
+	data.Success = types.BoolValue(true)
+
 	// Resolve unknown optional/computed fields
 	if data.Secret.IsUnknown() {
 		data.Secret = types.BoolValue(false)
+	}
+	if data.StoreId.IsUnknown() {
+		data.StoreId = types.StringNull()
+	}
+	if data.Project.IsUnknown() {
+		data.Project = types.StringNull()
 	}
 
 	return
@@ -280,8 +307,16 @@ func callKVItemUpdateAPI(ctx context.Context, r *kvItemResource, data *resource_
 	}
 
 	data.Organization = types.StringValue(org)
+	data.Success = types.BoolValue(true) // Update succeeded
+
 	if data.Secret.IsUnknown() {
 		data.Secret = types.BoolValue(false)
+	}
+	if data.StoreId.IsUnknown() {
+		data.StoreId = types.StringNull()
+	}
+	if data.Project.IsUnknown() {
+		data.Project = types.StringNull()
 	}
 
 	return
