@@ -415,7 +415,7 @@ func TestDataSource_GetProjectsToken(t *testing.T) {
 
 func TestProviderInfo_ResourceCount(t *testing.T) {
 	info := Provider()
-	assert.Equal(t, 20, len(info.Resources), "expected 20 resource mappings")
+	assert.Equal(t, 24, len(info.Resources), "expected 24 resource mappings")
 }
 
 func TestProviderInfo_DataSourceCount(t *testing.T) {
