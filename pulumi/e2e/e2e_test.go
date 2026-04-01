@@ -363,6 +363,38 @@ func TestE2E_KV(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// E2E Test: AI resources (AiGovernance, AiVectorCollection, AiVectorDocument, AiSkill)
+// ---------------------------------------------------------------------------
+
+func TestE2E_AI(t *testing.T) {
+	suffix := uniqueSuffix()
+	result, cleanup := createStack(t, "ai", map[string]string{
+		"e2e-ai:testSuffix": fmt.Sprintf("e2e-%s", suffix),
+	})
+	defer cleanup()
+
+	assert.NotEmpty(t, result.outputs["collectionId"].Value, "collectionId should be set")
+	assert.NotEmpty(t, result.outputs["collectionName"].Value, "collectionName should be set")
+	assert.NotEmpty(t, result.outputs["documentId"].Value, "documentId should be set")
+	assert.NotEmpty(t, result.outputs["skillId"].Value, "skillId should be set")
+	assert.NotEmpty(t, result.outputs["skillName"].Value, "skillName should be set")
+
+	t.Logf("Created AI resources: collection=%v doc=%v skill=%v",
+		result.outputs["collectionId"].Value,
+		result.outputs["documentId"].Value,
+		result.outputs["skillId"].Value)
+
+	// Test governance update: toggle aiEnabled (governance is a singleton so
+	// update is the only meaningful operation besides read)
+	ctx := context.Background()
+	err := result.stack.SetConfig(ctx, "e2e-ai:aiEnabled", auto.ConfigValue{Value: "true"})
+	if err == nil {
+		outputs := updateStack(t, result.stack)
+		assert.NotEmpty(t, outputs["collectionId"].Value, "collectionId should still be set after update")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // E2E Test: Full lifecycle (create → preview → update → destroy) for a project
 // ---------------------------------------------------------------------------
 

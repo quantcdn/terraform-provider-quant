@@ -1,0 +1,41 @@
+name: e2e-ai
+runtime: yaml
+description: E2E test for AI resources (AiGovernance, AiVectorCollection, AiVectorDocument, AiSkill)
+config:
+  testSuffix:
+    type: string
+    default: e2e-test
+resources:
+  testGovernance:
+    type: quant:index:AiGovernance
+    properties:
+      aiEnabled: true
+      modelPolicy: unrestricted
+  testCollection:
+    type: quant:index:AiVectorCollection
+    properties:
+      name: e2e-collection-${testSuffix}
+  testDocument:
+    type: quant:index:AiVectorDocument
+    properties:
+      collectionId: ${testCollection.id}
+      key: e2e-doc-${testSuffix}
+      content: This is a test document for E2E testing of the Pulumi provider.
+      metadata:
+        source: e2e-test
+    options:
+      dependsOn:
+        - ${testCollection}
+  testSkill:
+    type: quant:index:AiSkill
+    properties:
+      name: e2e-skill-${testSuffix}
+      description: E2E test skill
+      content: You are a test skill for E2E testing.
+outputs:
+  governanceVersion: ${testGovernance.version}
+  collectionId: ${testCollection.id}
+  collectionName: ${testCollection.name}
+  documentId: ${testDocument.documentId}
+  skillId: ${testSkill.id}
+  skillName: ${testSkill.name}
