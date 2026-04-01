@@ -551,7 +551,7 @@ func mapGetSkillResponse(ctx context.Context, resp *quantadmingo.GetSkill200Resp
 // mapSkillFromMap maps a skill map[string]interface{} (from Create/Import/Update/Sync
 // SDK responses) onto the Terraform model.
 func mapSkillFromMap(ctx context.Context, skillMap map[string]interface{}, org string, data *resource_ai_skill.AiSkillModel) (diags diag.Diagnostics) {
-	data.Id = optionalStringFromMap(skillMap, "id")
+	data.Id = optionalStringFromMap(skillMap, "skillId")
 	data.Organization = types.StringValue(org)
 	data.Name = optionalStringFromMap(skillMap, "name")
 
