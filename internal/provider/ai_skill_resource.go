@@ -385,45 +385,6 @@ func mapSkillFromMap(ctx context.Context, skillMap map[string]interface{}, org s
 	return
 }
 
-// buildSkillMetadataUpdate builds an UpdateSkillRequest from the Terraform model's
-// name, description, tags, and trigger_condition fields. Returns nil if no update
-// is needed (all optional fields are null/unknown).
-func buildSkillMetadataUpdate(ctx context.Context, data *resource_ai_skill.AiSkillModel) (*quantadmingo.UpdateSkillRequest, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	updateReq := quantadmingo.NewUpdateSkillRequest()
-	needsUpdate := false
-
-	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		name := data.Name.ValueString()
-		updateReq.Name = &name
-		needsUpdate = true
-	}
-	if !data.Description.IsNull() && !data.Description.IsUnknown() {
-		desc := data.Description.ValueString()
-		updateReq.Description = &desc
-		needsUpdate = true
-	}
-	if !data.TriggerCondition.IsNull() && !data.TriggerCondition.IsUnknown() {
-		tc := data.TriggerCondition.ValueString()
-		updateReq.TriggerCondition = &tc
-		needsUpdate = true
-	}
-	if !data.Tags.IsNull() && !data.Tags.IsUnknown() {
-		var tags []string
-		diags.Append(data.Tags.ElementsAs(ctx, &tags, false)...)
-		if diags.HasError() {
-			return nil, diags
-		}
-		updateReq.Tags = tags
-		needsUpdate = true
-	}
-
-	if !needsUpdate {
-		return nil, diags
-	}
-	return updateReq, diags
-}
-
 // optionalStringFromMap extracts a string value from a JSON-decoded map.
 func optionalStringFromMap(m map[string]interface{}, key string) types.String {
 	v, ok := m[key]

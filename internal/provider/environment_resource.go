@@ -195,40 +195,54 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
 		objVal, d := data.ComposeDefinition.ToObjectValue(ctx)
 		diags.Append(d...)
-		if !diags.HasError() {
-			composeJSON, err := json.Marshal(objVal)
-			if err == nil {
-				var compose quantadmingo.Compose
-				if err := json.Unmarshal(composeJSON, &compose); err == nil {
-					sdkReq.ComposeDefinition = &compose
-				}
-			}
+		if diags.HasError() {
+			return
 		}
+		composeJSON, err := json.Marshal(objVal)
+		if err != nil {
+			diags.AddError("Unable to serialize compose definition", err.Error())
+			return
+		}
+		var compose quantadmingo.Compose
+		if err := json.Unmarshal(composeJSON, &compose); err != nil {
+			diags.AddError("Unable to parse compose definition", err.Error())
+			return
+		}
+		sdkReq.ComposeDefinition = &compose
 	}
 
 	if !data.SpotConfiguration.IsNull() && !data.SpotConfiguration.IsUnknown() {
 		objVal, d := data.SpotConfiguration.ToObjectValue(ctx)
 		diags.Append(d...)
-		if !diags.HasError() {
-			spotJSON, err := json.Marshal(objVal)
-			if err == nil {
-				var spot quantadmingo.SpotConfiguration
-				if err := json.Unmarshal(spotJSON, &spot); err == nil {
-					sdkReq.SpotConfiguration = &spot
-				}
-			}
+		if diags.HasError() {
+			return
 		}
+		spotJSON, err := json.Marshal(objVal)
+		if err != nil {
+			diags.AddError("Unable to serialize spot configuration", err.Error())
+			return
+		}
+		var spot quantadmingo.SpotConfiguration
+		if err := json.Unmarshal(spotJSON, &spot); err != nil {
+			diags.AddError("Unable to parse spot configuration", err.Error())
+			return
+		}
+		sdkReq.SpotConfiguration = &spot
 	}
 
 	// Environment variables — now a types.List of nested objects.
 	if !data.Environment.IsNull() && !data.Environment.IsUnknown() {
 		envJSON, err := json.Marshal(data.Environment)
-		if err == nil {
-			var envVars []quantadmingo.CreateEnvironmentRequestEnvironmentInner
-			if err := json.Unmarshal(envJSON, &envVars); err == nil {
-				sdkReq.Environment = envVars
-			}
+		if err != nil {
+			diags.AddError("Unable to serialize environment variables", err.Error())
+			return
 		}
+		var envVars []quantadmingo.CreateEnvironmentRequestEnvironmentInner
+		if err := json.Unmarshal(envJSON, &envVars); err != nil {
+			diags.AddError("Unable to parse environment variables", err.Error())
+			return
+		}
+		sdkReq.Environment = envVars
 	}
 
 	org := r.getOrg(data)

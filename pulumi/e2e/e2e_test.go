@@ -392,11 +392,11 @@ func TestE2E_AIVector(t *testing.T) {
 
 	assert.NotEmpty(t, result.outputs["collectionId"].Value, "collectionId should be set")
 	assert.NotEmpty(t, result.outputs["collectionName"].Value, "collectionName should be set")
-	assert.NotEmpty(t, result.outputs["documentId"].Value, "documentId should be set")
+	assert.NotEmpty(t, result.outputs["chunksCreated"].Value, "chunksCreated should be set")
 
-	t.Logf("Created AI vector resources: collection=%v doc=%v",
+	t.Logf("Created AI vector resources: collection=%v chunksCreated=%v",
 		result.outputs["collectionId"].Value,
-		result.outputs["documentId"].Value)
+		result.outputs["chunksCreated"].Value)
 }
 
 // ---------------------------------------------------------------------------

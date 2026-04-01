@@ -90,6 +90,12 @@ func (r *aiVectorDocumentResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
+	// If the collection or documents were deleted externally, remove from state.
+	if data.CollectionId.IsNull() {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -201,6 +207,8 @@ func callVectorDocumentReadAPI(ctx context.Context, r *aiVectorDocumentResource,
 	httpResp, err := listReq.Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			// Signal "not found" by nulling CollectionId — caller handles state removal.
+			data.CollectionId = types.StringNull()
 			return
 		}
 		if httpResp != nil {
