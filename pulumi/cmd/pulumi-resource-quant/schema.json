@@ -13,6 +13,7 @@
     "license": "Apache-2.0",
     "attribution": "This Pulumi package is based on the [`quant` Terraform Provider](https://github.com/quantcdn/terraform-provider-quant).",
     "repository": "https://github.com/quantcdn/terraform-provider-quant",
+    "pluginDownloadURL": "github://api.github.com/quantcdn/terraform-provider-quant",
     "publisher": "QuantCDN",
     "meta": {
         "moduleFormat": "(.*)(?:/[^/]*)"
@@ -26,12 +27,14 @@
                 "quant": "Quant"
             },
             "compatibility": "tfbridge20",
-            "rootNamespace": "QuantCDN"
+            "rootNamespace": "QuantCDN",
+            "respectSchemaVersion": true
         },
         "go": {
-            "importBasePath": "github.com/quantcdn/pulumi-quant/sdk/go/quant",
+            "importBasePath": "github.com/quantcdn/terraform-provider-quant/v5/pulumi/sdk/go/quant",
             "generateResourceContainerTypes": true,
-            "generateExtraInputTypes": true
+            "generateExtraInputTypes": true,
+            "respectSchemaVersion": true
         },
         "nodejs": {
             "packageName": "@quantcdn/pulumi-quant",
@@ -44,7 +47,8 @@
                 "@types/node": "^10.0.0"
             },
             "compatibility": "tfbridge20",
-            "disableUnionOutputTypes": true
+            "disableUnionOutputTypes": true,
+            "respectSchemaVersion": true
         },
         "python": {
             "packageName": "pulumi_quant",
@@ -53,7 +57,10 @@
             },
             "readme": "\u003e This provider is a derived work of the [Terraform Provider](https://github.com/quantcdn/terraform-provider-quant)\n\u003e distributed under [MPL 2.0](https://www.mozilla.org/en-US/MPL/2.0/). If you encounter a bug or missing feature,\n\u003e please consult the source [`terraform-provider-quant` repo](https://github.com/quantcdn/terraform-provider-quant/issues).",
             "compatibility": "tfbridge20",
-            "pyproject": {}
+            "respectSchemaVersion": true,
+            "pyproject": {
+                "enabled": true
+            }
         }
     },
     "config": {

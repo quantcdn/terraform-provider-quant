@@ -15,6 +15,7 @@ generate: tfgen
 	./bin/pulumi-tfgen-quant schema --out $(SCHEMA_DIR)
 	cp $(SCHEMA_DIR)/schema.json cmd/pulumi-resource-quant/schema.json
 	cp $(SCHEMA_DIR)/bridge-metadata.json provider/bridge-metadata.json
+	cp $(SCHEMA_DIR)/bridge-metadata.json cmd/pulumi-resource-quant/bridge-metadata.json
 
 test: ## Run mock acceptance tests (preview-based, no API needed)
 	go test -v -cover ./provider/

@@ -1,1 +1,489 @@
-{}
+{
+    "auto-aliasing": {
+        "resources": {
+            "quant_ai_governance": {
+                "current": "quant:index:AiGovernance",
+                "fields": {
+                    "mandatory_filter_policies": {
+                        "maxItemsOne": false
+                    },
+                    "model_list": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_ai_skill": {
+                "current": "quant:index:AiSkill",
+                "fields": {
+                    "tags": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_ai_vector_collection": {
+                "current": "quant:index:AiVectorCollection"
+            },
+            "quant_ai_vector_document": {
+                "current": "quant:index:AiVectorDocument",
+                "fields": {
+                    "searchable_fields": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_application": {
+                "current": "quant:index:Application"
+            },
+            "quant_crawler": {
+                "current": "quant:index:Crawler",
+                "fields": {
+                    "allowed_domains": {
+                        "maxItemsOne": false
+                    },
+                    "exclude": {
+                        "maxItemsOne": false
+                    },
+                    "include": {
+                        "maxItemsOne": false
+                    },
+                    "sitemap": {
+                        "maxItemsOne": false
+                    },
+                    "start_urls": {
+                        "maxItemsOne": false
+                    },
+                    "status_ok": {
+                        "maxItemsOne": false
+                    },
+                    "urls": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_crawler_schedule": {
+                "current": "quant:index:CrawlerSchedule"
+            },
+            "quant_cron_job": {
+                "current": "quant:index:CronJob"
+            },
+            "quant_domain": {
+                "current": "quant:index:Domain",
+                "fields": {
+                    "dns_go_live_records": {
+                        "maxItemsOne": false
+                    },
+                    "dns_validation_records": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_environment": {
+                "current": "quant:index:Environment"
+            },
+            "quant_header": {
+                "current": "quant:index:Header"
+            },
+            "quant_kv_item": {
+                "current": "quant:index:KvItem"
+            },
+            "quant_kv_store": {
+                "current": "quant:index:KvStore"
+            },
+            "quant_project": {
+                "current": "quant:index:Project"
+            },
+            "quant_rule_auth": {
+                "current": "quant:index:RuleAuth",
+                "fields": {
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_rule_bot_challenge": {
+                "current": "quant:index:RuleBotChallenge",
+                "fields": {
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_rule_content_filter": {
+                "current": "quant:index:RuleContentFilter",
+                "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_rule_custom_response": {
+                "current": "quant:index:RuleCustomResponse",
+                "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_rule_function": {
+                "current": "quant:index:RuleFunction",
+                "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_rule_headers": {
+                "current": "quant:index:RuleHeaders",
+                "fields": {
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_rule_proxy": {
+                "current": "quant:index:RuleProxy",
+                "fields": {
+                    "action_config": {
+                        "fields": {
+                            "failover_origin_status_codes": {
+                                "maxItemsOne": false
+                            },
+                            "proxy_strip_headers": {
+                                "maxItemsOne": false
+                            },
+                            "proxy_strip_request_headers": {
+                                "maxItemsOne": false
+                            },
+                            "static_error_page_status_codes": {
+                                "maxItemsOne": false
+                            },
+                            "waf_config": {
+                                "fields": {
+                                    "allow_ip": {
+                                        "maxItemsOne": false
+                                    },
+                                    "allow_rules": {
+                                        "maxItemsOne": false
+                                    },
+                                    "block_asn": {
+                                        "maxItemsOne": false
+                                    },
+                                    "block_ip": {
+                                        "maxItemsOne": false
+                                    },
+                                    "block_referer": {
+                                        "maxItemsOne": false
+                                    },
+                                    "block_ua": {
+                                        "maxItemsOne": false
+                                    },
+                                    "notify_email": {
+                                        "maxItemsOne": false
+                                    },
+                                    "thresholds": {
+                                        "maxItemsOne": false
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "failover_origin_status_codes": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "proxy_strip_headers": {
+                        "maxItemsOne": false
+                    },
+                    "proxy_strip_request_headers": {
+                        "maxItemsOne": false
+                    },
+                    "static_error_page_status_codes": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    },
+                    "waf_config": {
+                        "fields": {
+                            "allow_ip": {
+                                "maxItemsOne": false
+                            },
+                            "allow_rules": {
+                                "maxItemsOne": false
+                            },
+                            "block_asn": {
+                                "maxItemsOne": false
+                            },
+                            "block_ip": {
+                                "maxItemsOne": false
+                            },
+                            "block_referer": {
+                                "maxItemsOne": false
+                            },
+                            "block_ua": {
+                                "maxItemsOne": false
+                            },
+                            "notify_email": {
+                                "maxItemsOne": false
+                            },
+                            "thresholds": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    }
+                }
+            },
+            "quant_rule_redirect": {
+                "current": "quant:index:RuleRedirect",
+                "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_rule_serve_static": {
+                "current": "quant:index:RuleServeStatic",
+                "fields": {
+                    "country_is": {
+                        "maxItemsOne": false
+                    },
+                    "country_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "domain": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is": {
+                        "maxItemsOne": false
+                    },
+                    "ip_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "method_is": {
+                        "maxItemsOne": false
+                    },
+                    "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_volume": {
+                "current": "quant:index:Volume"
+            }
+        },
+        "datasources": {
+            "quant_project": {
+                "current": "quant:index:getProject"
+            },
+            "quant_projects": {
+                "current": "quant:index:getProjects",
+                "fields": {
+                    "projects": {
+                        "maxItemsOne": false
+                    }
+                }
+            }
+        }
+    },
+    "auto-settings": {}
+}

@@ -1,0 +1,3 @@
+name: quant
+description: A Pulumi resource provider for quant.
+language: schema
