@@ -314,8 +314,23 @@ resources:
     type: quant:index:Application
     properties:
       appName: preview-test-app
-      composeDefinition: |
-        {"containers":[{"name":"web","image":"nginx:latest","cpu":256,"memory":512}]}
+      application: preview-test-app
+      environment: []
+      composeDefinition:
+        containers:
+          - name: web
+            imageReference:
+              type: external
+              identifier: nginx:latest
+            cpu: 256
+            memory: 512
+      database:
+        engine: mysql
+      filesystem:
+        mountPath: /mnt/data
+        required: false
+      minCapacity: 1
+      maxCapacity: 2
 `)
 }
 
@@ -329,6 +344,12 @@ resources:
     properties:
       application: preview-test-app
       envName: staging
+      organisation: test-org
+      imageSuffix: "staging"
+      minCapacity: 1
+      maxCapacity: 2
+      cloneConfigurationFrom: ""
+      mergeEnvironment: false
 `)
 }
 
@@ -356,8 +377,16 @@ resources:
     properties:
       application: preview-test-app
       environment: staging
-      command: '["echo","hello"]'
+      name: test-cron
+      commands:
+        - echo
+        - hello
       scheduleExpression: "0 0 * * *"
+      organisation: test-org
+      cron: test-cron-id
+      description: test cron job
+      isEnabled: true
+      targetContainerName: web
 `)
 }
 
