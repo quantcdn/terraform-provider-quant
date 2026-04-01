@@ -4,128 +4,925 @@ package resource_ai_governance
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
+
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
 
 func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
-		Description:         "Manages AI governance configuration for an organization.",
-		MarkdownDescription: "Manages AI governance configuration for an organization.",
 		Attributes: map[string]schema.Attribute{
-			"organization": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"ai_enabled": schema.BoolAttribute{
-				Required:            true,
-				Description:         "Whether AI features are enabled for the organization",
-				MarkdownDescription: "Whether AI features are enabled for the organization",
+				Required: true,
 			},
-			"model_policy": schema.StringAttribute{
-				Required:            true,
-				Description:         "Model access policy: unrestricted, allowlist, or blocklist",
-				MarkdownDescription: "Model access policy: `unrestricted`, `allowlist`, or `blocklist`",
+			"config": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{},
+				CustomType: ConfigType{
+					ObjectType: types.ObjectType{
+						AttrTypes: ConfigValue{}.AttributeTypes(ctx),
+					},
+				},
+				Computed: true,
+			},
+			"mandatory_filter_policies": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
+			"mandatory_guardrail_preset": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
 				Validators: []validator.String{
-					stringvalidator.OneOf("unrestricted", "allowlist", "blocklist"),
+					stringvalidator.OneOf(
+						"official",
+						"official-sensitive",
+						"protected",
+					),
 				},
 			},
 			"model_list": schema.ListAttribute{
-				Optional:            true,
-				ElementType:         types.StringType,
-				Description:         "List of model identifiers for the allowlist or blocklist policy",
-				MarkdownDescription: "List of model identifiers for the allowlist or blocklist policy",
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
 			},
-			"mandatory_guardrail_preset": schema.StringAttribute{
-				Optional:            true,
-				Description:         "Mandatory guardrail preset to enforce on all AI requests",
-				MarkdownDescription: "Mandatory guardrail preset to enforce on all AI requests",
-			},
-			"mandatory_filter_policies": schema.ListAttribute{
-				Optional:            true,
-				ElementType:         types.StringType,
-				Description:         "List of mandatory content filter policy identifiers",
-				MarkdownDescription: "List of mandatory content filter policy identifiers",
-			},
-			"spend_limits": schema.SingleNestedAttribute{
-				Optional:            true,
-				Description:         "Spend limit configuration for AI usage",
-				MarkdownDescription: "Spend limit configuration for AI usage",
-				Attributes: map[string]schema.Attribute{
-					"monthly_budget_cents": schema.Int64Attribute{
-						Optional:            true,
-						Description:         "Monthly budget in cents",
-						MarkdownDescription: "Monthly budget in cents",
-					},
-					"daily_budget_cents": schema.Int64Attribute{
-						Optional:            true,
-						Description:         "Daily budget in cents",
-						MarkdownDescription: "Daily budget in cents",
-					},
-					"per_user_monthly_budget_cents": schema.Int64Attribute{
-						Optional:            true,
-						Description:         "Per-user monthly budget in cents",
-						MarkdownDescription: "Per-user monthly budget in cents",
-					},
-					"per_user_daily_budget_cents": schema.Int64Attribute{
-						Optional:            true,
-						Description:         "Per-user daily budget in cents",
-						MarkdownDescription: "Per-user daily budget in cents",
-					},
-					"warning_threshold_percent": schema.Int64Attribute{
-						Optional:            true,
-						Description:         "Warning threshold as a percentage of budget (0-100)",
-						MarkdownDescription: "Warning threshold as a percentage of budget (0-100)",
-					},
+			"model_policy": schema.StringAttribute{
+				Required: true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"unrestricted",
+						"allowlist",
+						"blocklist",
+					),
 				},
 			},
-			"version": schema.Int64Attribute{
+			"org_id": schema.StringAttribute{
+				Computed: true,
+			},
+			"organisation": schema.StringAttribute{
+				Optional:            true,
 				Computed:            true,
-				Description:         "Configuration version for optimistic concurrency control",
-				MarkdownDescription: "Configuration version for optimistic concurrency control",
+				Description:         "The organisation ID",
+				MarkdownDescription: "The organisation ID",
+			},
+			"spend_limits": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"daily_budget_cents": schema.Int64Attribute{
+						Computed: true,
+					},
+					"monthly_budget_cents": schema.Int64Attribute{
+						Computed: true,
+					},
+					"per_user_daily_budget_cents": schema.Int64Attribute{
+						Computed: true,
+					},
+					"per_user_monthly_budget_cents": schema.Int64Attribute{
+						Computed: true,
+					},
+					"warning_threshold_percent": schema.Int64Attribute{
+						Computed: true,
+					},
+				},
+				CustomType: SpendLimitsType{
+					ObjectType: types.ObjectType{
+						AttrTypes: SpendLimitsValue{}.AttributeTypes(ctx),
+					},
+				},
+				Optional: true,
+				Computed: true,
+			},
+			"success": schema.BoolAttribute{
+				Computed: true,
+			},
+			"version": schema.Int64Attribute{
+				Optional: true,
+				Computed: true,
 			},
 		},
 	}
 }
 
 type AiGovernanceModel struct {
-	Organization           types.String `tfsdk:"organization"`
-	AiEnabled              types.Bool   `tfsdk:"ai_enabled"`
-	ModelPolicy            types.String `tfsdk:"model_policy"`
-	ModelList              types.List   `tfsdk:"model_list"`
-	MandatoryGuardrailPreset types.String `tfsdk:"mandatory_guardrail_preset"`
-	MandatoryFilterPolicies  types.List   `tfsdk:"mandatory_filter_policies"`
-	SpendLimits            types.Object `tfsdk:"spend_limits"`
-	Version                types.Int64  `tfsdk:"version"`
+	AiEnabled                types.Bool       `tfsdk:"ai_enabled"`
+	Config                   ConfigValue      `tfsdk:"config"`
+	MandatoryFilterPolicies  types.List       `tfsdk:"mandatory_filter_policies"`
+	MandatoryGuardrailPreset types.String     `tfsdk:"mandatory_guardrail_preset"`
+	ModelList                types.List       `tfsdk:"model_list"`
+	ModelPolicy              types.String     `tfsdk:"model_policy"`
+	OrgId                    types.String     `tfsdk:"org_id"`
+	Organisation             types.String     `tfsdk:"organisation"`
+	SpendLimits              SpendLimitsValue `tfsdk:"spend_limits"`
+	Success                  types.Bool       `tfsdk:"success"`
+	Version                  types.Int64      `tfsdk:"version"`
 }
 
-type SpendLimitsModel struct {
-	MonthlyBudgetCents       types.Int64 `tfsdk:"monthly_budget_cents"`
-	DailyBudgetCents         types.Int64 `tfsdk:"daily_budget_cents"`
-	PerUserMonthlyBudgetCents types.Int64 `tfsdk:"per_user_monthly_budget_cents"`
-	PerUserDailyBudgetCents   types.Int64 `tfsdk:"per_user_daily_budget_cents"`
-	WarningThresholdPercent   types.Int64 `tfsdk:"warning_threshold_percent"`
+var _ basetypes.ObjectTypable = ConfigType{}
+
+type ConfigType struct {
+	basetypes.ObjectType
 }
 
-// SpendLimitsAttrTypes returns the attribute type map for the spend_limits
-// nested object. Use this with types.ObjectNull() or types.ObjectValueFrom().
-func SpendLimitsAttrTypes() map[string]attr.Type {
+func (t ConfigType) Equal(o attr.Type) bool {
+	other, ok := o.(ConfigType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t ConfigType) String() string {
+	return "ConfigType"
+}
+
+func (t ConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return ConfigValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewConfigValueNull() ConfigValue {
+	return ConfigValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewConfigValueUnknown() ConfigValue {
+	return ConfigValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ConfigValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing ConfigValue Attribute Value",
+				"While creating a ConfigValue value, a missing attribute value was detected. "+
+					"A ConfigValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid ConfigValue Attribute Type",
+				"While creating a ConfigValue value, an invalid attribute value was detected. "+
+					"A ConfigValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ConfigValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("ConfigValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra ConfigValue Attribute Value",
+				"While creating a ConfigValue value, an extra attribute value was detected. "+
+					"A ConfigValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra ConfigValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewConfigValueUnknown(), diags
+	}
+
+	if diags.HasError() {
+		return NewConfigValueUnknown(), diags
+	}
+
+	return ConfigValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ConfigValue {
+	object, diags := NewConfigValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t ConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewConfigValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewConfigValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewConfigValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewConfigValueMust(ConfigValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t ConfigType) ValueType(ctx context.Context) attr.Value {
+	return ConfigValue{}
+}
+
+var _ basetypes.ObjectValuable = ConfigValue{}
+
+type ConfigValue struct {
+	state attr.ValueState
+}
+
+func (v ConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 0)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 0)
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v ConfigValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v ConfigValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v ConfigValue) String() string {
+	return "ConfigValue"
+}
+
+func (v ConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{})
+
+	return objVal, diags
+}
+
+func (v ConfigValue) Equal(o attr.Value) bool {
+	other, ok := o.(ConfigValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	return true
+}
+
+func (v ConfigValue) Type(ctx context.Context) attr.Type {
+	return ConfigType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v ConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{}
+}
+
+var _ basetypes.ObjectTypable = SpendLimitsType{}
+
+type SpendLimitsType struct {
+	basetypes.ObjectType
+}
+
+func (t SpendLimitsType) Equal(o attr.Type) bool {
+	other, ok := o.(SpendLimitsType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t SpendLimitsType) String() string {
+	return "SpendLimitsType"
+}
+
+func (t SpendLimitsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	dailyBudgetCentsAttribute, ok := attributes["daily_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_budget_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	dailyBudgetCentsVal, ok := dailyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_budget_cents expected to be basetypes.Int64Value, was: %T`, dailyBudgetCentsAttribute))
+	}
+
+	monthlyBudgetCentsAttribute, ok := attributes["monthly_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_budget_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	monthlyBudgetCentsVal, ok := monthlyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, monthlyBudgetCentsAttribute))
+	}
+
+	perUserDailyBudgetCentsAttribute, ok := attributes["per_user_daily_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_user_daily_budget_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	perUserDailyBudgetCentsVal, ok := perUserDailyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_user_daily_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserDailyBudgetCentsAttribute))
+	}
+
+	perUserMonthlyBudgetCentsAttribute, ok := attributes["per_user_monthly_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_user_monthly_budget_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	perUserMonthlyBudgetCentsVal, ok := perUserMonthlyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_user_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserMonthlyBudgetCentsAttribute))
+	}
+
+	warningThresholdPercentAttribute, ok := attributes["warning_threshold_percent"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`warning_threshold_percent is missing from object`)
+
+		return nil, diags
+	}
+
+	warningThresholdPercentVal, ok := warningThresholdPercentAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`warning_threshold_percent expected to be basetypes.Int64Value, was: %T`, warningThresholdPercentAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return SpendLimitsValue{
+		DailyBudgetCents:          dailyBudgetCentsVal,
+		MonthlyBudgetCents:        monthlyBudgetCentsVal,
+		PerUserDailyBudgetCents:   perUserDailyBudgetCentsVal,
+		PerUserMonthlyBudgetCents: perUserMonthlyBudgetCentsVal,
+		WarningThresholdPercent:   warningThresholdPercentVal,
+		state:                     attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSpendLimitsValueNull() SpendLimitsValue {
+	return SpendLimitsValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewSpendLimitsValueUnknown() SpendLimitsValue {
+	return SpendLimitsValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewSpendLimitsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (SpendLimitsValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing SpendLimitsValue Attribute Value",
+				"While creating a SpendLimitsValue value, a missing attribute value was detected. "+
+					"A SpendLimitsValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SpendLimitsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid SpendLimitsValue Attribute Type",
+				"While creating a SpendLimitsValue value, an invalid attribute value was detected. "+
+					"A SpendLimitsValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SpendLimitsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("SpendLimitsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra SpendLimitsValue Attribute Value",
+				"While creating a SpendLimitsValue value, an extra attribute value was detected. "+
+					"A SpendLimitsValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra SpendLimitsValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	dailyBudgetCentsAttribute, ok := attributes["daily_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_budget_cents is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	dailyBudgetCentsVal, ok := dailyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_budget_cents expected to be basetypes.Int64Value, was: %T`, dailyBudgetCentsAttribute))
+	}
+
+	monthlyBudgetCentsAttribute, ok := attributes["monthly_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_budget_cents is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	monthlyBudgetCentsVal, ok := monthlyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, monthlyBudgetCentsAttribute))
+	}
+
+	perUserDailyBudgetCentsAttribute, ok := attributes["per_user_daily_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_user_daily_budget_cents is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	perUserDailyBudgetCentsVal, ok := perUserDailyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_user_daily_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserDailyBudgetCentsAttribute))
+	}
+
+	perUserMonthlyBudgetCentsAttribute, ok := attributes["per_user_monthly_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_user_monthly_budget_cents is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	perUserMonthlyBudgetCentsVal, ok := perUserMonthlyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_user_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserMonthlyBudgetCentsAttribute))
+	}
+
+	warningThresholdPercentAttribute, ok := attributes["warning_threshold_percent"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`warning_threshold_percent is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	warningThresholdPercentVal, ok := warningThresholdPercentAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`warning_threshold_percent expected to be basetypes.Int64Value, was: %T`, warningThresholdPercentAttribute))
+	}
+
+	if diags.HasError() {
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	return SpendLimitsValue{
+		DailyBudgetCents:          dailyBudgetCentsVal,
+		MonthlyBudgetCents:        monthlyBudgetCentsVal,
+		PerUserDailyBudgetCents:   perUserDailyBudgetCentsVal,
+		PerUserMonthlyBudgetCents: perUserMonthlyBudgetCentsVal,
+		WarningThresholdPercent:   warningThresholdPercentVal,
+		state:                     attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSpendLimitsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) SpendLimitsValue {
+	object, diags := NewSpendLimitsValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewSpendLimitsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t SpendLimitsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewSpendLimitsValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewSpendLimitsValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewSpendLimitsValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewSpendLimitsValueMust(SpendLimitsValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t SpendLimitsType) ValueType(ctx context.Context) attr.Value {
+	return SpendLimitsValue{}
+}
+
+var _ basetypes.ObjectValuable = SpendLimitsValue{}
+
+type SpendLimitsValue struct {
+	DailyBudgetCents          basetypes.Int64Value `tfsdk:"daily_budget_cents"`
+	MonthlyBudgetCents        basetypes.Int64Value `tfsdk:"monthly_budget_cents"`
+	PerUserDailyBudgetCents   basetypes.Int64Value `tfsdk:"per_user_daily_budget_cents"`
+	PerUserMonthlyBudgetCents basetypes.Int64Value `tfsdk:"per_user_monthly_budget_cents"`
+	WarningThresholdPercent   basetypes.Int64Value `tfsdk:"warning_threshold_percent"`
+	state                     attr.ValueState
+}
+
+func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 5)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["daily_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["monthly_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["per_user_daily_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["per_user_monthly_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["warning_threshold_percent"] = basetypes.Int64Type{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 5)
+
+		val, err = v.DailyBudgetCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["daily_budget_cents"] = val
+
+		val, err = v.MonthlyBudgetCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["monthly_budget_cents"] = val
+
+		val, err = v.PerUserDailyBudgetCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["per_user_daily_budget_cents"] = val
+
+		val, err = v.PerUserMonthlyBudgetCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["per_user_monthly_budget_cents"] = val
+
+		val, err = v.WarningThresholdPercent.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["warning_threshold_percent"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v SpendLimitsValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v SpendLimitsValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v SpendLimitsValue) String() string {
+	return "SpendLimitsValue"
+}
+
+func (v SpendLimitsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"daily_budget_cents":            basetypes.Int64Type{},
+		"monthly_budget_cents":          basetypes.Int64Type{},
+		"per_user_daily_budget_cents":   basetypes.Int64Type{},
+		"per_user_monthly_budget_cents": basetypes.Int64Type{},
+		"warning_threshold_percent":     basetypes.Int64Type{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"daily_budget_cents":            v.DailyBudgetCents,
+			"monthly_budget_cents":          v.MonthlyBudgetCents,
+			"per_user_daily_budget_cents":   v.PerUserDailyBudgetCents,
+			"per_user_monthly_budget_cents": v.PerUserMonthlyBudgetCents,
+			"warning_threshold_percent":     v.WarningThresholdPercent,
+		})
+
+	return objVal, diags
+}
+
+func (v SpendLimitsValue) Equal(o attr.Value) bool {
+	other, ok := o.(SpendLimitsValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.DailyBudgetCents.Equal(other.DailyBudgetCents) {
+		return false
+	}
+
+	if !v.MonthlyBudgetCents.Equal(other.MonthlyBudgetCents) {
+		return false
+	}
+
+	if !v.PerUserDailyBudgetCents.Equal(other.PerUserDailyBudgetCents) {
+		return false
+	}
+
+	if !v.PerUserMonthlyBudgetCents.Equal(other.PerUserMonthlyBudgetCents) {
+		return false
+	}
+
+	if !v.WarningThresholdPercent.Equal(other.WarningThresholdPercent) {
+		return false
+	}
+
+	return true
+}
+
+func (v SpendLimitsValue) Type(ctx context.Context) attr.Type {
+	return SpendLimitsType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v SpendLimitsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
-		"monthly_budget_cents":          types.Int64Type,
-		"daily_budget_cents":            types.Int64Type,
-		"per_user_monthly_budget_cents": types.Int64Type,
-		"per_user_daily_budget_cents":   types.Int64Type,
-		"warning_threshold_percent":     types.Int64Type,
+		"daily_budget_cents":            basetypes.Int64Type{},
+		"monthly_budget_cents":          basetypes.Int64Type{},
+		"per_user_daily_budget_cents":   basetypes.Int64Type{},
+		"per_user_monthly_budget_cents": basetypes.Int64Type{},
+		"warning_threshold_percent":     basetypes.Int64Type{},
 	}
 }

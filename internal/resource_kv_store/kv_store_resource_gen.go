@@ -12,6 +12,11 @@ import (
 func KvStoreResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Store ID",
+				MarkdownDescription: "Store ID",
+			},
 			"name": schema.StringAttribute{
 				Required:            true,
 				Description:         "Store name",
@@ -20,24 +25,25 @@ func KvStoreResourceSchema(ctx context.Context) schema.Schema {
 			"organization": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Required:            true,
-				Description:         "Project machine name",
-				MarkdownDescription: "Project machine name",
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 			"store_id": schema.StringAttribute{
-				Computed:            true,
-				Description:         "Store ID",
-				MarkdownDescription: "Store ID",
+				Optional: true,
+				Computed: true,
 			},
 		},
 	}
 }
 
 type KvStoreModel struct {
+	Id           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
 	Organization types.String `tfsdk:"organization"`
 	Project      types.String `tfsdk:"project"`

@@ -40,6 +40,26 @@ func RuleServeStaticResourceSchema(ctx context.Context) schema.Schema {
 				},
 				Computed: true,
 			},
+			"asn": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "ASN filter type (asn_is, asn_is_not, any)",
+				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any)",
+			},
+			"asn_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed AS numbers",
+				MarkdownDescription: "Allowed AS numbers",
+			},
+			"asn_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded AS numbers",
+				MarkdownDescription: "Excluded AS numbers",
+			},
 			"country": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -178,6 +198,9 @@ func RuleServeStaticResourceSchema(ctx context.Context) schema.Schema {
 type RuleServeStaticModel struct {
 	Action         types.String      `tfsdk:"action"`
 	ActionConfig   ActionConfigValue `tfsdk:"action_config"`
+	Asn            types.String      `tfsdk:"asn"`
+	AsnIs          types.List        `tfsdk:"asn_is"`
+	AsnIsNot       types.List        `tfsdk:"asn_is_not"`
 	Country        types.String      `tfsdk:"country"`
 	CountryIs      types.List        `tfsdk:"country_is"`
 	CountryIsNot   types.List        `tfsdk:"country_is_not"`
@@ -209,9 +232,11 @@ type ActionConfigType struct {
 
 func (t ActionConfigType) Equal(o attr.Type) bool {
 	other, ok := o.(ActionConfigType)
+
 	if !ok {
 		return false
 	}
+
 	return t.ObjectType.Equal(other.ObjectType)
 }
 
@@ -221,16 +246,25 @@ func (t ActionConfigType) String() string {
 
 func (t ActionConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
 	attributes := in.Attributes()
 
 	staticFilePathAttribute, ok := attributes["static_file_path"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `static_file_path is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`static_file_path is missing from object`)
+
 		return nil, diags
 	}
+
 	staticFilePathVal, ok := staticFilePathAttribute.(basetypes.StringValue)
+
 	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`static_file_path expected to be basetypes.StringValue, was: %T`, staticFilePathAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`static_file_path expected to be basetypes.StringValue, was: %T`, staticFilePathAttribute))
 	}
 
 	if diags.HasError() {
@@ -257,10 +291,13 @@ func NewActionConfigValueUnknown() ActionConfigValue {
 
 func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ActionConfigValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
 	ctx := context.Background()
 
 	for name, attributeType := range attributeTypes {
 		attribute, ok := attributes[name]
+
 		if !ok {
 			diags.AddError(
 				"Missing ActionConfigValue Attribute Value",
@@ -269,8 +306,10 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
 					fmt.Sprintf("ActionConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
 			)
+
 			continue
 		}
+
 		if !attributeType.Equal(attribute.Type(ctx)) {
 			diags.AddError(
 				"Invalid ActionConfigValue Attribute Type",
@@ -285,6 +324,7 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 
 	for name := range attributes {
 		_, ok := attributeTypes[name]
+
 		if !ok {
 			diags.AddError(
 				"Extra ActionConfigValue Attribute Value",
@@ -301,13 +341,21 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 	}
 
 	staticFilePathAttribute, ok := attributes["static_file_path"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `static_file_path is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`static_file_path is missing from object`)
+
 		return NewActionConfigValueUnknown(), diags
 	}
+
 	staticFilePathVal, ok := staticFilePathAttribute.(basetypes.StringValue)
+
 	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`static_file_path expected to be basetypes.StringValue, was: %T`, staticFilePathAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`static_file_path expected to be basetypes.StringValue, was: %T`, staticFilePathAttribute))
 	}
 
 	if diags.HasError() {
@@ -322,8 +370,11 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 
 func NewActionConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ActionConfigValue {
 	object, diags := NewActionConfigValue(attributeTypes, attributes)
+
 	if diags.HasError() {
+		// This could potentially be added to the diag package.
 		diagsStrings := make([]string, 0, len(diags))
+
 		for _, diagnostic := range diags {
 			diagsStrings = append(diagsStrings, fmt.Sprintf(
 				"%s | %s | %s",
@@ -331,8 +382,10 @@ func NewActionConfigValueMust(attributeTypes map[string]attr.Type, attributes ma
 				diagnostic.Summary(),
 				diagnostic.Detail()))
 		}
+
 		panic("NewActionConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
 	}
+
 	return object
 }
 
@@ -340,29 +393,39 @@ func (t ActionConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Val
 	if in.Type() == nil {
 		return NewActionConfigValueNull(), nil
 	}
+
 	if !in.Type().Equal(t.TerraformType(ctx)) {
 		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
 	}
+
 	if !in.IsKnown() {
 		return NewActionConfigValueUnknown(), nil
 	}
+
 	if in.IsNull() {
 		return NewActionConfigValueNull(), nil
 	}
 
 	attributes := map[string]attr.Value{}
+
 	val := map[string]tftypes.Value{}
+
 	err := in.As(&val)
+
 	if err != nil {
 		return nil, err
 	}
+
 	for k, v := range val {
 		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
 		if err != nil {
 			return nil, err
 		}
+
 		attributes[k] = a
 	}
+
 	return NewActionConfigValueMust(ActionConfigValue{}.AttributeTypes(ctx), attributes), nil
 }
 
@@ -392,14 +455,17 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 		vals := make(map[string]tftypes.Value, 1)
 
 		val, err = v.StaticFilePath.ToTerraformValue(ctx)
+
 		if err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
+
 		vals["static_file_path"] = val
 
 		if err := tftypes.ValidateValue(objectType, vals); err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
+
 		return tftypes.NewValue(objectType, vals), nil
 	case attr.ValueStateNull:
 		return tftypes.NewValue(objectType, nil), nil
@@ -424,37 +490,47 @@ func (v ActionConfigValue) String() string {
 
 func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
 	attributeTypes := map[string]attr.Type{
 		"static_file_path": basetypes.StringType{},
 	}
+
 	if v.IsNull() {
 		return types.ObjectNull(attributeTypes), diags
 	}
+
 	if v.IsUnknown() {
 		return types.ObjectUnknown(attributeTypes), diags
 	}
+
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
 			"static_file_path": v.StaticFilePath,
 		})
+
 	return objVal, diags
 }
 
 func (v ActionConfigValue) Equal(o attr.Value) bool {
 	other, ok := o.(ActionConfigValue)
+
 	if !ok {
 		return false
 	}
+
 	if v.state != other.state {
 		return false
 	}
+
 	if v.state != attr.ValueStateKnown {
 		return true
 	}
+
 	if !v.StaticFilePath.Equal(other.StaticFilePath) {
 		return false
 	}
+
 	return true
 }
 

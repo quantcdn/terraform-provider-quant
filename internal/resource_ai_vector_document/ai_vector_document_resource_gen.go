@@ -4,84 +4,1110 @@ package resource_ai_vector_document
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 func AiVectorDocumentResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
-		Description:         "Manages a document in an AI vector database collection.",
-		MarkdownDescription: "Manages a document in an AI vector database collection.",
 		Attributes: map[string]schema.Attribute{
-			"collection_id": schema.StringAttribute{
-				Required:            true,
-				Description:         "Vector collection UUID",
-				MarkdownDescription: "Vector collection UUID",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+			"chunks_created": schema.Int64Attribute{
+				Computed: true,
 			},
-			"organization": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+			"collection_id": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"document_ids": schema.ListAttribute{
+				ElementType: types.StringType,
+				Computed:    true,
+			},
+			"documents": schema.ListNestedAttribute{
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"content": schema.StringAttribute{
+							Required:            true,
+							Description:         "Document text content",
+							MarkdownDescription: "Document text content",
+						},
+						"key": schema.StringAttribute{
+							Optional:            true,
+							Computed:            true,
+							Description:         "Stable document key for upsert",
+							MarkdownDescription: "Stable document key for upsert",
+							Validators: []validator.String{
+								stringvalidator.LengthAtMost(512),
+							},
+						},
+						"metadata": schema.SingleNestedAttribute{
+							Attributes: map[string]schema.Attribute{
+								"section": schema.StringAttribute{
+									Optional: true,
+									Computed: true,
+								},
+								"source_url": schema.StringAttribute{
+									Optional: true,
+									Computed: true,
+								},
+								"tags": schema.ListAttribute{
+									ElementType: types.StringType,
+									Optional:    true,
+									Computed:    true,
+								},
+								"title": schema.StringAttribute{
+									Optional: true,
+									Computed: true,
+								},
+							},
+							CustomType: MetadataType{
+								ObjectType: types.ObjectType{
+									AttrTypes: MetadataValue{}.AttributeTypes(ctx),
+								},
+							},
+							Optional: true,
+							Computed: true,
+						},
+					},
+					CustomType: DocumentsType{
+						ObjectType: types.ObjectType{
+							AttrTypes: DocumentsValue{}.AttributeTypes(ctx),
+						},
+					},
 				},
+				Required: true,
 			},
 			"key": schema.StringAttribute{
-				Required:            true,
-				Description:         "Stable document key (max 512 characters)",
-				MarkdownDescription: "Stable document key (max 512 characters)",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"content": schema.StringAttribute{
-				Required:            true,
-				Description:         "Document text content",
-				MarkdownDescription: "Document text content",
-			},
-			"content_sha256": schema.StringAttribute{
-				Computed:            true,
-				Description:         "SHA256 hash of content for drift detection",
-				MarkdownDescription: "SHA256 hash of content for drift detection",
-			},
-			"metadata": schema.MapAttribute{
 				Optional:            true,
-				ElementType:         types.StringType,
-				Description:         "Key-value metadata attached to the document",
-				MarkdownDescription: "Key-value metadata attached to the document",
-			},
-			"searchable_fields": schema.ListAttribute{
-				Optional:            true,
-				ElementType:         types.StringType,
-				Description:         "List of searchable field names",
-				MarkdownDescription: "List of searchable field names",
-			},
-			"document_id": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Auto-assigned document UUID",
-				MarkdownDescription: "Auto-assigned document UUID",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+				Description:         "Filter by document key",
+				MarkdownDescription: "Filter by document key",
+			},
+			"limit": schema.Int64Attribute{
+				Optional: true,
+				Computed: true,
+				Validators: []validator.Int64{
+					int64validator.AtMost(100),
 				},
+				Default: int64default.StaticInt64(50),
+			},
+			"message": schema.StringAttribute{
+				Computed: true,
+			},
+			"offset": schema.Int64Attribute{
+				Optional: true,
+				Computed: true,
+				Default:  int64default.StaticInt64(0),
+			},
+			"organisation": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"success": schema.BoolAttribute{
+				Computed: true,
 			},
 		},
 	}
 }
 
 type AiVectorDocumentModel struct {
-	CollectionId   types.String `tfsdk:"collection_id"`
-	Organization   types.String `tfsdk:"organization"`
-	Key            types.String `tfsdk:"key"`
-	Content        types.String `tfsdk:"content"`
-	ContentSha256  types.String `tfsdk:"content_sha256"`
-	Metadata       types.Map    `tfsdk:"metadata"`
-	SearchableFields types.List `tfsdk:"searchable_fields"`
-	DocumentId     types.String `tfsdk:"document_id"`
+	ChunksCreated types.Int64  `tfsdk:"chunks_created"`
+	CollectionId  types.String `tfsdk:"collection_id"`
+	DocumentIds   types.List   `tfsdk:"document_ids"`
+	Documents     types.List   `tfsdk:"documents"`
+	Key           types.String `tfsdk:"key"`
+	Limit         types.Int64  `tfsdk:"limit"`
+	Message       types.String `tfsdk:"message"`
+	Offset        types.Int64  `tfsdk:"offset"`
+	Organisation  types.String `tfsdk:"organisation"`
+	Success       types.Bool   `tfsdk:"success"`
+}
+
+var _ basetypes.ObjectTypable = DocumentsType{}
+
+type DocumentsType struct {
+	basetypes.ObjectType
+}
+
+func (t DocumentsType) Equal(o attr.Type) bool {
+	other, ok := o.(DocumentsType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t DocumentsType) String() string {
+	return "DocumentsType"
+}
+
+func (t DocumentsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	contentAttribute, ok := attributes["content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`content is missing from object`)
+
+		return nil, diags
+	}
+
+	contentVal, ok := contentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`content expected to be basetypes.StringValue, was: %T`, contentAttribute))
+	}
+
+	keyAttribute, ok := attributes["key"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`key is missing from object`)
+
+		return nil, diags
+	}
+
+	keyVal, ok := keyAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`key expected to be basetypes.StringValue, was: %T`, keyAttribute))
+	}
+
+	metadataAttribute, ok := attributes["metadata"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`metadata is missing from object`)
+
+		return nil, diags
+	}
+
+	metadataVal, ok := metadataAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`metadata expected to be basetypes.ObjectValue, was: %T`, metadataAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return DocumentsValue{
+		Content:  contentVal,
+		Key:      keyVal,
+		Metadata: metadataVal,
+		state:    attr.ValueStateKnown,
+	}, diags
+}
+
+func NewDocumentsValueNull() DocumentsValue {
+	return DocumentsValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewDocumentsValueUnknown() DocumentsValue {
+	return DocumentsValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewDocumentsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (DocumentsValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing DocumentsValue Attribute Value",
+				"While creating a DocumentsValue value, a missing attribute value was detected. "+
+					"A DocumentsValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("DocumentsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid DocumentsValue Attribute Type",
+				"While creating a DocumentsValue value, an invalid attribute value was detected. "+
+					"A DocumentsValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("DocumentsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("DocumentsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra DocumentsValue Attribute Value",
+				"While creating a DocumentsValue value, an extra attribute value was detected. "+
+					"A DocumentsValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra DocumentsValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewDocumentsValueUnknown(), diags
+	}
+
+	contentAttribute, ok := attributes["content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`content is missing from object`)
+
+		return NewDocumentsValueUnknown(), diags
+	}
+
+	contentVal, ok := contentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`content expected to be basetypes.StringValue, was: %T`, contentAttribute))
+	}
+
+	keyAttribute, ok := attributes["key"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`key is missing from object`)
+
+		return NewDocumentsValueUnknown(), diags
+	}
+
+	keyVal, ok := keyAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`key expected to be basetypes.StringValue, was: %T`, keyAttribute))
+	}
+
+	metadataAttribute, ok := attributes["metadata"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`metadata is missing from object`)
+
+		return NewDocumentsValueUnknown(), diags
+	}
+
+	metadataVal, ok := metadataAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`metadata expected to be basetypes.ObjectValue, was: %T`, metadataAttribute))
+	}
+
+	if diags.HasError() {
+		return NewDocumentsValueUnknown(), diags
+	}
+
+	return DocumentsValue{
+		Content:  contentVal,
+		Key:      keyVal,
+		Metadata: metadataVal,
+		state:    attr.ValueStateKnown,
+	}, diags
+}
+
+func NewDocumentsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) DocumentsValue {
+	object, diags := NewDocumentsValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewDocumentsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t DocumentsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewDocumentsValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewDocumentsValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewDocumentsValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewDocumentsValueMust(DocumentsValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t DocumentsType) ValueType(ctx context.Context) attr.Value {
+	return DocumentsValue{}
+}
+
+var _ basetypes.ObjectValuable = DocumentsValue{}
+
+type DocumentsValue struct {
+	Content  basetypes.StringValue `tfsdk:"content"`
+	Key      basetypes.StringValue `tfsdk:"key"`
+	Metadata basetypes.ObjectValue `tfsdk:"metadata"`
+	state    attr.ValueState
+}
+
+func (v DocumentsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["content"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["key"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["metadata"] = basetypes.ObjectType{
+		AttrTypes: MetadataValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.Content.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["content"] = val
+
+		val, err = v.Key.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["key"] = val
+
+		val, err = v.Metadata.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["metadata"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v DocumentsValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v DocumentsValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v DocumentsValue) String() string {
+	return "DocumentsValue"
+}
+
+func (v DocumentsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var metadata basetypes.ObjectValue
+
+	if v.Metadata.IsNull() {
+		metadata = types.ObjectNull(
+			MetadataValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.Metadata.IsUnknown() {
+		metadata = types.ObjectUnknown(
+			MetadataValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.Metadata.IsNull() && !v.Metadata.IsUnknown() {
+		metadata = types.ObjectValueMust(
+			MetadataValue{}.AttributeTypes(ctx),
+			v.Metadata.Attributes(),
+		)
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"content": basetypes.StringType{},
+		"key":     basetypes.StringType{},
+		"metadata": basetypes.ObjectType{
+			AttrTypes: MetadataValue{}.AttributeTypes(ctx),
+		},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"content":  v.Content,
+			"key":      v.Key,
+			"metadata": metadata,
+		})
+
+	return objVal, diags
+}
+
+func (v DocumentsValue) Equal(o attr.Value) bool {
+	other, ok := o.(DocumentsValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Content.Equal(other.Content) {
+		return false
+	}
+
+	if !v.Key.Equal(other.Key) {
+		return false
+	}
+
+	if !v.Metadata.Equal(other.Metadata) {
+		return false
+	}
+
+	return true
+}
+
+func (v DocumentsValue) Type(ctx context.Context) attr.Type {
+	return DocumentsType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v DocumentsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"content": basetypes.StringType{},
+		"key":     basetypes.StringType{},
+		"metadata": basetypes.ObjectType{
+			AttrTypes: MetadataValue{}.AttributeTypes(ctx),
+		},
+	}
+}
+
+var _ basetypes.ObjectTypable = MetadataType{}
+
+type MetadataType struct {
+	basetypes.ObjectType
+}
+
+func (t MetadataType) Equal(o attr.Type) bool {
+	other, ok := o.(MetadataType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t MetadataType) String() string {
+	return "MetadataType"
+}
+
+func (t MetadataType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	sectionAttribute, ok := attributes["section"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`section is missing from object`)
+
+		return nil, diags
+	}
+
+	sectionVal, ok := sectionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`section expected to be basetypes.StringValue, was: %T`, sectionAttribute))
+	}
+
+	sourceUrlAttribute, ok := attributes["source_url"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`source_url is missing from object`)
+
+		return nil, diags
+	}
+
+	sourceUrlVal, ok := sourceUrlAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`source_url expected to be basetypes.StringValue, was: %T`, sourceUrlAttribute))
+	}
+
+	tagsAttribute, ok := attributes["tags"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tags is missing from object`)
+
+		return nil, diags
+	}
+
+	tagsVal, ok := tagsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tags expected to be basetypes.ListValue, was: %T`, tagsAttribute))
+	}
+
+	titleAttribute, ok := attributes["title"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`title is missing from object`)
+
+		return nil, diags
+	}
+
+	titleVal, ok := titleAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`title expected to be basetypes.StringValue, was: %T`, titleAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return MetadataValue{
+		Section:   sectionVal,
+		SourceUrl: sourceUrlVal,
+		Tags:      tagsVal,
+		Title:     titleVal,
+		state:     attr.ValueStateKnown,
+	}, diags
+}
+
+func NewMetadataValueNull() MetadataValue {
+	return MetadataValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewMetadataValueUnknown() MetadataValue {
+	return MetadataValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewMetadataValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (MetadataValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing MetadataValue Attribute Value",
+				"While creating a MetadataValue value, a missing attribute value was detected. "+
+					"A MetadataValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("MetadataValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid MetadataValue Attribute Type",
+				"While creating a MetadataValue value, an invalid attribute value was detected. "+
+					"A MetadataValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("MetadataValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("MetadataValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra MetadataValue Attribute Value",
+				"While creating a MetadataValue value, an extra attribute value was detected. "+
+					"A MetadataValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra MetadataValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewMetadataValueUnknown(), diags
+	}
+
+	sectionAttribute, ok := attributes["section"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`section is missing from object`)
+
+		return NewMetadataValueUnknown(), diags
+	}
+
+	sectionVal, ok := sectionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`section expected to be basetypes.StringValue, was: %T`, sectionAttribute))
+	}
+
+	sourceUrlAttribute, ok := attributes["source_url"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`source_url is missing from object`)
+
+		return NewMetadataValueUnknown(), diags
+	}
+
+	sourceUrlVal, ok := sourceUrlAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`source_url expected to be basetypes.StringValue, was: %T`, sourceUrlAttribute))
+	}
+
+	tagsAttribute, ok := attributes["tags"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tags is missing from object`)
+
+		return NewMetadataValueUnknown(), diags
+	}
+
+	tagsVal, ok := tagsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tags expected to be basetypes.ListValue, was: %T`, tagsAttribute))
+	}
+
+	titleAttribute, ok := attributes["title"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`title is missing from object`)
+
+		return NewMetadataValueUnknown(), diags
+	}
+
+	titleVal, ok := titleAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`title expected to be basetypes.StringValue, was: %T`, titleAttribute))
+	}
+
+	if diags.HasError() {
+		return NewMetadataValueUnknown(), diags
+	}
+
+	return MetadataValue{
+		Section:   sectionVal,
+		SourceUrl: sourceUrlVal,
+		Tags:      tagsVal,
+		Title:     titleVal,
+		state:     attr.ValueStateKnown,
+	}, diags
+}
+
+func NewMetadataValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) MetadataValue {
+	object, diags := NewMetadataValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewMetadataValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t MetadataType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewMetadataValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewMetadataValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewMetadataValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewMetadataValueMust(MetadataValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t MetadataType) ValueType(ctx context.Context) attr.Value {
+	return MetadataValue{}
+}
+
+var _ basetypes.ObjectValuable = MetadataValue{}
+
+type MetadataValue struct {
+	Section   basetypes.StringValue `tfsdk:"section"`
+	SourceUrl basetypes.StringValue `tfsdk:"source_url"`
+	Tags      basetypes.ListValue   `tfsdk:"tags"`
+	Title     basetypes.StringValue `tfsdk:"title"`
+	state     attr.ValueState
+}
+
+func (v MetadataValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 4)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["section"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["source_url"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["tags"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["title"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 4)
+
+		val, err = v.Section.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["section"] = val
+
+		val, err = v.SourceUrl.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["source_url"] = val
+
+		val, err = v.Tags.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["tags"] = val
+
+		val, err = v.Title.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["title"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v MetadataValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v MetadataValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v MetadataValue) String() string {
+	return "MetadataValue"
+}
+
+func (v MetadataValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var tagsVal basetypes.ListValue
+	switch {
+	case v.Tags.IsUnknown():
+		tagsVal = types.ListUnknown(types.StringType)
+	case v.Tags.IsNull():
+		tagsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		tagsVal, d = types.ListValue(types.StringType, v.Tags.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"section":    basetypes.StringType{},
+			"source_url": basetypes.StringType{},
+			"tags": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"title": basetypes.StringType{},
+		}), diags
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"section":    basetypes.StringType{},
+		"source_url": basetypes.StringType{},
+		"tags": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"title": basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"section":    v.Section,
+			"source_url": v.SourceUrl,
+			"tags":       tagsVal,
+			"title":      v.Title,
+		})
+
+	return objVal, diags
+}
+
+func (v MetadataValue) Equal(o attr.Value) bool {
+	other, ok := o.(MetadataValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Section.Equal(other.Section) {
+		return false
+	}
+
+	if !v.SourceUrl.Equal(other.SourceUrl) {
+		return false
+	}
+
+	if !v.Tags.Equal(other.Tags) {
+		return false
+	}
+
+	if !v.Title.Equal(other.Title) {
+		return false
+	}
+
+	return true
+}
+
+func (v MetadataValue) Type(ctx context.Context) attr.Type {
+	return MetadataType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v MetadataValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"section":    basetypes.StringType{},
+		"source_url": basetypes.StringType{},
+		"tags": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"title": basetypes.StringType{},
+	}
 }

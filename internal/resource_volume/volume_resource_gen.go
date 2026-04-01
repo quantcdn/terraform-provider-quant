@@ -13,24 +13,19 @@ func VolumeResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"access_point_arn": schema.StringAttribute{
-				Computed:            true,
-				Description:         "EFS access point ARN",
-				MarkdownDescription: "EFS access point ARN",
+				Computed: true,
 			},
 			"access_point_id": schema.StringAttribute{
-				Computed:            true,
-				Description:         "EFS access point ID",
-				MarkdownDescription: "EFS access point ID",
+				Computed: true,
 			},
 			"application": schema.StringAttribute{
-				Required:            true,
-				Description:         "Application name",
-				MarkdownDescription: "Application name",
+				Optional:            true,
+				Computed:            true,
+				Description:         "The application ID",
+				MarkdownDescription: "The application ID",
 			},
 			"created_at": schema.StringAttribute{
-				Computed:            true,
-				Description:         "Creation timestamp",
-				MarkdownDescription: "Creation timestamp",
+				Computed: true,
 			},
 			"description": schema.StringAttribute{
 				Optional:            true,
@@ -39,20 +34,19 @@ func VolumeResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Volume description",
 			},
 			"environment": schema.StringAttribute{
-				Required:            true,
-				Description:         "Environment name",
-				MarkdownDescription: "Environment name",
-			},
-			"environment_efs_id": schema.StringAttribute{
-				Computed:            true,
-				Description:         "EFS filesystem ID",
-				MarkdownDescription: "EFS filesystem ID",
-			},
-			"organization": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
+				Description:         "The environment ID",
+				MarkdownDescription: "The environment ID",
+			},
+			"environment_efs_id": schema.StringAttribute{
+				Computed: true,
+			},
+			"organisation": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "The organisation ID",
+				MarkdownDescription: "The organisation ID",
 			},
 			"root_directory": schema.StringAttribute{
 				Optional:            true,
@@ -60,10 +54,14 @@ func VolumeResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Root directory path",
 				MarkdownDescription: "Root directory path",
 			},
-			"volume_id": schema.StringAttribute{
+			"volume": schema.StringAttribute{
+				Optional:            true,
 				Computed:            true,
-				Description:         "Volume ID",
-				MarkdownDescription: "Volume ID",
+				Description:         "The volume ID",
+				MarkdownDescription: "The volume ID",
+			},
+			"volume_id": schema.StringAttribute{
+				Computed: true,
 			},
 			"volume_name": schema.StringAttribute{
 				Required:            true,
@@ -82,8 +80,9 @@ type VolumeModel struct {
 	Description      types.String `tfsdk:"description"`
 	Environment      types.String `tfsdk:"environment"`
 	EnvironmentEfsId types.String `tfsdk:"environment_efs_id"`
-	Organization     types.String `tfsdk:"organization"`
+	Organisation     types.String `tfsdk:"organisation"`
 	RootDirectory    types.String `tfsdk:"root_directory"`
+	Volume           types.String `tfsdk:"volume"`
 	VolumeId         types.String `tfsdk:"volume_id"`
 	VolumeName       types.String `tfsdk:"volume_name"`
 }

@@ -4,149 +4,1951 @@ package resource_ai_skill
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
+
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
 
 func AiSkillResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
-		Description:         "Manages an AI skill for an organization.",
-		MarkdownDescription: "Manages an AI skill for an organization.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed:            true,
-				Description:         "Skill UUID",
-				MarkdownDescription: "Skill UUID",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"organization": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Required:            true,
-				Description:         "Skill name",
-				MarkdownDescription: "Skill name",
-			},
-			"description": schema.StringAttribute{
-				Optional:            true,
-				Description:         "Skill description",
-				MarkdownDescription: "Skill description",
-			},
-			"tags": schema.ListAttribute{
-				Optional:            true,
-				ElementType:         types.StringType,
-				Description:         "Tags for categorizing the skill",
-				MarkdownDescription: "Tags for categorizing the skill",
-			},
-			"trigger_condition": schema.StringAttribute{
-				Optional:            true,
-				Description:         "Condition that triggers the skill",
-				MarkdownDescription: "Condition that triggers the skill",
+			"allowed_tools": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
 			},
 			"content": schema.StringAttribute{
-				Optional:            true,
-				Description:         "Inline skill content. Conflicts with source.",
-				MarkdownDescription: "Inline skill content. Conflicts with `source`.",
+				Required: true,
 			},
-			"source": schema.SingleNestedAttribute{
-				Optional:            true,
-				Description:         "External source for importing a skill. Conflicts with content.",
-				MarkdownDescription: "External source for importing a skill. Conflicts with `content`.",
-				Attributes: map[string]schema.Attribute{
-					"type": schema.StringAttribute{
-						Required:            true,
-						Description:         "Source type: github or skills.sh",
-						MarkdownDescription: "Source type: `github` or `skills.sh`",
-					},
-					"repo": schema.StringAttribute{
-						Optional:            true,
-						Description:         "GitHub repository in org/repo format",
-						MarkdownDescription: "GitHub repository in `org/repo` format",
-					},
-					"path": schema.StringAttribute{
-						Optional:            true,
-						Description:         "File path within the repository",
-						MarkdownDescription: "File path within the repository",
-					},
-					"url": schema.StringAttribute{
-						Optional:            true,
-						Description:         "skills.sh URL",
-						MarkdownDescription: "skills.sh URL",
-					},
-					"version": schema.StringAttribute{
-						Required:            true,
-						Description:         "Pinned version tag",
-						MarkdownDescription: "Pinned version tag",
+			"description": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"disable_model_invocation": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"files": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{},
+				CustomType: FilesType{
+					ObjectType: types.ObjectType{
+						AttrTypes: FilesValue{}.AttributeTypes(ctx),
 					},
 				},
+				Optional: true,
+				Computed: true,
+			},
+			"installed_by": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"message": schema.StringAttribute{
+				Computed: true,
+			},
+			"name": schema.StringAttribute{
+				Required: true,
 			},
 			"namespace": schema.StringAttribute{
-				Computed:            true,
-				Description:         "Skill namespace",
-				MarkdownDescription: "Skill namespace",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Optional: true,
+				Computed: true,
 			},
-			"installed_at": schema.StringAttribute{
+			"organisation": schema.StringAttribute{
+				Optional:            true,
 				Computed:            true,
-				Description:         "Timestamp when the skill was installed",
-				MarkdownDescription: "Timestamp when the skill was installed",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Description:         "The organisation ID",
+				MarkdownDescription: "The organisation ID",
 			},
-			"updated_at": schema.StringAttribute{
+			"required_tools": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
+			"skill": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"allowed_tools": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"content": schema.StringAttribute{
+						Computed: true,
+					},
+					"description": schema.StringAttribute{
+						Computed: true,
+					},
+					"disable_model_invocation": schema.BoolAttribute{
+						Computed: true,
+					},
+					"files": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{},
+						CustomType: FilesType{
+							ObjectType: types.ObjectType{
+								AttrTypes: FilesValue{}.AttributeTypes(ctx),
+							},
+						},
+						Computed: true,
+					},
+					"installed_at": schema.StringAttribute{
+						Computed: true,
+					},
+					"name": schema.StringAttribute{
+						Computed: true,
+					},
+					"namespace": schema.StringAttribute{
+						Computed: true,
+					},
+					"required_tools": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"skill_id": schema.StringAttribute{
+						Computed: true,
+					},
+					"source": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{},
+						CustomType: SourceType{
+							ObjectType: types.ObjectType{
+								AttrTypes: SourceValue{}.AttributeTypes(ctx),
+							},
+						},
+						Computed: true,
+					},
+					"tags": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"trigger_condition": schema.StringAttribute{
+						Computed: true,
+					},
+					"updated_at": schema.StringAttribute{
+						Computed: true,
+					},
+				},
+				CustomType: SkillType{
+					ObjectType: types.ObjectType{
+						AttrTypes: SkillValue{}.AttributeTypes(ctx),
+					},
+				},
+				Computed: true,
+			},
+			"skill_id": schema.StringAttribute{
+				Optional:            true,
 				Computed:            true,
-				Description:         "Timestamp when the skill was last updated",
-				MarkdownDescription: "Timestamp when the skill was last updated",
+				Description:         "The skill ID",
+				MarkdownDescription: "The skill ID",
+			},
+			"success": schema.BoolAttribute{
+				Computed: true,
+			},
+			"tags": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Computed:    true,
+			},
+			"trigger_condition": schema.StringAttribute{
+				Required: true,
 			},
 		},
 	}
 }
 
 type AiSkillModel struct {
-	Id               types.String `tfsdk:"id"`
-	Organization     types.String `tfsdk:"organization"`
-	Name             types.String `tfsdk:"name"`
-	Description      types.String `tfsdk:"description"`
-	Tags             types.List   `tfsdk:"tags"`
-	TriggerCondition types.String `tfsdk:"trigger_condition"`
-	Content          types.String `tfsdk:"content"`
-	Source           types.Object `tfsdk:"source"`
-	Namespace        types.String `tfsdk:"namespace"`
-	InstalledAt      types.String `tfsdk:"installed_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
+	AllowedTools           types.List   `tfsdk:"allowed_tools"`
+	Content                types.String `tfsdk:"content"`
+	Description            types.String `tfsdk:"description"`
+	DisableModelInvocation types.Bool   `tfsdk:"disable_model_invocation"`
+	Files                  FilesValue   `tfsdk:"files"`
+	InstalledBy            types.String `tfsdk:"installed_by"`
+	Message                types.String `tfsdk:"message"`
+	Name                   types.String `tfsdk:"name"`
+	Namespace              types.String `tfsdk:"namespace"`
+	Organisation           types.String `tfsdk:"organisation"`
+	RequiredTools          types.List   `tfsdk:"required_tools"`
+	Skill                  SkillValue   `tfsdk:"skill"`
+	SkillId                types.String `tfsdk:"skill_id"`
+	Success                types.Bool   `tfsdk:"success"`
+	Tags                   types.List   `tfsdk:"tags"`
+	TriggerCondition       types.String `tfsdk:"trigger_condition"`
 }
 
-type SourceModel struct {
-	Type    types.String `tfsdk:"type"`
-	Repo    types.String `tfsdk:"repo"`
-	Path    types.String `tfsdk:"path"`
-	Url     types.String `tfsdk:"url"`
-	Version types.String `tfsdk:"version"`
+var _ basetypes.ObjectTypable = FilesType{}
+
+type FilesType struct {
+	basetypes.ObjectType
 }
 
-// SourceAttrTypes returns the attribute type map for the source nested object.
-// Use this with types.ObjectNull() or types.ObjectValueFrom().
-func SourceAttrTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		"type":    types.StringType,
-		"repo":    types.StringType,
-		"path":    types.StringType,
-		"url":     types.StringType,
-		"version": types.StringType,
+func (t FilesType) Equal(o attr.Type) bool {
+	other, ok := o.(FilesType)
+
+	if !ok {
+		return false
 	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t FilesType) String() string {
+	return "FilesType"
+}
+
+func (t FilesType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return FilesValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewFilesValueNull() FilesValue {
+	return FilesValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewFilesValueUnknown() FilesValue {
+	return FilesValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewFilesValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (FilesValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing FilesValue Attribute Value",
+				"While creating a FilesValue value, a missing attribute value was detected. "+
+					"A FilesValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("FilesValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid FilesValue Attribute Type",
+				"While creating a FilesValue value, an invalid attribute value was detected. "+
+					"A FilesValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("FilesValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("FilesValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra FilesValue Attribute Value",
+				"While creating a FilesValue value, an extra attribute value was detected. "+
+					"A FilesValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra FilesValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewFilesValueUnknown(), diags
+	}
+
+	if diags.HasError() {
+		return NewFilesValueUnknown(), diags
+	}
+
+	return FilesValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewFilesValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) FilesValue {
+	object, diags := NewFilesValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewFilesValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t FilesType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewFilesValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewFilesValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewFilesValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewFilesValueMust(FilesValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t FilesType) ValueType(ctx context.Context) attr.Value {
+	return FilesValue{}
+}
+
+var _ basetypes.ObjectValuable = FilesValue{}
+
+type FilesValue struct {
+	state attr.ValueState
+}
+
+func (v FilesValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 0)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 0)
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v FilesValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v FilesValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v FilesValue) String() string {
+	return "FilesValue"
+}
+
+func (v FilesValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{})
+
+	return objVal, diags
+}
+
+func (v FilesValue) Equal(o attr.Value) bool {
+	other, ok := o.(FilesValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	return true
+}
+
+func (v FilesValue) Type(ctx context.Context) attr.Type {
+	return FilesType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v FilesValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{}
+}
+
+var _ basetypes.ObjectTypable = SkillType{}
+
+type SkillType struct {
+	basetypes.ObjectType
+}
+
+func (t SkillType) Equal(o attr.Type) bool {
+	other, ok := o.(SkillType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t SkillType) String() string {
+	return "SkillType"
+}
+
+func (t SkillType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	allowedToolsAttribute, ok := attributes["allowed_tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_tools is missing from object`)
+
+		return nil, diags
+	}
+
+	allowedToolsVal, ok := allowedToolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_tools expected to be basetypes.ListValue, was: %T`, allowedToolsAttribute))
+	}
+
+	contentAttribute, ok := attributes["content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`content is missing from object`)
+
+		return nil, diags
+	}
+
+	contentVal, ok := contentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`content expected to be basetypes.StringValue, was: %T`, contentAttribute))
+	}
+
+	descriptionAttribute, ok := attributes["description"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`description is missing from object`)
+
+		return nil, diags
+	}
+
+	descriptionVal, ok := descriptionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
+	}
+
+	disableModelInvocationAttribute, ok := attributes["disable_model_invocation"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`disable_model_invocation is missing from object`)
+
+		return nil, diags
+	}
+
+	disableModelInvocationVal, ok := disableModelInvocationAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`disable_model_invocation expected to be basetypes.BoolValue, was: %T`, disableModelInvocationAttribute))
+	}
+
+	filesAttribute, ok := attributes["files"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`files is missing from object`)
+
+		return nil, diags
+	}
+
+	filesVal, ok := filesAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`files expected to be basetypes.ObjectValue, was: %T`, filesAttribute))
+	}
+
+	installedAtAttribute, ok := attributes["installed_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`installed_at is missing from object`)
+
+		return nil, diags
+	}
+
+	installedAtVal, ok := installedAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`installed_at expected to be basetypes.StringValue, was: %T`, installedAtAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return nil, diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	namespaceAttribute, ok := attributes["namespace"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`namespace is missing from object`)
+
+		return nil, diags
+	}
+
+	namespaceVal, ok := namespaceAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`namespace expected to be basetypes.StringValue, was: %T`, namespaceAttribute))
+	}
+
+	requiredToolsAttribute, ok := attributes["required_tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`required_tools is missing from object`)
+
+		return nil, diags
+	}
+
+	requiredToolsVal, ok := requiredToolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`required_tools expected to be basetypes.ListValue, was: %T`, requiredToolsAttribute))
+	}
+
+	skillIdAttribute, ok := attributes["skill_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`skill_id is missing from object`)
+
+		return nil, diags
+	}
+
+	skillIdVal, ok := skillIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`skill_id expected to be basetypes.StringValue, was: %T`, skillIdAttribute))
+	}
+
+	sourceAttribute, ok := attributes["source"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`source is missing from object`)
+
+		return nil, diags
+	}
+
+	sourceVal, ok := sourceAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`source expected to be basetypes.ObjectValue, was: %T`, sourceAttribute))
+	}
+
+	tagsAttribute, ok := attributes["tags"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tags is missing from object`)
+
+		return nil, diags
+	}
+
+	tagsVal, ok := tagsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tags expected to be basetypes.ListValue, was: %T`, tagsAttribute))
+	}
+
+	triggerConditionAttribute, ok := attributes["trigger_condition"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`trigger_condition is missing from object`)
+
+		return nil, diags
+	}
+
+	triggerConditionVal, ok := triggerConditionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`trigger_condition expected to be basetypes.StringValue, was: %T`, triggerConditionAttribute))
+	}
+
+	updatedAtAttribute, ok := attributes["updated_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`updated_at is missing from object`)
+
+		return nil, diags
+	}
+
+	updatedAtVal, ok := updatedAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`updated_at expected to be basetypes.StringValue, was: %T`, updatedAtAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return SkillValue{
+		AllowedTools:           allowedToolsVal,
+		Content:                contentVal,
+		Description:            descriptionVal,
+		DisableModelInvocation: disableModelInvocationVal,
+		Files:                  filesVal,
+		InstalledAt:            installedAtVal,
+		Name:                   nameVal,
+		Namespace:              namespaceVal,
+		RequiredTools:          requiredToolsVal,
+		SkillId:                skillIdVal,
+		Source:                 sourceVal,
+		Tags:                   tagsVal,
+		TriggerCondition:       triggerConditionVal,
+		UpdatedAt:              updatedAtVal,
+		state:                  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSkillValueNull() SkillValue {
+	return SkillValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewSkillValueUnknown() SkillValue {
+	return SkillValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewSkillValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (SkillValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing SkillValue Attribute Value",
+				"While creating a SkillValue value, a missing attribute value was detected. "+
+					"A SkillValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SkillValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid SkillValue Attribute Type",
+				"While creating a SkillValue value, an invalid attribute value was detected. "+
+					"A SkillValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SkillValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("SkillValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra SkillValue Attribute Value",
+				"While creating a SkillValue value, an extra attribute value was detected. "+
+					"A SkillValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra SkillValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewSkillValueUnknown(), diags
+	}
+
+	allowedToolsAttribute, ok := attributes["allowed_tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_tools is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	allowedToolsVal, ok := allowedToolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_tools expected to be basetypes.ListValue, was: %T`, allowedToolsAttribute))
+	}
+
+	contentAttribute, ok := attributes["content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`content is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	contentVal, ok := contentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`content expected to be basetypes.StringValue, was: %T`, contentAttribute))
+	}
+
+	descriptionAttribute, ok := attributes["description"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`description is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	descriptionVal, ok := descriptionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
+	}
+
+	disableModelInvocationAttribute, ok := attributes["disable_model_invocation"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`disable_model_invocation is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	disableModelInvocationVal, ok := disableModelInvocationAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`disable_model_invocation expected to be basetypes.BoolValue, was: %T`, disableModelInvocationAttribute))
+	}
+
+	filesAttribute, ok := attributes["files"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`files is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	filesVal, ok := filesAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`files expected to be basetypes.ObjectValue, was: %T`, filesAttribute))
+	}
+
+	installedAtAttribute, ok := attributes["installed_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`installed_at is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	installedAtVal, ok := installedAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`installed_at expected to be basetypes.StringValue, was: %T`, installedAtAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	namespaceAttribute, ok := attributes["namespace"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`namespace is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	namespaceVal, ok := namespaceAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`namespace expected to be basetypes.StringValue, was: %T`, namespaceAttribute))
+	}
+
+	requiredToolsAttribute, ok := attributes["required_tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`required_tools is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	requiredToolsVal, ok := requiredToolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`required_tools expected to be basetypes.ListValue, was: %T`, requiredToolsAttribute))
+	}
+
+	skillIdAttribute, ok := attributes["skill_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`skill_id is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	skillIdVal, ok := skillIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`skill_id expected to be basetypes.StringValue, was: %T`, skillIdAttribute))
+	}
+
+	sourceAttribute, ok := attributes["source"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`source is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	sourceVal, ok := sourceAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`source expected to be basetypes.ObjectValue, was: %T`, sourceAttribute))
+	}
+
+	tagsAttribute, ok := attributes["tags"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tags is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	tagsVal, ok := tagsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tags expected to be basetypes.ListValue, was: %T`, tagsAttribute))
+	}
+
+	triggerConditionAttribute, ok := attributes["trigger_condition"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`trigger_condition is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	triggerConditionVal, ok := triggerConditionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`trigger_condition expected to be basetypes.StringValue, was: %T`, triggerConditionAttribute))
+	}
+
+	updatedAtAttribute, ok := attributes["updated_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`updated_at is missing from object`)
+
+		return NewSkillValueUnknown(), diags
+	}
+
+	updatedAtVal, ok := updatedAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`updated_at expected to be basetypes.StringValue, was: %T`, updatedAtAttribute))
+	}
+
+	if diags.HasError() {
+		return NewSkillValueUnknown(), diags
+	}
+
+	return SkillValue{
+		AllowedTools:           allowedToolsVal,
+		Content:                contentVal,
+		Description:            descriptionVal,
+		DisableModelInvocation: disableModelInvocationVal,
+		Files:                  filesVal,
+		InstalledAt:            installedAtVal,
+		Name:                   nameVal,
+		Namespace:              namespaceVal,
+		RequiredTools:          requiredToolsVal,
+		SkillId:                skillIdVal,
+		Source:                 sourceVal,
+		Tags:                   tagsVal,
+		TriggerCondition:       triggerConditionVal,
+		UpdatedAt:              updatedAtVal,
+		state:                  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSkillValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) SkillValue {
+	object, diags := NewSkillValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewSkillValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t SkillType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewSkillValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewSkillValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewSkillValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewSkillValueMust(SkillValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t SkillType) ValueType(ctx context.Context) attr.Value {
+	return SkillValue{}
+}
+
+var _ basetypes.ObjectValuable = SkillValue{}
+
+type SkillValue struct {
+	AllowedTools           basetypes.ListValue   `tfsdk:"allowed_tools"`
+	Content                basetypes.StringValue `tfsdk:"content"`
+	Description            basetypes.StringValue `tfsdk:"description"`
+	DisableModelInvocation basetypes.BoolValue   `tfsdk:"disable_model_invocation"`
+	Files                  basetypes.ObjectValue `tfsdk:"files"`
+	InstalledAt            basetypes.StringValue `tfsdk:"installed_at"`
+	Name                   basetypes.StringValue `tfsdk:"name"`
+	Namespace              basetypes.StringValue `tfsdk:"namespace"`
+	RequiredTools          basetypes.ListValue   `tfsdk:"required_tools"`
+	SkillId                basetypes.StringValue `tfsdk:"skill_id"`
+	Source                 basetypes.ObjectValue `tfsdk:"source"`
+	Tags                   basetypes.ListValue   `tfsdk:"tags"`
+	TriggerCondition       basetypes.StringValue `tfsdk:"trigger_condition"`
+	UpdatedAt              basetypes.StringValue `tfsdk:"updated_at"`
+	state                  attr.ValueState
+}
+
+func (v SkillValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 14)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["allowed_tools"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["content"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["description"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["disable_model_invocation"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["files"] = basetypes.ObjectType{
+		AttrTypes: FilesValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
+	attrTypes["installed_at"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["namespace"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["required_tools"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["skill_id"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["source"] = basetypes.ObjectType{
+		AttrTypes: SourceValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
+	attrTypes["tags"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["trigger_condition"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["updated_at"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 14)
+
+		val, err = v.AllowedTools.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["allowed_tools"] = val
+
+		val, err = v.Content.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["content"] = val
+
+		val, err = v.Description.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["description"] = val
+
+		val, err = v.DisableModelInvocation.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["disable_model_invocation"] = val
+
+		val, err = v.Files.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["files"] = val
+
+		val, err = v.InstalledAt.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["installed_at"] = val
+
+		val, err = v.Name.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["name"] = val
+
+		val, err = v.Namespace.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["namespace"] = val
+
+		val, err = v.RequiredTools.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["required_tools"] = val
+
+		val, err = v.SkillId.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["skill_id"] = val
+
+		val, err = v.Source.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["source"] = val
+
+		val, err = v.Tags.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["tags"] = val
+
+		val, err = v.TriggerCondition.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["trigger_condition"] = val
+
+		val, err = v.UpdatedAt.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["updated_at"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v SkillValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v SkillValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v SkillValue) String() string {
+	return "SkillValue"
+}
+
+func (v SkillValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var files basetypes.ObjectValue
+
+	if v.Files.IsNull() {
+		files = types.ObjectNull(
+			FilesValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.Files.IsUnknown() {
+		files = types.ObjectUnknown(
+			FilesValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.Files.IsNull() && !v.Files.IsUnknown() {
+		files = types.ObjectValueMust(
+			FilesValue{}.AttributeTypes(ctx),
+			v.Files.Attributes(),
+		)
+	}
+
+	var source basetypes.ObjectValue
+
+	if v.Source.IsNull() {
+		source = types.ObjectNull(
+			SourceValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.Source.IsUnknown() {
+		source = types.ObjectUnknown(
+			SourceValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.Source.IsNull() && !v.Source.IsUnknown() {
+		source = types.ObjectValueMust(
+			SourceValue{}.AttributeTypes(ctx),
+			v.Source.Attributes(),
+		)
+	}
+
+	var allowedToolsVal basetypes.ListValue
+	switch {
+	case v.AllowedTools.IsUnknown():
+		allowedToolsVal = types.ListUnknown(types.StringType)
+	case v.AllowedTools.IsNull():
+		allowedToolsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		allowedToolsVal, d = types.ListValue(types.StringType, v.AllowedTools.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"content":                  basetypes.StringType{},
+			"description":              basetypes.StringType{},
+			"disable_model_invocation": basetypes.BoolType{},
+			"files": basetypes.ObjectType{
+				AttrTypes: FilesValue{}.AttributeTypes(ctx),
+			},
+			"installed_at": basetypes.StringType{},
+			"name":         basetypes.StringType{},
+			"namespace":    basetypes.StringType{},
+			"required_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"skill_id": basetypes.StringType{},
+			"source": basetypes.ObjectType{
+				AttrTypes: SourceValue{}.AttributeTypes(ctx),
+			},
+			"tags": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"trigger_condition": basetypes.StringType{},
+			"updated_at":        basetypes.StringType{},
+		}), diags
+	}
+
+	var requiredToolsVal basetypes.ListValue
+	switch {
+	case v.RequiredTools.IsUnknown():
+		requiredToolsVal = types.ListUnknown(types.StringType)
+	case v.RequiredTools.IsNull():
+		requiredToolsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		requiredToolsVal, d = types.ListValue(types.StringType, v.RequiredTools.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"content":                  basetypes.StringType{},
+			"description":              basetypes.StringType{},
+			"disable_model_invocation": basetypes.BoolType{},
+			"files": basetypes.ObjectType{
+				AttrTypes: FilesValue{}.AttributeTypes(ctx),
+			},
+			"installed_at": basetypes.StringType{},
+			"name":         basetypes.StringType{},
+			"namespace":    basetypes.StringType{},
+			"required_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"skill_id": basetypes.StringType{},
+			"source": basetypes.ObjectType{
+				AttrTypes: SourceValue{}.AttributeTypes(ctx),
+			},
+			"tags": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"trigger_condition": basetypes.StringType{},
+			"updated_at":        basetypes.StringType{},
+		}), diags
+	}
+
+	var tagsVal basetypes.ListValue
+	switch {
+	case v.Tags.IsUnknown():
+		tagsVal = types.ListUnknown(types.StringType)
+	case v.Tags.IsNull():
+		tagsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		tagsVal, d = types.ListValue(types.StringType, v.Tags.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"content":                  basetypes.StringType{},
+			"description":              basetypes.StringType{},
+			"disable_model_invocation": basetypes.BoolType{},
+			"files": basetypes.ObjectType{
+				AttrTypes: FilesValue{}.AttributeTypes(ctx),
+			},
+			"installed_at": basetypes.StringType{},
+			"name":         basetypes.StringType{},
+			"namespace":    basetypes.StringType{},
+			"required_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"skill_id": basetypes.StringType{},
+			"source": basetypes.ObjectType{
+				AttrTypes: SourceValue{}.AttributeTypes(ctx),
+			},
+			"tags": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"trigger_condition": basetypes.StringType{},
+			"updated_at":        basetypes.StringType{},
+		}), diags
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"allowed_tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"content":                  basetypes.StringType{},
+		"description":              basetypes.StringType{},
+		"disable_model_invocation": basetypes.BoolType{},
+		"files": basetypes.ObjectType{
+			AttrTypes: FilesValue{}.AttributeTypes(ctx),
+		},
+		"installed_at": basetypes.StringType{},
+		"name":         basetypes.StringType{},
+		"namespace":    basetypes.StringType{},
+		"required_tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"skill_id": basetypes.StringType{},
+		"source": basetypes.ObjectType{
+			AttrTypes: SourceValue{}.AttributeTypes(ctx),
+		},
+		"tags": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"trigger_condition": basetypes.StringType{},
+		"updated_at":        basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"allowed_tools":            allowedToolsVal,
+			"content":                  v.Content,
+			"description":              v.Description,
+			"disable_model_invocation": v.DisableModelInvocation,
+			"files":                    files,
+			"installed_at":             v.InstalledAt,
+			"name":                     v.Name,
+			"namespace":                v.Namespace,
+			"required_tools":           requiredToolsVal,
+			"skill_id":                 v.SkillId,
+			"source":                   source,
+			"tags":                     tagsVal,
+			"trigger_condition":        v.TriggerCondition,
+			"updated_at":               v.UpdatedAt,
+		})
+
+	return objVal, diags
+}
+
+func (v SkillValue) Equal(o attr.Value) bool {
+	other, ok := o.(SkillValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.AllowedTools.Equal(other.AllowedTools) {
+		return false
+	}
+
+	if !v.Content.Equal(other.Content) {
+		return false
+	}
+
+	if !v.Description.Equal(other.Description) {
+		return false
+	}
+
+	if !v.DisableModelInvocation.Equal(other.DisableModelInvocation) {
+		return false
+	}
+
+	if !v.Files.Equal(other.Files) {
+		return false
+	}
+
+	if !v.InstalledAt.Equal(other.InstalledAt) {
+		return false
+	}
+
+	if !v.Name.Equal(other.Name) {
+		return false
+	}
+
+	if !v.Namespace.Equal(other.Namespace) {
+		return false
+	}
+
+	if !v.RequiredTools.Equal(other.RequiredTools) {
+		return false
+	}
+
+	if !v.SkillId.Equal(other.SkillId) {
+		return false
+	}
+
+	if !v.Source.Equal(other.Source) {
+		return false
+	}
+
+	if !v.Tags.Equal(other.Tags) {
+		return false
+	}
+
+	if !v.TriggerCondition.Equal(other.TriggerCondition) {
+		return false
+	}
+
+	if !v.UpdatedAt.Equal(other.UpdatedAt) {
+		return false
+	}
+
+	return true
+}
+
+func (v SkillValue) Type(ctx context.Context) attr.Type {
+	return SkillType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v SkillValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"allowed_tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"content":                  basetypes.StringType{},
+		"description":              basetypes.StringType{},
+		"disable_model_invocation": basetypes.BoolType{},
+		"files": basetypes.ObjectType{
+			AttrTypes: FilesValue{}.AttributeTypes(ctx),
+		},
+		"installed_at": basetypes.StringType{},
+		"name":         basetypes.StringType{},
+		"namespace":    basetypes.StringType{},
+		"required_tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"skill_id": basetypes.StringType{},
+		"source": basetypes.ObjectType{
+			AttrTypes: SourceValue{}.AttributeTypes(ctx),
+		},
+		"tags": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"trigger_condition": basetypes.StringType{},
+		"updated_at":        basetypes.StringType{},
+	}
+}
+
+var _ basetypes.ObjectTypable = FilesType{}
+
+
+
+
+
+
+
+
+
+
+
+var _ basetypes.ObjectValuable = FilesValue{}
+
+
+
+
+
+
+
+
+
+
+var _ basetypes.ObjectTypable = SourceType{}
+
+type SourceType struct {
+	basetypes.ObjectType
+}
+
+func (t SourceType) Equal(o attr.Type) bool {
+	other, ok := o.(SourceType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t SourceType) String() string {
+	return "SourceType"
+}
+
+func (t SourceType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return SourceValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSourceValueNull() SourceValue {
+	return SourceValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewSourceValueUnknown() SourceValue {
+	return SourceValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewSourceValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (SourceValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing SourceValue Attribute Value",
+				"While creating a SourceValue value, a missing attribute value was detected. "+
+					"A SourceValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SourceValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid SourceValue Attribute Type",
+				"While creating a SourceValue value, an invalid attribute value was detected. "+
+					"A SourceValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SourceValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("SourceValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra SourceValue Attribute Value",
+				"While creating a SourceValue value, an extra attribute value was detected. "+
+					"A SourceValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra SourceValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewSourceValueUnknown(), diags
+	}
+
+	if diags.HasError() {
+		return NewSourceValueUnknown(), diags
+	}
+
+	return SourceValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSourceValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) SourceValue {
+	object, diags := NewSourceValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewSourceValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t SourceType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewSourceValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewSourceValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewSourceValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewSourceValueMust(SourceValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t SourceType) ValueType(ctx context.Context) attr.Value {
+	return SourceValue{}
+}
+
+var _ basetypes.ObjectValuable = SourceValue{}
+
+type SourceValue struct {
+	state attr.ValueState
+}
+
+func (v SourceValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 0)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 0)
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v SourceValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v SourceValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v SourceValue) String() string {
+	return "SourceValue"
+}
+
+func (v SourceValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{})
+
+	return objVal, diags
+}
+
+func (v SourceValue) Equal(o attr.Value) bool {
+	other, ok := o.(SourceValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	return true
+}
+
+func (v SourceValue) Type(ctx context.Context) attr.Type {
+	return SourceType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v SourceValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{}
 }
