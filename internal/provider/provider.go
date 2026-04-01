@@ -232,30 +232,5 @@ func (p *quantProvider) DataSources(ctx context.Context) []func() datasource.Dat
 }
 
 func (p *quantProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{
-		NewProjectResource,
-		NewDomainResource,
-		NewRuleProxyResource,
-		NewRuleRedirectResource,
-		NewRuleCustomResponseResource,
-		NewRuleContentFilterResource,
-		NewRuleFunctionResource,
-		NewRuleAuthResource,
-		NewRuleBotChallengeResource,
-		NewRuleHeadersResource,
-		NewRuleServeStaticResource,
-		NewCrawlerResource,
-		NewCrawlerScheduleResource,
-		NewHeaderResource,
-		NewApplicationResource,
-		NewEnvironmentResource,
-		NewVolumeResource,
-		NewCronJobResource,
-		NewKVStoreResource,
-		NewKVItemResource,
-		NewAiGovernanceResource,
-		NewAiVectorCollectionResource,
-		NewAiVectorDocumentResource,
-		NewAiSkillResource,
-	}
+	return GeneratedResources()
 }
