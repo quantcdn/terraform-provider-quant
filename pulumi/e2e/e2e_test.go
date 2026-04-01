@@ -47,7 +47,7 @@ func ensureProvider(t *testing.T) {
 		// Tests run from pulumi/e2e/, so .. is pulumi/
 		pulumiDir, _ := filepath.Abs("..")
 		binDir = filepath.Join(pulumiDir, "bin")
-		cmd := exec.Command("go", "build", "-o", filepath.Join(binDir, "pulumi-resource-quant"), "./cmd/pulumi-resource-quant")
+		cmd := exec.Command("go", "build", "-o", filepath.Join(binDir, "pulumi-resource-quant"), "./provider/cmd/pulumi-resource-quant")
 		cmd.Dir = pulumiDir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
