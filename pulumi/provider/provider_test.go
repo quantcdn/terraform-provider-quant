@@ -315,7 +315,6 @@ resources:
     properties:
       appName: preview-test-app
       application: preview-test-app
-      environment: []
       composeDefinition:
         containers:
           - name: web
