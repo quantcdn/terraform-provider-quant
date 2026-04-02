@@ -106,11 +106,23 @@ func buildSDKContainers(ctx context.Context, containersList basetypes.ListValue)
 	var diags diag.Diagnostics
 	var sdkContainers []quantadmingo.Container
 
-	// Extract each element as an ObjectValue, then read its attributes.
+	// Extract each element — may be a generated ContainersValue (custom type)
+	// or a plain ObjectValue. Both implement ObjectValuable with ToObjectValue().
 	elements := containersList.Elements()
 	for i, elem := range elements {
-		objVal, ok := elem.(basetypes.ObjectValue)
-		if !ok {
+		var objVal basetypes.ObjectValue
+
+		// Try direct ObjectValue first, then fall back to ToObjectValue()
+		if ov, ok := elem.(basetypes.ObjectValue); ok {
+			objVal = ov
+		} else if ova, ok := elem.(basetypes.ObjectValuable); ok {
+			var d diag.Diagnostics
+			objVal, d = ova.ToObjectValue(ctx)
+			diags.Append(d...)
+			if diags.HasError() {
+				return nil, diags
+			}
+		} else {
 			diags.AddAttributeError(
 				path.Root("compose_definition").AtName("containers"),
 				"Invalid container element",

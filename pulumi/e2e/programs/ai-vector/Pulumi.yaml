@@ -10,7 +10,7 @@ resources:
     type: quant:index:AiVectorCollection
     properties:
       name: e2e-collection-${testSuffix}
-      embeddingModel: text-embedding-3-small
+      embeddingModel: amazon.titan-embed-text-v2:0
   testDocument:
     type: quant:index:AiVectorDocument
     properties:

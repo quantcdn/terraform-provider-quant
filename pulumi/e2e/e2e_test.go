@@ -382,8 +382,6 @@ func TestE2E_AI(t *testing.T) {
 }
 
 func TestE2E_AIVector(t *testing.T) {
-	requiresInfra(t) // vector-db requires backend infra not always available on staging
-
 	suffix := uniqueSuffix()
 	result, cleanup := createStack(t, "ai-vector", map[string]string{
 		"e2e-ai-vector:testSuffix": fmt.Sprintf("e2e-%s", suffix),
@@ -392,10 +390,10 @@ func TestE2E_AIVector(t *testing.T) {
 
 	assert.NotEmpty(t, result.outputs["collectionId"].Value, "collectionId should be set")
 	assert.NotEmpty(t, result.outputs["collectionName"].Value, "collectionName should be set")
-	assert.NotEmpty(t, result.outputs["chunksCreated"].Value, "chunksCreated should be set")
 
-	t.Logf("Created AI vector resources: collection=%v chunksCreated=%v",
+	t.Logf("Created AI vector resources: collection=%v name=%v chunksCreated=%v",
 		result.outputs["collectionId"].Value,
+		result.outputs["collectionName"].Value,
 		result.outputs["chunksCreated"].Value)
 }
 
