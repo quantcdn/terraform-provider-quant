@@ -317,13 +317,23 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 				return nil, "", fmt.Errorf("error checking project status (HTTP %d): %v", statusCode, err)
 			}
 
-			// Project exists and can be read successfully
-			return projectResult, "ready", nil
+			// Check CDN provisioning status — wait until fully deployed.
+			// The SDK doesn't type this field, so check AdditionalProperties.
+			if status, ok := projectResult.AdditionalProperties["platform_provisioning_status"]; ok {
+				if statusStr, ok := status.(string); ok && statusStr == "deployed" {
+					return projectResult, "ready", nil
+				}
+				// Status exists but not deployed yet
+				return projectResult, "creating", nil
+			}
+
+			// Status field not present yet — CDN provisioning hasn't started
+			return projectResult, "creating", nil
 		},
-		Timeout:      10 * time.Minute,
-		Delay:        5 * time.Second,
-		MinTimeout:   3 * time.Second,
-		PollInterval: 5 * time.Second,
+		Timeout:      15 * time.Minute,
+		Delay:        10 * time.Second,
+		MinTimeout:   5 * time.Second,
+		PollInterval: 15 * time.Second,
 	}
 
 	_, err = createStateConf.WaitForStateContext(ctx)
