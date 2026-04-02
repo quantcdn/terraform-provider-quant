@@ -1,0 +1,3 @@
+encryptionsalt: v1:w9U13mqvRFs=:v1:jPgaMrUzwVo2iC+a:AyRgB3A16wse0GfOpxES6d0CCX4Irw==
+config:
+  e2e-rules-proxy-advanced:projectName: pulumi-e2e-rules-proxy-advanced-99833-4710
