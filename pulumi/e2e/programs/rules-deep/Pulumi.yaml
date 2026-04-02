@@ -304,6 +304,33 @@ resources:
       name: e2e-serve-static-country
       weight: 60
 
+  # ═══════════════════════ Content Filter ═══════════════════════
+
+  contentFilterBlock:
+    type: quant:index:RuleContentFilter
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/upload/*"
+      fnUuid: "00000000-0000-0000-0000-000000000000"
+      name: e2e-content-filter
+      weight: 10
+
+  # ═══════════════════════ Function ═══════════════════════
+
+  ruleFunction:
+    type: quant:index:RuleFunction
+    properties:
+      project: ${testProject.machineName}
+      domains:
+        - "*.example.com"
+      urls:
+        - "/api/edge/*"
+      fnUuid: "00000000-0000-0000-0000-000000000000"
+      name: e2e-rule-function
+
 outputs:
   redirect301Id: ${redirect301.id}
   redirect302Id: ${redirect302.id}
@@ -323,3 +350,5 @@ outputs:
   headersCorsId: ${headersCors.id}
   serveStaticMethodFilterId: ${serveStaticMethodFilter.id}
   serveStaticCountryFilterId: ${serveStaticCountryFilter.id}
+  contentFilterBlockId: ${contentFilterBlock.id}
+  ruleFunctionId: ${ruleFunction.id}

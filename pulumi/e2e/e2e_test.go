@@ -271,6 +271,10 @@ func TestE2E_RulesDeep(t *testing.T) {
 		// ServeStatic
 		"serveStaticMethodFilterId",
 		"serveStaticCountryFilterId",
+		// ContentFilter
+		"contentFilterBlockId",
+		// Function
+		"ruleFunctionId",
 	}
 	for _, key := range expected {
 		assert.NotEmpty(t, result.outputs[key].Value, "%s should be set", key)
