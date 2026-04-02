@@ -10,6 +10,7 @@ resources:
     type: quant:index:AiVectorCollection
     properties:
       name: e2e-collection-${testSuffix}
+      embeddingModel: text-embedding-3-small
   testDocument:
     type: quant:index:AiVectorDocument
     properties:

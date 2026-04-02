@@ -10,8 +10,17 @@ resources:
     type: quant:index:Application
     properties:
       appName: ${appName}
-      composeDefinition: |
-        {"containers":[{"name":"web","imageReference":{"type":"external","identifier":"nginx:latest"},"exposedPorts":[80]}],"taskCpu":256,"taskMemory":512,"architecture":"X86_64"}
+      composeDefinition:
+        containers:
+          - name: web
+            imageReference:
+              type: external
+              identifier: nginx:latest
+            exposedPorts:
+              - 80
+        taskCpu: 256
+        taskMemory: 512
+        architecture: X86_64
   testEnv:
     type: quant:index:Environment
     properties:
@@ -30,7 +39,9 @@ resources:
       name: e2e-test-cron
       application: ${testApp.appName}
       environment: ${testEnv.envName}
-      command: '["echo","e2e-test"]'
+      commands:
+        - echo
+        - e2e-test
       scheduleExpression: "cron(0 0 ? * SUN *)"
 outputs:
   appId: ${testApp.id}
