@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
@@ -419,6 +421,7 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 	}
 
 	// Computed fields that must be resolved to avoid "unknown" Pulumi bridge panic.
+	// Every field in the model must be set (even to null) after Create/Read.
 	if data.DeploymentInformation.IsUnknown() {
 		data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
 	}
@@ -431,8 +434,195 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 	if data.Application.IsUnknown() {
 		data.Application = types.StringNull()
 	}
+	if data.ComposeDefinition.IsUnknown() {
+		data.ComposeDefinition = resource_application.NewComposeDefinitionValueNull()
+	}
+	if data.Database.IsUnknown() {
+		data.Database = resource_application.NewDatabaseValueNull()
+	}
+	if data.Filesystem.IsUnknown() {
+		data.Filesystem = resource_application.NewFilesystemValueNull()
+	}
+	if data.Environment.IsUnknown() {
+		data.Environment = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
+	}
+
+	// Resolve any remaining unknown sub-fields inside nested objects.
+	// The Pulumi bridge panics if ANY nested field is still unknown after
+	// Create/Read ("rawStateDeltaHelper cannot process unknown PropertyValue
+	// values").  The checks above handle top-level nullification, but when the
+	// user provides a partial nested object (e.g. database.engine) the computed
+	// sub-fields (e.g. database.rds_instance_identifier) remain unknown.
+	resolveApplicationUnknowns(ctx, data)
 
 	return
+}
+
+// nullifyUnknownAttrValue recursively replaces unknown attr.Value instances
+// with their null equivalents.  For objects (basetypes.ObjectValue) it descends
+// into child attributes so that deeply nested unknowns are also resolved.  For
+// lists (basetypes.ListValue) it processes each element.
+func nullifyUnknownAttrValue(ctx context.Context, v attr.Value) attr.Value {
+	if v.IsUnknown() {
+		// Replace with null of the same type.
+		switch tv := v.(type) {
+		case basetypes.StringValue:
+			return types.StringNull()
+		case basetypes.Int64Value:
+			return types.Int64Null()
+		case basetypes.BoolValue:
+			return types.BoolNull()
+		case basetypes.Float64Value:
+			return types.Float64Null()
+		case basetypes.ObjectValue:
+			return types.ObjectNull(tv.AttributeTypes(ctx))
+		case basetypes.ListValue:
+			return types.ListNull(tv.ElementType(ctx))
+		default:
+			// For custom types implementing ObjectValuable, try to get attr types.
+			if ov, ok := v.(basetypes.ObjectValuable); ok {
+				objVal, diags := ov.ToObjectValue(ctx)
+				if !diags.HasError() {
+					return types.ObjectNull(objVal.AttributeTypes(ctx))
+				}
+			}
+			return v
+		}
+	}
+
+	// Not unknown — recurse into objects and lists to resolve nested unknowns.
+	switch tv := v.(type) {
+	case basetypes.ObjectValue:
+		attrs := tv.Attributes()
+		resolved := make(map[string]attr.Value, len(attrs))
+		changed := false
+		for k, child := range attrs {
+			r := nullifyUnknownAttrValue(ctx, child)
+			resolved[k] = r
+			if r != child {
+				changed = true
+			}
+		}
+		if changed {
+			obj, _ := types.ObjectValue(tv.AttributeTypes(ctx), resolved)
+			return obj
+		}
+		return v
+	case basetypes.ListValue:
+		elems := tv.Elements()
+		resolved := make([]attr.Value, len(elems))
+		changed := false
+		for i, elem := range elems {
+			r := nullifyUnknownAttrValue(ctx, elem)
+			resolved[i] = r
+			if r != elem {
+				changed = true
+			}
+		}
+		if changed {
+			list, _ := types.ListValue(tv.ElementType(ctx), resolved)
+			return list
+		}
+		return v
+	}
+
+	return v
+}
+
+// resolveApplicationUnknowns walks the Database, Filesystem, and
+// ComposeDefinition nested objects and replaces any unknown sub-fields with
+// null values.  This prevents the Pulumi bridge from panicking when it
+// encounters unknown PropertyValue values in the state.
+func resolveApplicationUnknowns(ctx context.Context, data *resource_application.ApplicationModel) {
+	// --- Database ---
+	if !data.Database.IsNull() && !data.Database.IsUnknown() {
+		db := data.Database
+		attrTypes := db.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"engine":                  nullifyUnknownAttrValue(ctx, db.Engine),
+			"instance_class":          nullifyUnknownAttrValue(ctx, db.InstanceClass),
+			"multi_az":                nullifyUnknownAttrValue(ctx, db.MultiAz),
+			"rds_instance_endpoint":   nullifyUnknownAttrValue(ctx, db.RdsInstanceEndpoint),
+			"rds_instance_engine":     nullifyUnknownAttrValue(ctx, db.RdsInstanceEngine),
+			"rds_instance_identifier": nullifyUnknownAttrValue(ctx, db.RdsInstanceIdentifier),
+			"rds_instance_status":     nullifyUnknownAttrValue(ctx, db.RdsInstanceStatus),
+			"storage_gb":              nullifyUnknownAttrValue(ctx, db.StorageGb),
+		}
+		newDB, diags := resource_application.NewDatabaseValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.Database = newDB
+		}
+	}
+
+	// --- Filesystem ---
+	if !data.Filesystem.IsNull() && !data.Filesystem.IsUnknown() {
+		fs := data.Filesystem
+		attrTypes := fs.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"filesystem_id": nullifyUnknownAttrValue(ctx, fs.FilesystemId),
+			"mount_path":    nullifyUnknownAttrValue(ctx, fs.MountPath),
+			"required":      nullifyUnknownAttrValue(ctx, fs.Required),
+		}
+		newFS, diags := resource_application.NewFilesystemValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.Filesystem = newFS
+		}
+	}
+
+	// --- ComposeDefinition ---
+	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
+		cd := data.ComposeDefinition
+
+		// Resolve containers list: each container element may have unknown
+		// sub-fields (e.g. health_check, origin_protection_config).
+		containers := cd.Containers
+		if !containers.IsNull() && !containers.IsUnknown() {
+			resolved := nullifyUnknownAttrValue(ctx, containers)
+			if lv, ok := resolved.(basetypes.ListValue); ok {
+				containers = lv
+			}
+		}
+
+		// Resolve spot_configuration sub-fields.
+		spotConfig := cd.SpotConfiguration
+		if !spotConfig.IsNull() && !spotConfig.IsUnknown() {
+			resolved := nullifyUnknownAttrValue(ctx, spotConfig)
+			if ov, ok := resolved.(basetypes.ObjectValue); ok {
+				spotConfig = ov
+			}
+		}
+
+		attrTypes := cd.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"architecture":               nullifyUnknownAttrValue(ctx, cd.Architecture),
+			"containers":                 containers,
+			"enable_cross_app_networking": nullifyUnknownAttrValue(ctx, cd.EnableCrossAppNetworking),
+			"enable_cross_env_networking": nullifyUnknownAttrValue(ctx, cd.EnableCrossEnvNetworking),
+			"max_capacity":               nullifyUnknownAttrValue(ctx, cd.MaxCapacity),
+			"min_capacity":               nullifyUnknownAttrValue(ctx, cd.MinCapacity),
+			"spot_configuration":         spotConfig,
+			"task_cpu":                    nullifyUnknownAttrValue(ctx, cd.TaskCpu),
+			"task_memory":                 nullifyUnknownAttrValue(ctx, cd.TaskMemory),
+		}
+		newCD, diags := resource_application.NewComposeDefinitionValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.ComposeDefinition = newCD
+		}
+	}
+
+	// --- ImageReference ---
+	if !data.ImageReference.IsNull() && !data.ImageReference.IsUnknown() {
+		ir := data.ImageReference
+		attrTypes := ir.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"identifier": nullifyUnknownAttrValue(ctx, ir.Identifier),
+			"type":       nullifyUnknownAttrValue(ctx, ir.ImageReferenceType),
+		}
+		newIR, diags := resource_application.NewImageReferenceValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.ImageReference = newIR
+		}
+	}
 }
 
 // callApplicationDeleteAPI deletes an application via the V3 API.
