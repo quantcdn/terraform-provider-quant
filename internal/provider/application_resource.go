@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -421,10 +420,10 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 
 	// Computed fields that must be resolved to avoid "unknown" Pulumi bridge panic.
 	if data.DeploymentInformation.IsUnknown() {
-		data.DeploymentInformation = types.ListNull(types.ObjectType{AttrTypes: resource_application.DeploymentInformationValue{}.AttributeTypes(ctx)})
+		data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
 	}
-	if data.Environments.IsUnknown() || data.Environments.IsNull() {
-		data.Environments = types.ListValueMust(types.ObjectType{AttrTypes: resource_application.EnvironmentValue{}.AttributeTypes(ctx)}, []attr.Value{})
+	if data.Environments.IsUnknown() {
+		data.Environments = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
 	}
 	if data.ImageReference.IsUnknown() {
 		data.ImageReference = resource_application.NewImageReferenceValueNull()

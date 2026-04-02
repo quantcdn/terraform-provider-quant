@@ -224,47 +224,8 @@
                             }
                         }
                     },
-                    "containers": {
-                        "maxItemsOne": false,
-                        "elem": {
-                            "fields": {
-                                "command": {
-                                    "maxItemsOne": false
-                                },
-                                "depends_on": {
-                                    "maxItemsOne": false
-                                },
-                                "entry_point": {
-                                    "maxItemsOne": false
-                                },
-                                "environment": {
-                                    "maxItemsOne": false
-                                },
-                                "exposed_ports": {
-                                    "maxItemsOne": false
-                                },
-                                "health_check": {
-                                    "fields": {
-                                        "command": {
-                                            "maxItemsOne": false
-                                        }
-                                    }
-                                },
-                                "mount_points": {
-                                    "maxItemsOne": false
-                                },
-                                "origin_protection_config": {
-                                    "fields": {
-                                        "ip_allow": {
-                                            "maxItemsOne": false
-                                        }
-                                    }
-                                },
-                                "secrets": {
-                                    "maxItemsOne": false
-                                }
-                            }
-                        }
+                    "container_names": {
+                        "maxItemsOne": false
                     },
                     "cron": {
                         "maxItemsOne": false,

@@ -436,248 +436,11 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"containers": schema.ListNestedAttribute{
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"command": schema.ListAttribute{
-							ElementType: types.StringType,
-							Computed:    true,
-						},
-						"cpu": schema.Int64Attribute{
-							Computed:            true,
-							Description:         "Container-level CPU units",
-							MarkdownDescription: "Container-level CPU units",
-						},
-						"depends_on": schema.ListNestedAttribute{
-							NestedObject: schema.NestedAttributeObject{
-								Attributes: map[string]schema.Attribute{
-									"condition": schema.StringAttribute{
-										Computed:            true,
-										Description:         "The condition to wait for on the dependency",
-										MarkdownDescription: "The condition to wait for on the dependency",
-									},
-									"container_name": schema.StringAttribute{
-										Computed:            true,
-										Description:         "The name of the container this container depends on",
-										MarkdownDescription: "The name of the container this container depends on",
-									},
-								},
-								CustomType: DependsOnType{
-									ObjectType: types.ObjectType{
-										AttrTypes: DependsOnValue{}.AttributeTypes(ctx),
-									},
-								},
-							},
-							Computed:            true,
-							Description:         "Container startup dependencies",
-							MarkdownDescription: "Container startup dependencies",
-						},
-						"entry_point": schema.ListAttribute{
-							ElementType: types.StringType,
-							Computed:    true,
-						},
-						"environment": schema.ListNestedAttribute{
-							NestedObject: schema.NestedAttributeObject{
-								Attributes: map[string]schema.Attribute{
-									"name": schema.StringAttribute{
-										Computed:            true,
-										Description:         "Environment variable name",
-										MarkdownDescription: "Environment variable name",
-									},
-									"value": schema.StringAttribute{
-										Computed:            true,
-										Description:         "Environment variable value",
-										MarkdownDescription: "Environment variable value",
-									},
-								},
-								CustomType: EnvironmentType{
-									ObjectType: types.ObjectType{
-										AttrTypes: EnvironmentValue{}.AttributeTypes(ctx),
-									},
-								},
-							},
-							Computed:            true,
-							Description:         "Environment variables specific to this container",
-							MarkdownDescription: "Environment variables specific to this container",
-						},
-						"essential": schema.BoolAttribute{
-							Computed: true,
-						},
-						"exposed_ports": schema.ListAttribute{
-							ElementType:         types.Int64Type,
-							Computed:            true,
-							Description:         "List of container ports to expose",
-							MarkdownDescription: "List of container ports to expose",
-						},
-						"health_check": schema.SingleNestedAttribute{
-							Attributes: map[string]schema.Attribute{
-								"command": schema.ListAttribute{
-									ElementType:         types.StringType,
-									Computed:            true,
-									Description:         "The command to run to determine if the container is healthy",
-									MarkdownDescription: "The command to run to determine if the container is healthy",
-								},
-								"interval": schema.Int64Attribute{
-									Computed:            true,
-									Description:         "Time period (seconds) between health checks",
-									MarkdownDescription: "Time period (seconds) between health checks",
-								},
-								"retries": schema.Int64Attribute{
-									Computed:            true,
-									Description:         "Number of times to retry a failed health check",
-									MarkdownDescription: "Number of times to retry a failed health check",
-								},
-								"start_period": schema.Int64Attribute{
-									Computed:            true,
-									Description:         "Grace period (seconds) to ignore unhealthy checks after container starts",
-									MarkdownDescription: "Grace period (seconds) to ignore unhealthy checks after container starts",
-								},
-								"timeout": schema.Int64Attribute{
-									Computed:            true,
-									Description:         "Time period (seconds) to wait for a health check to return",
-									MarkdownDescription: "Time period (seconds) to wait for a health check to return",
-								},
-							},
-							CustomType: HealthCheckType{
-								ObjectType: types.ObjectType{
-									AttrTypes: HealthCheckValue{}.AttributeTypes(ctx),
-								},
-							},
-							Computed:            true,
-							Description:         "Container health check configuration",
-							MarkdownDescription: "Container health check configuration",
-						},
-						"image_reference": schema.SingleNestedAttribute{
-							Attributes: map[string]schema.Attribute{
-								"identifier": schema.StringAttribute{
-									Computed:            true,
-									Description:         "The image identifier",
-									MarkdownDescription: "The image identifier",
-								},
-								"type": schema.StringAttribute{
-									Computed:            true,
-									Description:         "Specifies whether the image is internal (ECR) or external",
-									MarkdownDescription: "Specifies whether the image is internal (ECR) or external",
-								},
-							},
-							CustomType: ImageReferenceType{
-								ObjectType: types.ObjectType{
-									AttrTypes: ImageReferenceValue{}.AttributeTypes(ctx),
-								},
-							},
-							Computed: true,
-						},
-						"memory": schema.Int64Attribute{
-							Computed:            true,
-							Description:         "Container-level memory hard limit (MiB)",
-							MarkdownDescription: "Container-level memory hard limit (MiB)",
-						},
-						"memory_reservation": schema.Int64Attribute{
-							Computed:            true,
-							Description:         "Container-level memory soft limit (MiB)",
-							MarkdownDescription: "Container-level memory soft limit (MiB)",
-						},
-						"mount_points": schema.ListNestedAttribute{
-							NestedObject: schema.NestedAttributeObject{
-								Attributes: map[string]schema.Attribute{
-									"container_path": schema.StringAttribute{
-										Computed:            true,
-										Description:         "The path inside the container where the volume is mounted",
-										MarkdownDescription: "The path inside the container where the volume is mounted",
-									},
-									"read_only": schema.BoolAttribute{
-										Computed: true,
-									},
-									"source_volume": schema.StringAttribute{
-										Computed:            true,
-										Description:         "The name of the logical volume",
-										MarkdownDescription: "The name of the logical volume",
-									},
-								},
-								CustomType: MountPointsType{
-									ObjectType: types.ObjectType{
-										AttrTypes: MountPointsValue{}.AttributeTypes(ctx),
-									},
-								},
-							},
-							Computed: true,
-						},
-						"name": schema.StringAttribute{
-							Computed:            true,
-							Description:         "Name of the container",
-							MarkdownDescription: "Name of the container",
-						},
-						"origin_protection": schema.BoolAttribute{
-							Computed:            true,
-							Description:         "Enable origin protection for all exposed ports on this container",
-							MarkdownDescription: "Enable origin protection for all exposed ports on this container",
-						},
-						"origin_protection_config": schema.SingleNestedAttribute{
-							Attributes: map[string]schema.Attribute{
-								"enabled": schema.BoolAttribute{
-									Computed:            true,
-									Description:         "Whether origin protection is enabled",
-									MarkdownDescription: "Whether origin protection is enabled",
-								},
-								"ip_allow": schema.ListAttribute{
-									ElementType:         types.StringType,
-									Computed:            true,
-									Description:         "List of IP addresses or CIDR ranges",
-									MarkdownDescription: "List of IP addresses or CIDR ranges",
-								},
-							},
-							CustomType: OriginProtectionConfigType{
-								ObjectType: types.ObjectType{
-									AttrTypes: OriginProtectionConfigValue{}.AttributeTypes(ctx),
-								},
-							},
-							Computed:            true,
-							Description:         "Extended origin protection configuration",
-							MarkdownDescription: "Extended origin protection configuration",
-						},
-						"readonly_root_filesystem": schema.BoolAttribute{
-							Computed: true,
-						},
-						"secrets": schema.ListNestedAttribute{
-							NestedObject: schema.NestedAttributeObject{
-								Attributes: map[string]schema.Attribute{
-									"name": schema.StringAttribute{
-										Computed:            true,
-										Description:         "The environment variable name to be set in the container",
-										MarkdownDescription: "The environment variable name to be set in the container",
-									},
-									"value_from": schema.StringAttribute{
-										Computed:            true,
-										Description:         "The key of the secret in the environment's 'app-secrets' store",
-										MarkdownDescription: "The key of the secret in the environment's 'app-secrets' store",
-									},
-								},
-								CustomType: SecretsType{
-									ObjectType: types.ObjectType{
-										AttrTypes: SecretsValue{}.AttributeTypes(ctx),
-									},
-								},
-							},
-							Computed:            true,
-							Description:         "Secrets mapped to environment variables",
-							MarkdownDescription: "Secrets mapped to environment variables",
-						},
-						"user": schema.StringAttribute{
-							Computed: true,
-						},
-						"working_directory": schema.StringAttribute{
-							Computed: true,
-						},
-					},
-					CustomType: ContainersType{
-						ObjectType: types.ObjectType{
-							AttrTypes: ContainersValue{}.AttributeTypes(ctx),
-						},
-					},
-				},
+			"container_names": schema.ListAttribute{
+				ElementType:         types.StringType,
 				Computed:            true,
-				Description:         "Container configurations",
-				MarkdownDescription: "Container configurations",
+				Description:         "Container name list",
+				MarkdownDescription: "Container name list",
 			},
 			"created_at": schema.StringAttribute{
 				Computed:            true,
@@ -719,18 +482,18 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"deployment_failure_reason": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Human-readable explanation of why the deployment failed. Contains details such as wrong image architecture, missing image, or container startup errors.",
-				MarkdownDescription: "Human-readable explanation of why the deployment failed. Contains details such as wrong image architecture, missing image, or container startup errors.",
+				Description:         "Reason for deployment failure",
+				MarkdownDescription: "Reason for deployment failure",
 			},
 			"deployment_failure_type": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Type of deployment failure when deploymentStatus is FAILED (e.g., 'ECS_DEPLOYMENT_CIRCUIT_BREAKER', 'IMAGE_PULL_ERROR')",
-				MarkdownDescription: "Type of deployment failure when deploymentStatus is FAILED (e.g., 'ECS_DEPLOYMENT_CIRCUIT_BREAKER', 'IMAGE_PULL_ERROR')",
+				Description:         "Type of deployment failure",
+				MarkdownDescription: "Type of deployment failure",
 			},
 			"deployment_status": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Current deployment status. FAILED indicates the most recent deployment did not complete successfully.",
-				MarkdownDescription: "Current deployment status. FAILED indicates the most recent deployment did not complete successfully.",
+				Description:         "Current deployment status",
+				MarkdownDescription: "Current deployment status",
 			},
 			"desired_count": schema.Int64Attribute{
 				Computed:            true,
@@ -963,7 +726,7 @@ type EnvironmentModel struct {
 	Application             types.String           `tfsdk:"application"`
 	CloneConfigurationFrom  types.String           `tfsdk:"clone_configuration_from"`
 	ComposeDefinition       ComposeDefinitionValue `tfsdk:"compose_definition"`
-	Containers              types.List             `tfsdk:"containers"`
+	ContainerNames          types.List             `tfsdk:"container_names"`
 	CreatedAt               types.String           `tfsdk:"created_at"`
 	Cron                    types.List             `tfsdk:"cron"`
 	DeploymentFailureReason types.String           `tfsdk:"deployment_failure_reason"`
@@ -7051,29 +6814,6 @@ func (v SpotConfigurationValue) AttributeTypes(ctx context.Context) map[string]a
 		"strategy": basetypes.StringType{},
 	}
 }
-
-var _ basetypes.ObjectTypable = ContainersType{}
-
-
-
-
-
-
-
-
-
-
-
-var _ basetypes.ObjectValuable = ContainersValue{}
-
-
-
-
-
-
-
-
-
 
 var _ basetypes.ObjectTypable = CronType{}
 

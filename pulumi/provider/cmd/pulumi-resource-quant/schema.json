@@ -1362,237 +1362,6 @@
                 }
             }
         },
-        "quant:index/EnvironmentContainer:EnvironmentContainer": {
-            "properties": {
-                "commands": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "cpu": {
-                    "type": "integer"
-                },
-                "dependsOns": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/types/quant:index/EnvironmentContainerDependsOn:EnvironmentContainerDependsOn"
-                    }
-                },
-                "entryPoints": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "environments": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/types/quant:index/EnvironmentContainerEnvironment:EnvironmentContainerEnvironment"
-                    }
-                },
-                "essential": {
-                    "type": "boolean"
-                },
-                "exposedPorts": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "healthCheck": {
-                    "$ref": "#/types/quant:index/EnvironmentContainerHealthCheck:EnvironmentContainerHealthCheck"
-                },
-                "imageReference": {
-                    "$ref": "#/types/quant:index/EnvironmentContainerImageReference:EnvironmentContainerImageReference"
-                },
-                "memory": {
-                    "type": "integer"
-                },
-                "memoryReservation": {
-                    "type": "integer"
-                },
-                "mountPoints": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/types/quant:index/EnvironmentContainerMountPoint:EnvironmentContainerMountPoint"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "originProtection": {
-                    "type": "boolean"
-                },
-                "originProtectionConfig": {
-                    "$ref": "#/types/quant:index/EnvironmentContainerOriginProtectionConfig:EnvironmentContainerOriginProtectionConfig"
-                },
-                "readonlyRootFilesystem": {
-                    "type": "boolean"
-                },
-                "secrets": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/types/quant:index/EnvironmentContainerSecret:EnvironmentContainerSecret"
-                    }
-                },
-                "user": {
-                    "type": "string"
-                },
-                "workingDirectory": {
-                    "type": "string"
-                }
-            },
-            "type": "object",
-            "required": [
-                "commands",
-                "cpu",
-                "dependsOns",
-                "entryPoints",
-                "environments",
-                "essential",
-                "exposedPorts",
-                "healthCheck",
-                "imageReference",
-                "memory",
-                "memoryReservation",
-                "mountPoints",
-                "name",
-                "originProtection",
-                "originProtectionConfig",
-                "readonlyRootFilesystem",
-                "secrets",
-                "user",
-                "workingDirectory"
-            ]
-        },
-        "quant:index/EnvironmentContainerDependsOn:EnvironmentContainerDependsOn": {
-            "properties": {
-                "condition": {
-                    "type": "string"
-                },
-                "containerName": {
-                    "type": "string"
-                }
-            },
-            "type": "object",
-            "required": [
-                "condition",
-                "containerName"
-            ]
-        },
-        "quant:index/EnvironmentContainerEnvironment:EnvironmentContainerEnvironment": {
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            },
-            "type": "object",
-            "required": [
-                "name",
-                "value"
-            ]
-        },
-        "quant:index/EnvironmentContainerHealthCheck:EnvironmentContainerHealthCheck": {
-            "properties": {
-                "commands": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "interval": {
-                    "type": "integer"
-                },
-                "retries": {
-                    "type": "integer"
-                },
-                "startPeriod": {
-                    "type": "integer"
-                },
-                "timeout": {
-                    "type": "integer"
-                }
-            },
-            "type": "object",
-            "required": [
-                "commands",
-                "interval",
-                "retries",
-                "startPeriod",
-                "timeout"
-            ]
-        },
-        "quant:index/EnvironmentContainerImageReference:EnvironmentContainerImageReference": {
-            "properties": {
-                "identifier": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            },
-            "type": "object",
-            "required": [
-                "identifier",
-                "type"
-            ]
-        },
-        "quant:index/EnvironmentContainerMountPoint:EnvironmentContainerMountPoint": {
-            "properties": {
-                "containerPath": {
-                    "type": "string"
-                },
-                "readOnly": {
-                    "type": "boolean"
-                },
-                "sourceVolume": {
-                    "type": "string"
-                }
-            },
-            "type": "object",
-            "required": [
-                "containerPath",
-                "readOnly",
-                "sourceVolume"
-            ]
-        },
-        "quant:index/EnvironmentContainerOriginProtectionConfig:EnvironmentContainerOriginProtectionConfig": {
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                },
-                "ipAllows": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            },
-            "type": "object",
-            "required": [
-                "enabled",
-                "ipAllows"
-            ]
-        },
-        "quant:index/EnvironmentContainerSecret:EnvironmentContainerSecret": {
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "valueFrom": {
-                    "type": "string"
-                }
-            },
-            "type": "object",
-            "required": [
-                "name",
-                "valueFrom"
-            ]
-        },
         "quant:index/EnvironmentCron:EnvironmentCron": {
             "properties": {
                 "commands": {
@@ -3290,7 +3059,7 @@
                     "items": {
                         "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
                     },
-                    "description": "List of environments"
+                    "description": "List of environments (read-only, managed via Environment resource)"
                 },
                 "filesystem": {
                     "$ref": "#/types/quant:index/ApplicationFilesystem:ApplicationFilesystem",
@@ -3427,7 +3196,7 @@
                         "items": {
                             "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
                         },
-                        "description": "List of environments"
+                        "description": "List of environments (read-only, managed via Environment resource)"
                     },
                     "filesystem": {
                         "$ref": "#/types/quant:index/ApplicationFilesystem:ApplicationFilesystem",
@@ -4347,12 +4116,12 @@
                 "composeDefinition": {
                     "$ref": "#/types/quant:index/EnvironmentComposeDefinition:EnvironmentComposeDefinition"
                 },
-                "containers": {
+                "containerNames": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/types/quant:index/EnvironmentContainer:EnvironmentContainer"
+                        "type": "string"
                     },
-                    "description": "Container configurations"
+                    "description": "Container name list"
                 },
                 "createdAt": {
                     "type": "string",
@@ -4367,15 +4136,15 @@
                 },
                 "deploymentFailureReason": {
                     "type": "string",
-                    "description": "Human-readable explanation of why the deployment failed. Contains details such as wrong image architecture, missing image, or container startup errors."
+                    "description": "Reason for deployment failure"
                 },
                 "deploymentFailureType": {
                     "type": "string",
-                    "description": "Type of deployment failure when deploymentStatus is FAILED (e.g., 'ECS_DEPLOYMENT_CIRCUIT_BREAKER', 'IMAGE_PULL_ERROR')"
+                    "description": "Type of deployment failure"
                 },
                 "deploymentStatus": {
                     "type": "string",
-                    "description": "Current deployment status. FAILED indicates the most recent deployment did not complete successfully."
+                    "description": "Current deployment status"
                 },
                 "desiredCount": {
                     "type": "integer",
@@ -4469,7 +4238,7 @@
                 "application",
                 "cloneConfigurationFrom",
                 "composeDefinition",
-                "containers",
+                "containerNames",
                 "createdAt",
                 "crons",
                 "deploymentFailureReason",
@@ -4565,12 +4334,12 @@
                     "composeDefinition": {
                         "$ref": "#/types/quant:index/EnvironmentComposeDefinition:EnvironmentComposeDefinition"
                     },
-                    "containers": {
+                    "containerNames": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/types/quant:index/EnvironmentContainer:EnvironmentContainer"
+                            "type": "string"
                         },
-                        "description": "Container configurations"
+                        "description": "Container name list"
                     },
                     "createdAt": {
                         "type": "string",
@@ -4585,15 +4354,15 @@
                     },
                     "deploymentFailureReason": {
                         "type": "string",
-                        "description": "Human-readable explanation of why the deployment failed. Contains details such as wrong image architecture, missing image, or container startup errors."
+                        "description": "Reason for deployment failure"
                     },
                     "deploymentFailureType": {
                         "type": "string",
-                        "description": "Type of deployment failure when deploymentStatus is FAILED (e.g., 'ECS_DEPLOYMENT_CIRCUIT_BREAKER', 'IMAGE_PULL_ERROR')"
+                        "description": "Type of deployment failure"
                     },
                     "deploymentStatus": {
                         "type": "string",
-                        "description": "Current deployment status. FAILED indicates the most recent deployment did not complete successfully."
+                        "description": "Current deployment status"
                     },
                     "desiredCount": {
                         "type": "integer",

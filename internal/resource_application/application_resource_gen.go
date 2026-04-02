@@ -598,8 +598,8 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 					},
 				},
 				Computed:            true,
-				Description:         "List of environments",
-				MarkdownDescription: "List of environments",
+				Description:         "List of environments (read-only, managed via Environment resource)",
+				MarkdownDescription: "List of environments (read-only, managed via Environment resource)",
 			},
 			"filesystem": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
