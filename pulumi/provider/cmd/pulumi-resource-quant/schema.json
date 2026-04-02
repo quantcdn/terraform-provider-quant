@@ -778,31 +778,21 @@
         },
         "quant:index/ApplicationEnvironment:ApplicationEnvironment": {
             "properties": {
-                "desiredCount": {
-                    "type": "integer",
-                    "description": "Desired task count\n"
-                },
-                "envName": {
+                "name": {
                     "type": "string",
-                    "description": "Environment name\n"
+                    "description": "Environment variable name\n"
                 },
-                "runningCount": {
-                    "type": "integer",
-                    "description": "Running task count\n"
-                },
-                "status": {
+                "value": {
                     "type": "string",
-                    "description": "Environment status\n"
+                    "description": "Environment variable value\n"
                 }
             },
             "type": "object",
             "language": {
                 "nodejs": {
                     "requiredOutputs": [
-                        "desiredCount",
-                        "envName",
-                        "runningCount",
-                        "status"
+                        "name",
+                        "value"
                     ]
                 }
             }
@@ -3047,19 +3037,19 @@
                     "type": "integer",
                     "description": "Desired task count"
                 },
-                "environment": {
+                "environmentNames": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
+                        "type": "string"
                     },
-                    "description": "Optional. Initial environment variables for the production environment."
+                    "description": "List of environment names (read-only)"
                 },
                 "environments": {
                     "type": "array",
                     "items": {
                         "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
                     },
-                    "description": "List of environments (read-only, managed via Environment resource)"
+                    "description": "Optional. Initial environment variables for the production environment."
                 },
                 "filesystem": {
                     "$ref": "#/types/quant:index/ApplicationFilesystem:ApplicationFilesystem",
@@ -3098,8 +3088,8 @@
                 "database",
                 "deploymentInformations",
                 "desiredCount",
-                "environment",
                 "environments",
+                "environmentNames",
                 "filesystem",
                 "imageReference",
                 "maxCapacity",
@@ -3124,7 +3114,7 @@
                     "$ref": "#/types/quant:index/ApplicationDatabase:ApplicationDatabase",
                     "description": "Optional database configuration"
                 },
-                "environment": {
+                "environments": {
                     "type": "array",
                     "items": {
                         "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
@@ -3184,19 +3174,19 @@
                         "type": "integer",
                         "description": "Desired task count"
                     },
-                    "environment": {
+                    "environmentNames": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
+                            "type": "string"
                         },
-                        "description": "Optional. Initial environment variables for the production environment."
+                        "description": "List of environment names (read-only)"
                     },
                     "environments": {
                         "type": "array",
                         "items": {
                             "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
                         },
-                        "description": "List of environments (read-only, managed via Environment resource)"
+                        "description": "Optional. Initial environment variables for the production environment."
                     },
                     "filesystem": {
                         "$ref": "#/types/quant:index/ApplicationFilesystem:ApplicationFilesystem",

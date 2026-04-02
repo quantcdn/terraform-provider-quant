@@ -422,8 +422,8 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 	if data.DeploymentInformation.IsUnknown() {
 		data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
 	}
-	if data.Environments.IsUnknown() {
-		data.Environments = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
+	if data.EnvironmentNames.IsUnknown() {
+		data.EnvironmentNames = types.ListNull(types.StringType)
 	}
 	if data.ImageReference.IsUnknown() {
 		data.ImageReference = resource_application.NewImageReferenceValueNull()
