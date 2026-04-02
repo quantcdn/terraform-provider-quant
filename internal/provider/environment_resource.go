@@ -2,13 +2,10 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_environment"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -17,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_environment"
 )
 
 var (
@@ -190,44 +189,35 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 		sdkReq.MergeEnvironment = &v
 	}
 
-	// ComposeDefinition and SpotConfiguration are now nested objects.
-	// Serialize to JSON then unmarshal into SDK types.
+	// ComposeDefinition — build the SDK Compose struct field-by-field from
+	// the typed Terraform value to avoid json.Marshal on Terraform internal types.
 	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
-		objVal, d := data.ComposeDefinition.ToObjectValue(ctx)
+		cd := data.ComposeDefinition
+		cf := composeFields{
+			Architecture:             cd.Architecture,
+			Containers:               cd.Containers,
+			EnableCrossAppNetworking: cd.EnableCrossAppNetworking,
+			EnableCrossEnvNetworking: cd.EnableCrossEnvNetworking,
+			MaxCapacity:              cd.MaxCapacity,
+			MinCapacity:              cd.MinCapacity,
+			SpotConfiguration:        cd.SpotConfiguration,
+			TaskCpu:                  cd.TaskCpu,
+			TaskMemory:               cd.TaskMemory,
+		}
+		compose, d := buildSDKCompose(ctx, cf)
 		diags.Append(d...)
 		if diags.HasError() {
-			return
-		}
-		composeJSON, err := json.Marshal(objVal)
-		if err != nil {
-			diags.AddError("Unable to serialize compose definition", err.Error())
-			return
-		}
-		var compose quantadmingo.Compose
-		if err := json.Unmarshal(composeJSON, &compose); err != nil {
-			diags.AddError("Unable to parse compose definition", err.Error())
 			return
 		}
 		sdkReq.ComposeDefinition = &compose
 	}
 
+	// SpotConfiguration — build from typed Terraform value.
 	if !data.SpotConfiguration.IsNull() && !data.SpotConfiguration.IsUnknown() {
-		objVal, d := data.SpotConfiguration.ToObjectValue(ctx)
-		diags.Append(d...)
-		if diags.HasError() {
-			return
+		if !data.SpotConfiguration.Strategy.IsNull() && !data.SpotConfiguration.Strategy.IsUnknown() {
+			spot := quantadmingo.NewSpotConfiguration(data.SpotConfiguration.Strategy.ValueString())
+			sdkReq.SpotConfiguration = spot
 		}
-		spotJSON, err := json.Marshal(objVal)
-		if err != nil {
-			diags.AddError("Unable to serialize spot configuration", err.Error())
-			return
-		}
-		var spot quantadmingo.SpotConfiguration
-		if err := json.Unmarshal(spotJSON, &spot); err != nil {
-			diags.AddError("Unable to parse spot configuration", err.Error())
-			return
-		}
-		sdkReq.SpotConfiguration = &spot
 	}
 
 	// Environment variables — now a types.List of nested EnvironmentValue objects.
@@ -423,19 +413,21 @@ func callEnvironmentUpdateAPI(ctx context.Context, r *environmentResource, data 
 		return
 	}
 
-	var compose quantadmingo.Compose
-	objVal, d := data.ComposeDefinition.ToObjectValue(ctx)
+	cd := data.ComposeDefinition
+	cf := composeFields{
+		Architecture:             cd.Architecture,
+		Containers:               cd.Containers,
+		EnableCrossAppNetworking: cd.EnableCrossAppNetworking,
+		EnableCrossEnvNetworking: cd.EnableCrossEnvNetworking,
+		MaxCapacity:              cd.MaxCapacity,
+		MinCapacity:              cd.MinCapacity,
+		SpotConfiguration:        cd.SpotConfiguration,
+		TaskCpu:                  cd.TaskCpu,
+		TaskMemory:               cd.TaskMemory,
+	}
+	compose, d := buildSDKCompose(ctx, cf)
 	diags.Append(d...)
 	if diags.HasError() {
-		return
-	}
-	composeJSON, err := json.Marshal(objVal)
-	if err != nil {
-		diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition", err.Error())
-		return
-	}
-	if err := json.Unmarshal(composeJSON, &compose); err != nil {
-		diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition", err.Error())
 		return
 	}
 

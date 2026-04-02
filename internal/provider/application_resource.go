@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -131,30 +130,26 @@ func (r *applicationResource) ImportState(ctx context.Context, req resource.Impo
 func buildCreateApplicationRequest(ctx context.Context, data *resource_application.ApplicationModel) (*quantadmingo.CreateApplicationRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	// ComposeDefinition is now a ComposeDefinitionValue (nested object).
-	// Serialize its object representation to JSON for the SDK.
+	// ComposeDefinition — build the SDK Compose struct field-by-field from
+	// the typed Terraform value to avoid json.Marshal on Terraform internal types.
 	var compose quantadmingo.Compose
 	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
-		objVal, d := data.ComposeDefinition.ToObjectValue(ctx)
+		cd := data.ComposeDefinition
+		cf := composeFields{
+			Architecture:             cd.Architecture,
+			Containers:               cd.Containers,
+			EnableCrossAppNetworking: cd.EnableCrossAppNetworking,
+			EnableCrossEnvNetworking: cd.EnableCrossEnvNetworking,
+			MaxCapacity:              cd.MaxCapacity,
+			MinCapacity:              cd.MinCapacity,
+			SpotConfiguration:        cd.SpotConfiguration,
+			TaskCpu:                  cd.TaskCpu,
+			TaskMemory:               cd.TaskMemory,
+		}
+		var d diag.Diagnostics
+		compose, d = buildSDKCompose(ctx, cf)
 		diags.Append(d...)
 		if diags.HasError() {
-			return nil, diags
-		}
-		composeJSON, err := json.Marshal(objVal)
-		if err != nil {
-			diags.AddAttributeError(
-				path.Root("compose_definition"),
-				"Invalid compose_definition",
-				fmt.Sprintf("Failed to serialize compose_definition: %s", err.Error()),
-			)
-			return nil, diags
-		}
-		if err := json.Unmarshal(composeJSON, &compose); err != nil {
-			diags.AddAttributeError(
-				path.Root("compose_definition"),
-				"Invalid compose_definition",
-				fmt.Sprintf("Failed to parse compose_definition: %s", err.Error()),
-			)
 			return nil, diags
 		}
 	}
