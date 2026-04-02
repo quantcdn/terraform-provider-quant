@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_ai_vector_document"
@@ -208,6 +209,69 @@ func callVectorDocumentUpsertAPI(ctx context.Context, r *aiVectorDocumentResourc
 	}
 	if data.Offset.IsUnknown() {
 		data.Offset = types.Int64Null()
+	}
+
+	// Resolve unknown sub-fields in Documents to prevent Pulumi bridge panic.
+	// After Create, plan values for Computed sub-fields (key, metadata and its
+	// children) may still be "unknown". Terraform/Pulumi requires all Computed
+	// fields in state to be known (or null) after Apply.
+	metadataAttrTypes := resource_ai_vector_document.MetadataValue{}.AttributeTypes(ctx)
+
+	var resolvedDocs []resource_ai_vector_document.DocumentsValue
+	diags.Append(data.Documents.ElementsAs(ctx, &resolvedDocs, false)...)
+	if diags.HasError() {
+		return
+	}
+
+	for i := range resolvedDocs {
+		// key is Optional+Computed — resolve to null if still unknown.
+		if resolvedDocs[i].Key.IsUnknown() {
+			resolvedDocs[i].Key = basetypes.NewStringNull()
+		}
+		// metadata is Optional+Computed — resolve the whole object to null when
+		// unknown, which also covers its unknown children.
+		if resolvedDocs[i].Metadata.IsUnknown() {
+			resolvedDocs[i].Metadata = basetypes.NewObjectNull(metadataAttrTypes)
+		} else if !resolvedDocs[i].Metadata.IsNull() {
+			// metadata is known (user supplied it) — ensure its Computed children
+			// are resolved too.
+			attrs := resolvedDocs[i].Metadata.Attributes()
+			changed := false
+
+			if s, ok := attrs["section"].(basetypes.StringValue); ok && s.IsUnknown() {
+				attrs["section"] = basetypes.NewStringNull()
+				changed = true
+			}
+			if s, ok := attrs["source_url"].(basetypes.StringValue); ok && s.IsUnknown() {
+				attrs["source_url"] = basetypes.NewStringNull()
+				changed = true
+			}
+			if l, ok := attrs["tags"].(basetypes.ListValue); ok && l.IsUnknown() {
+				attrs["tags"] = basetypes.NewListNull(types.StringType)
+				changed = true
+			}
+			if s, ok := attrs["title"].(basetypes.StringValue); ok && s.IsUnknown() {
+				attrs["title"] = basetypes.NewStringNull()
+				changed = true
+			}
+
+			if changed {
+				rebuilt, d := basetypes.NewObjectValue(metadataAttrTypes, attrs)
+				diags.Append(d...)
+				if !diags.HasError() {
+					resolvedDocs[i].Metadata = rebuilt
+				}
+			}
+		}
+	}
+
+	if !diags.HasError() && len(resolvedDocs) > 0 {
+		docListType := resolvedDocs[0].Type(ctx)
+		docList, d := types.ListValueFrom(ctx, docListType, resolvedDocs)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Documents = docList
+		}
 	}
 
 	return
