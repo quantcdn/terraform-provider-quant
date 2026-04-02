@@ -387,21 +387,46 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 		data.UpdatedAt = types.StringNull()
 	}
 
-	// Resolve unknown optional/computed fields to null
+	// Force ALL complex nested types to null after Read.
+	// The Pulumi bridge panics if ANY nested field is still "unknown".
+	// Complex types have Computed sub-fields that can't be resolved without
+	// custom type round-trip issues. Null them all — the values were sent
+	// to the API during Create and don't need to persist in state.
+	data.ComposeDefinition = resource_environment.NewComposeDefinitionValueNull()
+	data.SpotConfiguration = resource_environment.NewSpotConfigurationValueNull()
+	data.AlbRouting = resource_environment.NewAlbRoutingValueNull()
+	data.LoadBalancer = resource_environment.NewLoadBalancerValueNull()
+	data.SecurityGroup = resource_environment.NewSecurityGroupValueNull()
+	data.Service = resource_environment.NewServiceValueNull()
+	data.Subnet = resource_environment.NewSubnetValueNull()
+	data.TaskDefinition = resource_environment.NewTaskDefinitionValueNull()
+	data.Vpc = resource_environment.NewVpcValueNull()
+	data.ContainerNames = types.ListNull(types.StringType)
+	data.Cron = types.ListNull(resource_environment.CronValue{}.Type(ctx))
+	data.Volumes = types.ListNull(resource_environment.VolumesValue{}.Type(ctx))
+	data.Environment = types.ListNull(resource_environment.EnvironmentValue{}.Type(ctx))
+
+	// Scalar computed fields
 	if data.CloneConfigurationFrom.IsUnknown() {
 		data.CloneConfigurationFrom = types.StringNull()
 	}
 	if data.ImageSuffix.IsUnknown() {
 		data.ImageSuffix = types.StringNull()
 	}
-	if data.SpotConfiguration.IsUnknown() {
-		data.SpotConfiguration = resource_environment.NewSpotConfigurationValueNull()
-	}
 	if data.MergeEnvironment.IsUnknown() {
 		data.MergeEnvironment = types.BoolNull()
 	}
-	if data.ComposeDefinition.IsUnknown() {
-		data.ComposeDefinition = resource_environment.NewComposeDefinitionValueNull()
+	if data.DeploymentFailureType.IsUnknown() {
+		data.DeploymentFailureType = types.StringNull()
+	}
+	if data.DeploymentFailureReason.IsUnknown() {
+		data.DeploymentFailureReason = types.StringNull()
+	}
+	if data.PublicIpAddress.IsUnknown() {
+		data.PublicIpAddress = types.StringNull()
+	}
+	if data.Application.IsUnknown() {
+		data.Application = types.StringNull()
 	}
 
 	return

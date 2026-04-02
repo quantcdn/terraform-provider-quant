@@ -420,40 +420,24 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 		data.ContainerNames = types.ListNull(types.StringType)
 	}
 
-	// Computed fields that must be resolved to avoid "unknown" Pulumi bridge panic.
-	// Every field in the model must be set (even to null) after Create/Read.
-	if data.DeploymentInformation.IsUnknown() {
-		data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
-	}
-	if data.EnvironmentNames.IsUnknown() {
-		data.EnvironmentNames = types.ListNull(types.StringType)
-	}
-	if data.ImageReference.IsUnknown() {
-		data.ImageReference = resource_application.NewImageReferenceValueNull()
-	}
+	// Force ALL complex nested types to null after Read.
+	// The Pulumi bridge panics if ANY nested field is still "unknown" after
+	// Create/Read. The user-provided values (composeDefinition, database, etc.)
+	// have Computed sub-fields that remain unknown after Create. Rather than
+	// trying to recursively resolve each one (which fails due to custom type
+	// round-trip issues), we null out all complex types. The values were already
+	// sent to the API during Create — they don't need to persist in state for
+	// the resource to function.
+	data.ComposeDefinition = resource_application.NewComposeDefinitionValueNull()
+	data.Database = resource_application.NewDatabaseValueNull()
+	data.Filesystem = resource_application.NewFilesystemValueNull()
+	data.ImageReference = resource_application.NewImageReferenceValueNull()
+	data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
+	data.EnvironmentNames = types.ListNull(types.StringType)
+	data.Environment = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
 	if data.Application.IsUnknown() {
 		data.Application = types.StringNull()
 	}
-	if data.ComposeDefinition.IsUnknown() {
-		data.ComposeDefinition = resource_application.NewComposeDefinitionValueNull()
-	}
-	if data.Database.IsUnknown() {
-		data.Database = resource_application.NewDatabaseValueNull()
-	}
-	if data.Filesystem.IsUnknown() {
-		data.Filesystem = resource_application.NewFilesystemValueNull()
-	}
-	if data.Environment.IsUnknown() {
-		data.Environment = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
-	}
-
-	// Resolve any remaining unknown sub-fields inside nested objects.
-	// The Pulumi bridge panics if ANY nested field is still unknown after
-	// Create/Read ("rawStateDeltaHelper cannot process unknown PropertyValue
-	// values").  The checks above handle top-level nullification, but when the
-	// user provides a partial nested object (e.g. database.engine) the computed
-	// sub-fields (e.g. database.rds_instance_identifier) remain unknown.
-	resolveApplicationUnknowns(ctx, data)
 
 	return
 }
@@ -495,35 +479,33 @@ func nullifyUnknownAttrValue(ctx context.Context, v attr.Value) attr.Value {
 	case basetypes.ObjectValue:
 		attrs := tv.Attributes()
 		resolved := make(map[string]attr.Value, len(attrs))
-		changed := false
 		for k, child := range attrs {
-			r := nullifyUnknownAttrValue(ctx, child)
-			resolved[k] = r
-			if r != child {
-				changed = true
-			}
+			resolved[k] = nullifyUnknownAttrValue(ctx, child)
 		}
-		if changed {
-			obj, _ := types.ObjectValue(tv.AttributeTypes(ctx), resolved)
-			return obj
-		}
-		return v
+		obj, _ := types.ObjectValue(tv.AttributeTypes(ctx), resolved)
+		return obj
 	case basetypes.ListValue:
 		elems := tv.Elements()
+		if len(elems) == 0 {
+			return v
+		}
 		resolved := make([]attr.Value, len(elems))
-		changed := false
 		for i, elem := range elems {
-			r := nullifyUnknownAttrValue(ctx, elem)
-			resolved[i] = r
-			if r != elem {
-				changed = true
+			// Custom types (ContainersValue, etc.) implement ObjectValuable
+			// but aren't basetypes.ObjectValue. Convert first, then recurse.
+			if _, isObj := elem.(basetypes.ObjectValue); !isObj {
+				if ov, ok := elem.(basetypes.ObjectValuable); ok {
+					objVal, d := ov.ToObjectValue(ctx)
+					if !d.HasError() {
+						resolved[i] = nullifyUnknownAttrValue(ctx, objVal)
+						continue
+					}
+				}
 			}
+			resolved[i] = nullifyUnknownAttrValue(ctx, elem)
 		}
-		if changed {
-			list, _ := types.ListValue(tv.ElementType(ctx), resolved)
-			return list
-		}
-		return v
+		list, _ := types.ListValue(tv.ElementType(ctx), resolved)
+		return list
 	}
 
 	return v
