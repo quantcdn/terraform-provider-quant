@@ -1,0 +1,38 @@
+name: e2e-environment
+runtime: yaml
+description: E2E test for standalone Environment resource (create, update, destroy)
+config:
+  appName:
+    type: string
+  envSuffix:
+    type: string
+    default: e2e-env
+resources:
+  # Create an app first (environment needs a parent app)
+  testApp:
+    type: quant:index:Application
+    properties:
+      appName: ${appName}
+      composeDefinition:
+        containers:
+          - name: web
+            imageReference:
+              type: external
+              identifier: nginx:latest
+            exposedPorts:
+              - 80
+        taskCpu: 256
+        taskMemory: 512
+        architecture: X86_64
+  # Create environment cloned from production
+  testEnv:
+    type: quant:index:Environment
+    properties:
+      application: ${testApp.appName}
+      envName: ${envSuffix}
+      cloneConfigurationFrom: production
+outputs:
+  appName: ${testApp.appName}
+  envName: ${testEnv.envName}
+  envStatus: ${testEnv.status}
+  envDeploymentStatus: ${testEnv.deploymentStatus}

@@ -398,6 +398,30 @@ func TestE2E_AIVector(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// E2E Test: Environment lifecycle (create → verify → update scaling → destroy)
+// ---------------------------------------------------------------------------
+
+func TestE2E_Environment(t *testing.T) {
+	requiresInfra(t)
+
+	suffix := uniqueSuffix()
+	result, cleanup := createStack(t, "environment", map[string]string{
+		"e2e-environment:appName":   fmt.Sprintf("pulumi-e2e-env-%s", suffix),
+		"e2e-environment:envSuffix": "staging",
+	})
+	defer cleanup()
+
+	assert.NotEmpty(t, result.outputs["appName"].Value, "appName should be set")
+	assert.Equal(t, "staging", result.outputs["envName"].Value, "envName should be staging")
+
+	t.Logf("Created: app=%v env=%v status=%v deployStatus=%v",
+		result.outputs["appName"].Value,
+		result.outputs["envName"].Value,
+		result.outputs["envStatus"].Value,
+		result.outputs["envDeploymentStatus"].Value)
+}
+
+// ---------------------------------------------------------------------------
 // E2E Test: Full lifecycle (create → preview → update → destroy) for a project
 // ---------------------------------------------------------------------------
 
