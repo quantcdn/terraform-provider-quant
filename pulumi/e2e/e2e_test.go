@@ -136,8 +136,8 @@ func createStack(t *testing.T, programName string, extraConfig ...map[string]str
 	outputs := upResult.Outputs
 
 	cleanup := func() {
-		// Destroy all resources
-		destroyResult, err := stack.Destroy(ctx, optdestroy.ProgressStreams(os.Stdout))
+		// Destroy resources sequentially to avoid API rate limit / conflict errors
+		destroyResult, err := stack.Destroy(ctx, optdestroy.ProgressStreams(os.Stdout), optdestroy.Parallel(1))
 		if err != nil {
 			t.Logf("Destroy stderr: %s", destroyResult.StdErr)
 			t.Errorf("pulumi destroy failed for %s: %v", programName, err)
@@ -474,7 +474,7 @@ func TestE2E_FullLifecycle(t *testing.T) {
 
 	// Step 4: Destroy
 	t.Log("Step 4: Destroy")
-	destroyResult, err := stack.Destroy(ctx, optdestroy.ProgressStreams(os.Stdout))
+	destroyResult, err := stack.Destroy(ctx, optdestroy.ProgressStreams(os.Stdout), optdestroy.Parallel(1))
 	if err != nil {
 		t.Logf("Destroy stderr: %s", destroyResult.StdErr)
 	}
