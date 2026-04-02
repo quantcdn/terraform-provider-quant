@@ -183,7 +183,11 @@ func TestE2E_Project(t *testing.T) {
 
 func TestE2E_Domain(t *testing.T) {
 	requiresInfra(t)
-	result, cleanup := createStack(t, "domain")
+	suffix := uniqueSuffix()
+	result, cleanup := createStack(t, "domain", map[string]string{
+		"e2e-domain:projectName":  fmt.Sprintf("pulumi-e2e-domain-%s", suffix),
+		"e2e-domain:domainSuffix": fmt.Sprintf("d%s", suffix),
+	})
 	defer cleanup()
 
 	assert.NotEmpty(t, result.outputs["domainId"].Value, "domainId should be set")
