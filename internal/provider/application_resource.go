@@ -377,40 +377,41 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 		return
 	}
 
-	// Map response to Terraform model
+	// --- Scalar fields ---
 	data.AppName = types.StringValue(app.GetAppName())
 	data.Organisation = types.StringValue(app.GetOrganisation())
 
-	// Status
 	if app.HasStatus() {
 		data.Status = types.StringValue(app.GetStatus())
 	} else {
 		data.Status = types.StringNull()
 	}
 
-	// Running count
 	if app.HasRunningCount() {
 		data.RunningCount = types.Int64Value(int64(app.GetRunningCount()))
 	} else {
 		data.RunningCount = types.Int64Null()
 	}
 
-	// Desired count
 	if app.HasDesiredCount() {
 		data.DesiredCount = types.Int64Value(int64(app.GetDesiredCount()))
 	} else {
 		data.DesiredCount = types.Int64Null()
 	}
 
-	// Min/Max capacity
 	if app.HasMinCapacity() {
 		data.MinCapacity = types.Int64Value(int64(app.GetMinCapacity()))
-	}
-	if app.HasMaxCapacity() {
-		data.MaxCapacity = types.Int64Value(int64(app.GetMaxCapacity()))
+	} else {
+		data.MinCapacity = types.Int64Null()
 	}
 
-	// Container names
+	if app.HasMaxCapacity() {
+		data.MaxCapacity = types.Int64Value(int64(app.GetMaxCapacity()))
+	} else {
+		data.MaxCapacity = types.Int64Null()
+	}
+
+	// --- ContainerNames ---
 	if app.HasContainerNames() {
 		names := app.GetContainerNames()
 		namesList, d := types.ListValueFrom(ctx, types.StringType, names)
@@ -420,21 +421,87 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 		data.ContainerNames = types.ListNull(types.StringType)
 	}
 
-	// Force ALL complex nested types to null after Read.
-	// The Pulumi bridge panics if ANY nested field is still "unknown" after
-	// Create/Read. The user-provided values (composeDefinition, database, etc.)
-	// have Computed sub-fields that remain unknown after Create. Rather than
-	// trying to recursively resolve each one (which fails due to custom type
-	// round-trip issues), we null out all complex types. The values were already
-	// sent to the API during Create — they don't need to persist in state for
-	// the resource to function.
-	data.ComposeDefinition = resource_application.NewComposeDefinitionValueNull()
-	data.Database = resource_application.NewDatabaseValueNull()
-	data.Filesystem = resource_application.NewFilesystemValueNull()
-	data.ImageReference = resource_application.NewImageReferenceValueNull()
-	data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
-	data.EnvironmentNames = types.ListNull(types.StringType)
-	data.Environment = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
+	// --- ComposeDefinition ---
+	if app.HasComposeDefinition() {
+		compose := app.GetComposeDefinition()
+		cd, d := buildAppComposeDefinitionValue(ctx, &compose)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.ComposeDefinition = cd
+		}
+	} else {
+		data.ComposeDefinition = resource_application.NewComposeDefinitionValueNull()
+	}
+
+	// --- Database ---
+	if dbPtr, ok := app.GetDatabaseOk(); ok && dbPtr != nil {
+		db, d := buildAppDatabaseValue(ctx, dbPtr)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Database = db
+		}
+	} else {
+		data.Database = resource_application.NewDatabaseValueNull()
+	}
+
+	// --- Filesystem ---
+	if fsPtr, ok := app.GetFilesystemOk(); ok && fsPtr != nil {
+		fs, d := buildAppFilesystemValue(ctx, fsPtr)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Filesystem = fs
+		}
+	} else {
+		data.Filesystem = resource_application.NewFilesystemValueNull()
+	}
+
+	// --- ImageReference ---
+	if irPtr, ok := app.GetImageReferenceOk(); ok && irPtr != nil {
+		ir, d := buildAppImageReferenceValue(ctx, irPtr)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.ImageReference = ir
+		}
+	} else {
+		data.ImageReference = resource_application.NewImageReferenceValueNull()
+	}
+
+	// --- DeploymentInformation ---
+	if app.HasDeploymentInformation() {
+		depList, d := buildAppDeploymentInformationList(ctx, app.GetDeploymentInformation())
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.DeploymentInformation = depList
+		}
+	} else {
+		data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
+	}
+
+	// --- EnvironmentNames ---
+	// The API returns environments as a list of objects with envName; extract names.
+	if app.HasEnvironments() {
+		envs := app.GetEnvironments()
+		names := make([]string, 0, len(envs))
+		for _, e := range envs {
+			if n, ok := e.GetEnvNameOk(); ok && n != nil {
+				names = append(names, *n)
+			}
+		}
+		namesList, d := types.ListValueFrom(ctx, types.StringType, names)
+		diags.Append(d...)
+		data.EnvironmentNames = namesList
+	} else {
+		data.EnvironmentNames = types.ListNull(types.StringType)
+	}
+
+	// --- Environment (env vars) ---
+	// The Application GET response does not return environment variables.
+	// Preserve current state if known; otherwise null.
+	if data.Environment.IsUnknown() {
+		data.Environment = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
+	}
+
+	// --- Application (self-link / computed ID) ---
 	if data.Application.IsUnknown() {
 		data.Application = types.StringNull()
 	}

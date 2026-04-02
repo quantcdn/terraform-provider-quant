@@ -340,60 +340,137 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 		return
 	}
 
+	// --- Scalar fields ---
 	data.EnvName = types.StringValue(env.GetEnvName())
 	data.Organisation = types.StringValue(org)
 
-	if env.Status != nil {
-		data.Status = types.StringValue(*env.Status)
+	if env.HasStatus() {
+		data.Status = types.StringValue(env.GetStatus())
 	} else {
 		data.Status = types.StringNull()
 	}
 
-	if env.RunningCount != nil {
-		data.RunningCount = types.Int64Value(int64(*env.RunningCount))
+	if env.HasRunningCount() {
+		data.RunningCount = types.Int64Value(int64(env.GetRunningCount()))
 	} else {
 		data.RunningCount = types.Int64Null()
 	}
 
-	if env.DesiredCount != nil {
-		data.DesiredCount = types.Int64Value(int64(*env.DesiredCount))
+	if env.HasDesiredCount() {
+		data.DesiredCount = types.Int64Value(int64(env.GetDesiredCount()))
 	} else {
 		data.DesiredCount = types.Int64Null()
 	}
 
-	if env.MinCapacity != nil {
-		data.MinCapacity = types.Int64Value(int64(*env.MinCapacity))
+	if env.HasMinCapacity() {
+		data.MinCapacity = types.Int64Value(int64(env.GetMinCapacity()))
+	} else {
+		data.MinCapacity = types.Int64Null()
 	}
 
-	if env.MaxCapacity != nil {
-		data.MaxCapacity = types.Int64Value(int64(*env.MaxCapacity))
+	if env.HasMaxCapacity() {
+		data.MaxCapacity = types.Int64Value(int64(env.GetMaxCapacity()))
+	} else {
+		data.MaxCapacity = types.Int64Null()
 	}
 
-	if env.DeploymentStatus != nil {
-		data.DeploymentStatus = types.StringValue(*env.DeploymentStatus)
+	if env.HasDeploymentStatus() {
+		data.DeploymentStatus = types.StringValue(env.GetDeploymentStatus())
 	} else {
 		data.DeploymentStatus = types.StringNull()
 	}
 
-	if env.CreatedAt != nil {
-		data.CreatedAt = types.StringValue(env.CreatedAt.Format(time.RFC3339))
+	if env.HasDeploymentFailureType() {
+		data.DeploymentFailureType = types.StringValue(env.GetDeploymentFailureType())
 	} else {
-		data.CreatedAt = types.StringNull()
+		data.DeploymentFailureType = types.StringNull()
 	}
 
-	if env.UpdatedAt != nil {
-		data.UpdatedAt = types.StringValue(env.UpdatedAt.Format(time.RFC3339))
+	if env.HasDeploymentFailureReason() {
+		data.DeploymentFailureReason = types.StringValue(env.GetDeploymentFailureReason())
 	} else {
-		data.UpdatedAt = types.StringNull()
+		data.DeploymentFailureReason = types.StringNull()
 	}
 
-	// Force ALL complex nested types to null after Read.
-	// The Pulumi bridge panics if ANY nested field is still "unknown".
-	// Complex types have Computed sub-fields that can't be resolved without
-	// custom type round-trip issues. Null them all — the values were sent
-	// to the API during Create and don't need to persist in state.
-	data.ComposeDefinition = resource_environment.NewComposeDefinitionValueNull()
-	data.SpotConfiguration = resource_environment.NewSpotConfigurationValueNull()
+	if env.HasPublicIpAddress() {
+		data.PublicIpAddress = types.StringValue(env.GetPublicIpAddress())
+	} else {
+		data.PublicIpAddress = types.StringNull()
+	}
+
+	data.CreatedAt = optionalTime(env.GetCreatedAtOk())
+	data.UpdatedAt = optionalTime(env.GetUpdatedAtOk())
+
+	// --- Volumes ---
+	if env.HasVolumes() {
+		volList, d := buildEnvVolumesListFromSDK(ctx, env.GetVolumes())
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Volumes = volList
+		}
+	} else {
+		data.Volumes = types.ListNull(resource_environment.VolumesValue{}.Type(ctx))
+	}
+
+	// --- Cron ---
+	if env.HasCron() {
+		cronList, d := buildEnvCronListFromSDK(ctx, env.GetCron())
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Cron = cronList
+		}
+	} else {
+		data.Cron = types.ListNull(resource_environment.CronValue{}.Type(ctx))
+	}
+
+	// --- ContainerNames ---
+	// EnvironmentResponse returns containers as []map[string]interface{};
+	// extract "name" from each for the containerNames list.
+	if env.HasContainers() {
+		sdkContainers := env.GetContainers()
+		names := make([]string, 0, len(sdkContainers))
+		for _, c := range sdkContainers {
+			if name, ok := c["name"]; ok {
+				if nameStr, ok := name.(string); ok && nameStr != "" {
+					names = append(names, nameStr)
+				}
+			}
+		}
+		if len(names) > 0 {
+			namesList, d := types.ListValueFrom(ctx, types.StringType, names)
+			diags.Append(d...)
+			data.ContainerNames = namesList
+		} else {
+			data.ContainerNames = types.ListNull(types.StringType)
+		}
+	} else {
+		data.ContainerNames = types.ListNull(types.StringType)
+	}
+
+	// --- ComposeDefinition ---
+	// The EnvironmentResponse SDK model does not include composeDefinition.
+	// Preserve user-configured state if known; null out unknowns.
+	if data.ComposeDefinition.IsUnknown() {
+		data.ComposeDefinition = resource_environment.NewComposeDefinitionValueNull()
+	}
+
+	// --- SpotConfiguration ---
+	// The EnvironmentResponse SDK model does not include spotConfiguration.
+	// Preserve user-configured state if known; null out unknowns.
+	if data.SpotConfiguration.IsUnknown() {
+		data.SpotConfiguration = resource_environment.NewSpotConfigurationValueNull()
+	}
+
+	// --- Environment (env vars) ---
+	// The EnvironmentResponse SDK model does not include environment variables.
+	// Preserve user-configured state if known; null out unknowns.
+	if data.Environment.IsUnknown() {
+		data.Environment = types.ListNull(resource_environment.EnvironmentValue{}.Type(ctx))
+	}
+
+	// --- Read-only server infrastructure fields ---
+	// These are readOnly=true in the OA spec (users never set them).
+	// Null them to avoid drift issues with opaque server-side data.
 	data.AlbRouting = resource_environment.NewAlbRoutingValueNull()
 	data.LoadBalancer = resource_environment.NewLoadBalancerValueNull()
 	data.SecurityGroup = resource_environment.NewSecurityGroupValueNull()
@@ -401,12 +478,8 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 	data.Subnet = resource_environment.NewSubnetValueNull()
 	data.TaskDefinition = resource_environment.NewTaskDefinitionValueNull()
 	data.Vpc = resource_environment.NewVpcValueNull()
-	data.ContainerNames = types.ListNull(types.StringType)
-	data.Cron = types.ListNull(resource_environment.CronValue{}.Type(ctx))
-	data.Volumes = types.ListNull(resource_environment.VolumesValue{}.Type(ctx))
-	data.Environment = types.ListNull(resource_environment.EnvironmentValue{}.Type(ctx))
 
-	// Scalar computed fields
+	// --- Create-only scalars: preserve if known, null out unknowns ---
 	if data.CloneConfigurationFrom.IsUnknown() {
 		data.CloneConfigurationFrom = types.StringNull()
 	}
@@ -415,15 +488,6 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 	}
 	if data.MergeEnvironment.IsUnknown() {
 		data.MergeEnvironment = types.BoolNull()
-	}
-	if data.DeploymentFailureType.IsUnknown() {
-		data.DeploymentFailureType = types.StringNull()
-	}
-	if data.DeploymentFailureReason.IsUnknown() {
-		data.DeploymentFailureReason = types.StringNull()
-	}
-	if data.PublicIpAddress.IsUnknown() {
-		data.PublicIpAddress = types.StringNull()
 	}
 	if data.Application.IsUnknown() {
 		data.Application = types.StringNull()
