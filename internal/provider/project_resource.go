@@ -317,18 +317,12 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 				return nil, "", fmt.Errorf("error checking project status (HTTP %d): %v", statusCode, err)
 			}
 
-			// Check CDN provisioning status — wait until fully deployed.
-			// The SDK doesn't type this field, so check AdditionalProperties.
-			if status, ok := projectResult.AdditionalProperties["platform_provisioning_status"]; ok {
-				if statusStr, ok := status.(string); ok && statusStr == "deployed" {
-					return projectResult, "ready", nil
-				}
-				// Status exists but not deployed yet
-				return projectResult, "creating", nil
-			}
-
-			// Status field not present yet — CDN provisioning hasn't started
-			return projectResult, "creating", nil
+			// Project exists and can be read — treat as ready.
+			// Note: CDN provisioning (platform_provisioning_status → deployed)
+			// happens asynchronously and may take 5-15+ minutes. Domain creation
+			// will fail until CDN provisioning completes. A future enhancement
+			// could add a wait_for_cdn_deployment option to this resource.
+			return projectResult, "ready", nil
 		},
 		Timeout:      15 * time.Minute,
 		Delay:        10 * time.Second,
