@@ -433,10 +433,12 @@ func TestE2E_AI(t *testing.T) {
 	assert.NotEmpty(t, outputs["skillId"].Value, "skillId should still be set after update")
 	t.Log("AI skill update succeeded")
 
-	// Note: AiGovernance update not tested here — changing modelPolicy from
-	// "unrestricted" requires modelList (allowlist/blocklist need model names).
-	// Governance is a singleton using PUT for both create and update, so the
-	// create test already exercises the update path.
+	// Test update: change governance modelPolicy to allowlist (modelList is
+	// already in the YAML program, so switching to allowlist is valid).
+	_ = result.stack.SetConfig(ctx, "e2e-ai:modelPolicy", auto.ConfigValue{Value: "allowlist"})
+	t.Log("Updating AI governance (modelPolicy → allowlist)...")
+	_ = updateStack(t, result.stack)
+	t.Log("AI governance update succeeded")
 }
 
 func TestE2E_AIVector(t *testing.T) {
@@ -1097,4 +1099,284 @@ func TestE2E_Import_AISkill(t *testing.T) {
 		t.Logf("Import succeeded but code generation file not found (expected with GenerateCode=false)")
 	}
 	t.Log("AI Skill import test completed successfully")
+}
+
+// ---------------------------------------------------------------------------
+// E2E Test: Import — AI Governance (singleton, no create needed)
+// ---------------------------------------------------------------------------
+
+func TestE2E_Import_AIGovernance(t *testing.T) {
+	ensureProvider(t)
+	checkE2EEnv(t)
+
+	ctx := context.Background()
+
+	// AiGovernance is a singleton — it already exists per org, so no API
+	// setup needed. We just import it.
+	dir := programDir(t, "ai")
+	currentPath := os.Getenv("PATH")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+currentPath)
+	stateDir := t.TempDir()
+	t.Setenv("PULUMI_BACKEND_URL", "file://"+stateDir)
+	t.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
+
+	stack, err := auto.UpsertStackLocalSource(ctx, "test", dir)
+	require.NoError(t, err)
+
+	suffix := uniqueSuffix()
+	err = stack.SetConfig(ctx, "e2e-ai:testSuffix", auto.ConfigValue{Value: fmt.Sprintf("gov-import-%s", suffix)})
+	require.NoError(t, err)
+
+	defer func() {
+		_ = stack.Workspace().RemoveStack(ctx, stack.Name())
+	}()
+
+	t.Log("Importing AI governance into Pulumi...")
+	_, err = stack.ImportResources(ctx,
+		optimport.Resources([]*optimport.ImportResource{
+			{
+				Type: "quant:index:AiGovernance",
+				Name: "testGovernance",
+				ID:   os.Getenv("QUANTCDN_ORGANIZATION"),
+			},
+		}),
+		optimport.GenerateCode(false),
+		optimport.ProgressStreams(os.Stdout),
+	)
+	if err != nil && !strings.Contains(err.Error(), "generated_code") {
+		require.NoError(t, err, "pulumi import failed for AI governance")
+	}
+	t.Log("AI Governance import test completed successfully")
+}
+
+// ---------------------------------------------------------------------------
+// E2E Test: Import — AI Vector Collection
+// ---------------------------------------------------------------------------
+
+func TestE2E_Import_AIVectorCollection(t *testing.T) {
+	ensureProvider(t)
+	checkE2EEnv(t)
+
+	ctx := context.Background()
+	apiClient := newAPIClient(t)
+	defer apiClient.Close()
+
+	suffix := uniqueSuffix()
+	collectionName := fmt.Sprintf("e2e-import-col-%s", suffix)
+	t.Logf("Creating vector collection '%s' via API...", collectionName)
+
+	createReq := quantadmingo.NewCreateVectorCollectionRequest(collectionName)
+	model := "amazon.titan-embed-text-v2:0"
+	createReq.EmbeddingModel = &model
+
+	resp, _, err := apiClient.Instance.AIVectorDatabaseAPI.CreateVectorCollection(apiClient.AuthContext, apiClient.Organization).
+		CreateVectorCollectionRequest(*createReq).Execute()
+	require.NoError(t, err, "API collection create failed")
+
+	collectionId := ""
+	if resp != nil && resp.Collection != nil && resp.Collection.CollectionId != nil {
+		collectionId = *resp.Collection.CollectionId
+	}
+	require.NotEmpty(t, collectionId, "collectionId should be returned")
+	t.Logf("Created vector collection: id=%s", collectionId)
+
+	defer func() {
+		_, _, err := apiClient.Instance.AIVectorDatabaseAPI.DeleteVectorCollection(apiClient.AuthContext, apiClient.Organization, collectionId).Execute()
+		if err != nil {
+			t.Logf("Cleanup warning: %v", err)
+		}
+	}()
+
+	dir := programDir(t, "ai-vector")
+	currentPath := os.Getenv("PATH")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+currentPath)
+	stateDir := t.TempDir()
+	t.Setenv("PULUMI_BACKEND_URL", "file://"+stateDir)
+	t.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
+
+	stack, err := auto.UpsertStackLocalSource(ctx, "test", dir)
+	require.NoError(t, err)
+
+	err = stack.SetConfig(ctx, "e2e-ai-vector:testSuffix", auto.ConfigValue{Value: fmt.Sprintf("col-import-%s", suffix)})
+	require.NoError(t, err)
+
+	defer func() {
+		_ = stack.Workspace().RemoveStack(ctx, stack.Name())
+	}()
+
+	t.Log("Importing vector collection into Pulumi...")
+	_, err = stack.ImportResources(ctx,
+		optimport.Resources([]*optimport.ImportResource{
+			{
+				Type: "quant:index:AiVectorCollection",
+				Name: "testCollection",
+				ID:   collectionId,
+			},
+		}),
+		optimport.GenerateCode(false),
+		optimport.ProgressStreams(os.Stdout),
+	)
+	if err != nil && !strings.Contains(err.Error(), "generated_code") {
+		require.NoError(t, err, "pulumi import failed for vector collection")
+	}
+	t.Log("AI Vector Collection import test completed successfully")
+}
+
+// ---------------------------------------------------------------------------
+// E2E Test: Import — AI Vector Document
+// ---------------------------------------------------------------------------
+
+func TestE2E_Import_AIVectorDocument(t *testing.T) {
+	ensureProvider(t)
+	checkE2EEnv(t)
+
+	ctx := context.Background()
+	apiClient := newAPIClient(t)
+	defer apiClient.Close()
+
+	suffix := uniqueSuffix()
+	collectionName := fmt.Sprintf("e2e-import-doc-col-%s", suffix)
+	t.Logf("Creating vector collection '%s' via API...", collectionName)
+
+	createReq := quantadmingo.NewCreateVectorCollectionRequest(collectionName)
+	model := "amazon.titan-embed-text-v2:0"
+	createReq.EmbeddingModel = &model
+
+	colResp, _, err := apiClient.Instance.AIVectorDatabaseAPI.CreateVectorCollection(apiClient.AuthContext, apiClient.Organization).
+		CreateVectorCollectionRequest(*createReq).Execute()
+	require.NoError(t, err, "API collection create failed")
+
+	collectionId := ""
+	if colResp != nil && colResp.Collection != nil && colResp.Collection.CollectionId != nil {
+		collectionId = *colResp.Collection.CollectionId
+	}
+	require.NotEmpty(t, collectionId, "collectionId should be returned")
+
+	defer func() {
+		_, _, _ = apiClient.Instance.AIVectorDatabaseAPI.DeleteVectorCollection(apiClient.AuthContext, apiClient.Organization, collectionId).Execute()
+	}()
+
+	docKey := fmt.Sprintf("e2e-import-doc-%s", suffix)
+	docs := []quantadmingo.UploadVectorDocumentsRequestDocumentsInner{
+		{Content: "E2E import test document content.", Key: &docKey},
+	}
+	uploadReq := quantadmingo.NewUploadVectorDocumentsRequest(docs)
+	_, _, err = apiClient.Instance.AIVectorDatabaseAPI.UploadVectorDocuments(apiClient.AuthContext, apiClient.Organization, collectionId).
+		UploadVectorDocumentsRequest(*uploadReq).Execute()
+	require.NoError(t, err, "API document upload failed")
+	t.Logf("Uploaded document: key=%s in collection=%s", docKey, collectionId)
+
+	dir := programDir(t, "ai-vector")
+	currentPath := os.Getenv("PATH")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+currentPath)
+	stateDir := t.TempDir()
+	t.Setenv("PULUMI_BACKEND_URL", "file://"+stateDir)
+	t.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
+
+	stack, err := auto.UpsertStackLocalSource(ctx, "test", dir)
+	require.NoError(t, err)
+
+	err = stack.SetConfig(ctx, "e2e-ai-vector:testSuffix", auto.ConfigValue{Value: fmt.Sprintf("doc-import-%s", suffix)})
+	require.NoError(t, err)
+
+	defer func() {
+		_ = stack.Workspace().RemoveStack(ctx, stack.Name())
+	}()
+
+	t.Log("Importing vector document into Pulumi...")
+	// Import format for AiVectorDocument is "collection-id/key"
+	_, err = stack.ImportResources(ctx,
+		optimport.Resources([]*optimport.ImportResource{
+			{
+				Type: "quant:index:AiVectorDocument",
+				Name: "testDocument",
+				ID:   fmt.Sprintf("%s/%s", collectionId, docKey),
+			},
+		}),
+		optimport.GenerateCode(false),
+		optimport.ProgressStreams(os.Stdout),
+	)
+	if err != nil && !strings.Contains(err.Error(), "generated_code") {
+		require.NoError(t, err, "pulumi import failed for vector document")
+	}
+	t.Log("AI Vector Document import test completed successfully")
+}
+
+// ---------------------------------------------------------------------------
+// E2E Test: Import — KV Item
+// ---------------------------------------------------------------------------
+
+func TestE2E_Import_KVItem(t *testing.T) {
+	ensureProvider(t)
+	checkE2EEnv(t)
+
+	ctx := context.Background()
+	apiClient := newAPIClient(t)
+	defer apiClient.Close()
+
+	suffix := uniqueSuffix()
+	projectName := fmt.Sprintf("pulumi-e2e-import-kvitem-%s", suffix)
+	t.Logf("Creating project '%s' via API...", projectName)
+
+	projReq := quantadmingo.NewV2ProjectRequestWithDefaults()
+	projReq.SetName(projectName)
+	projReq.SetRegion("au-govt")
+	createResp, _, err := apiClient.Instance.ProjectsAPI.ProjectsCreate(apiClient.AuthContext, apiClient.Organization).V2ProjectRequest(*projReq).Execute()
+	require.NoError(t, err, "API project create failed")
+	machineName := createResp.GetMachineName()
+
+	defer func() {
+		_, _ = apiClient.Instance.ProjectsAPI.ProjectsDelete(apiClient.AuthContext, apiClient.Organization, machineName).Execute()
+	}()
+
+	time.Sleep(5 * time.Second)
+
+	// Create KV store
+	storeReq := quantadmingo.NewV2StoreRequest("e2e-import-item-store")
+	kvResp, _, err := apiClient.Instance.KVAPI.KVCreate(apiClient.AuthContext, apiClient.Organization, machineName).V2StoreRequest(*storeReq).Execute()
+	require.NoError(t, err, "API KV store create failed")
+	storeId := kvResp.GetId()
+	t.Logf("Created KV store: id=%s", storeId)
+
+	// Create KV item
+	itemKey := "e2e-import-key"
+	itemReq := quantadmingo.NewV2StoreItemRequest(itemKey, "e2e-import-value")
+	_, _, err = apiClient.Instance.KVAPI.KVItemsCreate(apiClient.AuthContext, apiClient.Organization, machineName, storeId).V2StoreItemRequest(*itemReq).Execute()
+	require.NoError(t, err, "API KV item create failed")
+	t.Logf("Created KV item: key=%s", itemKey)
+
+	dir := programDir(t, "kv")
+	currentPath := os.Getenv("PATH")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+currentPath)
+	stateDir := t.TempDir()
+	t.Setenv("PULUMI_BACKEND_URL", "file://"+stateDir)
+	t.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
+
+	stack, err := auto.UpsertStackLocalSource(ctx, "test", dir)
+	require.NoError(t, err)
+
+	err = stack.SetConfig(ctx, "e2e-kv:projectName", auto.ConfigValue{Value: projectName})
+	require.NoError(t, err)
+
+	defer func() {
+		_ = stack.Workspace().RemoveStack(ctx, stack.Name())
+	}()
+
+	t.Log("Importing KV item into Pulumi...")
+	// Import format: "project/store_id/key"
+	_, err = stack.ImportResources(ctx,
+		optimport.Resources([]*optimport.ImportResource{
+			{
+				Type: "quant:index:KvItem",
+				Name: "testItem",
+				ID:   fmt.Sprintf("%s/%s/%s", machineName, storeId, itemKey),
+			},
+		}),
+		optimport.GenerateCode(false),
+		optimport.ProgressStreams(os.Stdout),
+	)
+	if err != nil && !strings.Contains(err.Error(), "generated_code") {
+		require.NoError(t, err, "pulumi import failed for KV item")
+	}
+	t.Log("KV Item import test completed successfully")
 }

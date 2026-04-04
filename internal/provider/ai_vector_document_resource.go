@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -132,11 +134,32 @@ func (r *aiVectorDocumentResource) Delete(ctx context.Context, req resource.Dele
 // ImportState imports vector documents. Format: "collection-id" or "collection-id/key"
 func (r *aiVectorDocumentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	var data resource_ai_vector_document.AiVectorDocumentModel
-	data.CollectionId = types.StringValue(req.ID)
+
+	// Parse "collection-id" or "collection-id/key" format.
+	parts := strings.SplitN(req.ID, "/", 2)
+	data.CollectionId = types.StringValue(parts[0])
+	if len(parts) == 2 {
+		data.Key = types.StringValue(parts[1])
+	}
 
 	resp.Diagnostics.Append(callVectorDocumentReadAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Resolve all computed fields that the Read didn't populate to avoid
+	// bridge Value Conversion errors on import.
+	if data.ChunksCreated.IsUnknown() {
+		data.ChunksCreated = types.Int64Null()
+	}
+	if data.Success.IsUnknown() {
+		data.Success = types.BoolValue(true)
+	}
+	if data.Message.IsUnknown() {
+		data.Message = types.StringNull()
+	}
+	if data.Organisation.IsUnknown() {
+		data.Organisation = types.StringValue(r.getOrg(&data))
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -410,6 +433,50 @@ func parseVectorDocumentReadResponse(ctx context.Context, apiResp *http.Response
 	}
 	if data.Offset.IsUnknown() {
 		data.Offset = types.Int64Null()
+	}
+
+	// Reconstruct Documents list from API response so Read/import has
+	// the full input. Always rebuild the list to ensure the element type
+	// is correctly set (a zero-value List has a missing element type which
+	// causes Pulumi bridge Value Conversion errors).
+	docAttrTypes := resource_ai_vector_document.DocumentsValue{}.AttributeTypes(ctx)
+	metadataAttrTypes := resource_ai_vector_document.MetadataValue{}.AttributeTypes(ctx)
+
+	// Get a canonical DocumentsType by building a populated value.
+	canonicalDoc, _ := resource_ai_vector_document.NewDocumentsValue(
+		docAttrTypes,
+		map[string]attr.Value{
+			"content":  types.StringNull(),
+			"key":      types.StringNull(),
+			"metadata": basetypes.NewObjectNull(metadataAttrTypes),
+		},
+	)
+	docListType := canonicalDoc.Type(ctx)
+
+	docValues := make([]resource_ai_vector_document.DocumentsValue, 0, len(envelope.Documents))
+	for _, doc := range envelope.Documents {
+		dv, d := resource_ai_vector_document.NewDocumentsValue(
+			docAttrTypes,
+			map[string]attr.Value{
+				"content":  types.StringValue(doc.Content),
+				"key":      types.StringValue(doc.Key),
+				"metadata": basetypes.NewObjectNull(metadataAttrTypes),
+			},
+		)
+		diags.Append(d...)
+		if !diags.HasError() {
+			docValues = append(docValues, dv)
+		}
+	}
+
+	if len(docValues) > 0 {
+		docList, d := types.ListValueFrom(ctx, docListType, docValues)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Documents = docList
+		}
+	} else {
+		data.Documents = types.ListNull(docListType)
 	}
 
 	return
