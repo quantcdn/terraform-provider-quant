@@ -995,11 +995,7 @@ func TestE2E_Import_KVStore(t *testing.T) {
 	}()
 
 	// Step 3: Import KV store
-	// Known issue: KV API returns store name as GetId() but KVShow expects a
-	// different identifier. Import test validates the format is accepted but
-	// the underlying KV import may need a fix to the API or ImportState handler.
 	t.Log("Importing KV store into Pulumi...")
-	t.Skip("Skipping — KV store import ID format mismatch (store name vs API identifier). Needs KV ImportState fix.")
 	_, err = stack.ImportResources(ctx,
 		optimport.Resources([]*optimport.ImportResource{
 			{
