@@ -95,6 +95,15 @@ func (r *cronJobResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	// Preserve computed fields from state to avoid bridge panic on unknown values.
+	var state resource_cron_job.CronJobModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	data.Organisation = state.Organisation
+	data.Cron = state.Cron
+
 	resp.Diagnostics.Append(callCronJobUpdateAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

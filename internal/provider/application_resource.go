@@ -105,11 +105,20 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 
 func (r *applicationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// The V3 Applications API does not have an Update endpoint.
-	// Any changes to mutable fields require delete + create (ForceNew in Terraform terms).
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"The QuantCloud Applications API does not support in-place updates. All configuration changes require destroying and recreating the application.",
-	)
+	// If only computed fields changed (drift in server-computed values),
+	// refresh state from the API instead of erroring.
+	var data resource_application.ApplicationModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(callApplicationReadAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

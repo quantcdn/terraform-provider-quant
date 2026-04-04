@@ -5,6 +5,9 @@ config:
   appName:
     type: string
     default: pulumi-e2e-app-test
+  cronSchedule:
+    type: string
+    default: "cron(0 0 ? * SUN *)"
 resources:
   testApp:
     type: quant:index:Application
@@ -42,9 +45,11 @@ resources:
       commands:
         - echo
         - e2e-test
-      scheduleExpression: "cron(0 0 ? * SUN *)"
+      scheduleExpression: ${cronSchedule}
 outputs:
   appId: ${testApp.id}
+  appName: ${testApp.appName}
   envId: ${testEnv.id}
+  envName: ${testEnv.envName}
   volumeId: ${testVolume.id}
   cronId: ${testCron.id}

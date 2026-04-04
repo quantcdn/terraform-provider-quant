@@ -5,6 +5,9 @@ config:
   testSuffix:
     type: string
     default: e2e-test
+  docContent:
+    type: string
+    default: This is a test document for E2E testing of the Pulumi provider.
 resources:
   testCollection:
     type: quant:index:AiVectorCollection
@@ -16,7 +19,7 @@ resources:
     properties:
       collectionId: ${testCollection.id}
       documents:
-        - content: This is a test document for E2E testing of the Pulumi provider.
+        - content: ${docContent}
           key: e2e-doc-${testSuffix}
     options:
       dependsOn:

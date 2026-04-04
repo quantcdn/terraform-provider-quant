@@ -111,6 +111,15 @@ func (r *aiSkillResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	// Preserve computed fields from state — SkillId is server-generated
+	// and will be unknown in the plan.
+	var state resource_ai_skill.AiSkillModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	data.SkillId = state.SkillId
+
 	resp.Diagnostics.Append(callSkillUpdateInlineAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -5,6 +5,12 @@ config:
   testSuffix:
     type: string
     default: e2e-test
+  skillContent:
+    type: string
+    default: You are a test skill for E2E testing.
+  skillDescription:
+    type: string
+    default: E2E test skill
 resources:
   testGovernance:
     type: quant:index:AiGovernance
@@ -15,8 +21,8 @@ resources:
     type: quant:index:AiSkill
     properties:
       name: e2e-skill-${testSuffix}
-      description: E2E test skill
-      content: You are a test skill for E2E testing.
+      description: ${skillDescription}
+      content: ${skillContent}
       triggerCondition: always
 outputs:
   governanceVersion: ${testGovernance.version}
