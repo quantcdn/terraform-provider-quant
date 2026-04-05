@@ -1,6 +1,36 @@
 {
     "auto-aliasing": {
         "resources": {
+            "quant_ai_agent": {
+                "current": "quant:index:AiAgent",
+                "fields": {
+                    "agent": {
+                        "fields": {
+                            "allowed_collections": {
+                                "maxItemsOne": false
+                            },
+                            "allowed_tools": {
+                                "maxItemsOne": false
+                            },
+                            "assigned_skills": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    },
+                    "allowed_collections": {
+                        "maxItemsOne": false
+                    },
+                    "allowed_tools": {
+                        "maxItemsOne": false
+                    },
+                    "assigned_skills": {
+                        "maxItemsOne": false
+                    },
+                    "filter_policies": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
             "quant_ai_governance": {
                 "current": "quant:index:AiGovernance",
                 "fields": {
@@ -652,6 +682,33 @@
                         "maxItemsOne": false
                     },
                     "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_slack_bot": {
+                "current": "quant:index:SlackBot",
+                "fields": {
+                    "allowed_channels": {
+                        "maxItemsOne": false
+                    },
+                    "bot": {
+                        "fields": {
+                            "allowed_channels": {
+                                "maxItemsOne": false
+                            },
+                            "keywords": {
+                                "maxItemsOne": false
+                            },
+                            "slash_commands": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    },
+                    "keywords": {
+                        "maxItemsOne": false
+                    },
+                    "slash_commands": {
                         "maxItemsOne": false
                     }
                 }

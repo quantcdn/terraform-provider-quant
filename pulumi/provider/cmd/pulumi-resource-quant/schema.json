@@ -105,6 +105,102 @@
         }
     },
     "types": {
+        "quant:index/AiAgentAgent:AiAgentAgent": {
+            "properties": {
+                "agentId": {
+                    "type": "string"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "createdBy": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name\n"
+                },
+                "hasOverlay": {
+                    "type": "boolean",
+                    "description": "Whether the requesting org has a per-org overlay for this global agent\n"
+                },
+                "isGlobal": {
+                    "type": "boolean",
+                    "description": "Whether this is a platform-managed global agent\n"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Whether 1M context window is enabled\n"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "systemPrompt": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "agentId",
+                        "allowedCollections",
+                        "allowedTools",
+                        "assignedSkills",
+                        "createdAt",
+                        "createdBy",
+                        "description",
+                        "group",
+                        "guardrailPreset",
+                        "hasOverlay",
+                        "isGlobal",
+                        "longContext",
+                        "maxTokens",
+                        "modelId",
+                        "name",
+                        "systemPrompt",
+                        "temperature",
+                        "updatedAt"
+                    ]
+                }
+            }
+        },
         "quant:index/AiGovernanceConfig:AiGovernanceConfig": {
             "type": "object"
         },
@@ -2318,6 +2414,74 @@
                 }
             }
         },
+        "quant:index/SlackBotBot:SlackBotBot": {
+            "properties": {
+                "agentId": {
+                    "type": "string"
+                },
+                "allowedChannels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "botId": {
+                    "type": "string"
+                },
+                "connected": {
+                    "type": "boolean"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "keywordsEnabled": {
+                    "type": "boolean"
+                },
+                "sessionTtlDays": {
+                    "type": "integer"
+                },
+                "setupType": {
+                    "type": "string"
+                },
+                "slashCommands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "agentId",
+                        "allowedChannels",
+                        "botId",
+                        "connected",
+                        "createdAt",
+                        "keywords",
+                        "keywordsEnabled",
+                        "sessionTtlDays",
+                        "setupType",
+                        "slashCommands",
+                        "status",
+                        "updatedAt"
+                    ]
+                }
+            }
+        },
         "quant:index/getProjectsProject:getProjectsProject": {
             "properties": {
                 "machineName": {
@@ -2424,6 +2588,263 @@
         }
     },
     "resources": {
+        "quant:index:AiAgent": {
+            "properties": {
+                "agent": {
+                    "$ref": "#/types/quant:index/AiAgentAgent:AiAgentAgent"
+                },
+                "agentId": {
+                    "type": "string",
+                    "description": "The agent ID"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Skill IDs to assign to this agent"
+                },
+                "createdBy": {
+                    "type": "string",
+                    "description": "User identifier who created the agent"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Filter policy IDs to apply to this agent's inference requests"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Enable 1M context window support"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "systemPrompt": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "agent",
+                "agentId",
+                "allowedCollections",
+                "allowedTools",
+                "assignedSkills",
+                "createdBy",
+                "description",
+                "filterPolicies",
+                "group",
+                "guardrailPreset",
+                "longContext",
+                "maxTokens",
+                "message",
+                "modelId",
+                "name",
+                "organisation",
+                "success",
+                "systemPrompt",
+                "temperature"
+            ],
+            "inputProperties": {
+                "agentId": {
+                    "type": "string",
+                    "description": "The agent ID"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Skill IDs to assign to this agent"
+                },
+                "createdBy": {
+                    "type": "string",
+                    "description": "User identifier who created the agent"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Filter policy IDs to apply to this agent's inference requests"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Enable 1M context window support"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "systemPrompt": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                }
+            },
+            "requiredInputs": [
+                "description",
+                "modelId",
+                "systemPrompt"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiAgent resources.\n",
+                "properties": {
+                    "agent": {
+                        "$ref": "#/types/quant:index/AiAgentAgent:AiAgentAgent"
+                    },
+                    "agentId": {
+                        "type": "string",
+                        "description": "The agent ID"
+                    },
+                    "allowedCollections": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "allowedTools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "assignedSkills": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Skill IDs to assign to this agent"
+                    },
+                    "createdBy": {
+                        "type": "string",
+                        "description": "User identifier who created the agent"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "filterPolicies": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Filter policy IDs to apply to this agent's inference requests"
+                    },
+                    "group": {
+                        "type": "string"
+                    },
+                    "guardrailPreset": {
+                        "type": "string",
+                        "description": "Guardrail preset name"
+                    },
+                    "longContext": {
+                        "type": "boolean",
+                        "description": "Enable 1M context window support"
+                    },
+                    "maxTokens": {
+                        "type": "integer"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "modelId": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "The organisation ID"
+                    },
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "systemPrompt": {
+                        "type": "string"
+                    },
+                    "temperature": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            }
+        },
         "quant:index:AiGovernance": {
             "properties": {
                 "aiEnabled": {
@@ -9135,6 +9556,175 @@
                     "weight": {
                         "type": "integer",
                         "description": "Rule weight"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "quant:index:SlackBot": {
+            "properties": {
+                "agentId": {
+                    "type": "string",
+                    "description": "The AI agent that powers this bot"
+                },
+                "allowedChannels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack channel IDs the bot may respond in"
+                },
+                "bot": {
+                    "$ref": "#/types/quant:index/SlackBotBot:SlackBotBot"
+                },
+                "botId": {
+                    "type": "string",
+                    "description": "The Slack bot ID"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Keywords that trigger the bot"
+                },
+                "keywordsEnabled": {
+                    "type": "boolean",
+                    "description": "Whether keyword triggers are enabled"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "sessionTtlDays": {
+                    "type": "integer",
+                    "description": "Session TTL in days"
+                },
+                "setupType": {
+                    "type": "string",
+                    "description": "Whether to use Quant-managed or customer-provided Slack app"
+                },
+                "slashCommands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slash commands the bot responds to"
+                }
+            },
+            "required": [
+                "agentId",
+                "allowedChannels",
+                "bot",
+                "botId",
+                "keywords",
+                "keywordsEnabled",
+                "organisation",
+                "sessionTtlDays",
+                "setupType",
+                "slashCommands"
+            ],
+            "inputProperties": {
+                "agentId": {
+                    "type": "string",
+                    "description": "The AI agent that powers this bot"
+                },
+                "allowedChannels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack channel IDs the bot may respond in"
+                },
+                "botId": {
+                    "type": "string",
+                    "description": "The Slack bot ID"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Keywords that trigger the bot"
+                },
+                "keywordsEnabled": {
+                    "type": "boolean",
+                    "description": "Whether keyword triggers are enabled"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "sessionTtlDays": {
+                    "type": "integer",
+                    "description": "Session TTL in days"
+                },
+                "setupType": {
+                    "type": "string",
+                    "description": "Whether to use Quant-managed or customer-provided Slack app"
+                },
+                "slashCommands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slash commands the bot responds to"
+                }
+            },
+            "requiredInputs": [
+                "agentId",
+                "setupType"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering SlackBot resources.\n",
+                "properties": {
+                    "agentId": {
+                        "type": "string",
+                        "description": "The AI agent that powers this bot"
+                    },
+                    "allowedChannels": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Slack channel IDs the bot may respond in"
+                    },
+                    "bot": {
+                        "$ref": "#/types/quant:index/SlackBotBot:SlackBotBot"
+                    },
+                    "botId": {
+                        "type": "string",
+                        "description": "The Slack bot ID"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Keywords that trigger the bot"
+                    },
+                    "keywordsEnabled": {
+                        "type": "boolean",
+                        "description": "Whether keyword triggers are enabled"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "The organisation ID"
+                    },
+                    "sessionTtlDays": {
+                        "type": "integer",
+                        "description": "Session TTL in days"
+                    },
+                    "setupType": {
+                        "type": "string",
+                        "description": "Whether to use Quant-managed or customer-provided Slack app"
+                    },
+                    "slashCommands": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Slash commands the bot responds to"
                     }
                 },
                 "type": "object"

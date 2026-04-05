@@ -1,6 +1,36 @@
 {
     "auto-aliasing": {
         "resources": {
+            "quant_ai_agent": {
+                "current": "quant:index:AiAgent",
+                "fields": {
+                    "agent": {
+                        "fields": {
+                            "allowed_collections": {
+                                "maxItemsOne": false
+                            },
+                            "allowed_tools": {
+                                "maxItemsOne": false
+                            },
+                            "assigned_skills": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    },
+                    "allowed_collections": {
+                        "maxItemsOne": false
+                    },
+                    "allowed_tools": {
+                        "maxItemsOne": false
+                    },
+                    "assigned_skills": {
+                        "maxItemsOne": false
+                    },
+                    "filter_policies": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
             "quant_ai_governance": {
                 "current": "quant:index:AiGovernance",
                 "fields": {
@@ -15,6 +45,25 @@
             "quant_ai_skill": {
                 "current": "quant:index:AiSkill",
                 "fields": {
+                    "allowed_tools": {
+                        "maxItemsOne": false
+                    },
+                    "required_tools": {
+                        "maxItemsOne": false
+                    },
+                    "skill": {
+                        "fields": {
+                            "allowed_tools": {
+                                "maxItemsOne": false
+                            },
+                            "required_tools": {
+                                "maxItemsOne": false
+                            },
+                            "tags": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    },
                     "tags": {
                         "maxItemsOne": false
                     }
@@ -26,13 +75,87 @@
             "quant_ai_vector_document": {
                 "current": "quant:index:AiVectorDocument",
                 "fields": {
-                    "searchable_fields": {
+                    "document_ids": {
                         "maxItemsOne": false
+                    },
+                    "documents": {
+                        "maxItemsOne": false,
+                        "elem": {
+                            "fields": {
+                                "metadata": {
+                                    "fields": {
+                                        "tags": {
+                                            "maxItemsOne": false
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
             "quant_application": {
-                "current": "quant:index:Application"
+                "current": "quant:index:Application",
+                "fields": {
+                    "compose_definition": {
+                        "fields": {
+                            "containers": {
+                                "maxItemsOne": false,
+                                "elem": {
+                                    "fields": {
+                                        "command": {
+                                            "maxItemsOne": false
+                                        },
+                                        "depends_on": {
+                                            "maxItemsOne": false
+                                        },
+                                        "entry_point": {
+                                            "maxItemsOne": false
+                                        },
+                                        "environment": {
+                                            "maxItemsOne": false
+                                        },
+                                        "exposed_ports": {
+                                            "maxItemsOne": false
+                                        },
+                                        "health_check": {
+                                            "fields": {
+                                                "command": {
+                                                    "maxItemsOne": false
+                                                }
+                                            }
+                                        },
+                                        "mount_points": {
+                                            "maxItemsOne": false
+                                        },
+                                        "origin_protection_config": {
+                                            "fields": {
+                                                "ip_allow": {
+                                                    "maxItemsOne": false
+                                                }
+                                            }
+                                        },
+                                        "secrets": {
+                                            "maxItemsOne": false
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "container_names": {
+                        "maxItemsOne": false
+                    },
+                    "deployment_information": {
+                        "maxItemsOne": false
+                    },
+                    "environment": {
+                        "maxItemsOne": false
+                    },
+                    "environment_names": {
+                        "maxItemsOne": false
+                    }
+                }
             },
             "quant_crawler": {
                 "current": "quant:index:Crawler",
@@ -64,7 +187,12 @@
                 "current": "quant:index:CrawlerSchedule"
             },
             "quant_cron_job": {
-                "current": "quant:index:CronJob"
+                "current": "quant:index:CronJob",
+                "fields": {
+                    "command": {
+                        "maxItemsOne": false
+                    }
+                }
             },
             "quant_domain": {
                 "current": "quant:index:Domain",
@@ -78,7 +206,74 @@
                 }
             },
             "quant_environment": {
-                "current": "quant:index:Environment"
+                "current": "quant:index:Environment",
+                "fields": {
+                    "compose_definition": {
+                        "fields": {
+                            "containers": {
+                                "maxItemsOne": false,
+                                "elem": {
+                                    "fields": {
+                                        "command": {
+                                            "maxItemsOne": false
+                                        },
+                                        "depends_on": {
+                                            "maxItemsOne": false
+                                        },
+                                        "entry_point": {
+                                            "maxItemsOne": false
+                                        },
+                                        "environment": {
+                                            "maxItemsOne": false
+                                        },
+                                        "exposed_ports": {
+                                            "maxItemsOne": false
+                                        },
+                                        "health_check": {
+                                            "fields": {
+                                                "command": {
+                                                    "maxItemsOne": false
+                                                }
+                                            }
+                                        },
+                                        "mount_points": {
+                                            "maxItemsOne": false
+                                        },
+                                        "origin_protection_config": {
+                                            "fields": {
+                                                "ip_allow": {
+                                                    "maxItemsOne": false
+                                                }
+                                            }
+                                        },
+                                        "secrets": {
+                                            "maxItemsOne": false
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "container_names": {
+                        "maxItemsOne": false
+                    },
+                    "cron": {
+                        "maxItemsOne": false,
+                        "elem": {
+                            "fields": {
+                                "command": {
+                                    "maxItemsOne": false
+                                }
+                            }
+                        }
+                    },
+                    "environment": {
+                        "maxItemsOne": false
+                    },
+                    "volumes": {
+                        "maxItemsOne": false
+                    }
+                }
             },
             "quant_header": {
                 "current": "quant:index:Header"
@@ -95,6 +290,12 @@
             "quant_rule_auth": {
                 "current": "quant:index:RuleAuth",
                 "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
                     "country_is": {
                         "maxItemsOne": false
                     },
@@ -124,6 +325,12 @@
             "quant_rule_bot_challenge": {
                 "current": "quant:index:RuleBotChallenge",
                 "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
                     "country_is": {
                         "maxItemsOne": false
                     },
@@ -258,6 +465,12 @@
             "quant_rule_headers": {
                 "current": "quant:index:RuleHeaders",
                 "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
                     "country_is": {
                         "maxItemsOne": false
                     },
@@ -441,6 +654,12 @@
             "quant_rule_serve_static": {
                 "current": "quant:index:RuleServeStatic",
                 "fields": {
+                    "asn_is": {
+                        "maxItemsOne": false
+                    },
+                    "asn_is_not": {
+                        "maxItemsOne": false
+                    },
                     "country_is": {
                         "maxItemsOne": false
                     },
@@ -463,6 +682,33 @@
                         "maxItemsOne": false
                     },
                     "url": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
+            "quant_slack_bot": {
+                "current": "quant:index:SlackBot",
+                "fields": {
+                    "allowed_channels": {
+                        "maxItemsOne": false
+                    },
+                    "bot": {
+                        "fields": {
+                            "allowed_channels": {
+                                "maxItemsOne": false
+                            },
+                            "keywords": {
+                                "maxItemsOne": false
+                            },
+                            "slash_commands": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    },
+                    "keywords": {
+                        "maxItemsOne": false
+                    },
+                    "slash_commands": {
                         "maxItemsOne": false
                     }
                 }

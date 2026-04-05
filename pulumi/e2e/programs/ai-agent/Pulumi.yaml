@@ -1,0 +1,26 @@
+name: e2e-ai-agent
+runtime: yaml
+description: E2E test for AI Agent resource
+config:
+  testSuffix:
+    type: string
+    default: e2e-test
+  systemPrompt:
+    type: string
+    default: You are a test assistant for E2E testing of the Pulumi provider.
+  temperature:
+    type: string
+    default: "0.3"
+resources:
+  testAgent:
+    type: quant:index:AiAgent
+    properties:
+      name: e2e-agent-${testSuffix}
+      description: E2E test agent
+      systemPrompt: ${systemPrompt}
+      modelId: anthropic.claude-3-5-sonnet-20241022-v2:0
+      temperature: ${temperature}
+      maxTokens: 4000
+outputs:
+  agentId: ${testAgent.agentId}
+  agentName: ${testAgent.name}

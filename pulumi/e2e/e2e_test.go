@@ -466,6 +466,56 @@ func TestE2E_AIVector(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// E2E Test: AI Agent (create, update, destroy)
+// ---------------------------------------------------------------------------
+
+func TestE2E_AIAgent(t *testing.T) {
+	suffix := uniqueSuffix()
+	result, cleanup := createStack(t, "ai-agent", map[string]string{
+		"e2e-ai-agent:testSuffix": fmt.Sprintf("e2e-%s", suffix),
+	})
+	defer cleanup()
+
+	assert.NotEmpty(t, result.outputs["agentId"].Value, "agentId should be set")
+	assert.NotEmpty(t, result.outputs["agentName"].Value, "agentName should be set")
+	t.Logf("Created AI agent: id=%v name=%v", result.outputs["agentId"].Value, result.outputs["agentName"].Value)
+
+	// Test update: change systemPrompt and temperature
+	ctx := context.Background()
+	_ = result.stack.SetConfig(ctx, "e2e-ai-agent:systemPrompt", auto.ConfigValue{Value: "You are an updated test assistant."})
+	_ = result.stack.SetConfig(ctx, "e2e-ai-agent:temperature", auto.ConfigValue{Value: "0.7"})
+	t.Log("Updating AI agent (systemPrompt, temperature)...")
+	outputs := updateStack(t, result.stack)
+	assert.NotEmpty(t, outputs["agentId"].Value, "agentId should still be set after update")
+	t.Log("AI agent update succeeded")
+}
+
+// ---------------------------------------------------------------------------
+// E2E Test: Slack Bot (create agent + bot, update, destroy)
+// ---------------------------------------------------------------------------
+
+func TestE2E_SlackBot(t *testing.T) {
+	suffix := uniqueSuffix()
+	result, cleanup := createStack(t, "slack-bot", map[string]string{
+		"e2e-slack-bot:testSuffix": fmt.Sprintf("e2e-%s", suffix),
+	})
+	defer cleanup()
+
+	assert.NotEmpty(t, result.outputs["agentId"].Value, "agentId should be set")
+	assert.NotEmpty(t, result.outputs["botId"].Value, "botId should be set")
+	t.Logf("Created Slack bot: agent=%v bot=%v status=%v",
+		result.outputs["agentId"].Value, result.outputs["botId"].Value, result.outputs["botStatus"].Value)
+
+	// Test update: change sessionTtlDays
+	ctx := context.Background()
+	_ = result.stack.SetConfig(ctx, "e2e-slack-bot:sessionTtl", auto.ConfigValue{Value: "14"})
+	t.Log("Updating Slack bot (sessionTtlDays)...")
+	outputs := updateStack(t, result.stack)
+	assert.NotEmpty(t, outputs["botId"].Value, "botId should still be set after update")
+	t.Log("Slack bot update succeeded")
+}
+
+// ---------------------------------------------------------------------------
 // E2E Test: Environment lifecycle (create → verify → update scaling → destroy)
 // ---------------------------------------------------------------------------
 
