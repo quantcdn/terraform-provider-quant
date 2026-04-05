@@ -592,8 +592,9 @@ func buildAppComposeDefinitionValue(ctx context.Context, compose *quantadmingo.C
 // Environment: build Terraform model values from SDK EnvironmentResponse
 // ---------------------------------------------------------------------------
 
-// buildEnvContainerValue builds a single resource_environment.ContainersValue
-// from an SDK Container.
+// buildEnvContainerValue is kept for potential future use.
+//
+//nolint:unused
 func buildEnvContainerValue(ctx context.Context, c *quantadmingo.Container) (resource_environment.ContainersValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -710,8 +711,9 @@ func buildEnvContainerValue(ctx context.Context, c *quantadmingo.Container) (res
 	return result, diags
 }
 
-// buildEnvComposeDefinitionValue builds a resource_environment.ComposeDefinitionValue
-// from the SDK Compose response.
+// buildEnvComposeDefinitionValue is kept for potential future use.
+//
+//nolint:unused
 func buildEnvComposeDefinitionValue(ctx context.Context, compose *quantadmingo.Compose) (resource_environment.ComposeDefinitionValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -826,8 +828,9 @@ func buildEnvCronListFromSDK(ctx context.Context, crons []quantadmingo.Cron) (ba
 	return result, diags
 }
 
-// buildEnvSpotConfigurationValue builds a resource_environment.SpotConfigurationValue
-// from the SDK SpotConfiguration response.
+// buildEnvSpotConfigurationValue is kept for potential future use.
+//
+//nolint:unused
 func buildEnvSpotConfigurationValue(ctx context.Context, spot *quantadmingo.SpotConfiguration) (resource_environment.SpotConfigurationValue, diag.Diagnostics) {
 	return autoMap(ctx,
 		resource_environment.SpotConfigurationValue{}.AttributeTypes(ctx),

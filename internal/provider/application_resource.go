@@ -518,10 +518,9 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 	return
 }
 
-// nullifyUnknownAttrValue recursively replaces unknown attr.Value instances
-// with their null equivalents.  For objects (basetypes.ObjectValue) it descends
-// into child attributes so that deeply nested unknowns are also resolved.  For
-// lists (basetypes.ListValue) it processes each element.
+// nullifyUnknownAttrValue is kept for potential future use.
+//
+//nolint:unused
 func nullifyUnknownAttrValue(ctx context.Context, v attr.Value) attr.Value {
 	if v.IsUnknown() {
 		// Replace with null of the same type.
@@ -587,10 +586,9 @@ func nullifyUnknownAttrValue(ctx context.Context, v attr.Value) attr.Value {
 	return v
 }
 
-// resolveApplicationUnknowns walks the Database, Filesystem, and
-// ComposeDefinition nested objects and replaces any unknown sub-fields with
-// null values.  This prevents the Pulumi bridge from panicking when it
-// encounters unknown PropertyValue values in the state.
+// resolveApplicationUnknowns is kept for potential future use.
+//
+//nolint:unused
 func resolveApplicationUnknowns(ctx context.Context, data *resource_application.ApplicationModel) {
 	// --- Database ---
 	if !data.Database.IsNull() && !data.Database.IsUnknown() {
