@@ -494,8 +494,9 @@ func mapAiAgentResponse(ctx context.Context, agent *quantadmingo.GetAIAgent200Re
 	data.AllowedTools = stringListFromSlice(ctx, agent.AllowedTools)
 	data.AllowedCollections = stringListFromSlice(ctx, agent.AllowedCollections)
 	data.AssignedSkills = stringListFromSlice(ctx, agent.AssignedSkills)
-	// FilterPolicies is not on the response model — preserve from state/null.
-	if data.FilterPolicies.IsUnknown() {
+	// FilterPolicies is not on the response model — always set to a typed null
+	// so the list has a concrete element type (bridge rejects dynamic type).
+	if data.FilterPolicies.IsUnknown() || data.FilterPolicies.IsNull() || data.FilterPolicies.ElementType(ctx) == nil {
 		data.FilterPolicies = types.ListNull(types.StringType)
 	}
 

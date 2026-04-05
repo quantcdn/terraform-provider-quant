@@ -1430,3 +1430,178 @@ func TestE2E_Import_KVItem(t *testing.T) {
 	}
 	t.Log("KV Item import test completed successfully")
 }
+
+// ---------------------------------------------------------------------------
+// E2E Test: Import — AI Agent
+// ---------------------------------------------------------------------------
+
+func TestE2E_Import_AIAgent(t *testing.T) {
+	ensureProvider(t)
+	checkE2EEnv(t)
+
+	ctx := context.Background()
+	apiClient := newAPIClient(t)
+	defer apiClient.Close()
+
+	suffix := uniqueSuffix()
+	agentName := fmt.Sprintf("e2e-import-agent-%s", suffix)
+	t.Logf("Creating AI agent '%s' via API...", agentName)
+
+	createReq := quantadmingo.NewCreateAIAgentRequest(
+		agentName,
+		"E2E import test agent",
+		"You are a test assistant for import testing.",
+		"anthropic.claude-3-5-sonnet-20241022-v2:0",
+	)
+
+	resp, _, err := apiClient.Instance.AIAgentsAPI.CreateAIAgent(apiClient.AuthContext, apiClient.Organization).
+		CreateAIAgentRequest(*createReq).Execute()
+	require.NoError(t, err, "API agent create failed")
+
+	agentId := ""
+	if resp != nil && resp.Agent != nil {
+		if id, ok := resp.Agent["agentId"].(string); ok {
+			agentId = id
+		}
+	}
+	require.NotEmpty(t, agentId, "agentId should be returned")
+	t.Logf("Created AI agent: id=%s", agentId)
+
+	defer func() {
+		_, _, err := apiClient.Instance.AIAgentsAPI.DeleteAIAgent(apiClient.AuthContext, apiClient.Organization, agentId).Execute()
+		if err != nil {
+			t.Logf("Cleanup warning: %v", err)
+		}
+	}()
+
+	dir := programDir(t, "ai-agent")
+	currentPath := os.Getenv("PATH")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+currentPath)
+	stateDir := t.TempDir()
+	t.Setenv("PULUMI_BACKEND_URL", "file://"+stateDir)
+	t.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
+
+	stack, err := auto.UpsertStackLocalSource(ctx, "test", dir)
+	require.NoError(t, err)
+
+	err = stack.SetConfig(ctx, "e2e-ai-agent:testSuffix", auto.ConfigValue{Value: fmt.Sprintf("agent-import-%s", suffix)})
+	require.NoError(t, err)
+
+	defer func() {
+		_ = stack.Workspace().RemoveStack(ctx, stack.Name())
+	}()
+
+	t.Log("Importing AI agent into Pulumi...")
+	_, err = stack.ImportResources(ctx,
+		optimport.Resources([]*optimport.ImportResource{
+			{
+				Type: "quant:index:AiAgent",
+				Name: "testAgent",
+				ID:   agentId,
+			},
+		}),
+		optimport.GenerateCode(false),
+		optimport.ProgressStreams(os.Stdout),
+	)
+	if err != nil && !strings.Contains(err.Error(), "generated_code") {
+		require.NoError(t, err, "pulumi import failed for AI agent")
+	}
+	t.Log("AI Agent import test completed successfully")
+}
+
+// ---------------------------------------------------------------------------
+// E2E Test: Import — Slack Bot
+// ---------------------------------------------------------------------------
+
+func TestE2E_Import_SlackBot(t *testing.T) {
+	ensureProvider(t)
+	checkE2EEnv(t)
+
+	ctx := context.Background()
+	apiClient := newAPIClient(t)
+	defer apiClient.Close()
+
+	// Slack bot needs an agent — create one first.
+	suffix := uniqueSuffix()
+	agentName := fmt.Sprintf("e2e-import-bot-agent-%s", suffix)
+	t.Logf("Creating backing AI agent '%s' via API...", agentName)
+
+	agentReq := quantadmingo.NewCreateAIAgentRequest(
+		agentName,
+		"Agent for Slack bot import test",
+		"You are a Slack assistant for import testing.",
+		"anthropic.claude-3-5-sonnet-20241022-v2:0",
+	)
+	agentResp, _, err := apiClient.Instance.AIAgentsAPI.CreateAIAgent(apiClient.AuthContext, apiClient.Organization).
+		CreateAIAgentRequest(*agentReq).Execute()
+	require.NoError(t, err, "API agent create failed")
+
+	agentId := ""
+	if agentResp != nil && agentResp.Agent != nil {
+		if id, ok := agentResp.Agent["agentId"].(string); ok {
+			agentId = id
+		}
+	}
+	require.NotEmpty(t, agentId, "agentId should be returned")
+
+	defer func() {
+		_, _, _ = apiClient.Instance.AIAgentsAPI.DeleteAIAgent(apiClient.AuthContext, apiClient.Organization, agentId).Execute()
+	}()
+
+	// Now create the Slack bot.
+	t.Logf("Creating Slack bot via API with agent %s...", agentId)
+	botReq := quantadmingo.NewCreateSlackBotRequest(agentId, "quant")
+	botResp, _, err := apiClient.Instance.AISlackBotsAPI.CreateSlackBot(apiClient.AuthContext, apiClient.Organization).
+		CreateSlackBotRequest(*botReq).Execute()
+	require.NoError(t, err, "API slack bot create failed")
+
+	botId := ""
+	if botResp != nil && botResp.Bot != nil {
+		if id, ok := botResp.Bot["botId"].(string); ok {
+			botId = id
+		}
+	}
+	require.NotEmpty(t, botId, "botId should be returned")
+	t.Logf("Created Slack bot: id=%s", botId)
+
+	defer func() {
+		_, _, err := apiClient.Instance.AISlackBotsAPI.DeleteSlackBot(apiClient.AuthContext, apiClient.Organization, botId).Execute()
+		if err != nil {
+			t.Logf("Cleanup warning: %v", err)
+		}
+	}()
+
+	dir := programDir(t, "slack-bot")
+	currentPath := os.Getenv("PATH")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+currentPath)
+	stateDir := t.TempDir()
+	t.Setenv("PULUMI_BACKEND_URL", "file://"+stateDir)
+	t.Setenv("PULUMI_CONFIG_PASSPHRASE", "")
+
+	stack, err := auto.UpsertStackLocalSource(ctx, "test", dir)
+	require.NoError(t, err)
+
+	err = stack.SetConfig(ctx, "e2e-slack-bot:testSuffix", auto.ConfigValue{Value: fmt.Sprintf("bot-import-%s", suffix)})
+	require.NoError(t, err)
+
+	defer func() {
+		_ = stack.Workspace().RemoveStack(ctx, stack.Name())
+	}()
+
+	t.Log("Importing Slack bot into Pulumi...")
+	_, err = stack.ImportResources(ctx,
+		optimport.Resources([]*optimport.ImportResource{
+			{
+				Type: "quant:index:SlackBot",
+				Name: "testBot",
+				ID:   botId,
+			},
+		}),
+		optimport.GenerateCode(false),
+		optimport.ProgressStreams(os.Stdout),
+	)
+	if err != nil && !strings.Contains(err.Error(), "generated_code") {
+		require.NoError(t, err, "pulumi import failed for Slack bot")
+	}
+	t.Log("Slack Bot import test completed successfully")
+}
