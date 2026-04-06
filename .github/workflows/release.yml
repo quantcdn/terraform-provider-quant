@@ -148,10 +148,13 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Update npm (ensures OIDC support)
+        run: npm install -g npm@latest
 
       - name: Build tfgen
         env:
@@ -177,5 +180,6 @@ jobs:
           yarn install --no-lockfile
           yarn run build
 
-      - name: Publish to npm (OIDC provenance)
-        run: cd pulumi/sdk/nodejs && npm publish --access public --provenance
+      - name: Publish to npm
+        # Do NOT set NODE_AUTH_TOKEN — OIDC trusted publishing requires it absent
+        run: cd pulumi/sdk/nodejs && npm publish --access public
