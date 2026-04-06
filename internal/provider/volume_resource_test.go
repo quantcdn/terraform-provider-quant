@@ -95,7 +95,7 @@ func TestAccVolumeResource(t *testing.T) {
 				ImportState:   true,
 				ImportStateId: fmt.Sprintf("%s/%s/%s", app, env, volumeId),
 				ImportStateVerifyIgnore: []string{
-					"organization",
+					"organisation",
 				},
 			},
 		},
@@ -110,7 +110,7 @@ provider "quant" {
 }
 
 resource "quant_volume" "test" {
-  organization = %[1]q
+  organisation =%[1]q
   application  = %[2]q
   environment  = %[3]q
   volume_name  = "data"
@@ -144,7 +144,7 @@ provider "quant" {
 }
 
 resource "quant_volume" "test" {
-  organization = "test-org"
+  organisation ="test-org"
   application  = "test-app"
   environment  = "production"
   volume_name  = "error-test"

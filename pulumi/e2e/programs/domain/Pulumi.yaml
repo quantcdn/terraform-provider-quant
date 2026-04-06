@@ -4,23 +4,19 @@ description: E2E test for Domain resource
 config:
   projectName:
     type: string
-    default: pulumi-e2e-domain-test
-  domainName:
+  domainSuffix:
     type: string
-    default: pulumi-e2e-test.example.com
-  region:
-    type: string
-    default: au-govt
+    default: e2e
 resources:
   testProject:
     type: quant:index:Project
     properties:
       name: ${projectName}
-      region: ${region}
+      region: au-govt
   testDomain:
     type: quant:index:Domain
     properties:
-      domain: ${domainName}
+      domain: ${domainSuffix}.pulumi-e2e.example.com
       project: ${testProject.machineName}
 outputs:
   domainId: ${testDomain.id}

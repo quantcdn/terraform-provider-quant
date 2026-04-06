@@ -27,6 +27,12 @@ func RuleBotChallengeResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"action_config": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
+					"robot_challenge_challenge_ttl": schema.Int64Attribute{
+						Computed:            true,
+						Description:         "Challenge TTL in seconds",
+						MarkdownDescription: "Challenge TTL in seconds",
+						Default:             int64default.StaticInt64(30),
+					},
 					"robot_challenge_type": schema.StringAttribute{
 						Computed:            true,
 						Description:         "Challenge type (invisible or checkbox)",
@@ -36,11 +42,7 @@ func RuleBotChallengeResourceSchema(ctx context.Context) schema.Schema {
 						Computed:            true,
 						Description:         "Verification TTL in seconds",
 						MarkdownDescription: "Verification TTL in seconds",
-					},
-					"robot_challenge_challenge_ttl": schema.Int64Attribute{
-						Computed:            true,
-						Description:         "Challenge TTL in seconds",
-						MarkdownDescription: "Challenge TTL in seconds",
+						Default:             int64default.StaticInt64(10800),
 					},
 				},
 				CustomType: ActionConfigType{
@@ -49,6 +51,26 @@ func RuleBotChallengeResourceSchema(ctx context.Context) schema.Schema {
 					},
 				},
 				Computed: true,
+			},
+			"asn": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "ASN filter type (asn_is, asn_is_not, any)",
+				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any)",
+			},
+			"asn_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed AS numbers",
+				MarkdownDescription: "Allowed AS numbers",
+			},
+			"asn_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded AS numbers",
+				MarkdownDescription: "Excluded AS numbers",
 			},
 			"country": schema.StringAttribute{
 				Optional:            true,
@@ -202,6 +224,9 @@ func RuleBotChallengeResourceSchema(ctx context.Context) schema.Schema {
 type RuleBotChallengeModel struct {
 	Action                        types.String      `tfsdk:"action"`
 	ActionConfig                  ActionConfigValue `tfsdk:"action_config"`
+	Asn                           types.String      `tfsdk:"asn"`
+	AsnIs                         types.List        `tfsdk:"asn_is"`
+	AsnIsNot                      types.List        `tfsdk:"asn_is_not"`
 	Country                       types.String      `tfsdk:"country"`
 	CountryIs                     types.List        `tfsdk:"country_is"`
 	CountryIsNot                  types.List        `tfsdk:"country_is_not"`
@@ -235,9 +260,11 @@ type ActionConfigType struct {
 
 func (t ActionConfigType) Equal(o attr.Type) bool {
 	other, ok := o.(ActionConfigType)
+
 	if !ok {
 		return false
 	}
+
 	return t.ObjectType.Equal(other.ObjectType)
 }
 
@@ -247,36 +274,61 @@ func (t ActionConfigType) String() string {
 
 func (t ActionConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
 	attributes := in.Attributes()
 
-	robotChallengeTypeAttribute, ok := attributes["robot_challenge_type"]
+	robotChallengeChallengeTtlAttribute, ok := attributes["robot_challenge_challenge_ttl"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `robot_challenge_type is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`robot_challenge_challenge_ttl is missing from object`)
+
 		return nil, diags
 	}
-	robotChallengeTypeVal, ok := robotChallengeTypeAttribute.(basetypes.StringValue)
+
+	robotChallengeChallengeTtlVal, ok := robotChallengeChallengeTtlAttribute.(basetypes.Int64Value)
+
 	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`robot_challenge_type expected to be basetypes.StringValue, was: %T`, robotChallengeTypeAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`robot_challenge_challenge_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeChallengeTtlAttribute))
+	}
+
+	robotChallengeTypeAttribute, ok := attributes["robot_challenge_type"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`robot_challenge_type is missing from object`)
+
+		return nil, diags
+	}
+
+	robotChallengeTypeVal, ok := robotChallengeTypeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`robot_challenge_type expected to be basetypes.StringValue, was: %T`, robotChallengeTypeAttribute))
 	}
 
 	robotChallengeVerificationTtlAttribute, ok := attributes["robot_challenge_verification_ttl"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `robot_challenge_verification_ttl is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`robot_challenge_verification_ttl is missing from object`)
+
 		return nil, diags
-	}
-	robotChallengeVerificationTtlVal, ok := robotChallengeVerificationTtlAttribute.(basetypes.Int64Value)
-	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`robot_challenge_verification_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeVerificationTtlAttribute))
 	}
 
-	robotChallengeChallengeTtlAttribute, ok := attributes["robot_challenge_challenge_ttl"]
+	robotChallengeVerificationTtlVal, ok := robotChallengeVerificationTtlAttribute.(basetypes.Int64Value)
+
 	if !ok {
-		diags.AddError("Attribute Missing", `robot_challenge_challenge_ttl is missing from object`)
-		return nil, diags
-	}
-	robotChallengeChallengeTtlVal, ok := robotChallengeChallengeTtlAttribute.(basetypes.Int64Value)
-	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`robot_challenge_challenge_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeChallengeTtlAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`robot_challenge_verification_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeVerificationTtlAttribute))
 	}
 
 	if diags.HasError() {
@@ -284,9 +336,9 @@ func (t ActionConfigType) ValueFromObject(ctx context.Context, in basetypes.Obje
 	}
 
 	return ActionConfigValue{
+		RobotChallengeChallengeTtl:    robotChallengeChallengeTtlVal,
 		RobotChallengeType:            robotChallengeTypeVal,
 		RobotChallengeVerificationTtl: robotChallengeVerificationTtlVal,
-		RobotChallengeChallengeTtl:    robotChallengeChallengeTtlVal,
 		state:                         attr.ValueStateKnown,
 	}, diags
 }
@@ -305,10 +357,13 @@ func NewActionConfigValueUnknown() ActionConfigValue {
 
 func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ActionConfigValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
 	ctx := context.Background()
 
 	for name, attributeType := range attributeTypes {
 		attribute, ok := attributes[name]
+
 		if !ok {
 			diags.AddError(
 				"Missing ActionConfigValue Attribute Value",
@@ -317,8 +372,10 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
 					fmt.Sprintf("ActionConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
 			)
+
 			continue
 		}
+
 		if !attributeType.Equal(attribute.Type(ctx)) {
 			diags.AddError(
 				"Invalid ActionConfigValue Attribute Type",
@@ -333,6 +390,7 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 
 	for name := range attributes {
 		_, ok := attributeTypes[name]
+
 		if !ok {
 			diags.AddError(
 				"Extra ActionConfigValue Attribute Value",
@@ -348,34 +406,58 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 		return NewActionConfigValueUnknown(), diags
 	}
 
-	robotChallengeTypeAttribute, ok := attributes["robot_challenge_type"]
+	robotChallengeChallengeTtlAttribute, ok := attributes["robot_challenge_challenge_ttl"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `robot_challenge_type is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`robot_challenge_challenge_ttl is missing from object`)
+
 		return NewActionConfigValueUnknown(), diags
 	}
-	robotChallengeTypeVal, ok := robotChallengeTypeAttribute.(basetypes.StringValue)
+
+	robotChallengeChallengeTtlVal, ok := robotChallengeChallengeTtlAttribute.(basetypes.Int64Value)
+
 	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`robot_challenge_type expected to be basetypes.StringValue, was: %T`, robotChallengeTypeAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`robot_challenge_challenge_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeChallengeTtlAttribute))
+	}
+
+	robotChallengeTypeAttribute, ok := attributes["robot_challenge_type"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`robot_challenge_type is missing from object`)
+
+		return NewActionConfigValueUnknown(), diags
+	}
+
+	robotChallengeTypeVal, ok := robotChallengeTypeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`robot_challenge_type expected to be basetypes.StringValue, was: %T`, robotChallengeTypeAttribute))
 	}
 
 	robotChallengeVerificationTtlAttribute, ok := attributes["robot_challenge_verification_ttl"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `robot_challenge_verification_ttl is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`robot_challenge_verification_ttl is missing from object`)
+
 		return NewActionConfigValueUnknown(), diags
-	}
-	robotChallengeVerificationTtlVal, ok := robotChallengeVerificationTtlAttribute.(basetypes.Int64Value)
-	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`robot_challenge_verification_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeVerificationTtlAttribute))
 	}
 
-	robotChallengeChallengeTtlAttribute, ok := attributes["robot_challenge_challenge_ttl"]
+	robotChallengeVerificationTtlVal, ok := robotChallengeVerificationTtlAttribute.(basetypes.Int64Value)
+
 	if !ok {
-		diags.AddError("Attribute Missing", `robot_challenge_challenge_ttl is missing from object`)
-		return NewActionConfigValueUnknown(), diags
-	}
-	robotChallengeChallengeTtlVal, ok := robotChallengeChallengeTtlAttribute.(basetypes.Int64Value)
-	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`robot_challenge_challenge_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeChallengeTtlAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`robot_challenge_verification_ttl expected to be basetypes.Int64Value, was: %T`, robotChallengeVerificationTtlAttribute))
 	}
 
 	if diags.HasError() {
@@ -383,17 +465,20 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 	}
 
 	return ActionConfigValue{
+		RobotChallengeChallengeTtl:    robotChallengeChallengeTtlVal,
 		RobotChallengeType:            robotChallengeTypeVal,
 		RobotChallengeVerificationTtl: robotChallengeVerificationTtlVal,
-		RobotChallengeChallengeTtl:    robotChallengeChallengeTtlVal,
 		state:                         attr.ValueStateKnown,
 	}, diags
 }
 
 func NewActionConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ActionConfigValue {
 	object, diags := NewActionConfigValue(attributeTypes, attributes)
+
 	if diags.HasError() {
+		// This could potentially be added to the diag package.
 		diagsStrings := make([]string, 0, len(diags))
+
 		for _, diagnostic := range diags {
 			diagsStrings = append(diagsStrings, fmt.Sprintf(
 				"%s | %s | %s",
@@ -401,8 +486,10 @@ func NewActionConfigValueMust(attributeTypes map[string]attr.Type, attributes ma
 				diagnostic.Summary(),
 				diagnostic.Detail()))
 		}
+
 		panic("NewActionConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
 	}
+
 	return object
 }
 
@@ -410,29 +497,39 @@ func (t ActionConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Val
 	if in.Type() == nil {
 		return NewActionConfigValueNull(), nil
 	}
+
 	if !in.Type().Equal(t.TerraformType(ctx)) {
 		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
 	}
+
 	if !in.IsKnown() {
 		return NewActionConfigValueUnknown(), nil
 	}
+
 	if in.IsNull() {
 		return NewActionConfigValueNull(), nil
 	}
 
 	attributes := map[string]attr.Value{}
+
 	val := map[string]tftypes.Value{}
+
 	err := in.As(&val)
+
 	if err != nil {
 		return nil, err
 	}
+
 	for k, v := range val {
 		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
 		if err != nil {
 			return nil, err
 		}
+
 		attributes[k] = a
 	}
+
 	return NewActionConfigValueMust(ActionConfigValue{}.AttributeTypes(ctx), attributes), nil
 }
 
@@ -443,9 +540,9 @@ func (t ActionConfigType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = ActionConfigValue{}
 
 type ActionConfigValue struct {
+	RobotChallengeChallengeTtl    basetypes.Int64Value  `tfsdk:"robot_challenge_challenge_ttl"`
 	RobotChallengeType            basetypes.StringValue `tfsdk:"robot_challenge_type"`
 	RobotChallengeVerificationTtl basetypes.Int64Value  `tfsdk:"robot_challenge_verification_ttl"`
-	RobotChallengeChallengeTtl    basetypes.Int64Value  `tfsdk:"robot_challenge_challenge_ttl"`
 	state                         attr.ValueState
 }
 
@@ -455,9 +552,9 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 	var val tftypes.Value
 	var err error
 
+	attrTypes["robot_challenge_challenge_ttl"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["robot_challenge_type"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["robot_challenge_verification_ttl"] = basetypes.Int64Type{}.TerraformType(ctx)
-	attrTypes["robot_challenge_challenge_ttl"] = basetypes.Int64Type{}.TerraformType(ctx)
 
 	objectType := tftypes.Object{AttributeTypes: attrTypes}
 
@@ -465,27 +562,34 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 	case attr.ValueStateKnown:
 		vals := make(map[string]tftypes.Value, 3)
 
-		val, err = v.RobotChallengeType.ToTerraformValue(ctx)
+		val, err = v.RobotChallengeChallengeTtl.ToTerraformValue(ctx)
+
 		if err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
+
+		vals["robot_challenge_challenge_ttl"] = val
+
+		val, err = v.RobotChallengeType.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
 		vals["robot_challenge_type"] = val
 
 		val, err = v.RobotChallengeVerificationTtl.ToTerraformValue(ctx)
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-		vals["robot_challenge_verification_ttl"] = val
 
-		val, err = v.RobotChallengeChallengeTtl.ToTerraformValue(ctx)
 		if err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
-		vals["robot_challenge_challenge_ttl"] = val
+
+		vals["robot_challenge_verification_ttl"] = val
 
 		if err := tftypes.ValidateValue(objectType, vals); err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
+
 		return tftypes.NewValue(objectType, vals), nil
 	case attr.ValueStateNull:
 		return tftypes.NewValue(objectType, nil), nil
@@ -510,47 +614,59 @@ func (v ActionConfigValue) String() string {
 
 func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
 	attributeTypes := map[string]attr.Type{
+		"robot_challenge_challenge_ttl":    basetypes.Int64Type{},
 		"robot_challenge_type":             basetypes.StringType{},
 		"robot_challenge_verification_ttl": basetypes.Int64Type{},
-		"robot_challenge_challenge_ttl":    basetypes.Int64Type{},
 	}
+
 	if v.IsNull() {
 		return types.ObjectNull(attributeTypes), diags
 	}
+
 	if v.IsUnknown() {
 		return types.ObjectUnknown(attributeTypes), diags
 	}
+
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
+			"robot_challenge_challenge_ttl":    v.RobotChallengeChallengeTtl,
 			"robot_challenge_type":             v.RobotChallengeType,
 			"robot_challenge_verification_ttl": v.RobotChallengeVerificationTtl,
-			"robot_challenge_challenge_ttl":    v.RobotChallengeChallengeTtl,
 		})
+
 	return objVal, diags
 }
 
 func (v ActionConfigValue) Equal(o attr.Value) bool {
 	other, ok := o.(ActionConfigValue)
+
 	if !ok {
 		return false
 	}
+
 	if v.state != other.state {
 		return false
 	}
+
 	if v.state != attr.ValueStateKnown {
 		return true
 	}
-	if !v.RobotChallengeType.Equal(other.RobotChallengeType) {
-		return false
-	}
-	if !v.RobotChallengeVerificationTtl.Equal(other.RobotChallengeVerificationTtl) {
-		return false
-	}
+
 	if !v.RobotChallengeChallengeTtl.Equal(other.RobotChallengeChallengeTtl) {
 		return false
 	}
+
+	if !v.RobotChallengeType.Equal(other.RobotChallengeType) {
+		return false
+	}
+
+	if !v.RobotChallengeVerificationTtl.Equal(other.RobotChallengeVerificationTtl) {
+		return false
+	}
+
 	return true
 }
 
@@ -564,8 +680,8 @@ func (v ActionConfigValue) Type(ctx context.Context) attr.Type {
 
 func (v ActionConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
+		"robot_challenge_challenge_ttl":    basetypes.Int64Type{},
 		"robot_challenge_type":             basetypes.StringType{},
 		"robot_challenge_verification_ttl": basetypes.Int64Type{},
-		"robot_challenge_challenge_ttl":    basetypes.Int64Type{},
 	}
 }

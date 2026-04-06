@@ -14,59 +14,51 @@ func CronJobResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"application": schema.StringAttribute{
-				Required:            true,
-				Description:         "Application name",
-				MarkdownDescription: "Application name",
+				Optional:            true,
+				Computed:            true,
+				Description:         "The application ID",
+				MarkdownDescription: "The application ID",
 			},
-			"command": schema.StringAttribute{
-				Required:            true,
-				Description:         "Command to execute as a JSON array of strings",
-				MarkdownDescription: "Command to execute as a JSON array of strings",
+			"command": schema.ListAttribute{
+				ElementType: types.StringType,
+				Required:    true,
+			},
+			"cron": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "The cron job ID",
+				MarkdownDescription: "The cron job ID",
 			},
 			"description": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Cron job description",
-				MarkdownDescription: "Cron job description",
+				Optional: true,
+				Computed: true,
 			},
 			"environment": schema.StringAttribute{
-				Required:            true,
-				Description:         "Environment name",
-				MarkdownDescription: "Environment name",
+				Optional:            true,
+				Computed:            true,
+				Description:         "The environment ID",
+				MarkdownDescription: "The environment ID",
 			},
 			"is_enabled": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Whether the cron job is enabled",
-				MarkdownDescription: "Whether the cron job is enabled",
-				Default:             booldefault.StaticBool(true),
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(true),
 			},
 			"name": schema.StringAttribute{
-				Required:            true,
-				Description:         "Cron job name",
-				MarkdownDescription: "Cron job name",
+				Required: true,
 			},
-			"organization": schema.StringAttribute{
+			"organisation": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
-			},
-			"schedule": schema.StringAttribute{
-				Computed:            true,
-				Description:         "Resolved cron schedule",
-				MarkdownDescription: "Resolved cron schedule",
+				Description:         "The organisation ID",
+				MarkdownDescription: "The organisation ID",
 			},
 			"schedule_expression": schema.StringAttribute{
-				Required:            true,
-				Description:         "Cron schedule expression",
-				MarkdownDescription: "Cron schedule expression",
+				Required: true,
 			},
 			"target_container_name": schema.StringAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Target container name",
-				MarkdownDescription: "Target container name",
+				Optional: true,
+				Computed: true,
 			},
 		},
 	}
@@ -74,13 +66,13 @@ func CronJobResourceSchema(ctx context.Context) schema.Schema {
 
 type CronJobModel struct {
 	Application         types.String `tfsdk:"application"`
-	Command             types.String `tfsdk:"command"`
+	Command             types.List   `tfsdk:"command"`
+	Cron                types.String `tfsdk:"cron"`
 	Description         types.String `tfsdk:"description"`
 	Environment         types.String `tfsdk:"environment"`
 	IsEnabled           types.Bool   `tfsdk:"is_enabled"`
 	Name                types.String `tfsdk:"name"`
-	Organization        types.String `tfsdk:"organization"`
-	Schedule            types.String `tfsdk:"schedule"`
+	Organisation        types.String `tfsdk:"organisation"`
 	ScheduleExpression  types.String `tfsdk:"schedule_expression"`
 	TargetContainerName types.String `tfsdk:"target_container_name"`
 }

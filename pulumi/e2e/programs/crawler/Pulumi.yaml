@@ -8,6 +8,12 @@ config:
   region:
     type: string
     default: au-govt
+  crawlerDomain:
+    type: string
+    default: "https://example.com"
+  scheduleCron:
+    type: string
+    default: "0 0 * * 0"
 resources:
   testProject:
     type: quant:index:Project
@@ -18,14 +24,15 @@ resources:
     type: quant:index:Crawler
     properties:
       project: ${testProject.machineName}
-      domain: https://example.com
+      domain: ${crawlerDomain}
   testSchedule:
     type: quant:index:CrawlerSchedule
     properties:
       project: ${testProject.machineName}
       crawler: ${testCrawler.uuid}
       name: e2e-test-schedule
-      scheduleCronString: "0 0 * * 0"
+      scheduleCronString: ${scheduleCron}
 outputs:
   crawlerId: ${testCrawler.id}
+  crawlerUuid: ${testCrawler.uuid}
   scheduleId: ${testSchedule.id}

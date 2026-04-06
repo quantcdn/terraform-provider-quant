@@ -1,7 +1,9 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"math"
 	"math/rand"
 	"net/http"
@@ -147,7 +149,25 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 	var lastResp *http.Response
 	var lastErr error
 
+	// Buffer the request body so retries can replay it. Without this,
+	// the body is consumed on the first attempt and retries send an empty
+	// body, causing 400 errors from servers/CDNs.
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
+		_ = req.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	}
+
 	for attempt := 0; attempt <= rt.config.MaxRetries; attempt++ {
+		// Restore body for retries
+		if bodyBytes != nil {
+			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
 		// Wait for rate limiter token
 		if rt.config.RequestsPerSecond > 0 {
 			select {

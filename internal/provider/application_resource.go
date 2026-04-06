@@ -2,20 +2,21 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_application"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_application"
 )
 
 var (
@@ -55,6 +56,13 @@ func (r *applicationResource) Configure(_ context.Context, req resource.Configur
 	}
 
 	r.client = c
+}
+
+func (r *applicationResource) getOrg(data *resource_application.ApplicationModel) string {
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
+	}
+	return r.client.Organization
 }
 
 func (r *applicationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -97,12 +105,20 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 
 func (r *applicationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// The V3 Applications API does not have an Update endpoint.
-	// Any changes to mutable fields require delete + create (ForceNew in Terraform terms).
-	// This method should never be called because all mutable attributes are marked as requiring replacement.
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"The QuantCloud Applications API does not support in-place updates. All configuration changes require destroying and recreating the application.",
-	)
+	// If only computed fields changed (drift in server-computed values),
+	// refresh state from the API instead of erroring.
+	var data resource_application.ApplicationModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(callApplicationReadAPI(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -125,15 +141,28 @@ func (r *applicationResource) ImportState(ctx context.Context, req resource.Impo
 func buildCreateApplicationRequest(ctx context.Context, data *resource_application.ApplicationModel) (*quantadmingo.CreateApplicationRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	// Parse the compose definition JSON
+	// ComposeDefinition — build the SDK Compose struct field-by-field from
+	// the typed Terraform value to avoid json.Marshal on Terraform internal types.
 	var compose quantadmingo.Compose
-	if err := json.Unmarshal([]byte(data.ComposeDefinition.ValueString()), &compose); err != nil {
-		diags.AddAttributeError(
-			path.Root("compose_definition"),
-			"Invalid compose_definition JSON",
-			fmt.Sprintf("Failed to parse compose_definition as JSON: %s", err.Error()),
-		)
-		return nil, diags
+	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
+		cd := data.ComposeDefinition
+		cf := composeFields{
+			Architecture:             cd.Architecture,
+			Containers:               cd.Containers,
+			EnableCrossAppNetworking: cd.EnableCrossAppNetworking,
+			EnableCrossEnvNetworking: cd.EnableCrossEnvNetworking,
+			MaxCapacity:              cd.MaxCapacity,
+			MinCapacity:              cd.MinCapacity,
+			SpotConfiguration:        cd.SpotConfiguration,
+			TaskCpu:                  cd.TaskCpu,
+			TaskMemory:               cd.TaskMemory,
+		}
+		var d diag.Diagnostics
+		compose, d = buildSDKCompose(ctx, cf)
+		diags.Append(d...)
+		if diags.HasError() {
+			return nil, diags
+		}
 	}
 
 	sdkReq := quantadmingo.NewCreateApplicationRequest(data.AppName.ValueString(), compose)
@@ -146,60 +175,75 @@ func buildCreateApplicationRequest(ctx context.Context, data *resource_applicati
 		sdkReq.SetMaxCapacity(int32(data.MaxCapacity.ValueInt64()))
 	}
 
-	// Database configuration
-	hasDatabase := false
-	db := quantadmingo.NewCreateApplicationRequestDatabase()
+	// Database configuration — now a nested DatabaseValue object.
+	if !data.Database.IsNull() && !data.Database.IsUnknown() {
+		db := quantadmingo.NewCreateApplicationRequestDatabase()
+		hasDatabase := false
 
-	if !data.DatabaseEngine.IsNull() && !data.DatabaseEngine.IsUnknown() {
-		db.SetEngine(data.DatabaseEngine.ValueString())
-		hasDatabase = true
-	}
-	if !data.DatabaseInstanceClass.IsNull() && !data.DatabaseInstanceClass.IsUnknown() {
-		db.SetInstanceClass(data.DatabaseInstanceClass.ValueString())
-		hasDatabase = true
-	}
-	if !data.DatabaseStorageGb.IsNull() && !data.DatabaseStorageGb.IsUnknown() {
-		db.SetStorageGb(int32(data.DatabaseStorageGb.ValueInt64()))
-		hasDatabase = true
-	}
-	if !data.DatabaseMultiAz.IsNull() && !data.DatabaseMultiAz.IsUnknown() {
-		db.SetMultiAz(data.DatabaseMultiAz.ValueBool())
-		hasDatabase = true
-	}
+		if !data.Database.Engine.IsNull() && !data.Database.Engine.IsUnknown() {
+			db.SetEngine(data.Database.Engine.ValueString())
+			hasDatabase = true
+		}
+		if !data.Database.InstanceClass.IsNull() && !data.Database.InstanceClass.IsUnknown() {
+			db.SetInstanceClass(data.Database.InstanceClass.ValueString())
+			hasDatabase = true
+		}
+		if !data.Database.StorageGb.IsNull() && !data.Database.StorageGb.IsUnknown() {
+			db.SetStorageGb(int32(data.Database.StorageGb.ValueInt64()))
+			hasDatabase = true
+		}
+		if !data.Database.MultiAz.IsNull() && !data.Database.MultiAz.IsUnknown() {
+			db.SetMultiAz(data.Database.MultiAz.ValueBool())
+			hasDatabase = true
+		}
 
-	if hasDatabase {
-		sdkReq.SetDatabase(*db)
-	}
-
-	// Filesystem configuration
-	hasFilesystem := false
-	fs := quantadmingo.NewCreateApplicationRequestFilesystem()
-
-	if !data.FilesystemRequired.IsNull() && !data.FilesystemRequired.IsUnknown() {
-		fs.SetRequired(data.FilesystemRequired.ValueBool())
-		hasFilesystem = true
-	}
-	if !data.FilesystemMountPath.IsNull() && !data.FilesystemMountPath.IsUnknown() {
-		fs.SetMountPath(data.FilesystemMountPath.ValueString())
-		hasFilesystem = true
+		if hasDatabase {
+			sdkReq.SetDatabase(*db)
+		}
 	}
 
-	if hasFilesystem {
-		sdkReq.SetFilesystem(*fs)
+	// Filesystem configuration — now a nested FilesystemValue object.
+	if !data.Filesystem.IsNull() && !data.Filesystem.IsUnknown() {
+		fs := quantadmingo.NewCreateApplicationRequestFilesystem()
+		hasFilesystem := false
+
+		if !data.Filesystem.Required.IsNull() && !data.Filesystem.Required.IsUnknown() {
+			fs.SetRequired(data.Filesystem.Required.ValueBool())
+			hasFilesystem = true
+		}
+		if !data.Filesystem.MountPath.IsNull() && !data.Filesystem.MountPath.IsUnknown() {
+			fs.SetMountPath(data.Filesystem.MountPath.ValueString())
+			hasFilesystem = true
+		}
+
+		if hasFilesystem {
+			sdkReq.SetFilesystem(*fs)
+		}
 	}
 
-	// Environment variables
+	// Environment variables — now a types.List of nested EnvironmentValue objects.
 	if !data.Environment.IsNull() && !data.Environment.IsUnknown() {
-		var envVars []quantadmingo.CreateApplicationRequestEnvironmentInner
-		if err := json.Unmarshal([]byte(data.Environment.ValueString()), &envVars); err != nil {
-			diags.AddAttributeError(
-				path.Root("environment"),
-				"Invalid environment JSON",
-				fmt.Sprintf("Failed to parse environment as JSON array: %s", err.Error()),
-			)
+		var envValues []resource_application.EnvironmentValue
+		diags.Append(data.Environment.ElementsAs(ctx, &envValues, false)...)
+		if diags.HasError() {
 			return nil, diags
 		}
-		sdkReq.SetEnvironment(envVars)
+		var envVars []quantadmingo.CreateApplicationRequestEnvironmentInner
+		for _, ev := range envValues {
+			item := quantadmingo.NewCreateApplicationRequestEnvironmentInner()
+			if !ev.Name.IsNull() && !ev.Name.IsUnknown() {
+				v := ev.Name.ValueString()
+				item.Name = &v
+			}
+			if !ev.Value.IsNull() && !ev.Value.IsUnknown() {
+				v := ev.Value.ValueString()
+				item.Value = &v
+			}
+			envVars = append(envVars, *item)
+		}
+		if len(envVars) > 0 {
+			sdkReq.SetEnvironment(envVars)
+		}
 	}
 
 	return sdkReq, diags
@@ -216,25 +260,13 @@ func callApplicationCreateAPI(ctx context.Context, r *applicationResource, data 
 		return
 	}
 
-	if data.ComposeDefinition.IsNull() || data.ComposeDefinition.IsUnknown() {
-		diags.AddAttributeError(
-			path.Root("compose_definition"),
-			"Missing compose_definition attribute",
-			"Cannot create an application without a compose_definition.",
-		)
-		return
-	}
-
 	sdkReq, buildDiags := buildCreateApplicationRequest(ctx, data)
 	diags.Append(buildDiags...)
 	if diags.HasError() {
 		return
 	}
 
-	org := r.client.Organization
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		org = data.Organization.ValueString()
-	}
+	org := r.getOrg(data)
 
 	app, resp, err := r.client.Instance.ApplicationsAPI.CreateApplication(r.client.AuthContext, org).CreateApplicationRequest(*sdkReq).Execute()
 
@@ -326,10 +358,7 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 		return
 	}
 
-	org := r.client.Organization
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		org = data.Organization.ValueString()
-	}
+	org := r.getOrg(data)
 
 	app, resp, err := r.client.Instance.ApplicationsAPI.GetApplication(r.client.AuthContext, org, data.AppName.ValueString()).Execute()
 	if err != nil {
@@ -357,101 +386,299 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 		return
 	}
 
-	// Map response to Terraform model
+	// --- Scalar fields ---
 	data.AppName = types.StringValue(app.GetAppName())
-	data.Organization = types.StringValue(app.GetOrganisation())
+	data.Organisation = types.StringValue(app.GetOrganisation())
 
-	// Status
 	if app.HasStatus() {
 		data.Status = types.StringValue(app.GetStatus())
 	} else {
 		data.Status = types.StringNull()
 	}
 
-	// Running count
 	if app.HasRunningCount() {
 		data.RunningCount = types.Int64Value(int64(app.GetRunningCount()))
 	} else {
 		data.RunningCount = types.Int64Null()
 	}
 
-	// Desired count
 	if app.HasDesiredCount() {
 		data.DesiredCount = types.Int64Value(int64(app.GetDesiredCount()))
 	} else {
 		data.DesiredCount = types.Int64Null()
 	}
 
-	// Min/Max capacity
 	if app.HasMinCapacity() {
 		data.MinCapacity = types.Int64Value(int64(app.GetMinCapacity()))
+	} else {
+		data.MinCapacity = types.Int64Null()
 	}
+
 	if app.HasMaxCapacity() {
 		data.MaxCapacity = types.Int64Value(int64(app.GetMaxCapacity()))
+	} else {
+		data.MaxCapacity = types.Int64Null()
 	}
 
-	// Container names
+	// --- ContainerNames ---
 	if app.HasContainerNames() {
 		names := app.GetContainerNames()
-		namesJSON, err := json.Marshal(names)
-		if err == nil {
-			data.ContainerNames = types.StringValue(string(namesJSON))
-		} else {
-			data.ContainerNames = types.StringNull()
-		}
+		namesList, d := types.ListValueFrom(ctx, types.StringType, names)
+		diags.Append(d...)
+		data.ContainerNames = namesList
 	} else {
-		data.ContainerNames = types.StringNull()
+		data.ContainerNames = types.ListNull(types.StringType)
 	}
 
-	// Compose definition — read it back from the API response and serialize as JSON
+	// --- ComposeDefinition ---
 	if app.HasComposeDefinition() {
 		compose := app.GetComposeDefinition()
-		composeJSON, err := json.Marshal(compose)
-		if err == nil {
-			data.ComposeDefinition = types.StringValue(string(composeJSON))
+		cd, d := buildAppComposeDefinitionValue(ctx, &compose)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.ComposeDefinition = cd
 		}
+	} else {
+		data.ComposeDefinition = resource_application.NewComposeDefinitionValueNull()
 	}
 
-	// Database info from response (read-only fields from ApplicationDatabase)
-	if app.HasDatabase() {
-		db := app.GetDatabase()
-		if db.RdsInstanceEngine != nil {
-			data.DatabaseEngine = types.StringValue(db.GetRdsInstanceEngine())
+	// --- Database ---
+	if dbPtr, ok := app.GetDatabaseOk(); ok && dbPtr != nil {
+		db, d := buildAppDatabaseValue(ctx, dbPtr)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Database = db
 		}
+	} else {
+		data.Database = resource_application.NewDatabaseValueNull()
 	}
 
-	// Filesystem info from response
-	if app.HasFilesystem() {
-		fs := app.GetFilesystem()
-		if fs.MountPath != nil {
-			data.FilesystemMountPath = types.StringValue(fs.GetMountPath())
+	// --- Filesystem ---
+	if fsPtr, ok := app.GetFilesystemOk(); ok && fsPtr != nil {
+		fs, d := buildAppFilesystemValue(ctx, fsPtr)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Filesystem = fs
 		}
+	} else {
+		data.Filesystem = resource_application.NewFilesystemValueNull()
 	}
 
-	// Resolve any unknown optional/computed fields to null
-	if data.DatabaseEngine.IsUnknown() {
-		data.DatabaseEngine = types.StringNull()
+	// --- ImageReference ---
+	if irPtr, ok := app.GetImageReferenceOk(); ok && irPtr != nil {
+		ir, d := buildAppImageReferenceValue(ctx, irPtr)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.ImageReference = ir
+		}
+	} else {
+		data.ImageReference = resource_application.NewImageReferenceValueNull()
 	}
-	if data.DatabaseInstanceClass.IsUnknown() {
-		data.DatabaseInstanceClass = types.StringNull()
+
+	// --- DeploymentInformation ---
+	if app.HasDeploymentInformation() {
+		depList, d := buildAppDeploymentInformationList(ctx, app.GetDeploymentInformation())
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.DeploymentInformation = depList
+		}
+	} else {
+		data.DeploymentInformation = types.ListNull(resource_application.DeploymentInformationValue{}.Type(ctx))
 	}
-	if data.DatabaseStorageGb.IsUnknown() {
-		data.DatabaseStorageGb = types.Int64Null()
+
+	// --- EnvironmentNames ---
+	// The API returns environments as a list of objects with envName; extract names.
+	if app.HasEnvironments() {
+		envs := app.GetEnvironments()
+		names := make([]string, 0, len(envs))
+		for _, e := range envs {
+			if n, ok := e.GetEnvNameOk(); ok && n != nil {
+				names = append(names, *n)
+			}
+		}
+		namesList, d := types.ListValueFrom(ctx, types.StringType, names)
+		diags.Append(d...)
+		data.EnvironmentNames = namesList
+	} else {
+		data.EnvironmentNames = types.ListNull(types.StringType)
 	}
-	if data.DatabaseMultiAz.IsUnknown() {
-		data.DatabaseMultiAz = types.BoolNull()
-	}
-	if data.FilesystemRequired.IsUnknown() {
-		data.FilesystemRequired = types.BoolNull()
-	}
-	if data.FilesystemMountPath.IsUnknown() {
-		data.FilesystemMountPath = types.StringNull()
-	}
+
+	// --- Environment (env vars) ---
+	// The Application GET response does not return environment variables.
+	// Preserve current state if known; otherwise null.
 	if data.Environment.IsUnknown() {
-		data.Environment = types.StringNull()
+		data.Environment = types.ListNull(resource_application.EnvironmentValue{}.Type(ctx))
+	}
+
+	// --- Application (self-link / computed ID) ---
+	if data.Application.IsUnknown() {
+		data.Application = types.StringNull()
 	}
 
 	return
+}
+
+// nullifyUnknownAttrValue is kept for potential future use.
+//
+//nolint:unused
+func nullifyUnknownAttrValue(ctx context.Context, v attr.Value) attr.Value {
+	if v.IsUnknown() {
+		// Replace with null of the same type.
+		switch tv := v.(type) {
+		case basetypes.StringValue:
+			return types.StringNull()
+		case basetypes.Int64Value:
+			return types.Int64Null()
+		case basetypes.BoolValue:
+			return types.BoolNull()
+		case basetypes.Float64Value:
+			return types.Float64Null()
+		case basetypes.ObjectValue:
+			return types.ObjectNull(tv.AttributeTypes(ctx))
+		case basetypes.ListValue:
+			return types.ListNull(tv.ElementType(ctx))
+		default:
+			// For custom types implementing ObjectValuable, try to get attr types.
+			if ov, ok := v.(basetypes.ObjectValuable); ok {
+				objVal, diags := ov.ToObjectValue(ctx)
+				if !diags.HasError() {
+					return types.ObjectNull(objVal.AttributeTypes(ctx))
+				}
+			}
+			return v
+		}
+	}
+
+	// Not unknown — recurse into objects and lists to resolve nested unknowns.
+	switch tv := v.(type) {
+	case basetypes.ObjectValue:
+		attrs := tv.Attributes()
+		resolved := make(map[string]attr.Value, len(attrs))
+		for k, child := range attrs {
+			resolved[k] = nullifyUnknownAttrValue(ctx, child)
+		}
+		obj, _ := types.ObjectValue(tv.AttributeTypes(ctx), resolved)
+		return obj
+	case basetypes.ListValue:
+		elems := tv.Elements()
+		if len(elems) == 0 {
+			return v
+		}
+		resolved := make([]attr.Value, len(elems))
+		for i, elem := range elems {
+			// Custom types (ContainersValue, etc.) implement ObjectValuable
+			// but aren't basetypes.ObjectValue. Convert first, then recurse.
+			if _, isObj := elem.(basetypes.ObjectValue); !isObj {
+				if ov, ok := elem.(basetypes.ObjectValuable); ok {
+					objVal, d := ov.ToObjectValue(ctx)
+					if !d.HasError() {
+						resolved[i] = nullifyUnknownAttrValue(ctx, objVal)
+						continue
+					}
+				}
+			}
+			resolved[i] = nullifyUnknownAttrValue(ctx, elem)
+		}
+		list, _ := types.ListValue(tv.ElementType(ctx), resolved)
+		return list
+	}
+
+	return v
+}
+
+// resolveApplicationUnknowns is kept for potential future use.
+//
+//nolint:unused
+func resolveApplicationUnknowns(ctx context.Context, data *resource_application.ApplicationModel) {
+	// --- Database ---
+	if !data.Database.IsNull() && !data.Database.IsUnknown() {
+		db := data.Database
+		attrTypes := db.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"engine":                  nullifyUnknownAttrValue(ctx, db.Engine),
+			"instance_class":          nullifyUnknownAttrValue(ctx, db.InstanceClass),
+			"multi_az":                nullifyUnknownAttrValue(ctx, db.MultiAz),
+			"rds_instance_endpoint":   nullifyUnknownAttrValue(ctx, db.RdsInstanceEndpoint),
+			"rds_instance_engine":     nullifyUnknownAttrValue(ctx, db.RdsInstanceEngine),
+			"rds_instance_identifier": nullifyUnknownAttrValue(ctx, db.RdsInstanceIdentifier),
+			"rds_instance_status":     nullifyUnknownAttrValue(ctx, db.RdsInstanceStatus),
+			"storage_gb":              nullifyUnknownAttrValue(ctx, db.StorageGb),
+		}
+		newDB, diags := resource_application.NewDatabaseValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.Database = newDB
+		}
+	}
+
+	// --- Filesystem ---
+	if !data.Filesystem.IsNull() && !data.Filesystem.IsUnknown() {
+		fs := data.Filesystem
+		attrTypes := fs.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"filesystem_id": nullifyUnknownAttrValue(ctx, fs.FilesystemId),
+			"mount_path":    nullifyUnknownAttrValue(ctx, fs.MountPath),
+			"required":      nullifyUnknownAttrValue(ctx, fs.Required),
+		}
+		newFS, diags := resource_application.NewFilesystemValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.Filesystem = newFS
+		}
+	}
+
+	// --- ComposeDefinition ---
+	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
+		cd := data.ComposeDefinition
+
+		// Resolve containers list: each container element may have unknown
+		// sub-fields (e.g. health_check, origin_protection_config).
+		containers := cd.Containers
+		if !containers.IsNull() && !containers.IsUnknown() {
+			resolved := nullifyUnknownAttrValue(ctx, containers)
+			if lv, ok := resolved.(basetypes.ListValue); ok {
+				containers = lv
+			}
+		}
+
+		// Resolve spot_configuration sub-fields.
+		spotConfig := cd.SpotConfiguration
+		if !spotConfig.IsNull() && !spotConfig.IsUnknown() {
+			resolved := nullifyUnknownAttrValue(ctx, spotConfig)
+			if ov, ok := resolved.(basetypes.ObjectValue); ok {
+				spotConfig = ov
+			}
+		}
+
+		attrTypes := cd.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"architecture":               nullifyUnknownAttrValue(ctx, cd.Architecture),
+			"containers":                 containers,
+			"enable_cross_app_networking": nullifyUnknownAttrValue(ctx, cd.EnableCrossAppNetworking),
+			"enable_cross_env_networking": nullifyUnknownAttrValue(ctx, cd.EnableCrossEnvNetworking),
+			"max_capacity":               nullifyUnknownAttrValue(ctx, cd.MaxCapacity),
+			"min_capacity":               nullifyUnknownAttrValue(ctx, cd.MinCapacity),
+			"spot_configuration":         spotConfig,
+			"task_cpu":                    nullifyUnknownAttrValue(ctx, cd.TaskCpu),
+			"task_memory":                 nullifyUnknownAttrValue(ctx, cd.TaskMemory),
+		}
+		newCD, diags := resource_application.NewComposeDefinitionValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.ComposeDefinition = newCD
+		}
+	}
+
+	// --- ImageReference ---
+	if !data.ImageReference.IsNull() && !data.ImageReference.IsUnknown() {
+		ir := data.ImageReference
+		attrTypes := ir.AttributeTypes(ctx)
+		attrs := map[string]attr.Value{
+			"identifier": nullifyUnknownAttrValue(ctx, ir.Identifier),
+			"type":       nullifyUnknownAttrValue(ctx, ir.ImageReferenceType),
+		}
+		newIR, diags := resource_application.NewImageReferenceValue(attrTypes, attrs)
+		if !diags.HasError() {
+			data.ImageReference = newIR
+		}
+	}
 }
 
 // callApplicationDeleteAPI deletes an application via the V3 API.
@@ -465,10 +692,7 @@ func callApplicationDeleteAPI(ctx context.Context, r *applicationResource, data 
 		return
 	}
 
-	org := r.client.Organization
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		org = data.Organization.ValueString()
-	}
+	org := r.getOrg(data)
 
 	resp, err := r.client.Instance.ApplicationsAPI.DeleteApplication(r.client.AuthContext, org, data.AppName.ValueString()).Execute()
 

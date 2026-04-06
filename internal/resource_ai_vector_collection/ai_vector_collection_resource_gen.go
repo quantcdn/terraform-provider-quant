@@ -4,67 +4,813 @@ package resource_ai_vector_collection
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 func AiVectorCollectionResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
-		Description:         "Manages an AI vector database collection.",
-		MarkdownDescription: "Manages an AI vector database collection.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed:            true,
-				Description:         "Collection UUID",
-				MarkdownDescription: "Collection UUID",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+			"collection": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"collection_id": schema.StringAttribute{
+						Computed: true,
+					},
+					"created_at": schema.StringAttribute{
+						Computed: true,
+					},
+					"description": schema.StringAttribute{
+						Computed: true,
+					},
+					"dimensions": schema.Int64Attribute{
+						Computed: true,
+					},
+					"document_count": schema.Int64Attribute{
+						Computed: true,
+					},
+					"embedding_model": schema.StringAttribute{
+						Computed: true,
+					},
+					"name": schema.StringAttribute{
+						Computed: true,
+					},
+					"updated_at": schema.StringAttribute{
+						Computed: true,
+					},
 				},
+				CustomType: CollectionType{
+					ObjectType: types.ObjectType{
+						AttrTypes: CollectionValue{}.AttributeTypes(ctx),
+					},
+				},
+				Computed: true,
 			},
-			"organization": schema.StringAttribute{
+			"collection_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Description:         "The collection ID",
+				MarkdownDescription: "The collection ID",
+			},
+			"description": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"dimensions": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Embedding dimensions (default: 1024)",
+				MarkdownDescription: "Embedding dimensions (default: 1024)",
+			},
+			"embedding_model": schema.StringAttribute{
+				Required:            true,
+				Description:         "Embedding model to use. Supported: amazon.titan-embed-text-v2:0, cohere.embed-english-v3, cohere.embed-multilingual-v3",
+				MarkdownDescription: "Embedding model to use. Supported: amazon.titan-embed-text-v2:0, cohere.embed-english-v3, cohere.embed-multilingual-v3",
+			},
+			"message": schema.StringAttribute{
+				Computed: true,
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				Description:         "Collection name (immutable after creation)",
-				MarkdownDescription: "Collection name (immutable after creation)",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Description:         "Collection name (used for reference)",
+				MarkdownDescription: "Collection name (used for reference)",
 			},
-			"description": schema.StringAttribute{
+			"organisation": schema.StringAttribute{
 				Optional:            true,
-				Description:         "Collection description",
-				MarkdownDescription: "Collection description",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"created_at": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Timestamp when the collection was created",
-				MarkdownDescription: "Timestamp when the collection was created",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Description:         "The organisation ID",
+				MarkdownDescription: "The organisation ID",
+			},
+			"success": schema.BoolAttribute{
+				Computed: true,
 			},
 		},
 	}
 }
 
 type AiVectorCollectionModel struct {
-	Id           types.String `tfsdk:"id"`
-	Organization types.String `tfsdk:"organization"`
-	Name         types.String `tfsdk:"name"`
-	Description  types.String `tfsdk:"description"`
-	CreatedAt    types.String `tfsdk:"created_at"`
+	Collection     CollectionValue `tfsdk:"collection"`
+	CollectionId   types.String    `tfsdk:"collection_id"`
+	Description    types.String    `tfsdk:"description"`
+	Dimensions     types.Int64     `tfsdk:"dimensions"`
+	EmbeddingModel types.String    `tfsdk:"embedding_model"`
+	Message        types.String    `tfsdk:"message"`
+	Name           types.String    `tfsdk:"name"`
+	Organisation   types.String    `tfsdk:"organisation"`
+	Success        types.Bool      `tfsdk:"success"`
+}
+
+var _ basetypes.ObjectTypable = CollectionType{}
+
+type CollectionType struct {
+	basetypes.ObjectType
+}
+
+func (t CollectionType) Equal(o attr.Type) bool {
+	other, ok := o.(CollectionType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t CollectionType) String() string {
+	return "CollectionType"
+}
+
+func (t CollectionType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	collectionIdAttribute, ok := attributes["collection_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`collection_id is missing from object`)
+
+		return nil, diags
+	}
+
+	collectionIdVal, ok := collectionIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`collection_id expected to be basetypes.StringValue, was: %T`, collectionIdAttribute))
+	}
+
+	createdAtAttribute, ok := attributes["created_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`created_at is missing from object`)
+
+		return nil, diags
+	}
+
+	createdAtVal, ok := createdAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`created_at expected to be basetypes.StringValue, was: %T`, createdAtAttribute))
+	}
+
+	descriptionAttribute, ok := attributes["description"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`description is missing from object`)
+
+		return nil, diags
+	}
+
+	descriptionVal, ok := descriptionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
+	}
+
+	dimensionsAttribute, ok := attributes["dimensions"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`dimensions is missing from object`)
+
+		return nil, diags
+	}
+
+	dimensionsVal, ok := dimensionsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`dimensions expected to be basetypes.Int64Value, was: %T`, dimensionsAttribute))
+	}
+
+	documentCountAttribute, ok := attributes["document_count"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`document_count is missing from object`)
+
+		return nil, diags
+	}
+
+	documentCountVal, ok := documentCountAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`document_count expected to be basetypes.Int64Value, was: %T`, documentCountAttribute))
+	}
+
+	embeddingModelAttribute, ok := attributes["embedding_model"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`embedding_model is missing from object`)
+
+		return nil, diags
+	}
+
+	embeddingModelVal, ok := embeddingModelAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`embedding_model expected to be basetypes.StringValue, was: %T`, embeddingModelAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return nil, diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	updatedAtAttribute, ok := attributes["updated_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`updated_at is missing from object`)
+
+		return nil, diags
+	}
+
+	updatedAtVal, ok := updatedAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`updated_at expected to be basetypes.StringValue, was: %T`, updatedAtAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return CollectionValue{
+		CollectionId:   collectionIdVal,
+		CreatedAt:      createdAtVal,
+		Description:    descriptionVal,
+		Dimensions:     dimensionsVal,
+		DocumentCount:  documentCountVal,
+		EmbeddingModel: embeddingModelVal,
+		Name:           nameVal,
+		UpdatedAt:      updatedAtVal,
+		state:          attr.ValueStateKnown,
+	}, diags
+}
+
+func NewCollectionValueNull() CollectionValue {
+	return CollectionValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewCollectionValueUnknown() CollectionValue {
+	return CollectionValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewCollectionValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (CollectionValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing CollectionValue Attribute Value",
+				"While creating a CollectionValue value, a missing attribute value was detected. "+
+					"A CollectionValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("CollectionValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid CollectionValue Attribute Type",
+				"While creating a CollectionValue value, an invalid attribute value was detected. "+
+					"A CollectionValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("CollectionValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("CollectionValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra CollectionValue Attribute Value",
+				"While creating a CollectionValue value, an extra attribute value was detected. "+
+					"A CollectionValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra CollectionValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewCollectionValueUnknown(), diags
+	}
+
+	collectionIdAttribute, ok := attributes["collection_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`collection_id is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	collectionIdVal, ok := collectionIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`collection_id expected to be basetypes.StringValue, was: %T`, collectionIdAttribute))
+	}
+
+	createdAtAttribute, ok := attributes["created_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`created_at is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	createdAtVal, ok := createdAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`created_at expected to be basetypes.StringValue, was: %T`, createdAtAttribute))
+	}
+
+	descriptionAttribute, ok := attributes["description"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`description is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	descriptionVal, ok := descriptionAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
+	}
+
+	dimensionsAttribute, ok := attributes["dimensions"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`dimensions is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	dimensionsVal, ok := dimensionsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`dimensions expected to be basetypes.Int64Value, was: %T`, dimensionsAttribute))
+	}
+
+	documentCountAttribute, ok := attributes["document_count"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`document_count is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	documentCountVal, ok := documentCountAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`document_count expected to be basetypes.Int64Value, was: %T`, documentCountAttribute))
+	}
+
+	embeddingModelAttribute, ok := attributes["embedding_model"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`embedding_model is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	embeddingModelVal, ok := embeddingModelAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`embedding_model expected to be basetypes.StringValue, was: %T`, embeddingModelAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
+	}
+
+	updatedAtAttribute, ok := attributes["updated_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`updated_at is missing from object`)
+
+		return NewCollectionValueUnknown(), diags
+	}
+
+	updatedAtVal, ok := updatedAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`updated_at expected to be basetypes.StringValue, was: %T`, updatedAtAttribute))
+	}
+
+	if diags.HasError() {
+		return NewCollectionValueUnknown(), diags
+	}
+
+	return CollectionValue{
+		CollectionId:   collectionIdVal,
+		CreatedAt:      createdAtVal,
+		Description:    descriptionVal,
+		Dimensions:     dimensionsVal,
+		DocumentCount:  documentCountVal,
+		EmbeddingModel: embeddingModelVal,
+		Name:           nameVal,
+		UpdatedAt:      updatedAtVal,
+		state:          attr.ValueStateKnown,
+	}, diags
+}
+
+func NewCollectionValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) CollectionValue {
+	object, diags := NewCollectionValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewCollectionValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t CollectionType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewCollectionValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewCollectionValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewCollectionValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewCollectionValueMust(CollectionValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t CollectionType) ValueType(ctx context.Context) attr.Value {
+	return CollectionValue{}
+}
+
+var _ basetypes.ObjectValuable = CollectionValue{}
+
+type CollectionValue struct {
+	CollectionId   basetypes.StringValue `tfsdk:"collection_id"`
+	CreatedAt      basetypes.StringValue `tfsdk:"created_at"`
+	Description    basetypes.StringValue `tfsdk:"description"`
+	Dimensions     basetypes.Int64Value  `tfsdk:"dimensions"`
+	DocumentCount  basetypes.Int64Value  `tfsdk:"document_count"`
+	EmbeddingModel basetypes.StringValue `tfsdk:"embedding_model"`
+	Name           basetypes.StringValue `tfsdk:"name"`
+	UpdatedAt      basetypes.StringValue `tfsdk:"updated_at"`
+	state          attr.ValueState
+}
+
+func (v CollectionValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 8)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["collection_id"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["created_at"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["description"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["dimensions"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["document_count"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["embedding_model"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["updated_at"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 8)
+
+		val, err = v.CollectionId.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["collection_id"] = val
+
+		val, err = v.CreatedAt.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["created_at"] = val
+
+		val, err = v.Description.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["description"] = val
+
+		val, err = v.Dimensions.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["dimensions"] = val
+
+		val, err = v.DocumentCount.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["document_count"] = val
+
+		val, err = v.EmbeddingModel.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["embedding_model"] = val
+
+		val, err = v.Name.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["name"] = val
+
+		val, err = v.UpdatedAt.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["updated_at"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v CollectionValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v CollectionValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v CollectionValue) String() string {
+	return "CollectionValue"
+}
+
+func (v CollectionValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"collection_id":   basetypes.StringType{},
+		"created_at":      basetypes.StringType{},
+		"description":     basetypes.StringType{},
+		"dimensions":      basetypes.Int64Type{},
+		"document_count":  basetypes.Int64Type{},
+		"embedding_model": basetypes.StringType{},
+		"name":            basetypes.StringType{},
+		"updated_at":      basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"collection_id":   v.CollectionId,
+			"created_at":      v.CreatedAt,
+			"description":     v.Description,
+			"dimensions":      v.Dimensions,
+			"document_count":  v.DocumentCount,
+			"embedding_model": v.EmbeddingModel,
+			"name":            v.Name,
+			"updated_at":      v.UpdatedAt,
+		})
+
+	return objVal, diags
+}
+
+func (v CollectionValue) Equal(o attr.Value) bool {
+	other, ok := o.(CollectionValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.CollectionId.Equal(other.CollectionId) {
+		return false
+	}
+
+	if !v.CreatedAt.Equal(other.CreatedAt) {
+		return false
+	}
+
+	if !v.Description.Equal(other.Description) {
+		return false
+	}
+
+	if !v.Dimensions.Equal(other.Dimensions) {
+		return false
+	}
+
+	if !v.DocumentCount.Equal(other.DocumentCount) {
+		return false
+	}
+
+	if !v.EmbeddingModel.Equal(other.EmbeddingModel) {
+		return false
+	}
+
+	if !v.Name.Equal(other.Name) {
+		return false
+	}
+
+	if !v.UpdatedAt.Equal(other.UpdatedAt) {
+		return false
+	}
+
+	return true
+}
+
+func (v CollectionValue) Type(ctx context.Context) attr.Type {
+	return CollectionType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v CollectionValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"collection_id":   basetypes.StringType{},
+		"created_at":      basetypes.StringType{},
+		"description":     basetypes.StringType{},
+		"dimensions":      basetypes.Int64Type{},
+		"document_count":  basetypes.Int64Type{},
+		"embedding_model": basetypes.StringType{},
+		"name":            basetypes.StringType{},
+		"updated_at":      basetypes.StringType{},
+	}
 }

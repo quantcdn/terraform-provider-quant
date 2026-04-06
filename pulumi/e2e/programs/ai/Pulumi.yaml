@@ -1,0 +1,36 @@
+name: e2e-ai
+runtime: yaml
+description: E2E test for AI resources (AiGovernance, AiSkill)
+config:
+  testSuffix:
+    type: string
+    default: e2e-test
+  skillContent:
+    type: string
+    default: You are a test skill for E2E testing.
+  skillDescription:
+    type: string
+    default: E2E test skill
+  modelPolicy:
+    type: string
+    default: unrestricted
+resources:
+  testGovernance:
+    type: quant:index:AiGovernance
+    properties:
+      aiEnabled: true
+      modelPolicy: ${modelPolicy}
+      modelLists:
+        - anthropic.claude-3-5-sonnet-20241022-v2:0
+        - anthropic.claude-3-haiku-20240307-v1:0
+  testSkill:
+    type: quant:index:AiSkill
+    properties:
+      name: e2e-skill-${testSuffix}
+      description: ${skillDescription}
+      content: ${skillContent}
+      triggerCondition: always
+outputs:
+  governanceVersion: ${testGovernance.version}
+  skillId: ${testSkill.id}
+  skillName: ${testSkill.name}

@@ -41,6 +41,26 @@ func RuleHeadersResourceSchema(ctx context.Context) schema.Schema {
 				},
 				Computed: true,
 			},
+			"asn": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "ASN filter type (asn_is, asn_is_not, any)",
+				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any)",
+			},
+			"asn_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Allowed AS numbers",
+				MarkdownDescription: "Allowed AS numbers",
+			},
+			"asn_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Excluded AS numbers",
+				MarkdownDescription: "Excluded AS numbers",
+			},
 			"country": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -180,6 +200,9 @@ func RuleHeadersResourceSchema(ctx context.Context) schema.Schema {
 type RuleHeadersModel struct {
 	Action         types.String      `tfsdk:"action"`
 	ActionConfig   ActionConfigValue `tfsdk:"action_config"`
+	Asn            types.String      `tfsdk:"asn"`
+	AsnIs          types.List        `tfsdk:"asn_is"`
+	AsnIsNot       types.List        `tfsdk:"asn_is_not"`
 	Country        types.String      `tfsdk:"country"`
 	CountryIs      types.List        `tfsdk:"country_is"`
 	CountryIsNot   types.List        `tfsdk:"country_is_not"`
@@ -211,9 +234,11 @@ type ActionConfigType struct {
 
 func (t ActionConfigType) Equal(o attr.Type) bool {
 	other, ok := o.(ActionConfigType)
+
 	if !ok {
 		return false
 	}
+
 	return t.ObjectType.Equal(other.ObjectType)
 }
 
@@ -223,16 +248,25 @@ func (t ActionConfigType) String() string {
 
 func (t ActionConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
 	attributes := in.Attributes()
 
 	headersAttribute, ok := attributes["headers"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `headers is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`headers is missing from object`)
+
 		return nil, diags
 	}
+
 	headersVal, ok := headersAttribute.(basetypes.MapValue)
+
 	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`headers expected to be basetypes.MapValue, was: %T`, headersAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`headers expected to be basetypes.MapValue, was: %T`, headersAttribute))
 	}
 
 	if diags.HasError() {
@@ -259,10 +293,13 @@ func NewActionConfigValueUnknown() ActionConfigValue {
 
 func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ActionConfigValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
 	ctx := context.Background()
 
 	for name, attributeType := range attributeTypes {
 		attribute, ok := attributes[name]
+
 		if !ok {
 			diags.AddError(
 				"Missing ActionConfigValue Attribute Value",
@@ -271,8 +308,10 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
 					fmt.Sprintf("ActionConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
 			)
+
 			continue
 		}
+
 		if !attributeType.Equal(attribute.Type(ctx)) {
 			diags.AddError(
 				"Invalid ActionConfigValue Attribute Type",
@@ -287,6 +326,7 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 
 	for name := range attributes {
 		_, ok := attributeTypes[name]
+
 		if !ok {
 			diags.AddError(
 				"Extra ActionConfigValue Attribute Value",
@@ -303,13 +343,21 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 	}
 
 	headersAttribute, ok := attributes["headers"]
+
 	if !ok {
-		diags.AddError("Attribute Missing", `headers is missing from object`)
+		diags.AddError(
+			"Attribute Missing",
+			`headers is missing from object`)
+
 		return NewActionConfigValueUnknown(), diags
 	}
+
 	headersVal, ok := headersAttribute.(basetypes.MapValue)
+
 	if !ok {
-		diags.AddError("Attribute Wrong Type", fmt.Sprintf(`headers expected to be basetypes.MapValue, was: %T`, headersAttribute))
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`headers expected to be basetypes.MapValue, was: %T`, headersAttribute))
 	}
 
 	if diags.HasError() {
@@ -324,8 +372,11 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 
 func NewActionConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ActionConfigValue {
 	object, diags := NewActionConfigValue(attributeTypes, attributes)
+
 	if diags.HasError() {
+		// This could potentially be added to the diag package.
 		diagsStrings := make([]string, 0, len(diags))
+
 		for _, diagnostic := range diags {
 			diagsStrings = append(diagsStrings, fmt.Sprintf(
 				"%s | %s | %s",
@@ -333,8 +384,10 @@ func NewActionConfigValueMust(attributeTypes map[string]attr.Type, attributes ma
 				diagnostic.Summary(),
 				diagnostic.Detail()))
 		}
+
 		panic("NewActionConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
 	}
+
 	return object
 }
 
@@ -342,29 +395,39 @@ func (t ActionConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Val
 	if in.Type() == nil {
 		return NewActionConfigValueNull(), nil
 	}
+
 	if !in.Type().Equal(t.TerraformType(ctx)) {
 		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
 	}
+
 	if !in.IsKnown() {
 		return NewActionConfigValueUnknown(), nil
 	}
+
 	if in.IsNull() {
 		return NewActionConfigValueNull(), nil
 	}
 
 	attributes := map[string]attr.Value{}
+
 	val := map[string]tftypes.Value{}
+
 	err := in.As(&val)
+
 	if err != nil {
 		return nil, err
 	}
+
 	for k, v := range val {
 		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
 		if err != nil {
 			return nil, err
 		}
+
 		attributes[k] = a
 	}
+
 	return NewActionConfigValueMust(ActionConfigValue{}.AttributeTypes(ctx), attributes), nil
 }
 
@@ -385,7 +448,9 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 	var val tftypes.Value
 	var err error
 
-	attrTypes["headers"] = basetypes.MapType{ElemType: basetypes.StringType{}}.TerraformType(ctx)
+	attrTypes["headers"] = basetypes.MapType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
 
 	objectType := tftypes.Object{AttributeTypes: attrTypes}
 
@@ -394,14 +459,17 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 		vals := make(map[string]tftypes.Value, 1)
 
 		val, err = v.Headers.ToTerraformValue(ctx)
+
 		if err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
+
 		vals["headers"] = val
 
 		if err := tftypes.ValidateValue(objectType, vals); err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
+
 		return tftypes.NewValue(objectType, vals), nil
 	case attr.ValueStateNull:
 		return tftypes.NewValue(objectType, nil), nil
@@ -426,37 +494,69 @@ func (v ActionConfigValue) String() string {
 
 func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	attributeTypes := map[string]attr.Type{
-		"headers": basetypes.MapType{ElemType: basetypes.StringType{}},
+
+	var headersVal basetypes.MapValue
+	switch {
+	case v.Headers.IsUnknown():
+		headersVal = types.MapUnknown(types.StringType)
+	case v.Headers.IsNull():
+		headersVal = types.MapNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		headersVal, d = types.MapValue(types.StringType, v.Headers.Elements())
+		diags.Append(d...)
 	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"headers": basetypes.MapType{
+				ElemType: types.StringType,
+			},
+		}), diags
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"headers": basetypes.MapType{
+			ElemType: types.StringType,
+		},
+	}
+
 	if v.IsNull() {
 		return types.ObjectNull(attributeTypes), diags
 	}
+
 	if v.IsUnknown() {
 		return types.ObjectUnknown(attributeTypes), diags
 	}
+
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
-			"headers": v.Headers,
+			"headers": headersVal,
 		})
+
 	return objVal, diags
 }
 
 func (v ActionConfigValue) Equal(o attr.Value) bool {
 	other, ok := o.(ActionConfigValue)
+
 	if !ok {
 		return false
 	}
+
 	if v.state != other.state {
 		return false
 	}
+
 	if v.state != attr.ValueStateKnown {
 		return true
 	}
+
 	if !v.Headers.Equal(other.Headers) {
 		return false
 	}
+
 	return true
 }
 
@@ -470,6 +570,8 @@ func (v ActionConfigValue) Type(ctx context.Context) attr.Type {
 
 func (v ActionConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
-		"headers": basetypes.MapType{ElemType: basetypes.StringType{}},
+		"headers": basetypes.MapType{
+			ElemType: types.StringType,
+		},
 	}
 }

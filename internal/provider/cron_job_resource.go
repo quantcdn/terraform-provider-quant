@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -96,6 +95,15 @@ func (r *cronJobResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	// Preserve computed fields from state to avoid bridge panic on unknown values.
+	var state resource_cron_job.CronJobModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	data.Organisation = state.Organisation
+	data.Cron = state.Cron
+
 	resp.Diagnostics.Append(callCronJobUpdateAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -145,8 +153,8 @@ func (r *cronJobResource) ImportState(ctx context.Context, req resource.ImportSt
 }
 
 func (r *cronJobResource) getOrg(data *resource_cron_job.CronJobModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -157,10 +165,10 @@ func callCronJobCreateAPI(ctx context.Context, r *cronJobResource, data *resourc
 		return
 	}
 
-	// Parse command JSON array
+	// Extract command list
 	var command []string
-	if err := json.Unmarshal([]byte(data.Command.ValueString()), &command); err != nil {
-		diags.AddAttributeError(path.Root("command"), "Invalid command JSON", fmt.Sprintf("command must be a JSON array of strings: %s", err.Error()))
+	diags.Append(data.Command.ElementsAs(ctx, &command, false)...)
+	if diags.HasError() {
 		return
 	}
 
@@ -199,7 +207,7 @@ func callCronJobCreateAPI(ctx context.Context, r *cronJobResource, data *resourc
 	}
 
 	mapCronResponse(cron, data)
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	return
 }
@@ -233,7 +241,7 @@ func callCronJobReadAPI(ctx context.Context, r *cronJobResource, data *resource_
 	}
 
 	mapCronResponse(cron, data)
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	return
 }
@@ -255,11 +263,11 @@ func callCronJobUpdateAPI(ctx context.Context, r *cronJobResource, data *resourc
 		sdkReq.IsEnabled = *quantadmingo.NewNullableBool(&v)
 	}
 
-	// Parse command JSON array
+	// Extract command list
 	if !data.Command.IsNull() && !data.Command.IsUnknown() {
 		var command []string
-		if err := json.Unmarshal([]byte(data.Command.ValueString()), &command); err != nil {
-			diags.AddAttributeError(path.Root("command"), "Invalid command JSON", err.Error())
+		diags.Append(data.Command.ElementsAs(ctx, &command, false)...)
+		if diags.HasError() {
 			return
 		}
 		sdkReq.Command = command
@@ -302,19 +310,20 @@ func callCronJobDeleteAPI(ctx context.Context, r *cronJobResource, data *resourc
 }
 
 func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobModel) {
+	ctx := context.Background()
 	if cron.Name != nil {
 		data.Name = types.StringValue(*cron.Name)
 	}
 	if cron.ScheduleExpression != nil {
 		data.ScheduleExpression = types.StringValue(*cron.ScheduleExpression)
-		// schedule is a computed alias for the resolved expression
-		data.Schedule = types.StringValue(*cron.ScheduleExpression)
+		// Also set cron field (alias)
+		data.Cron = types.StringValue(*cron.ScheduleExpression)
 	}
 	if len(cron.Command) > 0 {
-		cmdJSON, err := json.Marshal(cron.Command)
-		if err == nil {
-			data.Command = types.StringValue(string(cmdJSON))
-		}
+		cmdList, _ := types.ListValueFrom(ctx, types.StringType, cron.Command)
+		data.Command = cmdList
+	} else if data.Command.IsUnknown() {
+		data.Command = types.ListNull(types.StringType)
 	}
 	if cron.Description.IsSet() && cron.Description.Get() != nil {
 		data.Description = types.StringValue(*cron.Description.Get())
@@ -333,13 +342,22 @@ func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobMod
 	if data.TargetContainerName.IsUnknown() {
 		data.TargetContainerName = types.StringNull()
 	}
-	if data.Schedule.IsUnknown() {
-		data.Schedule = types.StringNull()
+	if data.Cron.IsUnknown() {
+		data.Cron = types.StringNull()
 	}
 	if data.ScheduleExpression.IsUnknown() {
 		data.ScheduleExpression = types.StringNull()
 	}
 	if data.IsEnabled.IsUnknown() {
 		data.IsEnabled = types.BoolNull()
+	}
+	if data.Application.IsUnknown() {
+		data.Application = types.StringNull()
+	}
+	if data.Environment.IsUnknown() {
+		data.Environment = types.StringNull()
+	}
+	if data.Organisation.IsUnknown() {
+		data.Organisation = types.StringNull()
 	}
 }

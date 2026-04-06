@@ -294,8 +294,8 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 	// but the actual project provisioning is asynchronous in the backend.
 	// We need to poll until the project is fully available.
 	createStateConf := retry.StateChangeConf{
-		Pending: []string{"creating", "pending", "not_found"},
-		Target:  []string{"ready", "active"},
+		Pending: []string{"creating", "pending", "not_found", "provisioning"},
+		Target:  []string{"deployed"},
 		Refresh: func() (interface{}, string, error) {
 			withToken := false
 			if !project.WithToken.IsNull() {
@@ -317,20 +317,28 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 				return nil, "", fmt.Errorf("error checking project status (HTTP %d): %v", statusCode, err)
 			}
 
-			// Project exists and can be read successfully
-			return projectResult, "ready", nil
+			// Project exists — check CDN provisioning status.
+			// CloudFront distribution deployment is asynchronous and can take
+			// 15-25 minutes. We wait for it here because downstream resources
+			// (domains) will fail until the CDN is fully provisioned.
+			if status, ok := projectResult.AdditionalProperties["platform_provisioning_status"].(string); ok && status == "deployed" {
+				return projectResult, "deployed", nil
+			}
+
+			// CDN not yet provisioned — keep polling.
+			return projectResult, "provisioning", nil
 		},
-		Timeout:      10 * time.Minute,
-		Delay:        5 * time.Second,
-		MinTimeout:   3 * time.Second,
-		PollInterval: 5 * time.Second,
+		Timeout:      45 * time.Minute,
+		Delay:        10 * time.Second,
+		MinTimeout:   5 * time.Second,
+		PollInterval: 30 * time.Second,
 	}
 
 	_, err = createStateConf.WaitForStateContext(ctx)
 	if err != nil {
 		diags.AddError(
-			"Project creation timeout",
-			fmt.Sprintf("Project was created but did not become ready within the timeout period. This may indicate the project is still being provisioned. Error: %s", err.Error()),
+			"CDN provisioning timeout",
+			fmt.Sprintf("Project was created but CDN provisioning (CloudFront distribution) did not complete within 45 minutes. The project exists but domains cannot be added until provisioning completes. Error: %s", err.Error()),
 		)
 	}
 

@@ -94,19 +94,60 @@ func (r *crawlerResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *crawlerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	// Start from current state — this ensures all computed and complex fields
+	// are resolved. Then apply planned changes on top.
 	var data resource_crawler.CrawlerModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
-	var state resource_crawler.CrawlerModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
-	// Preserve computed identifiers from state.
-	data.Uuid = state.Uuid
-	data.Id = state.Id
+	var plan resource_crawler.CrawlerModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Apply user-changeable fields from plan onto the state-initialized model.
+	data.Domain = plan.Domain
+	data.Name = plan.Name
+	data.BrowserMode = plan.BrowserMode
+	data.Workers = plan.Workers
+	data.Delay = plan.Delay
+	data.Depth = plan.Depth
+	data.MaxHits = plan.MaxHits
+	data.MaxHtml = plan.MaxHtml
+	data.MaxErrors = plan.MaxErrors
+	data.UserAgent = plan.UserAgent
+	data.WebhookUrl = plan.WebhookUrl
+	data.WebhookAuthHeader = plan.WebhookAuthHeader
+	data.WebhookExtraVars = plan.WebhookExtraVars
+	data.Project = plan.Project
+	// List/map fields: use plan values if set, otherwise keep state
+	if !plan.Urls.IsUnknown() {
+		data.Urls = plan.Urls
+	}
+	if !plan.StartUrls.IsUnknown() {
+		data.StartUrls = plan.StartUrls
+	}
+	if !plan.Exclude.IsUnknown() {
+		data.Exclude = plan.Exclude
+	}
+	if !plan.Include.IsUnknown() {
+		data.Include = plan.Include
+	}
+	if !plan.AllowedDomains.IsUnknown() {
+		data.AllowedDomains = plan.AllowedDomains
+	}
+	if !plan.Headers.IsUnknown() {
+		data.Headers = plan.Headers
+	}
+	if !plan.Sitemap.IsUnknown() {
+		data.Sitemap = plan.Sitemap
+	}
+	if !plan.StatusOk.IsUnknown() {
+		data.StatusOk = plan.StatusOk
+	}
+	if !plan.Assets.IsUnknown() {
+		data.Assets = plan.Assets
 	}
 
 	resp.Diagnostics.Append(callCrawlerUpdateAPI(ctx, r, &data)...)

@@ -14,7 +14,18 @@ permissions:
   contents: write
 
 jobs:
+  version:
+    name: Extract version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
   goreleaser:
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -40,24 +51,132 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
-  notify-pulumi:
-    name: Notify pulumi-quant
-    needs: goreleaser
+  build-provider:
+    name: Build Pulumi provider (${{ matrix.os }}-${{ matrix.arch }})
+    needs: version
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            os: linux
+            arch: amd64
+          - goos: linux
+            goarch: arm64
+            os: linux
+            arch: arm64
+          - goos: darwin
+            goarch: amd64
+            os: darwin
+            arch: amd64
+          - goos: darwin
+            goarch: arm64
+            os: darwin
+            arch: arm64
+          - goos: windows
+            goarch: amd64
+            os: windows
+            arch: amd64
     steps:
-      - name: Generate GitHub App token
-        id: generate_token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.QUANT_SDK_APP_ID }}
-          private-key: ${{ secrets.QUANT_SDK_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: pulumi-quant
+      - uses: actions/checkout@v6
 
-      - name: Dispatch upstream-release event
-        uses: peter-evans/repository-dispatch@v3
+      - uses: actions/setup-go@v6
         with:
-          token: ${{ steps.generate_token.outputs.token }}
-          repository: quantcdn/pulumi-quant
-          event-type: upstream-release
-          client-payload: '{"version": "${{ github.ref_name }}"}'
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build Pulumi provider binary
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p dist/pulumi
+          cd pulumi
+          BINARY_NAME="pulumi-resource-quant"
+          if [ "$GOOS" = "windows" ]; then BINARY_NAME="${BINARY_NAME}.exe"; fi
+          go build -ldflags "-s -w -X github.com/quantcdn/terraform-provider-quant/v5/pulumi/provider/pkg/version.Version=${VERSION}" \
+            -o "../dist/pulumi/${BINARY_NAME}" ./provider/cmd/pulumi-resource-quant
+
+      - name: Package Pulumi tarball
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          TARBALL="pulumi-resource-quant-v${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          tar -czf "${TARBALL}" -C dist/pulumi .
+          echo "PULUMI_TARBALL=${TARBALL}" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pulumi-provider-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PULUMI_TARBALL }}
+
+  publish-github-release:
+    name: Publish Pulumi binaries to GitHub Release
+    needs: [version, goreleaser, build-provider]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: pulumi-provider-*
+          merge-multiple: true
+
+      - name: Upload Pulumi provider binaries to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" artifacts/*.tar.gz \
+            --repo "${{ github.repository }}"
+
+  publish-npm:
+    name: Publish npm
+    needs: [version, goreleaser]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Build tfgen
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cd pulumi
+          go build -ldflags "-X github.com/quantcdn/terraform-provider-quant/v5/pulumi/provider/pkg/version.Version=${VERSION}" \
+            -o ../bin/pulumi-tfgen-quant ./provider/cmd/pulumi-tfgen-quant
+
+      - name: Generate Node.js SDK
+        run: cd pulumi && ../bin/pulumi-tfgen-quant nodejs --out sdk/nodejs
+
+      - name: Set SDK version
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cd pulumi/sdk/nodejs
+          npm version "${VERSION}" --no-git-tag-version --allow-same-version
+
+      - name: Build SDK
+        run: |
+          cd pulumi/sdk/nodejs
+          yarn install --no-lockfile
+          yarn run build
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: cd pulumi/sdk/nodejs && npm publish --access public

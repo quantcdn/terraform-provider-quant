@@ -7,10 +7,10 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_ai_governance"
@@ -56,8 +56,8 @@ func (r *aiGovernanceResource) Configure(_ context.Context, req resource.Configu
 }
 
 func (r *aiGovernanceResource) getOrg(data *resource_ai_governance.AiGovernanceModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -93,7 +93,7 @@ func (r *aiGovernanceResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	// If the governance config was not found, remove from state so Terraform plans recreation.
-	if data.Organization.IsNull() {
+	if data.Organisation.IsNull() {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -158,7 +158,7 @@ func (r *aiGovernanceResource) ImportState(ctx context.Context, req resource.Imp
 
 	// The import ID is the organization name (or empty to use provider default).
 	if req.ID != "" {
-		data.Organization = types.StringValue(req.ID)
+		data.Organisation = types.StringValue(req.ID)
 	}
 
 	resp.Diagnostics.Append(callGovernanceReadAPI(ctx, r, &data)...)
@@ -206,13 +206,9 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		sdkReq.SetMandatoryFilterPolicies(policies)
 	}
 
-	// spend_limits
+	// spend_limits — SpendLimits is a SpendLimitsValue with fields directly accessible.
 	if !data.SpendLimits.IsNull() && !data.SpendLimits.IsUnknown() {
-		var sl resource_ai_governance.SpendLimitsModel
-		diags.Append(data.SpendLimits.As(ctx, &sl, basetypes.ObjectAsOptions{})...)
-		if diags.HasError() {
-			return
-		}
+		sl := data.SpendLimits
 		slMap := map[string]interface{}{}
 		if !sl.MonthlyBudgetCents.IsNull() && !sl.MonthlyBudgetCents.IsUnknown() {
 			slMap["monthlyBudgetCents"] = sl.MonthlyBudgetCents.ValueInt64()
@@ -252,6 +248,10 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 
 	// Map the typed SDK response directly — no HTTP body re-read needed.
 	diags.Append(mapGovernanceConfigFromMap(ctx, sdkResp.GetConfig(), org, data)...)
+
+	// Computed-only fields from the response envelope.
+	data.Success = types.BoolValue(sdkResp.GetSuccess())
+
 	return
 }
 
@@ -261,8 +261,8 @@ func callGovernanceReadAPI(ctx context.Context, r *aiGovernanceResource, data *r
 	sdkResp, httpResp, err := r.client.Instance.AIGovernanceAPI.GetGovernanceConfig(r.client.AuthContext, org).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			// Signal "not found" by nulling Organization — caller handles state removal.
-			data.Organization = types.StringNull()
+			// Signal "not found" by nulling Organisation — caller handles state removal.
+			data.Organisation = types.StringNull()
 			return
 		}
 		if httpResp != nil {
@@ -283,10 +283,21 @@ func callGovernanceReadAPI(ctx context.Context, r *aiGovernanceResource, data *r
 // mapGovernanceGetResponse maps the typed GetGovernanceConfig200Response onto
 // the Terraform model. This is used for Read and ImportState.
 func mapGovernanceGetResponse(ctx context.Context, resp *quantadmingo.GetGovernanceConfig200Response, org string, data *resource_ai_governance.AiGovernanceModel) (diags diag.Diagnostics) {
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 	data.AiEnabled = types.BoolValue(resp.GetAiEnabled())
 	data.ModelPolicy = types.StringValue(resp.GetModelPolicy())
 	data.Version = types.Int64Value(int64(resp.GetVersion()))
+
+	// org_id — from the response or fall back to the org parameter.
+	if orgId, ok := resp.GetOrgIdOk(); ok && orgId != nil && *orgId != "" {
+		data.OrgId = types.StringValue(*orgId)
+	} else {
+		data.OrgId = types.StringValue(org)
+	}
+
+	// Computed-only response metadata.
+	data.Success = types.BoolValue(true) // GET succeeded
+	data.Config = resource_ai_governance.NewConfigValueNull()
 
 	// model_list
 	if ml := resp.GetModelList(); len(ml) > 0 {
@@ -313,20 +324,21 @@ func mapGovernanceGetResponse(ctx context.Context, resp *quantadmingo.GetGoverna
 		data.MandatoryFilterPolicies = types.ListNull(types.StringType)
 	}
 
-	// spend_limits
+	// spend_limits — construct SpendLimitsValue via NewSpendLimitsValue.
 	if slPtr, ok := resp.GetSpendLimitsOk(); ok && slPtr != nil {
-		sl := resource_ai_governance.SpendLimitsModel{
-			MonthlyBudgetCents:        nullableInt32ToInt64(slPtr.MonthlyBudgetCents),
-			DailyBudgetCents:          nullableInt32ToInt64(slPtr.DailyBudgetCents),
-			PerUserMonthlyBudgetCents: nullableInt32ToInt64(slPtr.PerUserMonthlyBudgetCents),
-			PerUserDailyBudgetCents:   nullableInt32ToInt64(slPtr.PerUserDailyBudgetCents),
-			WarningThresholdPercent:   nullableInt32ToInt64(slPtr.WarningThresholdPercent),
+		slAttrTypes := resource_ai_governance.SpendLimitsValue{}.AttributeTypes(ctx)
+		slAttrs := map[string]attr.Value{
+			"monthly_budget_cents":          nullableInt32ToInt64(slPtr.MonthlyBudgetCents),
+			"daily_budget_cents":            nullableInt32ToInt64(slPtr.DailyBudgetCents),
+			"per_user_monthly_budget_cents": nullableInt32ToInt64(slPtr.PerUserMonthlyBudgetCents),
+			"per_user_daily_budget_cents":   nullableInt32ToInt64(slPtr.PerUserDailyBudgetCents),
+			"warning_threshold_percent":     nullableInt32ToInt64(slPtr.WarningThresholdPercent),
 		}
-		objVal, d := types.ObjectValueFrom(ctx, resource_ai_governance.SpendLimitsAttrTypes(), sl)
+		slVal, d := resource_ai_governance.NewSpendLimitsValue(slAttrTypes, slAttrs)
 		diags.Append(d...)
-		data.SpendLimits = objVal
+		data.SpendLimits = slVal
 	} else {
-		data.SpendLimits = types.ObjectNull(resource_ai_governance.SpendLimitsAttrTypes())
+		data.SpendLimits = resource_ai_governance.NewSpendLimitsValueNull()
 	}
 
 	return
@@ -344,7 +356,7 @@ func nullableInt32ToInt64(n quantadmingo.NullableInt32) types.Int64 {
 // SDK response onto the Terraform model. The PUT response returns config as
 // map[string]interface{}, so we extract fields using helper functions.
 func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interface{}, org string, data *resource_ai_governance.AiGovernanceModel) (diags diag.Diagnostics) {
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	if v, ok := configMap["aiEnabled"]; ok {
 		if b, ok := v.(bool); ok {
@@ -354,6 +366,16 @@ func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interf
 
 	data.ModelPolicy = optionalStringFromConfigMap(configMap, "modelPolicy")
 	data.Version = optionalInt64FromMap(configMap, "version")
+
+	// org_id — from the config map or fall back to the org parameter.
+	if s := optionalStringFromConfigMap(configMap, "orgId"); !s.IsNull() {
+		data.OrgId = s
+	} else {
+		data.OrgId = types.StringValue(org)
+	}
+
+	// Computed-only: config is an opaque empty object, set null.
+	data.Config = resource_ai_governance.NewConfigValueNull()
 
 	// model_list
 	if v, ok := configMap["modelList"]; ok && v != nil {
@@ -400,24 +422,25 @@ func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interf
 		data.MandatoryFilterPolicies = types.ListNull(types.StringType)
 	}
 
-	// spend_limits
+	// spend_limits — construct SpendLimitsValue via NewSpendLimitsValue.
 	if v, ok := configMap["spendLimits"]; ok && v != nil {
 		if slMap, ok := v.(map[string]interface{}); ok && len(slMap) > 0 {
-			sl := resource_ai_governance.SpendLimitsModel{
-				MonthlyBudgetCents:        optionalInt64FromMap(slMap, "monthlyBudgetCents"),
-				DailyBudgetCents:          optionalInt64FromMap(slMap, "dailyBudgetCents"),
-				PerUserMonthlyBudgetCents: optionalInt64FromMap(slMap, "perUserMonthlyBudgetCents"),
-				PerUserDailyBudgetCents:   optionalInt64FromMap(slMap, "perUserDailyBudgetCents"),
-				WarningThresholdPercent:   optionalInt64FromMap(slMap, "warningThresholdPercent"),
+			slAttrTypes := resource_ai_governance.SpendLimitsValue{}.AttributeTypes(ctx)
+			slAttrs := map[string]attr.Value{
+				"monthly_budget_cents":          optionalInt64FromMap(slMap, "monthlyBudgetCents"),
+				"daily_budget_cents":            optionalInt64FromMap(slMap, "dailyBudgetCents"),
+				"per_user_monthly_budget_cents": optionalInt64FromMap(slMap, "perUserMonthlyBudgetCents"),
+				"per_user_daily_budget_cents":   optionalInt64FromMap(slMap, "perUserDailyBudgetCents"),
+				"warning_threshold_percent":     optionalInt64FromMap(slMap, "warningThresholdPercent"),
 			}
-			objVal, d := types.ObjectValueFrom(ctx, resource_ai_governance.SpendLimitsAttrTypes(), sl)
+			slVal, d := resource_ai_governance.NewSpendLimitsValue(slAttrTypes, slAttrs)
 			diags.Append(d...)
-			data.SpendLimits = objVal
+			data.SpendLimits = slVal
 		} else {
-			data.SpendLimits = types.ObjectNull(resource_ai_governance.SpendLimitsAttrTypes())
+			data.SpendLimits = resource_ai_governance.NewSpendLimitsValueNull()
 		}
 	} else {
-		data.SpendLimits = types.ObjectNull(resource_ai_governance.SpendLimitsAttrTypes())
+		data.SpendLimits = resource_ai_governance.NewSpendLimitsValueNull()
 	}
 
 	return

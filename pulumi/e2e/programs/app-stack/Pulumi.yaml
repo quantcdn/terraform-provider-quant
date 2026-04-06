@@ -5,13 +5,25 @@ config:
   appName:
     type: string
     default: pulumi-e2e-app-test
+  cronSchedule:
+    type: string
+    default: "cron(0 0 ? * SUN *)"
 resources:
   testApp:
     type: quant:index:Application
     properties:
       appName: ${appName}
-      composeDefinition: |
-        {"containers":[{"name":"web","imageReference":{"type":"external","identifier":"nginx:latest"},"exposedPorts":[80]}],"taskCpu":256,"taskMemory":512,"architecture":"X86_64"}
+      composeDefinition:
+        containers:
+          - name: web
+            imageReference:
+              type: external
+              identifier: nginx:latest
+            exposedPorts:
+              - 80
+        taskCpu: 256
+        taskMemory: 512
+        architecture: X86_64
   testEnv:
     type: quant:index:Environment
     properties:
@@ -30,10 +42,14 @@ resources:
       name: e2e-test-cron
       application: ${testApp.appName}
       environment: ${testEnv.envName}
-      command: '["echo","e2e-test"]'
-      scheduleExpression: "cron(0 0 ? * SUN *)"
+      commands:
+        - echo
+        - e2e-test
+      scheduleExpression: ${cronSchedule}
 outputs:
   appId: ${testApp.id}
+  appName: ${testApp.appName}
   envId: ${testEnv.id}
+  envName: ${testEnv.envName}
   volumeId: ${testVolume.id}
   cronId: ${testCron.id}

@@ -21,31 +21,33 @@ func KvItemResourceSchema(ctx context.Context) schema.Schema {
 			"organization": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Organization machine name (defaults to provider organization)",
-				MarkdownDescription: "Organization machine name (defaults to provider organization)",
+				Description:         "Organization identifier",
+				MarkdownDescription: "Organization identifier",
 			},
 			"project": schema.StringAttribute{
-				Required:            true,
-				Description:         "Project machine name",
-				MarkdownDescription: "Project machine name",
+				Optional:            true,
+				Computed:            true,
+				Description:         "Project identifier",
+				MarkdownDescription: "Project identifier",
 			},
 			"secret": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Store as secret with KMS encryption",
-				MarkdownDescription: "Store as secret with KMS encryption",
+				Description:         "Store as secret with KMS encryption. Secrets cannot be retrieved via GET operations (returns [ENCRYPTED]). Ideal for API keys, passwords, and credentials.",
+				MarkdownDescription: "Store as secret with KMS encryption. Secrets cannot be retrieved via GET operations (returns [ENCRYPTED]). Ideal for API keys, passwords, and credentials.",
 				Default:             booldefault.StaticBool(false),
 			},
 			"store_id": schema.StringAttribute{
-				Required:            true,
-				Description:         "KV store ID",
-				MarkdownDescription: "KV store ID",
+				Optional: true,
+				Computed: true,
+			},
+			"success": schema.BoolAttribute{
+				Computed: true,
 			},
 			"value": schema.StringAttribute{
 				Required:            true,
-				Sensitive:           true,
-				Description:         "Item value (can be a JSON string)",
-				MarkdownDescription: "Item value (can be a JSON string)",
+				Description:         "Item value (can be JSON string)",
+				MarkdownDescription: "Item value (can be JSON string)",
 			},
 		},
 	}
@@ -57,5 +59,6 @@ type KvItemModel struct {
 	Project      types.String `tfsdk:"project"`
 	Secret       types.Bool   `tfsdk:"secret"`
 	StoreId      types.String `tfsdk:"store_id"`
+	Success      types.Bool   `tfsdk:"success"`
 	Value        types.String `tfsdk:"value"`
 }

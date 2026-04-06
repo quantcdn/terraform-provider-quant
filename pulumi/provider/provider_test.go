@@ -28,7 +28,7 @@ func ensureProvider(t *testing.T) {
 		// Tests run from pulumi/provider/, so .. is pulumi/
 		pulumiDir, _ := filepath.Abs("..")
 		binDir = filepath.Join(pulumiDir, "bin")
-		cmd := exec.Command("go", "build", "-o", filepath.Join(binDir, "pulumi-resource-quant"), "./cmd/pulumi-resource-quant")
+		cmd := exec.Command("go", "build", "-o", filepath.Join(binDir, "pulumi-resource-quant"), "./provider/cmd/pulumi-resource-quant")
 		cmd.Dir = pulumiDir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -314,8 +314,22 @@ resources:
     type: quant:index:Application
     properties:
       appName: preview-test-app
-      composeDefinition: |
-        {"containers":[{"name":"web","image":"nginx:latest","cpu":256,"memory":512}]}
+      application: preview-test-app
+      composeDefinition:
+        containers:
+          - name: web
+            imageReference:
+              type: external
+              identifier: nginx:latest
+            cpu: 256
+            memory: 512
+      database:
+        engine: mysql
+      filesystem:
+        mountPath: /mnt/data
+        required: false
+      minCapacity: 1
+      maxCapacity: 2
 `)
 }
 
@@ -329,6 +343,12 @@ resources:
     properties:
       application: preview-test-app
       envName: staging
+      organisation: test-org
+      imageSuffix: "staging"
+      minCapacity: 1
+      maxCapacity: 2
+      cloneConfigurationFrom: ""
+      mergeEnvironment: false
 `)
 }
 
@@ -356,8 +376,16 @@ resources:
     properties:
       application: preview-test-app
       environment: staging
-      command: '["echo","hello"]'
+      name: test-cron
+      commands:
+        - echo
+        - hello
       scheduleExpression: "0 0 * * *"
+      organisation: test-org
+      cron: test-cron-id
+      description: test cron job
+      isEnabled: true
+      targetContainerName: web
 `)
 }
 
@@ -415,7 +443,9 @@ func TestDataSource_GetProjectsToken(t *testing.T) {
 
 func TestProviderInfo_ResourceCount(t *testing.T) {
 	info := Provider()
-	assert.Equal(t, 24, len(info.Resources), "expected 24 resource mappings")
+	// Both Resources() and bridge mappings are generated from generator_config.yml.
+	// If this count changes, update it — but it should match the registrations section.
+	assert.Equal(t, 26, len(info.Resources), "resource count must match generator_config.yml registrations")
 }
 
 func TestProviderInfo_DataSourceCount(t *testing.T) {

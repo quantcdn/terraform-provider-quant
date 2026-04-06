@@ -65,6 +65,18 @@ func NewWithOptions(bearer string, organization string, opts *ClientOptions) *Cl
 		Client: &http.Client{
 			Transport: rateLimiter,
 			Timeout:   timeout,
+			// Preserve Authorization header on redirects across host changes.
+			// Go strips it by default, but our API may redirect between
+			// domain aliases (e.g. dash.stage → staging--quant-gov--...).
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 10 {
+					return http.ErrUseLastResponse
+				}
+				if auth := via[0].Header.Get("Authorization"); auth != "" {
+					req.Header.Set("Authorization", auth)
+				}
+				return nil
+			},
 		},
 		rateLimiter: rateLimiter,
 	}

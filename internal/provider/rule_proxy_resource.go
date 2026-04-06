@@ -204,7 +204,7 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 	// Note: when appProxy is true, mapper already set ApplicationProxy/Name/Environment/Container/Port
 
 	// Cache lifetime: string in TF schema but needs validation
-	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() {
+	if !data.CacheLifetime.IsNull() && !data.CacheLifetime.IsUnknown() && data.CacheLifetime.ValueString() != "" {
 		cacheLifetime, err := parseCacheLifetime(data.CacheLifetime)
 		if err != nil {
 			diags.AddError("Invalid cache_lifetime value",

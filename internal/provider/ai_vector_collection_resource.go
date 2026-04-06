@@ -55,8 +55,8 @@ func (r *aiVectorCollectionResource) Configure(_ context.Context, req resource.C
 }
 
 func (r *aiVectorCollectionResource) getOrg(data *resource_ai_vector_collection.AiVectorCollectionModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -91,7 +91,7 @@ func (r *aiVectorCollectionResource) Read(ctx context.Context, req resource.Read
 	}
 
 	// If the collection was not found, remove from state so Terraform plans recreation.
-	if data.Id.IsNull() {
+	if data.CollectionId.IsNull() {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -126,10 +126,10 @@ func (r *aiVectorCollectionResource) ImportState(ctx context.Context, req resour
 	var data resource_ai_vector_collection.AiVectorCollectionModel
 
 	if parts := strings.SplitN(id, "/", 2); len(parts) == 2 {
-		data.Organization = types.StringValue(parts[0])
-		data.Id = types.StringValue(parts[1])
+		data.Organisation = types.StringValue(parts[0])
+		data.CollectionId = types.StringValue(parts[1])
 	} else {
-		data.Id = types.StringValue(id)
+		data.CollectionId = types.StringValue(id)
 	}
 
 	resp.Diagnostics.Append(callVectorCollectionReadAPI(ctx, r, &data)...)
@@ -152,6 +152,14 @@ func callVectorCollectionCreateAPI(ctx context.Context, r *aiVectorCollectionRes
 		desc := data.Description.ValueString()
 		sdkReq.Description = &desc
 	}
+	if !data.EmbeddingModel.IsNull() && !data.EmbeddingModel.IsUnknown() {
+		model := data.EmbeddingModel.ValueString()
+		sdkReq.EmbeddingModel = &model
+	} else {
+		// Default embedding model when not specified
+		defaultModel := "amazon.titan-embed-text-v2:0"
+		sdkReq.EmbeddingModel = &defaultModel
+	}
 
 	sdkResp, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.CreateVectorCollection(r.client.AuthContext, org).
 		CreateVectorCollectionRequest(*sdkReq).Execute()
@@ -173,11 +181,11 @@ func callVectorCollectionCreateAPI(ctx context.Context, r *aiVectorCollectionRes
 func callVectorCollectionReadAPI(ctx context.Context, r *aiVectorCollectionResource, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	sdkResp, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.GetVectorCollection(r.client.AuthContext, org, data.Id.ValueString()).Execute()
+	sdkResp, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.GetVectorCollection(r.client.AuthContext, org, data.CollectionId.ValueString()).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			// Signal "not found" by nulling Id — caller handles state removal.
-			data.Id = types.StringNull()
+			data.CollectionId = types.StringNull()
 			return
 		}
 		if httpResp != nil {
@@ -197,7 +205,7 @@ func callVectorCollectionReadAPI(ctx context.Context, r *aiVectorCollectionResou
 func callVectorCollectionDeleteAPI(ctx context.Context, r *aiVectorCollectionResource, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	_, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.DeleteVectorCollection(r.client.AuthContext, org, data.Id.ValueString()).Execute()
+	_, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.DeleteVectorCollection(r.client.AuthContext, org, data.CollectionId.ValueString()).Execute()
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			return // Already deleted
@@ -219,9 +227,9 @@ func callVectorCollectionDeleteAPI(ctx context.Context, r *aiVectorCollectionRes
 func mapCreateVectorCollectionResponse(resp *quantadmingo.CreateVectorCollection201Response, org string, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	col := resp.GetCollection()
 
-	data.Id = types.StringValue(col.GetCollectionId())
+	data.CollectionId = types.StringValue(col.GetCollectionId())
 	data.Name = types.StringValue(col.GetName())
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	if desc, ok := col.GetDescriptionOk(); ok && desc != nil && *desc != "" {
 		data.Description = types.StringValue(*desc)
@@ -229,17 +237,27 @@ func mapCreateVectorCollectionResponse(resp *quantadmingo.CreateVectorCollection
 		data.Description = types.StringNull()
 	}
 
-	// createdAt is not a typed field in CreateVectorCollection201ResponseCollection
-	// but may appear in AdditionalProperties.
-	if ca, ok := col.AdditionalProperties["createdAt"]; ok {
-		if s, ok := ca.(string); ok && s != "" {
-			data.CreatedAt = types.StringValue(s)
-		} else {
-			data.CreatedAt = types.StringNull()
-		}
-	} else {
-		data.CreatedAt = types.StringNull()
+	if em, ok := col.GetEmbeddingModelOk(); ok && em != nil && *em != "" {
+		data.EmbeddingModel = types.StringValue(*em)
 	}
+
+	// dimensions
+	if dim, ok := col.GetDimensionsOk(); ok && dim != nil {
+		data.Dimensions = types.Int64Value(int64(*dim))
+	} else {
+		data.Dimensions = types.Int64Null()
+	}
+
+	// Computed-only response metadata.
+	data.Success = types.BoolValue(resp.GetSuccess())
+	if msg, ok := resp.GetMessageOk(); ok && msg != nil && *msg != "" {
+		data.Message = types.StringValue(*msg)
+	} else {
+		data.Message = types.StringNull()
+	}
+
+	// collection nested object — set null (data is already in top-level fields).
+	data.Collection = resource_ai_vector_collection.NewCollectionValueNull()
 
 	return
 }
@@ -249,9 +267,9 @@ func mapCreateVectorCollectionResponse(resp *quantadmingo.CreateVectorCollection
 func mapGetVectorCollectionResponse(resp *quantadmingo.GetVectorCollection200Response, org string, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	col := resp.GetCollection()
 
-	data.Id = types.StringValue(col.GetCollectionId())
+	data.CollectionId = types.StringValue(col.GetCollectionId())
 	data.Name = types.StringValue(col.GetName())
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	if desc, ok := col.GetDescriptionOk(); ok && desc != nil && *desc != "" {
 		data.Description = types.StringValue(*desc)
@@ -259,11 +277,23 @@ func mapGetVectorCollectionResponse(resp *quantadmingo.GetVectorCollection200Res
 		data.Description = types.StringNull()
 	}
 
-	if createdAt, ok := col.GetCreatedAtOk(); ok && createdAt != nil {
-		data.CreatedAt = types.StringValue(createdAt.Format("2006-01-02T15:04:05Z07:00"))
-	} else {
-		data.CreatedAt = types.StringNull()
+	if em, ok := col.GetEmbeddingModelOk(); ok && em != nil && *em != "" {
+		data.EmbeddingModel = types.StringValue(*em)
 	}
+
+	// dimensions
+	if dim, ok := col.GetDimensionsOk(); ok && dim != nil {
+		data.Dimensions = types.Int64Value(int64(*dim))
+	} else {
+		data.Dimensions = types.Int64Null()
+	}
+
+	// Computed-only response metadata.
+	data.Success = types.BoolValue(true) // GET succeeded
+	data.Message = types.StringNull()
+
+	// collection nested object — set null (data is already in top-level fields).
+	data.Collection = resource_ai_vector_collection.NewCollectionValueNull()
 
 	return
 }

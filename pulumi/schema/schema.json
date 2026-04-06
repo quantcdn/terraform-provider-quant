@@ -13,6 +13,7 @@
     "license": "Apache-2.0",
     "attribution": "This Pulumi package is based on the [`quant` Terraform Provider](https://github.com/quantcdn/terraform-provider-quant).",
     "repository": "https://github.com/quantcdn/terraform-provider-quant",
+    "pluginDownloadURL": "github://api.github.com/quantcdn/terraform-provider-quant",
     "publisher": "QuantCDN",
     "meta": {
         "moduleFormat": "(.*)(?:/[^/]*)"
@@ -26,12 +27,14 @@
                 "quant": "Quant"
             },
             "compatibility": "tfbridge20",
-            "rootNamespace": "QuantCDN"
+            "rootNamespace": "QuantCDN",
+            "respectSchemaVersion": true
         },
         "go": {
-            "importBasePath": "github.com/quantcdn/pulumi-quant/sdk/go/quant",
+            "importBasePath": "github.com/quantcdn/terraform-provider-quant/v5/pulumi/sdk/go/quant",
             "generateResourceContainerTypes": true,
-            "generateExtraInputTypes": true
+            "generateExtraInputTypes": true,
+            "respectSchemaVersion": true
         },
         "nodejs": {
             "packageName": "@quantcdn/pulumi-quant",
@@ -44,7 +47,8 @@
                 "@types/node": "^10.0.0"
             },
             "compatibility": "tfbridge20",
-            "disableUnionOutputTypes": true
+            "disableUnionOutputTypes": true,
+            "respectSchemaVersion": true
         },
         "python": {
             "packageName": "pulumi_quant",
@@ -53,7 +57,10 @@
             },
             "readme": "\u003e This provider is a derived work of the [Terraform Provider](https://github.com/quantcdn/terraform-provider-quant)\n\u003e distributed under [MPL 2.0](https://www.mozilla.org/en-US/MPL/2.0/). If you encounter a bug or missing feature,\n\u003e please consult the source [`terraform-provider-quant` repo](https://github.com/quantcdn/terraform-provider-quant/issues).",
             "compatibility": "tfbridge20",
-            "pyproject": {}
+            "respectSchemaVersion": true,
+            "pyproject": {
+                "enabled": true
+            }
         }
     },
     "config": {
@@ -98,59 +105,840 @@
         }
     },
     "types": {
+        "quant:index/AiAgentAgent:AiAgentAgent": {
+            "properties": {
+                "agentId": {
+                    "type": "string"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "createdBy": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name\n"
+                },
+                "hasOverlay": {
+                    "type": "boolean",
+                    "description": "Whether the requesting org has a per-org overlay for this global agent\n"
+                },
+                "isGlobal": {
+                    "type": "boolean",
+                    "description": "Whether this is a platform-managed global agent\n"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Whether 1M context window is enabled\n"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "systemPrompt": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "agentId",
+                        "allowedCollections",
+                        "allowedTools",
+                        "assignedSkills",
+                        "createdAt",
+                        "createdBy",
+                        "description",
+                        "group",
+                        "guardrailPreset",
+                        "hasOverlay",
+                        "isGlobal",
+                        "longContext",
+                        "maxTokens",
+                        "modelId",
+                        "name",
+                        "systemPrompt",
+                        "temperature",
+                        "updatedAt"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiGovernanceConfig:AiGovernanceConfig": {
+            "type": "object"
+        },
         "quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits": {
             "properties": {
                 "dailyBudgetCents": {
-                    "type": "integer",
-                    "description": "Daily budget in cents\n"
+                    "type": "integer"
                 },
                 "monthlyBudgetCents": {
-                    "type": "integer",
-                    "description": "Monthly budget in cents\n"
+                    "type": "integer"
                 },
                 "perUserDailyBudgetCents": {
-                    "type": "integer",
-                    "description": "Per-user daily budget in cents\n"
+                    "type": "integer"
                 },
                 "perUserMonthlyBudgetCents": {
-                    "type": "integer",
-                    "description": "Per-user monthly budget in cents\n"
+                    "type": "integer"
                 },
                 "warningThresholdPercent": {
-                    "type": "integer",
-                    "description": "Warning threshold as a percentage of budget (0-100)\n"
+                    "type": "integer"
                 }
             },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "dailyBudgetCents",
+                        "monthlyBudgetCents",
+                        "perUserDailyBudgetCents",
+                        "perUserMonthlyBudgetCents",
+                        "warningThresholdPercent"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiSkillFiles:AiSkillFiles": {
             "type": "object"
         },
-        "quant:index/AiSkillSource:AiSkillSource": {
+        "quant:index/AiSkillSkill:AiSkillSkill": {
             "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "File path within the repository\n"
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
-                "repo": {
-                    "type": "string",
-                    "description": "GitHub repository in `org/repo` format\n"
+                "content": {
+                    "type": "string"
                 },
-                "type": {
-                    "type": "string",
-                    "description": "Source type: \u003cspan pulumi-lang-nodejs=\"`github`\" pulumi-lang-dotnet=\"`Github`\" pulumi-lang-go=\"`github`\" pulumi-lang-python=\"`github`\" pulumi-lang-yaml=\"`github`\" pulumi-lang-java=\"`github`\"\u003e`github`\u003c/span\u003e or `skills.sh`\n"
+                "description": {
+                    "type": "string"
                 },
-                "url": {
-                    "type": "string",
-                    "description": "skills.sh URL\n"
+                "disableModelInvocation": {
+                    "type": "boolean"
                 },
-                "version": {
+                "files": {
+                    "$ref": "#/types/quant:index/AiSkillSkillFiles:AiSkillSkillFiles"
+                },
+                "installedAt": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "requiredTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "skillId": {
+                    "type": "string"
+                },
+                "source": {
+                    "$ref": "#/types/quant:index/AiSkillSkillSource:AiSkillSkillSource"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "triggerCondition": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "allowedTools",
+                        "content",
+                        "description",
+                        "disableModelInvocation",
+                        "files",
+                        "installedAt",
+                        "name",
+                        "namespace",
+                        "requiredTools",
+                        "skillId",
+                        "source",
+                        "tags",
+                        "triggerCondition",
+                        "updatedAt"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiSkillSkillFiles:AiSkillSkillFiles": {
+            "type": "object"
+        },
+        "quant:index/AiSkillSkillSource:AiSkillSkillSource": {
+            "type": "object"
+        },
+        "quant:index/AiVectorCollectionCollection:AiVectorCollectionCollection": {
+            "properties": {
+                "collectionId": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "integer"
+                },
+                "documentCount": {
+                    "type": "integer"
+                },
+                "embeddingModel": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "collectionId",
+                        "createdAt",
+                        "description",
+                        "dimensions",
+                        "documentCount",
+                        "embeddingModel",
+                        "name",
+                        "updatedAt"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiVectorDocumentDocument:AiVectorDocumentDocument": {
+            "properties": {
+                "content": {
                     "type": "string",
-                    "description": "Pinned version tag\n"
+                    "description": "Document text content\n"
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Stable document key for upsert\n"
+                },
+                "metadata": {
+                    "$ref": "#/types/quant:index/AiVectorDocumentDocumentMetadata:AiVectorDocumentDocumentMetadata"
                 }
             },
             "type": "object",
             "required": [
-                "type",
-                "version"
+                "content"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "content",
+                        "key",
+                        "metadata"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiVectorDocumentDocumentMetadata:AiVectorDocumentDocumentMetadata": {
+            "properties": {
+                "section": {
+                    "type": "string"
+                },
+                "sourceUrl": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "section",
+                        "sourceUrl",
+                        "tags",
+                        "title"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationComposeDefinition:ApplicationComposeDefinition": {
+            "properties": {
+                "architecture": {
+                    "type": "string",
+                    "description": "CPU architecture (X86_64 or ARM64)\n"
+                },
+                "containers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainer:ApplicationComposeDefinitionContainer"
+                    }
+                },
+                "enableCrossAppNetworking": {
+                    "type": "boolean",
+                    "description": "Optional. Enable cross-application networking within the same organization. When false (default): Uses shared/app-specific security group based on enableCrossEnvNetworking. When true: Uses org-specific security group to enable container-to-container communication with ALL applications in the same organization via service discovery (microservices architecture). This setting takes priority over enableCrossEnvNetworking.\n"
+                },
+                "enableCrossEnvNetworking": {
+                    "type": "boolean",
+                    "description": "Optional. Enable cross-environment networking within the same application. When false (default): Uses shared security group for complete isolation (most secure). When true: Uses app-specific security group to enable communication between environments of the same application (e.g., staging can connect to production database). Note: If enableCrossAppNetworking is true, this setting is overridden.\n"
+                },
+                "maxCapacity": {
+                    "type": "integer",
+                    "description": "Maximum number of instances\n"
+                },
+                "minCapacity": {
+                    "type": "integer",
+                    "description": "Minimum number of instances\n"
+                },
+                "spotConfiguration": {
+                    "$ref": "#/types/quant:index/ApplicationComposeDefinitionSpotConfiguration:ApplicationComposeDefinitionSpotConfiguration",
+                    "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.\n"
+                },
+                "taskCpu": {
+                    "type": "integer",
+                    "description": "Task-level CPU units (e.g., 256, 512, 1024)\n"
+                },
+                "taskMemory": {
+                    "type": "integer",
+                    "description": "Task-level memory in MB\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "architecture",
+                        "containers",
+                        "enableCrossAppNetworking",
+                        "enableCrossEnvNetworking",
+                        "maxCapacity",
+                        "minCapacity",
+                        "spotConfiguration",
+                        "taskCpu",
+                        "taskMemory"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationComposeDefinitionContainer:ApplicationComposeDefinitionContainer": {
+            "properties": {
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cpu": {
+                    "type": "integer",
+                    "description": "Container-level CPU units\n"
+                },
+                "dependsOns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainerDependsOn:ApplicationComposeDefinitionContainerDependsOn"
+                    },
+                    "description": "Container startup dependencies\n"
+                },
+                "entryPoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "environments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainerEnvironment:ApplicationComposeDefinitionContainerEnvironment"
+                    },
+                    "description": "Environment variables specific to this container\n"
+                },
+                "essential": {
+                    "type": "boolean"
+                },
+                "exposedPorts": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "description": "List of container ports to expose\n"
+                },
+                "healthCheck": {
+                    "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainerHealthCheck:ApplicationComposeDefinitionContainerHealthCheck",
+                    "description": "Container health check configuration\n"
+                },
+                "imageReference": {
+                    "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainerImageReference:ApplicationComposeDefinitionContainerImageReference"
+                },
+                "memory": {
+                    "type": "integer",
+                    "description": "Container-level memory hard limit (MiB)\n"
+                },
+                "memoryReservation": {
+                    "type": "integer",
+                    "description": "Container-level memory soft limit (MiB)\n"
+                },
+                "mountPoints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainerMountPoint:ApplicationComposeDefinitionContainerMountPoint"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the container\n"
+                },
+                "originProtection": {
+                    "type": "boolean",
+                    "description": "Enable origin protection for all exposed ports on this container. Use originProtectionConfig for advanced options like IP allow lists.\n"
+                },
+                "originProtectionConfig": {
+                    "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainerOriginProtectionConfig:ApplicationComposeDefinitionContainerOriginProtectionConfig",
+                    "description": "Extended origin protection configuration with IP allow list support\n"
+                },
+                "readonlyRootFilesystem": {
+                    "type": "boolean"
+                },
+                "secrets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationComposeDefinitionContainerSecret:ApplicationComposeDefinitionContainerSecret"
+                    },
+                    "description": "Secrets mapped to environment variables\n"
+                },
+                "user": {
+                    "type": "string"
+                },
+                "workingDirectory": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "imageReference",
+                "name"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "commands",
+                        "cpu",
+                        "dependsOns",
+                        "entryPoints",
+                        "environments",
+                        "essential",
+                        "exposedPorts",
+                        "healthCheck",
+                        "imageReference",
+                        "memory",
+                        "memoryReservation",
+                        "mountPoints",
+                        "name",
+                        "originProtection",
+                        "originProtectionConfig",
+                        "readonlyRootFilesystem",
+                        "secrets",
+                        "user",
+                        "workingDirectory"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationComposeDefinitionContainerDependsOn:ApplicationComposeDefinitionContainerDependsOn": {
+            "properties": {
+                "condition": {
+                    "type": "string",
+                    "description": "The condition to wait for on the dependency\n"
+                },
+                "containerName": {
+                    "type": "string",
+                    "description": "The name of the container this container depends on\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "containerName"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "condition",
+                        "containerName"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationComposeDefinitionContainerEnvironment:ApplicationComposeDefinitionContainerEnvironment": {
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Environment variable name\n"
+                },
+                "value": {
+                    "type": "string",
+                    "description": "Environment variable value\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "name",
+                "value"
             ]
+        },
+        "quant:index/ApplicationComposeDefinitionContainerHealthCheck:ApplicationComposeDefinitionContainerHealthCheck": {
+            "properties": {
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The command to run to determine if the container is healthy\n"
+                },
+                "interval": {
+                    "type": "integer",
+                    "description": "Time period (seconds) between health checks\n"
+                },
+                "retries": {
+                    "type": "integer",
+                    "description": "Number of times to retry a failed health check\n"
+                },
+                "startPeriod": {
+                    "type": "integer",
+                    "description": "Grace period (seconds) to ignore unhealthy checks after container starts\n"
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Time period (seconds) to wait for a health check to return\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "commands",
+                        "interval",
+                        "retries",
+                        "startPeriod",
+                        "timeout"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationComposeDefinitionContainerImageReference:ApplicationComposeDefinitionContainerImageReference": {
+            "properties": {
+                "identifier": {
+                    "type": "string",
+                    "description": "The image identifier. For 'internal' type, this is the image tag. For 'external' type, this is the full image name.\n"
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Specifies whether the image is internal (ECR) or external (e.g., Docker Hub)\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "identifier",
+                "type"
+            ]
+        },
+        "quant:index/ApplicationComposeDefinitionContainerMountPoint:ApplicationComposeDefinitionContainerMountPoint": {
+            "properties": {
+                "containerPath": {
+                    "type": "string",
+                    "description": "The path inside the container where the volume is mounted\n"
+                },
+                "readOnly": {
+                    "type": "boolean"
+                },
+                "sourceVolume": {
+                    "type": "string",
+                    "description": "The name of the logical volume\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "containerPath",
+                "sourceVolume"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "containerPath",
+                        "readOnly",
+                        "sourceVolume"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationComposeDefinitionContainerOriginProtectionConfig:ApplicationComposeDefinitionContainerOriginProtectionConfig": {
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Whether origin protection is enabled. Defaults to true if this config object is provided.\n"
+                },
+                "ipAllows": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of IP addresses or CIDR ranges that can bypass origin protection for direct access (e.g., VPN IPs)\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "enabled",
+                        "ipAllows"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationComposeDefinitionContainerSecret:ApplicationComposeDefinitionContainerSecret": {
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The environment variable name to be set in the container\n"
+                },
+                "valueFrom": {
+                    "type": "string",
+                    "description": "The key of the secret in the environment's 'app-secrets' store\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "name",
+                "valueFrom"
+            ]
+        },
+        "quant:index/ApplicationComposeDefinitionSpotConfiguration:ApplicationComposeDefinitionSpotConfiguration": {
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "description": "Spot instance strategy. 'off' = On-Demand only (highest reliability, no savings). 'spot-only' = 100% Spot instances (~70% savings, default for non-prod). 'mixed-safe' = 50% Spot instances (~35% savings, requires multiple instances). 'mixed-aggressive' = 80% Spot instances (~56% savings, requires multiple instances).\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "strategy"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationDatabase:ApplicationDatabase": {
+            "properties": {
+                "engine": {
+                    "type": "string",
+                    "description": "Database engine type (MySQL 8.4, Postgres)\n"
+                },
+                "instanceClass": {
+                    "type": "string",
+                    "description": "RDS instance class\n"
+                },
+                "multiAz": {
+                    "type": "boolean",
+                    "description": "Enable Multi-AZ deployment (higher availability and cost)\n"
+                },
+                "rdsInstanceEndpoint": {
+                    "type": "string",
+                    "description": "RDS instance endpoint address\n"
+                },
+                "rdsInstanceEngine": {
+                    "type": "string",
+                    "description": "Database engine\n"
+                },
+                "rdsInstanceIdentifier": {
+                    "type": "string",
+                    "description": "RDS instance identifier\n"
+                },
+                "rdsInstanceStatus": {
+                    "type": "string",
+                    "description": "RDS instance status\n"
+                },
+                "storageGb": {
+                    "type": "integer",
+                    "description": "Allocated storage in GiB\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "engine",
+                        "instanceClass",
+                        "multiAz",
+                        "rdsInstanceEndpoint",
+                        "rdsInstanceEngine",
+                        "rdsInstanceIdentifier",
+                        "rdsInstanceStatus",
+                        "storageGb"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationDeploymentInformation:ApplicationDeploymentInformation": {
+            "properties": {
+                "createdAt": {
+                    "type": "string",
+                    "description": "Deployment creation timestamp\n"
+                },
+                "deploymentId": {
+                    "type": "string",
+                    "description": "Deployment identifier\n"
+                },
+                "imageTag": {
+                    "type": "string",
+                    "description": "Image tag deployed\n"
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Deployment status\n"
+                },
+                "taskDefinitionArn": {
+                    "type": "string",
+                    "description": "Task definition ARN used\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "createdAt",
+                        "deploymentId",
+                        "imageTag",
+                        "status",
+                        "taskDefinitionArn"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationEnvironment:ApplicationEnvironment": {
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Environment variable name\n"
+                },
+                "value": {
+                    "type": "string",
+                    "description": "Environment variable value\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "name",
+                        "value"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationFilesystem:ApplicationFilesystem": {
+            "properties": {
+                "filesystemId": {
+                    "type": "string",
+                    "description": "EFS filesystem ID\n"
+                },
+                "mountPath": {
+                    "type": "string",
+                    "description": "Mount path inside containers\n"
+                },
+                "required": {
+                    "type": "boolean",
+                    "description": "Whether to create a shared filesystem\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "filesystemId",
+                        "mountPath",
+                        "required"
+                    ]
+                }
+            }
+        },
+        "quant:index/ApplicationImageReference:ApplicationImageReference": {
+            "properties": {
+                "identifier": {
+                    "type": "string",
+                    "description": "Image identifier\n"
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Image type\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "identifier",
+                        "type"
+                    ]
+                }
+            }
         },
         "quant:index/CrawlerAssets:CrawlerAssets": {
             "properties": {
@@ -292,6 +1080,509 @@
                     ]
                 }
             }
+        },
+        "quant:index/EnvironmentAlbRouting:EnvironmentAlbRouting": {
+            "type": "object"
+        },
+        "quant:index/EnvironmentComposeDefinition:EnvironmentComposeDefinition": {
+            "properties": {
+                "architecture": {
+                    "type": "string",
+                    "description": "CPU architecture (X86_64 or ARM64)\n"
+                },
+                "containers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainer:EnvironmentComposeDefinitionContainer"
+                    }
+                },
+                "enableCrossAppNetworking": {
+                    "type": "boolean",
+                    "description": "Optional. Enable cross-application networking within the same organization. When false (default): Uses shared/app-specific security group based on enableCrossEnvNetworking. When true: Uses org-specific security group to enable container-to-container communication with ALL applications in the same organization via service discovery (microservices architecture). This setting takes priority over enableCrossEnvNetworking.\n"
+                },
+                "enableCrossEnvNetworking": {
+                    "type": "boolean",
+                    "description": "Optional. Enable cross-environment networking within the same application. When false (default): Uses shared security group for complete isolation (most secure). When true: Uses app-specific security group to enable communication between environments of the same application (e.g., staging can connect to production database). Note: If enableCrossAppNetworking is true, this setting is overridden.\n"
+                },
+                "maxCapacity": {
+                    "type": "integer",
+                    "description": "Maximum number of instances\n"
+                },
+                "minCapacity": {
+                    "type": "integer",
+                    "description": "Minimum number of instances\n"
+                },
+                "spotConfiguration": {
+                    "$ref": "#/types/quant:index/EnvironmentComposeDefinitionSpotConfiguration:EnvironmentComposeDefinitionSpotConfiguration",
+                    "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.\n"
+                },
+                "taskCpu": {
+                    "type": "integer",
+                    "description": "Task-level CPU units (e.g., 256, 512, 1024)\n"
+                },
+                "taskMemory": {
+                    "type": "integer",
+                    "description": "Task-level memory in MB\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "architecture",
+                        "containers",
+                        "enableCrossAppNetworking",
+                        "enableCrossEnvNetworking",
+                        "maxCapacity",
+                        "minCapacity",
+                        "spotConfiguration",
+                        "taskCpu",
+                        "taskMemory"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentComposeDefinitionContainer:EnvironmentComposeDefinitionContainer": {
+            "properties": {
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cpu": {
+                    "type": "integer",
+                    "description": "Container-level CPU units\n"
+                },
+                "dependsOns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainerDependsOn:EnvironmentComposeDefinitionContainerDependsOn"
+                    },
+                    "description": "Container startup dependencies\n"
+                },
+                "entryPoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "environments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainerEnvironment:EnvironmentComposeDefinitionContainerEnvironment"
+                    },
+                    "description": "Environment variables specific to this container\n"
+                },
+                "essential": {
+                    "type": "boolean"
+                },
+                "exposedPorts": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "description": "List of container ports to expose\n"
+                },
+                "healthCheck": {
+                    "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainerHealthCheck:EnvironmentComposeDefinitionContainerHealthCheck",
+                    "description": "Container health check configuration\n"
+                },
+                "imageReference": {
+                    "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainerImageReference:EnvironmentComposeDefinitionContainerImageReference"
+                },
+                "memory": {
+                    "type": "integer",
+                    "description": "Container-level memory hard limit (MiB)\n"
+                },
+                "memoryReservation": {
+                    "type": "integer",
+                    "description": "Container-level memory soft limit (MiB)\n"
+                },
+                "mountPoints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainerMountPoint:EnvironmentComposeDefinitionContainerMountPoint"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the container\n"
+                },
+                "originProtection": {
+                    "type": "boolean",
+                    "description": "Enable origin protection for all exposed ports on this container. Use originProtectionConfig for advanced options like IP allow lists.\n"
+                },
+                "originProtectionConfig": {
+                    "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainerOriginProtectionConfig:EnvironmentComposeDefinitionContainerOriginProtectionConfig",
+                    "description": "Extended origin protection configuration with IP allow list support\n"
+                },
+                "readonlyRootFilesystem": {
+                    "type": "boolean"
+                },
+                "secrets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentComposeDefinitionContainerSecret:EnvironmentComposeDefinitionContainerSecret"
+                    },
+                    "description": "Secrets mapped to environment variables\n"
+                },
+                "user": {
+                    "type": "string"
+                },
+                "workingDirectory": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "imageReference",
+                "name"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "commands",
+                        "cpu",
+                        "dependsOns",
+                        "entryPoints",
+                        "environments",
+                        "essential",
+                        "exposedPorts",
+                        "healthCheck",
+                        "imageReference",
+                        "memory",
+                        "memoryReservation",
+                        "mountPoints",
+                        "name",
+                        "originProtection",
+                        "originProtectionConfig",
+                        "readonlyRootFilesystem",
+                        "secrets",
+                        "user",
+                        "workingDirectory"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentComposeDefinitionContainerDependsOn:EnvironmentComposeDefinitionContainerDependsOn": {
+            "properties": {
+                "condition": {
+                    "type": "string",
+                    "description": "The condition to wait for on the dependency\n"
+                },
+                "containerName": {
+                    "type": "string",
+                    "description": "The name of the container this container depends on\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "containerName"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "condition",
+                        "containerName"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentComposeDefinitionContainerEnvironment:EnvironmentComposeDefinitionContainerEnvironment": {
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Environment variable name\n"
+                },
+                "value": {
+                    "type": "string",
+                    "description": "Environment variable value\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "name",
+                "value"
+            ]
+        },
+        "quant:index/EnvironmentComposeDefinitionContainerHealthCheck:EnvironmentComposeDefinitionContainerHealthCheck": {
+            "properties": {
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "The command to run to determine if the container is healthy\n"
+                },
+                "interval": {
+                    "type": "integer",
+                    "description": "Time period (seconds) between health checks\n"
+                },
+                "retries": {
+                    "type": "integer",
+                    "description": "Number of times to retry a failed health check\n"
+                },
+                "startPeriod": {
+                    "type": "integer",
+                    "description": "Grace period (seconds) to ignore unhealthy checks after container starts\n"
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Time period (seconds) to wait for a health check to return\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "commands",
+                        "interval",
+                        "retries",
+                        "startPeriod",
+                        "timeout"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentComposeDefinitionContainerImageReference:EnvironmentComposeDefinitionContainerImageReference": {
+            "properties": {
+                "identifier": {
+                    "type": "string",
+                    "description": "The image identifier. For 'internal' type, this is the image tag. For 'external' type, this is the full image name.\n"
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Specifies whether the image is internal (ECR) or external (e.g., Docker Hub)\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "identifier",
+                "type"
+            ]
+        },
+        "quant:index/EnvironmentComposeDefinitionContainerMountPoint:EnvironmentComposeDefinitionContainerMountPoint": {
+            "properties": {
+                "containerPath": {
+                    "type": "string",
+                    "description": "The path inside the container where the volume is mounted\n"
+                },
+                "readOnly": {
+                    "type": "boolean"
+                },
+                "sourceVolume": {
+                    "type": "string",
+                    "description": "The name of the logical volume\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "containerPath",
+                "sourceVolume"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "containerPath",
+                        "readOnly",
+                        "sourceVolume"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentComposeDefinitionContainerOriginProtectionConfig:EnvironmentComposeDefinitionContainerOriginProtectionConfig": {
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Whether origin protection is enabled. Defaults to true if this config object is provided.\n"
+                },
+                "ipAllows": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of IP addresses or CIDR ranges that can bypass origin protection for direct access (e.g., VPN IPs)\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "enabled",
+                        "ipAllows"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentComposeDefinitionContainerSecret:EnvironmentComposeDefinitionContainerSecret": {
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The environment variable name to be set in the container\n"
+                },
+                "valueFrom": {
+                    "type": "string",
+                    "description": "The key of the secret in the environment's 'app-secrets' store\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "name",
+                "valueFrom"
+            ]
+        },
+        "quant:index/EnvironmentComposeDefinitionSpotConfiguration:EnvironmentComposeDefinitionSpotConfiguration": {
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "description": "Spot instance strategy. 'off' = On-Demand only (highest reliability, no savings). 'spot-only' = 100% Spot instances (~70% savings, default for non-prod). 'mixed-safe' = 50% Spot instances (~35% savings, requires multiple instances). 'mixed-aggressive' = 80% Spot instances (~56% savings, requires multiple instances).\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "strategy"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentCron:EnvironmentCron": {
+            "properties": {
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "isEnabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "scheduleExpression": {
+                    "type": "string"
+                },
+                "targetContainerName": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "commands",
+                        "description",
+                        "isEnabled",
+                        "name",
+                        "scheduleExpression",
+                        "targetContainerName"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentEnvironment:EnvironmentEnvironment": {
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Variable name\n"
+                },
+                "value": {
+                    "type": "string",
+                    "description": "Variable value\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "name",
+                        "value"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentLoadBalancer:EnvironmentLoadBalancer": {
+            "type": "object"
+        },
+        "quant:index/EnvironmentSecurityGroup:EnvironmentSecurityGroup": {
+            "type": "object"
+        },
+        "quant:index/EnvironmentService:EnvironmentService": {
+            "type": "object"
+        },
+        "quant:index/EnvironmentSpotConfiguration:EnvironmentSpotConfiguration": {
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "description": "Spot instance strategy. 'off' = On-Demand only (highest reliability, no savings). 'spot-only' = 100% Spot instances (~70% savings, default for non-prod). 'mixed-safe' = 50% Spot instances (~35% savings, requires multiple instances). 'mixed-aggressive' = 80% Spot instances (~56% savings, requires multiple instances).\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "strategy"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentSubnet:EnvironmentSubnet": {
+            "type": "object"
+        },
+        "quant:index/EnvironmentTaskDefinition:EnvironmentTaskDefinition": {
+            "type": "object"
+        },
+        "quant:index/EnvironmentVolume:EnvironmentVolume": {
+            "properties": {
+                "accessPointArn": {
+                    "type": "string"
+                },
+                "accessPointId": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "environmentEfsId": {
+                    "type": "string"
+                },
+                "rootDirectory": {
+                    "type": "string"
+                },
+                "volumeId": {
+                    "type": "string"
+                },
+                "volumeName": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "accessPointArn",
+                        "accessPointId",
+                        "createdAt",
+                        "description",
+                        "environmentEfsId",
+                        "rootDirectory",
+                        "volumeId",
+                        "volumeName"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentVpc:EnvironmentVpc": {
+            "type": "object"
         },
         "quant:index/RuleAuthActionConfig:RuleAuthActionConfig": {
             "properties": {
@@ -1123,6 +2414,74 @@
                 }
             }
         },
+        "quant:index/SlackBotBot:SlackBotBot": {
+            "properties": {
+                "agentId": {
+                    "type": "string"
+                },
+                "allowedChannels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "botId": {
+                    "type": "string"
+                },
+                "connected": {
+                    "type": "boolean"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "keywordsEnabled": {
+                    "type": "boolean"
+                },
+                "sessionTtlDays": {
+                    "type": "integer"
+                },
+                "setupType": {
+                    "type": "string"
+                },
+                "slashCommands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "agentId",
+                        "allowedChannels",
+                        "botId",
+                        "connected",
+                        "createdAt",
+                        "keywords",
+                        "keywordsEnabled",
+                        "sessionTtlDays",
+                        "setupType",
+                        "slashCommands",
+                        "status",
+                        "updatedAt"
+                    ]
+                }
+            }
+        },
         "quant:index/getProjectsProject:getProjectsProject": {
             "properties": {
                 "machineName": {
@@ -1229,87 +2588,350 @@
         }
     },
     "resources": {
+        "quant:index:AiAgent": {
+            "properties": {
+                "agent": {
+                    "$ref": "#/types/quant:index/AiAgentAgent:AiAgentAgent"
+                },
+                "agentId": {
+                    "type": "string",
+                    "description": "The agent ID"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Skill IDs to assign to this agent"
+                },
+                "createdBy": {
+                    "type": "string",
+                    "description": "User identifier who created the agent"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Filter policy IDs to apply to this agent's inference requests"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Enable 1M context window support"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "systemPrompt": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "agent",
+                "agentId",
+                "allowedCollections",
+                "allowedTools",
+                "assignedSkills",
+                "createdBy",
+                "description",
+                "filterPolicies",
+                "group",
+                "guardrailPreset",
+                "longContext",
+                "maxTokens",
+                "message",
+                "modelId",
+                "name",
+                "organisation",
+                "success",
+                "systemPrompt",
+                "temperature"
+            ],
+            "inputProperties": {
+                "agentId": {
+                    "type": "string",
+                    "description": "The agent ID"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Skill IDs to assign to this agent"
+                },
+                "createdBy": {
+                    "type": "string",
+                    "description": "User identifier who created the agent"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Filter policy IDs to apply to this agent's inference requests"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Enable 1M context window support"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "systemPrompt": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                }
+            },
+            "requiredInputs": [
+                "description",
+                "modelId",
+                "systemPrompt"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiAgent resources.\n",
+                "properties": {
+                    "agent": {
+                        "$ref": "#/types/quant:index/AiAgentAgent:AiAgentAgent"
+                    },
+                    "agentId": {
+                        "type": "string",
+                        "description": "The agent ID"
+                    },
+                    "allowedCollections": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "allowedTools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "assignedSkills": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Skill IDs to assign to this agent"
+                    },
+                    "createdBy": {
+                        "type": "string",
+                        "description": "User identifier who created the agent"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "filterPolicies": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Filter policy IDs to apply to this agent's inference requests"
+                    },
+                    "group": {
+                        "type": "string"
+                    },
+                    "guardrailPreset": {
+                        "type": "string",
+                        "description": "Guardrail preset name"
+                    },
+                    "longContext": {
+                        "type": "boolean",
+                        "description": "Enable 1M context window support"
+                    },
+                    "maxTokens": {
+                        "type": "integer"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "modelId": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "The organisation ID"
+                    },
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "systemPrompt": {
+                        "type": "string"
+                    },
+                    "temperature": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            }
+        },
         "quant:index:AiGovernance": {
             "properties": {
                 "aiEnabled": {
-                    "type": "boolean",
-                    "description": "Whether AI features are enabled for the organization"
+                    "type": "boolean"
+                },
+                "config": {
+                    "$ref": "#/types/quant:index/AiGovernanceConfig:AiGovernanceConfig"
                 },
                 "mandatoryFilterPolicies": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "description": "List of mandatory content filter policy identifiers"
+                    }
                 },
                 "mandatoryGuardrailPreset": {
-                    "type": "string",
-                    "description": "Mandatory guardrail preset to enforce on all AI requests"
+                    "type": "string"
                 },
                 "modelLists": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "description": "List of model identifiers for the allowlist or blocklist policy"
+                    }
                 },
                 "modelPolicy": {
-                    "type": "string",
-                    "description": "Model access policy: \u003cspan pulumi-lang-nodejs=\"`unrestricted`\" pulumi-lang-dotnet=\"`Unrestricted`\" pulumi-lang-go=\"`unrestricted`\" pulumi-lang-python=\"`unrestricted`\" pulumi-lang-yaml=\"`unrestricted`\" pulumi-lang-java=\"`unrestricted`\"\u003e`unrestricted`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`allowlist`\" pulumi-lang-dotnet=\"`Allowlist`\" pulumi-lang-go=\"`allowlist`\" pulumi-lang-python=\"`allowlist`\" pulumi-lang-yaml=\"`allowlist`\" pulumi-lang-java=\"`allowlist`\"\u003e`allowlist`\u003c/span\u003e, or \u003cspan pulumi-lang-nodejs=\"`blocklist`\" pulumi-lang-dotnet=\"`Blocklist`\" pulumi-lang-go=\"`blocklist`\" pulumi-lang-python=\"`blocklist`\" pulumi-lang-yaml=\"`blocklist`\" pulumi-lang-java=\"`blocklist`\"\u003e`blocklist`\u003c/span\u003e"
+                    "type": "string"
                 },
-                "organization": {
+                "orgId": {
+                    "type": "string"
+                },
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 },
                 "spendLimits": {
-                    "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits",
-                    "description": "Spend limit configuration for AI usage"
+                    "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits"
+                },
+                "success": {
+                    "type": "boolean"
                 },
                 "version": {
-                    "type": "integer",
-                    "description": "Configuration version for optimistic concurrency control"
+                    "type": "integer"
                 }
             },
             "required": [
                 "aiEnabled",
+                "config",
+                "mandatoryFilterPolicies",
+                "mandatoryGuardrailPreset",
+                "modelLists",
                 "modelPolicy",
-                "organization",
+                "orgId",
+                "organisation",
+                "spendLimits",
+                "success",
                 "version"
             ],
             "inputProperties": {
                 "aiEnabled": {
-                    "type": "boolean",
-                    "description": "Whether AI features are enabled for the organization"
+                    "type": "boolean"
                 },
                 "mandatoryFilterPolicies": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "description": "List of mandatory content filter policy identifiers"
+                    }
                 },
                 "mandatoryGuardrailPreset": {
-                    "type": "string",
-                    "description": "Mandatory guardrail preset to enforce on all AI requests"
+                    "type": "string"
                 },
                 "modelLists": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "description": "List of model identifiers for the allowlist or blocklist policy"
+                    }
                 },
                 "modelPolicy": {
-                    "type": "string",
-                    "description": "Model access policy: \u003cspan pulumi-lang-nodejs=\"`unrestricted`\" pulumi-lang-dotnet=\"`Unrestricted`\" pulumi-lang-go=\"`unrestricted`\" pulumi-lang-python=\"`unrestricted`\" pulumi-lang-yaml=\"`unrestricted`\" pulumi-lang-java=\"`unrestricted`\"\u003e`unrestricted`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`allowlist`\" pulumi-lang-dotnet=\"`Allowlist`\" pulumi-lang-go=\"`allowlist`\" pulumi-lang-python=\"`allowlist`\" pulumi-lang-yaml=\"`allowlist`\" pulumi-lang-java=\"`allowlist`\"\u003e`allowlist`\u003c/span\u003e, or \u003cspan pulumi-lang-nodejs=\"`blocklist`\" pulumi-lang-dotnet=\"`Blocklist`\" pulumi-lang-go=\"`blocklist`\" pulumi-lang-python=\"`blocklist`\" pulumi-lang-yaml=\"`blocklist`\" pulumi-lang-java=\"`blocklist`\"\u003e`blocklist`\u003c/span\u003e"
+                    "type": "string"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 },
                 "spendLimits": {
-                    "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits",
-                    "description": "Spend limit configuration for AI usage"
+                    "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits"
+                },
+                "version": {
+                    "type": "integer"
                 }
             },
             "requiredInputs": [
@@ -1320,42 +2942,44 @@
                 "description": "Input properties used for looking up and filtering AiGovernance resources.\n",
                 "properties": {
                     "aiEnabled": {
-                        "type": "boolean",
-                        "description": "Whether AI features are enabled for the organization"
+                        "type": "boolean"
+                    },
+                    "config": {
+                        "$ref": "#/types/quant:index/AiGovernanceConfig:AiGovernanceConfig"
                     },
                     "mandatoryFilterPolicies": {
                         "type": "array",
                         "items": {
                             "type": "string"
-                        },
-                        "description": "List of mandatory content filter policy identifiers"
+                        }
                     },
                     "mandatoryGuardrailPreset": {
-                        "type": "string",
-                        "description": "Mandatory guardrail preset to enforce on all AI requests"
+                        "type": "string"
                     },
                     "modelLists": {
                         "type": "array",
                         "items": {
                             "type": "string"
-                        },
-                        "description": "List of model identifiers for the allowlist or blocklist policy"
+                        }
                     },
                     "modelPolicy": {
-                        "type": "string",
-                        "description": "Model access policy: \u003cspan pulumi-lang-nodejs=\"`unrestricted`\" pulumi-lang-dotnet=\"`Unrestricted`\" pulumi-lang-go=\"`unrestricted`\" pulumi-lang-python=\"`unrestricted`\" pulumi-lang-yaml=\"`unrestricted`\" pulumi-lang-java=\"`unrestricted`\"\u003e`unrestricted`\u003c/span\u003e, \u003cspan pulumi-lang-nodejs=\"`allowlist`\" pulumi-lang-dotnet=\"`Allowlist`\" pulumi-lang-go=\"`allowlist`\" pulumi-lang-python=\"`allowlist`\" pulumi-lang-yaml=\"`allowlist`\" pulumi-lang-java=\"`allowlist`\"\u003e`allowlist`\u003c/span\u003e, or \u003cspan pulumi-lang-nodejs=\"`blocklist`\" pulumi-lang-dotnet=\"`Blocklist`\" pulumi-lang-go=\"`blocklist`\" pulumi-lang-python=\"`blocklist`\" pulumi-lang-yaml=\"`blocklist`\" pulumi-lang-java=\"`blocklist`\"\u003e`blocklist`\u003c/span\u003e"
+                        "type": "string"
                     },
-                    "organization": {
+                    "orgId": {
+                        "type": "string"
+                    },
+                    "organisation": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
+                        "description": "The organisation ID"
                     },
                     "spendLimits": {
-                        "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits",
-                        "description": "Spend limit configuration for AI usage"
+                        "$ref": "#/types/quant:index/AiGovernanceSpendLimits:AiGovernanceSpendLimits"
+                    },
+                    "success": {
+                        "type": "boolean"
                     },
                     "version": {
-                        "type": "integer",
-                        "description": "Configuration version for optimistic concurrency control"
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -1363,135 +2987,201 @@
         },
         "quant:index:AiSkill": {
             "properties": {
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "content": {
-                    "type": "string",
-                    "description": "Inline skill content. Conflicts with \u003cspan pulumi-lang-nodejs=\"`source`\" pulumi-lang-dotnet=\"`Source`\" pulumi-lang-go=\"`source`\" pulumi-lang-python=\"`source`\" pulumi-lang-yaml=\"`source`\" pulumi-lang-java=\"`source`\"\u003e`source`\u003c/span\u003e."
+                    "type": "string"
                 },
                 "description": {
-                    "type": "string",
-                    "description": "Skill description"
+                    "type": "string"
                 },
-                "installedAt": {
-                    "type": "string",
-                    "description": "Timestamp when the skill was installed"
+                "disableModelInvocation": {
+                    "type": "boolean"
+                },
+                "files": {
+                    "$ref": "#/types/quant:index/AiSkillFiles:AiSkillFiles"
+                },
+                "installedBy": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
                 },
                 "name": {
-                    "type": "string",
-                    "description": "Skill name"
+                    "type": "string"
                 },
                 "namespace": {
-                    "type": "string",
-                    "description": "Skill namespace"
+                    "type": "string"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 },
-                "source": {
-                    "$ref": "#/types/quant:index/AiSkillSource:AiSkillSource",
-                    "description": "External source for importing a skill. Conflicts with \u003cspan pulumi-lang-nodejs=\"`content`\" pulumi-lang-dotnet=\"`Content`\" pulumi-lang-go=\"`content`\" pulumi-lang-python=\"`content`\" pulumi-lang-yaml=\"`content`\" pulumi-lang-java=\"`content`\"\u003e`content`\u003c/span\u003e."
+                "requiredTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "skill": {
+                    "$ref": "#/types/quant:index/AiSkillSkill:AiSkillSkill"
+                },
+                "skillId": {
+                    "type": "string",
+                    "description": "The skill ID"
+                },
+                "success": {
+                    "type": "boolean"
                 },
                 "tags": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "description": "Tags for categorizing the skill"
+                    }
                 },
                 "triggerCondition": {
-                    "type": "string",
-                    "description": "Condition that triggers the skill"
-                },
-                "updatedAt": {
-                    "type": "string",
-                    "description": "Timestamp when the skill was last updated"
+                    "type": "string"
                 }
             },
             "required": [
-                "installedAt",
+                "allowedTools",
+                "content",
+                "description",
+                "disableModelInvocation",
+                "files",
+                "installedBy",
+                "message",
                 "name",
                 "namespace",
-                "organization",
-                "updatedAt"
+                "organisation",
+                "requiredTools",
+                "skill",
+                "skillId",
+                "success",
+                "tags",
+                "triggerCondition"
             ],
             "inputProperties": {
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "content": {
-                    "type": "string",
-                    "description": "Inline skill content. Conflicts with \u003cspan pulumi-lang-nodejs=\"`source`\" pulumi-lang-dotnet=\"`Source`\" pulumi-lang-go=\"`source`\" pulumi-lang-python=\"`source`\" pulumi-lang-yaml=\"`source`\" pulumi-lang-java=\"`source`\"\u003e`source`\u003c/span\u003e."
+                    "type": "string"
                 },
                 "description": {
-                    "type": "string",
-                    "description": "Skill description"
+                    "type": "string"
+                },
+                "disableModelInvocation": {
+                    "type": "boolean"
+                },
+                "files": {
+                    "$ref": "#/types/quant:index/AiSkillFiles:AiSkillFiles"
+                },
+                "installedBy": {
+                    "type": "string"
                 },
                 "name": {
-                    "type": "string",
-                    "description": "Skill name"
+                    "type": "string"
                 },
-                "organization": {
-                    "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                "namespace": {
+                    "type": "string"
                 },
-                "source": {
-                    "$ref": "#/types/quant:index/AiSkillSource:AiSkillSource",
-                    "description": "External source for importing a skill. Conflicts with \u003cspan pulumi-lang-nodejs=\"`content`\" pulumi-lang-dotnet=\"`Content`\" pulumi-lang-go=\"`content`\" pulumi-lang-python=\"`content`\" pulumi-lang-yaml=\"`content`\" pulumi-lang-java=\"`content`\"\u003e`content`\u003c/span\u003e."
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "requiredTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "skillId": {
+                    "type": "string",
+                    "description": "The skill ID"
                 },
                 "tags": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "description": "Tags for categorizing the skill"
+                    }
                 },
                 "triggerCondition": {
-                    "type": "string",
-                    "description": "Condition that triggers the skill"
+                    "type": "string"
                 }
             },
+            "requiredInputs": [
+                "content",
+                "triggerCondition"
+            ],
             "stateInputs": {
                 "description": "Input properties used for looking up and filtering AiSkill resources.\n",
                 "properties": {
+                    "allowedTools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "content": {
-                        "type": "string",
-                        "description": "Inline skill content. Conflicts with \u003cspan pulumi-lang-nodejs=\"`source`\" pulumi-lang-dotnet=\"`Source`\" pulumi-lang-go=\"`source`\" pulumi-lang-python=\"`source`\" pulumi-lang-yaml=\"`source`\" pulumi-lang-java=\"`source`\"\u003e`source`\u003c/span\u003e."
+                        "type": "string"
                     },
                     "description": {
-                        "type": "string",
-                        "description": "Skill description"
+                        "type": "string"
                     },
-                    "installedAt": {
-                        "type": "string",
-                        "description": "Timestamp when the skill was installed"
+                    "disableModelInvocation": {
+                        "type": "boolean"
+                    },
+                    "files": {
+                        "$ref": "#/types/quant:index/AiSkillFiles:AiSkillFiles"
+                    },
+                    "installedBy": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
                     },
                     "name": {
-                        "type": "string",
-                        "description": "Skill name"
+                        "type": "string"
                     },
                     "namespace": {
-                        "type": "string",
-                        "description": "Skill namespace"
+                        "type": "string"
                     },
-                    "organization": {
+                    "organisation": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
+                        "description": "The organisation ID"
                     },
-                    "source": {
-                        "$ref": "#/types/quant:index/AiSkillSource:AiSkillSource",
-                        "description": "External source for importing a skill. Conflicts with \u003cspan pulumi-lang-nodejs=\"`content`\" pulumi-lang-dotnet=\"`Content`\" pulumi-lang-go=\"`content`\" pulumi-lang-python=\"`content`\" pulumi-lang-yaml=\"`content`\" pulumi-lang-java=\"`content`\"\u003e`content`\u003c/span\u003e."
+                    "requiredTools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "skill": {
+                        "$ref": "#/types/quant:index/AiSkillSkill:AiSkillSkill"
+                    },
+                    "skillId": {
+                        "type": "string",
+                        "description": "The skill ID"
+                    },
+                    "success": {
+                        "type": "boolean"
                     },
                     "tags": {
                         "type": "array",
                         "items": {
                             "type": "string"
-                        },
-                        "description": "Tags for categorizing the skill"
+                        }
                     },
                     "triggerCondition": {
-                        "type": "string",
-                        "description": "Condition that triggers the skill"
-                    },
-                    "updatedAt": {
-                        "type": "string",
-                        "description": "Timestamp when the skill was last updated"
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1499,60 +3189,112 @@
         },
         "quant:index:AiVectorCollection": {
             "properties": {
-                "createdAt": {
+                "collection": {
+                    "$ref": "#/types/quant:index/AiVectorCollectionCollection:AiVectorCollectionCollection"
+                },
+                "collectionId": {
                     "type": "string",
-                    "description": "Timestamp when the collection was created"
+                    "description": "The collection ID"
                 },
                 "description": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "integer",
+                    "description": "Embedding dimensions (default: 1024)"
+                },
+                "embeddingModel": {
                     "type": "string",
-                    "description": "Collection description"
+                    "description": "Embedding model to use. Supported: amazon.titan-embed-text-v2:0, cohere.embed-english-v3, cohere.embed-multilingual-v3"
+                },
+                "message": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string",
-                    "description": "Collection name (immutable after creation)"
+                    "description": "Collection name (used for reference)"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
+                },
+                "success": {
+                    "type": "boolean"
                 }
             },
             "required": [
-                "createdAt",
+                "collection",
+                "collectionId",
+                "description",
+                "dimensions",
+                "embeddingModel",
+                "message",
                 "name",
-                "organization"
+                "organisation",
+                "success"
             ],
             "inputProperties": {
-                "description": {
+                "collectionId": {
                     "type": "string",
-                    "description": "Collection description"
+                    "description": "The collection ID"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "integer",
+                    "description": "Embedding dimensions (default: 1024)"
+                },
+                "embeddingModel": {
+                    "type": "string",
+                    "description": "Embedding model to use. Supported: amazon.titan-embed-text-v2:0, cohere.embed-english-v3, cohere.embed-multilingual-v3"
                 },
                 "name": {
                     "type": "string",
-                    "description": "Collection name (immutable after creation)"
+                    "description": "Collection name (used for reference)"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 }
             },
+            "requiredInputs": [
+                "embeddingModel"
+            ],
             "stateInputs": {
                 "description": "Input properties used for looking up and filtering AiVectorCollection resources.\n",
                 "properties": {
-                    "createdAt": {
+                    "collection": {
+                        "$ref": "#/types/quant:index/AiVectorCollectionCollection:AiVectorCollectionCollection"
+                    },
+                    "collectionId": {
                         "type": "string",
-                        "description": "Timestamp when the collection was created"
+                        "description": "The collection ID"
                     },
                     "description": {
+                        "type": "string"
+                    },
+                    "dimensions": {
+                        "type": "integer",
+                        "description": "Embedding dimensions (default: 1024)"
+                    },
+                    "embeddingModel": {
                         "type": "string",
-                        "description": "Collection description"
+                        "description": "Embedding model to use. Supported: amazon.titan-embed-text-v2:0, cohere.embed-english-v3, cohere.embed-multilingual-v3"
+                    },
+                    "message": {
+                        "type": "string"
                     },
                     "name": {
                         "type": "string",
-                        "description": "Collection name (immutable after creation)"
+                        "description": "Collection name (used for reference)"
                     },
-                    "organization": {
+                    "organisation": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
+                        "description": "The organisation ID"
+                    },
+                    "success": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -1560,130 +3302,122 @@
         },
         "quant:index:AiVectorDocument": {
             "properties": {
+                "chunksCreated": {
+                    "type": "integer"
+                },
                 "collectionId": {
-                    "type": "string",
-                    "description": "Vector collection UUID"
+                    "type": "string"
                 },
-                "content": {
-                    "type": "string",
-                    "description": "Document text content"
-                },
-                "contentSha256": {
-                    "type": "string",
-                    "description": "SHA256 hash of content for drift detection"
-                },
-                "documentId": {
-                    "type": "string",
-                    "description": "Auto-assigned document UUID"
-                },
-                "key": {
-                    "type": "string",
-                    "description": "Stable document key (max 512 characters)"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    },
-                    "description": "Key-value metadata attached to the document"
-                },
-                "organization": {
-                    "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
-                },
-                "searchableFields": {
+                "documentIds": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    },
-                    "description": "List of searchable field names"
+                    }
+                },
+                "documents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiVectorDocumentDocument:AiVectorDocumentDocument"
+                    }
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Filter by document key"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "organisation": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
                 }
             },
             "required": [
+                "chunksCreated",
                 "collectionId",
-                "content",
-                "contentSha256",
-                "documentId",
+                "documentIds",
+                "documents",
                 "key",
-                "organization"
+                "limit",
+                "message",
+                "offset",
+                "organisation",
+                "success"
             ],
             "inputProperties": {
                 "collectionId": {
-                    "type": "string",
-                    "description": "Vector collection UUID"
+                    "type": "string"
                 },
-                "content": {
-                    "type": "string",
-                    "description": "Document text content"
+                "documents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiVectorDocumentDocument:AiVectorDocumentDocument"
+                    }
                 },
                 "key": {
                     "type": "string",
-                    "description": "Stable document key (max 512 characters)"
+                    "description": "Filter by document key"
                 },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    },
-                    "description": "Key-value metadata attached to the document"
+                "limit": {
+                    "type": "integer"
                 },
-                "organization": {
-                    "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                "offset": {
+                    "type": "integer"
                 },
-                "searchableFields": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "description": "List of searchable field names"
+                "organisation": {
+                    "type": "string"
                 }
             },
             "requiredInputs": [
-                "collectionId",
-                "content",
-                "key"
+                "documents"
             ],
             "stateInputs": {
                 "description": "Input properties used for looking up and filtering AiVectorDocument resources.\n",
                 "properties": {
+                    "chunksCreated": {
+                        "type": "integer"
+                    },
                     "collectionId": {
-                        "type": "string",
-                        "description": "Vector collection UUID"
+                        "type": "string"
                     },
-                    "content": {
-                        "type": "string",
-                        "description": "Document text content"
-                    },
-                    "contentSha256": {
-                        "type": "string",
-                        "description": "SHA256 hash of content for drift detection"
-                    },
-                    "documentId": {
-                        "type": "string",
-                        "description": "Auto-assigned document UUID"
-                    },
-                    "key": {
-                        "type": "string",
-                        "description": "Stable document key (max 512 characters)"
-                    },
-                    "metadata": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
-                        "description": "Key-value metadata attached to the document"
-                    },
-                    "organization": {
-                        "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
-                    },
-                    "searchableFields": {
+                    "documentIds": {
                         "type": "array",
                         "items": {
                             "type": "string"
-                        },
-                        "description": "List of searchable field names"
+                        }
+                    },
+                    "documents": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/AiVectorDocumentDocument:AiVectorDocumentDocument"
+                        }
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "Filter by document key"
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "organisation": {
+                        "type": "string"
+                    },
+                    "success": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -1695,45 +3429,56 @@
                     "type": "string",
                     "description": "Application name"
                 },
-                "composeDefinition": {
+                "application": {
                     "type": "string",
-                    "description": "Compose definition as a JSON string. Defines containers, CPU, memory, networking, and other task configuration."
+                    "description": "The application ID"
+                },
+                "composeDefinition": {
+                    "$ref": "#/types/quant:index/ApplicationComposeDefinition:ApplicationComposeDefinition"
                 },
                 "containerNames": {
-                    "type": "string",
-                    "description": "List of container names as a JSON array"
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of container names"
                 },
-                "databaseEngine": {
-                    "type": "string",
-                    "description": "Database engine type (mysql, postgres)"
+                "database": {
+                    "$ref": "#/types/quant:index/ApplicationDatabase:ApplicationDatabase",
+                    "description": "Optional database configuration"
                 },
-                "databaseInstanceClass": {
-                    "type": "string",
-                    "description": "RDS instance class"
-                },
-                "databaseMultiAz": {
-                    "type": "boolean",
-                    "description": "Enable Multi-AZ database deployment"
-                },
-                "databaseStorageGb": {
-                    "type": "integer",
-                    "description": "Database allocated storage in GiB"
+                "deploymentInformations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationDeploymentInformation:ApplicationDeploymentInformation"
+                    },
+                    "description": "Deployment history"
                 },
                 "desiredCount": {
                     "type": "integer",
                     "description": "Desired task count"
                 },
-                "environment": {
-                    "type": "string",
-                    "description": "Initial environment variables as a JSON array of {name, value} objects"
+                "environmentNames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of environment names (read-only)"
                 },
-                "filesystemMountPath": {
-                    "type": "string",
-                    "description": "Mount path inside containers for the shared filesystem"
+                "environments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
+                    },
+                    "description": "Optional. Initial environment variables for the production environment."
                 },
-                "filesystemRequired": {
-                    "type": "boolean",
-                    "description": "Whether to create a shared filesystem"
+                "filesystem": {
+                    "$ref": "#/types/quant:index/ApplicationFilesystem:ApplicationFilesystem",
+                    "description": "Optional filesystem configuration"
+                },
+                "imageReference": {
+                    "$ref": "#/types/quant:index/ApplicationImageReference:ApplicationImageReference",
+                    "description": "Image reference information"
                 },
                 "maxCapacity": {
                     "type": "integer",
@@ -1743,9 +3488,9 @@
                     "type": "integer",
                     "description": "Minimum task count for auto-scaling"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name. Defaults to the provider-level organization."
+                    "description": "Organisation machine name"
                 },
                 "runningCount": {
                     "type": "integer",
@@ -1758,19 +3503,19 @@
             },
             "required": [
                 "appName",
+                "application",
                 "composeDefinition",
                 "containerNames",
-                "databaseEngine",
-                "databaseInstanceClass",
-                "databaseMultiAz",
-                "databaseStorageGb",
+                "database",
+                "deploymentInformations",
                 "desiredCount",
-                "environment",
-                "filesystemMountPath",
-                "filesystemRequired",
+                "environments",
+                "environmentNames",
+                "filesystem",
+                "imageReference",
                 "maxCapacity",
                 "minCapacity",
-                "organization",
+                "organisation",
                 "runningCount",
                 "status"
             ],
@@ -1779,37 +3524,27 @@
                     "type": "string",
                     "description": "Application name"
                 },
+                "application": {
+                    "type": "string",
+                    "description": "The application ID"
+                },
                 "composeDefinition": {
-                    "type": "string",
-                    "description": "Compose definition as a JSON string. Defines containers, CPU, memory, networking, and other task configuration."
+                    "$ref": "#/types/quant:index/ApplicationComposeDefinition:ApplicationComposeDefinition"
                 },
-                "databaseEngine": {
-                    "type": "string",
-                    "description": "Database engine type (mysql, postgres)"
+                "database": {
+                    "$ref": "#/types/quant:index/ApplicationDatabase:ApplicationDatabase",
+                    "description": "Optional database configuration"
                 },
-                "databaseInstanceClass": {
-                    "type": "string",
-                    "description": "RDS instance class"
+                "environments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
+                    },
+                    "description": "Optional. Initial environment variables for the production environment."
                 },
-                "databaseMultiAz": {
-                    "type": "boolean",
-                    "description": "Enable Multi-AZ database deployment"
-                },
-                "databaseStorageGb": {
-                    "type": "integer",
-                    "description": "Database allocated storage in GiB"
-                },
-                "environment": {
-                    "type": "string",
-                    "description": "Initial environment variables as a JSON array of {name, value} objects"
-                },
-                "filesystemMountPath": {
-                    "type": "string",
-                    "description": "Mount path inside containers for the shared filesystem"
-                },
-                "filesystemRequired": {
-                    "type": "boolean",
-                    "description": "Whether to create a shared filesystem"
+                "filesystem": {
+                    "$ref": "#/types/quant:index/ApplicationFilesystem:ApplicationFilesystem",
+                    "description": "Optional filesystem configuration"
                 },
                 "maxCapacity": {
                     "type": "integer",
@@ -1818,10 +3553,6 @@
                 "minCapacity": {
                     "type": "integer",
                     "description": "Minimum task count for auto-scaling"
-                },
-                "organization": {
-                    "type": "string",
-                    "description": "Organization machine name. Defaults to the provider-level organization."
                 }
             },
             "requiredInputs": [
@@ -1835,45 +3566,56 @@
                         "type": "string",
                         "description": "Application name"
                     },
-                    "composeDefinition": {
+                    "application": {
                         "type": "string",
-                        "description": "Compose definition as a JSON string. Defines containers, CPU, memory, networking, and other task configuration."
+                        "description": "The application ID"
+                    },
+                    "composeDefinition": {
+                        "$ref": "#/types/quant:index/ApplicationComposeDefinition:ApplicationComposeDefinition"
                     },
                     "containerNames": {
-                        "type": "string",
-                        "description": "List of container names as a JSON array"
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of container names"
                     },
-                    "databaseEngine": {
-                        "type": "string",
-                        "description": "Database engine type (mysql, postgres)"
+                    "database": {
+                        "$ref": "#/types/quant:index/ApplicationDatabase:ApplicationDatabase",
+                        "description": "Optional database configuration"
                     },
-                    "databaseInstanceClass": {
-                        "type": "string",
-                        "description": "RDS instance class"
-                    },
-                    "databaseMultiAz": {
-                        "type": "boolean",
-                        "description": "Enable Multi-AZ database deployment"
-                    },
-                    "databaseStorageGb": {
-                        "type": "integer",
-                        "description": "Database allocated storage in GiB"
+                    "deploymentInformations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/ApplicationDeploymentInformation:ApplicationDeploymentInformation"
+                        },
+                        "description": "Deployment history"
                     },
                     "desiredCount": {
                         "type": "integer",
                         "description": "Desired task count"
                     },
-                    "environment": {
-                        "type": "string",
-                        "description": "Initial environment variables as a JSON array of {name, value} objects"
+                    "environmentNames": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of environment names (read-only)"
                     },
-                    "filesystemMountPath": {
-                        "type": "string",
-                        "description": "Mount path inside containers for the shared filesystem"
+                    "environments": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/ApplicationEnvironment:ApplicationEnvironment"
+                        },
+                        "description": "Optional. Initial environment variables for the production environment."
                     },
-                    "filesystemRequired": {
-                        "type": "boolean",
-                        "description": "Whether to create a shared filesystem"
+                    "filesystem": {
+                        "$ref": "#/types/quant:index/ApplicationFilesystem:ApplicationFilesystem",
+                        "description": "Optional filesystem configuration"
+                    },
+                    "imageReference": {
+                        "$ref": "#/types/quant:index/ApplicationImageReference:ApplicationImageReference",
+                        "description": "Image reference information"
                     },
                     "maxCapacity": {
                         "type": "integer",
@@ -1883,9 +3625,9 @@
                         "type": "integer",
                         "description": "Minimum task count for auto-scaling"
                     },
-                    "organization": {
+                    "organisation": {
                         "type": "string",
-                        "description": "Organization machine name. Defaults to the provider-level organization."
+                        "description": "Organisation machine name"
                     },
                     "runningCount": {
                         "type": "integer",
@@ -2538,99 +4280,95 @@
             "properties": {
                 "application": {
                     "type": "string",
-                    "description": "Application name"
+                    "description": "The application ID"
                 },
-                "command": {
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cron": {
                     "type": "string",
-                    "description": "Command to execute as a JSON array of strings"
+                    "description": "The cron job ID"
                 },
                 "description": {
-                    "type": "string",
-                    "description": "Cron job description"
+                    "type": "string"
                 },
                 "environment": {
                     "type": "string",
-                    "description": "Environment name"
+                    "description": "The environment ID"
                 },
                 "isEnabled": {
-                    "type": "boolean",
-                    "description": "Whether the cron job is enabled"
+                    "type": "boolean"
                 },
                 "name": {
-                    "type": "string",
-                    "description": "Cron job name"
+                    "type": "string"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
-                },
-                "schedule": {
-                    "type": "string",
-                    "description": "Resolved cron schedule"
+                    "description": "The organisation ID"
                 },
                 "scheduleExpression": {
-                    "type": "string",
-                    "description": "Cron schedule expression"
+                    "type": "string"
                 },
                 "targetContainerName": {
-                    "type": "string",
-                    "description": "Target container name"
+                    "type": "string"
                 }
             },
             "required": [
                 "application",
-                "command",
+                "commands",
+                "cron",
                 "description",
                 "environment",
                 "isEnabled",
                 "name",
-                "organization",
-                "schedule",
+                "organisation",
                 "scheduleExpression",
                 "targetContainerName"
             ],
             "inputProperties": {
                 "application": {
                     "type": "string",
-                    "description": "Application name"
+                    "description": "The application ID"
                 },
-                "command": {
+                "commands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cron": {
                     "type": "string",
-                    "description": "Command to execute as a JSON array of strings"
+                    "description": "The cron job ID"
                 },
                 "description": {
-                    "type": "string",
-                    "description": "Cron job description"
+                    "type": "string"
                 },
                 "environment": {
                     "type": "string",
-                    "description": "Environment name"
+                    "description": "The environment ID"
                 },
                 "isEnabled": {
-                    "type": "boolean",
-                    "description": "Whether the cron job is enabled"
+                    "type": "boolean"
                 },
                 "name": {
-                    "type": "string",
-                    "description": "Cron job name"
+                    "type": "string"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 },
                 "scheduleExpression": {
-                    "type": "string",
-                    "description": "Cron schedule expression"
+                    "type": "string"
                 },
                 "targetContainerName": {
-                    "type": "string",
-                    "description": "Target container name"
+                    "type": "string"
                 }
             },
             "requiredInputs": [
-                "application",
-                "command",
-                "environment",
+                "commands",
                 "scheduleExpression"
             ],
             "stateInputs": {
@@ -2638,43 +4376,40 @@
                 "properties": {
                     "application": {
                         "type": "string",
-                        "description": "Application name"
+                        "description": "The application ID"
                     },
-                    "command": {
+                    "commands": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "cron": {
                         "type": "string",
-                        "description": "Command to execute as a JSON array of strings"
+                        "description": "The cron job ID"
                     },
                     "description": {
-                        "type": "string",
-                        "description": "Cron job description"
+                        "type": "string"
                     },
                     "environment": {
                         "type": "string",
-                        "description": "Environment name"
+                        "description": "The environment ID"
                     },
                     "isEnabled": {
-                        "type": "boolean",
-                        "description": "Whether the cron job is enabled"
+                        "type": "boolean"
                     },
                     "name": {
-                        "type": "string",
-                        "description": "Cron job name"
+                        "type": "string"
                     },
-                    "organization": {
+                    "organisation": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
-                    },
-                    "schedule": {
-                        "type": "string",
-                        "description": "Resolved cron schedule"
+                        "description": "The organisation ID"
                     },
                     "scheduleExpression": {
-                        "type": "string",
-                        "description": "Cron schedule expression"
+                        "type": "string"
                     },
                     "targetContainerName": {
-                        "type": "string",
-                        "description": "Target container name"
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2777,21 +4512,46 @@
         },
         "quant:index:Environment": {
             "properties": {
+                "albRouting": {
+                    "$ref": "#/types/quant:index/EnvironmentAlbRouting:EnvironmentAlbRouting",
+                    "description": "ALB routing configuration"
+                },
                 "application": {
                     "type": "string",
-                    "description": "Application name"
+                    "description": "The application ID"
                 },
                 "cloneConfigurationFrom": {
                     "type": "string",
                     "description": "Clone configuration from an existing environment"
                 },
                 "composeDefinition": {
-                    "type": "string",
-                    "description": "Compose definition as a JSON string"
+                    "$ref": "#/types/quant:index/EnvironmentComposeDefinition:EnvironmentComposeDefinition"
+                },
+                "containerNames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Container name list"
                 },
                 "createdAt": {
                     "type": "string",
                     "description": "Creation timestamp"
+                },
+                "crons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentCron:EnvironmentCron"
+                    },
+                    "description": "Scheduled cron jobs"
+                },
+                "deploymentFailureReason": {
+                    "type": "string",
+                    "description": "Reason for deployment failure"
+                },
+                "deploymentFailureType": {
+                    "type": "string",
+                    "description": "Type of deployment failure"
                 },
                 "deploymentStatus": {
                     "type": "string",
@@ -2803,88 +4563,141 @@
                 },
                 "envName": {
                     "type": "string",
-                    "description": "Environment name (e.g., staging, development)"
+                    "description": "Environment name (e.g., 'staging', 'development')"
                 },
-                "environmentVariables": {
-                    "type": "string",
-                    "description": "Environment variables as a JSON array of {name, value} objects"
+                "environments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentEnvironment:EnvironmentEnvironment"
+                    },
+                    "description": "Environment variables to inject"
                 },
                 "imageSuffix": {
                     "type": "string",
                     "description": "Optional image tag suffix for cloning"
                 },
+                "loadBalancer": {
+                    "$ref": "#/types/quant:index/EnvironmentLoadBalancer:EnvironmentLoadBalancer",
+                    "description": "Load balancer configuration"
+                },
                 "maxCapacity": {
                     "type": "integer",
-                    "description": "Maximum number of instances for auto-scaling"
+                    "description": "Maximum number of instances"
                 },
                 "mergeEnvironment": {
                     "type": "boolean",
-                    "description": "Whether to merge environment variables with cloned ones"
+                    "description": "Whether to merge environment variables with cloned ones (true) or replace them (false). Default: false"
                 },
                 "minCapacity": {
                     "type": "integer",
-                    "description": "Minimum number of instances for auto-scaling"
+                    "description": "Minimum number of instances"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
+                },
+                "publicIpAddress": {
+                    "type": "string",
+                    "description": "Public IP address for SSH access"
                 },
                 "runningCount": {
                     "type": "integer",
                     "description": "Number of running tasks"
                 },
+                "securityGroup": {
+                    "$ref": "#/types/quant:index/EnvironmentSecurityGroup:EnvironmentSecurityGroup",
+                    "description": "Security group configuration"
+                },
+                "service": {
+                    "$ref": "#/types/quant:index/EnvironmentService:EnvironmentService",
+                    "description": "ECS service details"
+                },
                 "spotConfiguration": {
-                    "type": "string",
-                    "description": "Spot configuration as a JSON string"
+                    "$ref": "#/types/quant:index/EnvironmentSpotConfiguration:EnvironmentSpotConfiguration",
+                    "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments."
                 },
                 "status": {
                     "type": "string",
                     "description": "Environment status"
                 },
+                "subnet": {
+                    "$ref": "#/types/quant:index/EnvironmentSubnet:EnvironmentSubnet",
+                    "description": "Subnet configuration"
+                },
+                "taskDefinition": {
+                    "$ref": "#/types/quant:index/EnvironmentTaskDefinition:EnvironmentTaskDefinition",
+                    "description": "ECS task definition details"
+                },
                 "updatedAt": {
                     "type": "string",
                     "description": "Last update timestamp"
+                },
+                "volumes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentVolume:EnvironmentVolume"
+                    },
+                    "description": "Persistent storage volumes"
+                },
+                "vpc": {
+                    "$ref": "#/types/quant:index/EnvironmentVpc:EnvironmentVpc",
+                    "description": "VPC configuration"
                 }
             },
             "required": [
+                "albRouting",
                 "application",
                 "cloneConfigurationFrom",
                 "composeDefinition",
+                "containerNames",
                 "createdAt",
+                "crons",
+                "deploymentFailureReason",
+                "deploymentFailureType",
                 "deploymentStatus",
                 "desiredCount",
                 "envName",
-                "environmentVariables",
+                "environments",
                 "imageSuffix",
+                "loadBalancer",
                 "maxCapacity",
                 "mergeEnvironment",
                 "minCapacity",
-                "organization",
+                "organisation",
+                "publicIpAddress",
                 "runningCount",
+                "securityGroup",
+                "service",
                 "spotConfiguration",
                 "status",
-                "updatedAt"
+                "subnet",
+                "taskDefinition",
+                "updatedAt",
+                "volumes",
+                "vpc"
             ],
             "inputProperties": {
                 "application": {
                     "type": "string",
-                    "description": "Application name"
+                    "description": "The application ID"
                 },
                 "cloneConfigurationFrom": {
                     "type": "string",
                     "description": "Clone configuration from an existing environment"
                 },
                 "composeDefinition": {
-                    "type": "string",
-                    "description": "Compose definition as a JSON string"
+                    "$ref": "#/types/quant:index/EnvironmentComposeDefinition:EnvironmentComposeDefinition"
                 },
                 "envName": {
                     "type": "string",
-                    "description": "Environment name (e.g., staging, development)"
+                    "description": "Environment name (e.g., 'staging', 'development')"
                 },
-                "environmentVariables": {
-                    "type": "string",
-                    "description": "Environment variables as a JSON array of {name, value} objects"
+                "environments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/EnvironmentEnvironment:EnvironmentEnvironment"
+                    },
+                    "description": "Environment variables to inject"
                 },
                 "imageSuffix": {
                     "type": "string",
@@ -2892,47 +4705,71 @@
                 },
                 "maxCapacity": {
                     "type": "integer",
-                    "description": "Maximum number of instances for auto-scaling"
+                    "description": "Maximum number of instances"
                 },
                 "mergeEnvironment": {
                     "type": "boolean",
-                    "description": "Whether to merge environment variables with cloned ones"
+                    "description": "Whether to merge environment variables with cloned ones (true) or replace them (false). Default: false"
                 },
                 "minCapacity": {
                     "type": "integer",
-                    "description": "Minimum number of instances for auto-scaling"
+                    "description": "Minimum number of instances"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 },
                 "spotConfiguration": {
-                    "type": "string",
-                    "description": "Spot configuration as a JSON string"
+                    "$ref": "#/types/quant:index/EnvironmentSpotConfiguration:EnvironmentSpotConfiguration",
+                    "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments."
                 }
             },
             "requiredInputs": [
-                "application",
                 "envName"
             ],
             "stateInputs": {
                 "description": "Input properties used for looking up and filtering Environment resources.\n",
                 "properties": {
+                    "albRouting": {
+                        "$ref": "#/types/quant:index/EnvironmentAlbRouting:EnvironmentAlbRouting",
+                        "description": "ALB routing configuration"
+                    },
                     "application": {
                         "type": "string",
-                        "description": "Application name"
+                        "description": "The application ID"
                     },
                     "cloneConfigurationFrom": {
                         "type": "string",
                         "description": "Clone configuration from an existing environment"
                     },
                     "composeDefinition": {
-                        "type": "string",
-                        "description": "Compose definition as a JSON string"
+                        "$ref": "#/types/quant:index/EnvironmentComposeDefinition:EnvironmentComposeDefinition"
+                    },
+                    "containerNames": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Container name list"
                     },
                     "createdAt": {
                         "type": "string",
                         "description": "Creation timestamp"
+                    },
+                    "crons": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/EnvironmentCron:EnvironmentCron"
+                        },
+                        "description": "Scheduled cron jobs"
+                    },
+                    "deploymentFailureReason": {
+                        "type": "string",
+                        "description": "Reason for deployment failure"
+                    },
+                    "deploymentFailureType": {
+                        "type": "string",
+                        "description": "Type of deployment failure"
                     },
                     "deploymentStatus": {
                         "type": "string",
@@ -2944,47 +4781,85 @@
                     },
                     "envName": {
                         "type": "string",
-                        "description": "Environment name (e.g., staging, development)"
+                        "description": "Environment name (e.g., 'staging', 'development')"
                     },
-                    "environmentVariables": {
-                        "type": "string",
-                        "description": "Environment variables as a JSON array of {name, value} objects"
+                    "environments": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/EnvironmentEnvironment:EnvironmentEnvironment"
+                        },
+                        "description": "Environment variables to inject"
                     },
                     "imageSuffix": {
                         "type": "string",
                         "description": "Optional image tag suffix for cloning"
                     },
+                    "loadBalancer": {
+                        "$ref": "#/types/quant:index/EnvironmentLoadBalancer:EnvironmentLoadBalancer",
+                        "description": "Load balancer configuration"
+                    },
                     "maxCapacity": {
                         "type": "integer",
-                        "description": "Maximum number of instances for auto-scaling"
+                        "description": "Maximum number of instances"
                     },
                     "mergeEnvironment": {
                         "type": "boolean",
-                        "description": "Whether to merge environment variables with cloned ones"
+                        "description": "Whether to merge environment variables with cloned ones (true) or replace them (false). Default: false"
                     },
                     "minCapacity": {
                         "type": "integer",
-                        "description": "Minimum number of instances for auto-scaling"
+                        "description": "Minimum number of instances"
                     },
-                    "organization": {
+                    "organisation": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
+                        "description": "The organisation ID"
+                    },
+                    "publicIpAddress": {
+                        "type": "string",
+                        "description": "Public IP address for SSH access"
                     },
                     "runningCount": {
                         "type": "integer",
                         "description": "Number of running tasks"
                     },
+                    "securityGroup": {
+                        "$ref": "#/types/quant:index/EnvironmentSecurityGroup:EnvironmentSecurityGroup",
+                        "description": "Security group configuration"
+                    },
+                    "service": {
+                        "$ref": "#/types/quant:index/EnvironmentService:EnvironmentService",
+                        "description": "ECS service details"
+                    },
                     "spotConfiguration": {
-                        "type": "string",
-                        "description": "Spot configuration as a JSON string"
+                        "$ref": "#/types/quant:index/EnvironmentSpotConfiguration:EnvironmentSpotConfiguration",
+                        "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments."
                     },
                     "status": {
                         "type": "string",
                         "description": "Environment status"
                     },
+                    "subnet": {
+                        "$ref": "#/types/quant:index/EnvironmentSubnet:EnvironmentSubnet",
+                        "description": "Subnet configuration"
+                    },
+                    "taskDefinition": {
+                        "$ref": "#/types/quant:index/EnvironmentTaskDefinition:EnvironmentTaskDefinition",
+                        "description": "ECS task definition details"
+                    },
                     "updatedAt": {
                         "type": "string",
                         "description": "Last update timestamp"
+                    },
+                    "volumes": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/EnvironmentVolume:EnvironmentVolume"
+                        },
+                        "description": "Persistent storage volumes"
+                    },
+                    "vpc": {
+                        "$ref": "#/types/quant:index/EnvironmentVpc:EnvironmentVpc",
+                        "description": "VPC configuration"
                     }
                 },
                 "type": "object"
@@ -3058,24 +4933,25 @@
                 },
                 "organization": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "Organization identifier"
                 },
                 "project": {
                     "type": "string",
-                    "description": "Project machine name"
+                    "description": "Project identifier"
                 },
                 "secret": {
                     "type": "boolean",
-                    "description": "Store as secret with KMS encryption"
+                    "description": "Store as secret with KMS encryption. Secrets cannot be retrieved via GET operations (returns [ENCRYPTED]). Ideal for API keys, passwords, and credentials."
                 },
                 "storeId": {
-                    "type": "string",
-                    "description": "KV store ID"
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
                 },
                 "value": {
                     "type": "string",
-                    "description": "Item value (can be a JSON string)",
-                    "secret": true
+                    "description": "Item value (can be JSON string)"
                 }
             },
             "required": [
@@ -3084,6 +4960,7 @@
                 "project",
                 "secret",
                 "storeId",
+                "success",
                 "value"
             ],
             "inputProperties": {
@@ -3093,30 +4970,26 @@
                 },
                 "organization": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "Organization identifier"
                 },
                 "project": {
                     "type": "string",
-                    "description": "Project machine name"
+                    "description": "Project identifier"
                 },
                 "secret": {
                     "type": "boolean",
-                    "description": "Store as secret with KMS encryption"
+                    "description": "Store as secret with KMS encryption. Secrets cannot be retrieved via GET operations (returns [ENCRYPTED]). Ideal for API keys, passwords, and credentials."
                 },
                 "storeId": {
-                    "type": "string",
-                    "description": "KV store ID"
+                    "type": "string"
                 },
                 "value": {
                     "type": "string",
-                    "description": "Item value (can be a JSON string)",
-                    "secret": true
+                    "description": "Item value (can be JSON string)"
                 }
             },
             "requiredInputs": [
                 "key",
-                "project",
-                "storeId",
                 "value"
             ],
             "stateInputs": {
@@ -3128,24 +5001,25 @@
                     },
                     "organization": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
+                        "description": "Organization identifier"
                     },
                     "project": {
                         "type": "string",
-                        "description": "Project machine name"
+                        "description": "Project identifier"
                     },
                     "secret": {
                         "type": "boolean",
-                        "description": "Store as secret with KMS encryption"
+                        "description": "Store as secret with KMS encryption. Secrets cannot be retrieved via GET operations (returns [ENCRYPTED]). Ideal for API keys, passwords, and credentials."
                     },
                     "storeId": {
-                        "type": "string",
-                        "description": "KV store ID"
+                        "type": "string"
+                    },
+                    "success": {
+                        "type": "boolean"
                     },
                     "value": {
                         "type": "string",
-                        "description": "Item value (can be a JSON string)",
-                        "secret": true
+                        "description": "Item value (can be JSON string)"
                     }
                 },
                 "type": "object"
@@ -3159,15 +5033,14 @@
                 },
                 "organization": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "Organization identifier"
                 },
                 "project": {
                     "type": "string",
-                    "description": "Project machine name"
+                    "description": "Project identifier"
                 },
                 "storeId": {
-                    "type": "string",
-                    "description": "Store ID"
+                    "type": "string"
                 }
             },
             "required": [
@@ -3183,16 +5056,16 @@
                 },
                 "organization": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "Organization identifier"
                 },
                 "project": {
                     "type": "string",
-                    "description": "Project machine name"
+                    "description": "Project identifier"
+                },
+                "storeId": {
+                    "type": "string"
                 }
             },
-            "requiredInputs": [
-                "project"
-            ],
             "stateInputs": {
                 "description": "Input properties used for looking up and filtering KvStore resources.\n",
                 "properties": {
@@ -3202,15 +5075,14 @@
                     },
                     "organization": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
+                        "description": "Organization identifier"
                     },
                     "project": {
                         "type": "string",
-                        "description": "Project machine name"
+                        "description": "Project identifier"
                     },
                     "storeId": {
-                        "type": "string",
-                        "description": "Store ID"
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -3397,10 +5269,27 @@
                 "actionConfig": {
                     "$ref": "#/types/quant:index/RuleAuthActionConfig:RuleAuthActionConfig"
                 },
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "authPass": {
                     "type": "string",
-                    "description": "Authentication password",
-                    "secret": true
+                    "description": "Authentication password"
                 },
                 "authUser": {
                     "type": "string",
@@ -3514,6 +5403,9 @@
             "required": [
                 "action",
                 "actionConfig",
+                "asn",
+                "asnIs",
+                "asnIsNots",
                 "authPass",
                 "authUser",
                 "country",
@@ -3538,10 +5430,27 @@
                 "weight"
             ],
             "inputProperties": {
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "authPass": {
                     "type": "string",
-                    "description": "Authentication password",
-                    "secret": true
+                    "description": "Authentication password"
                 },
                 "authUser": {
                     "type": "string",
@@ -3660,10 +5569,27 @@
                     "actionConfig": {
                         "$ref": "#/types/quant:index/RuleAuthActionConfig:RuleAuthActionConfig"
                     },
+                    "asn": {
+                        "type": "string",
+                        "description": "ASN filter type (asn_is, asn_is_not, any)"
+                    },
+                    "asnIs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Allowed AS numbers"
+                    },
+                    "asnIsNots": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Excluded AS numbers"
+                    },
                     "authPass": {
                         "type": "string",
-                        "description": "Authentication password",
-                        "secret": true
+                        "description": "Authentication password"
                     },
                     "authUser": {
                         "type": "string",
@@ -3786,6 +5712,24 @@
                 "actionConfig": {
                     "$ref": "#/types/quant:index/RuleBotChallengeActionConfig:RuleBotChallengeActionConfig"
                 },
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "country": {
                     "type": "string",
                     "description": "Country filter type (country_is, country_is_not, any)"
@@ -3906,6 +5850,9 @@
             "required": [
                 "action",
                 "actionConfig",
+                "asn",
+                "asnIs",
+                "asnIsNots",
                 "country",
                 "countryIs",
                 "countryIsNots",
@@ -3931,6 +5878,24 @@
                 "weight"
             ],
             "inputProperties": {
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "country": {
                     "type": "string",
                     "description": "Country filter type (country_is, country_is_not, any)"
@@ -4054,6 +6019,24 @@
                     },
                     "actionConfig": {
                         "$ref": "#/types/quant:index/RuleBotChallengeActionConfig:RuleBotChallengeActionConfig"
+                    },
+                    "asn": {
+                        "type": "string",
+                        "description": "ASN filter type (asn_is, asn_is_not, any)"
+                    },
+                    "asnIs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Allowed AS numbers"
+                    },
+                    "asnIsNots": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Excluded AS numbers"
                     },
                     "country": {
                         "type": "string",
@@ -5510,6 +7493,24 @@
                 "actionConfig": {
                     "$ref": "#/types/quant:index/RuleHeadersActionConfig:RuleHeadersActionConfig"
                 },
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "country": {
                     "type": "string",
                     "description": "Country filter type (country_is, country_is_not, any)"
@@ -5625,6 +7626,9 @@
             "required": [
                 "action",
                 "actionConfig",
+                "asn",
+                "asnIs",
+                "asnIsNots",
                 "country",
                 "countryIs",
                 "countryIsNots",
@@ -5648,6 +7652,24 @@
                 "weight"
             ],
             "inputProperties": {
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "country": {
                     "type": "string",
                     "description": "Country filter type (country_is, country_is_not, any)"
@@ -5766,6 +7788,24 @@
                     },
                     "actionConfig": {
                         "$ref": "#/types/quant:index/RuleHeadersActionConfig:RuleHeadersActionConfig"
+                    },
+                    "asn": {
+                        "type": "string",
+                        "description": "ASN filter type (asn_is, asn_is_not, any)"
+                    },
+                    "asnIs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Allowed AS numbers"
+                    },
+                    "asnIsNots": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Excluded AS numbers"
                     },
                     "country": {
                         "type": "string",
@@ -7101,6 +9141,24 @@
                 "actionConfig": {
                     "$ref": "#/types/quant:index/RuleServeStaticActionConfig:RuleServeStaticActionConfig"
                 },
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "country": {
                     "type": "string",
                     "description": "Country filter type (country_is, country_is_not, any)"
@@ -7213,6 +9271,9 @@
             "required": [
                 "action",
                 "actionConfig",
+                "asn",
+                "asnIs",
+                "asnIsNots",
                 "country",
                 "countryIs",
                 "countryIsNots",
@@ -7236,6 +9297,24 @@
                 "weight"
             ],
             "inputProperties": {
+                "asn": {
+                    "type": "string",
+                    "description": "ASN filter type (asn_is, asn_is_not, any)"
+                },
+                "asnIs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Allowed AS numbers"
+                },
+                "asnIsNots": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Excluded AS numbers"
+                },
                 "country": {
                     "type": "string",
                     "description": "Country filter type (country_is, country_is_not, any)"
@@ -7352,6 +9431,24 @@
                     "actionConfig": {
                         "$ref": "#/types/quant:index/RuleServeStaticActionConfig:RuleServeStaticActionConfig"
                     },
+                    "asn": {
+                        "type": "string",
+                        "description": "ASN filter type (asn_is, asn_is_not, any)"
+                    },
+                    "asnIs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Allowed AS numbers"
+                    },
+                    "asnIsNots": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Excluded AS numbers"
+                    },
                     "country": {
                         "type": "string",
                         "description": "Country filter type (country_is, country_is_not, any)"
@@ -7464,23 +9561,189 @@
                 "type": "object"
             }
         },
+        "quant:index:SlackBot": {
+            "properties": {
+                "agentId": {
+                    "type": "string",
+                    "description": "The AI agent that powers this bot"
+                },
+                "allowedChannels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack channel IDs the bot may respond in"
+                },
+                "bot": {
+                    "$ref": "#/types/quant:index/SlackBotBot:SlackBotBot"
+                },
+                "botId": {
+                    "type": "string",
+                    "description": "The Slack bot ID"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Keywords that trigger the bot"
+                },
+                "keywordsEnabled": {
+                    "type": "boolean",
+                    "description": "Whether keyword triggers are enabled"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "sessionTtlDays": {
+                    "type": "integer",
+                    "description": "Session TTL in days"
+                },
+                "setupType": {
+                    "type": "string",
+                    "description": "Whether to use Quant-managed or customer-provided Slack app"
+                },
+                "slashCommands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slash commands the bot responds to"
+                }
+            },
+            "required": [
+                "agentId",
+                "allowedChannels",
+                "bot",
+                "botId",
+                "keywords",
+                "keywordsEnabled",
+                "organisation",
+                "sessionTtlDays",
+                "setupType",
+                "slashCommands"
+            ],
+            "inputProperties": {
+                "agentId": {
+                    "type": "string",
+                    "description": "The AI agent that powers this bot"
+                },
+                "allowedChannels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack channel IDs the bot may respond in"
+                },
+                "botId": {
+                    "type": "string",
+                    "description": "The Slack bot ID"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Keywords that trigger the bot"
+                },
+                "keywordsEnabled": {
+                    "type": "boolean",
+                    "description": "Whether keyword triggers are enabled"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "sessionTtlDays": {
+                    "type": "integer",
+                    "description": "Session TTL in days"
+                },
+                "setupType": {
+                    "type": "string",
+                    "description": "Whether to use Quant-managed or customer-provided Slack app"
+                },
+                "slashCommands": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slash commands the bot responds to"
+                }
+            },
+            "requiredInputs": [
+                "agentId",
+                "setupType"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering SlackBot resources.\n",
+                "properties": {
+                    "agentId": {
+                        "type": "string",
+                        "description": "The AI agent that powers this bot"
+                    },
+                    "allowedChannels": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Slack channel IDs the bot may respond in"
+                    },
+                    "bot": {
+                        "$ref": "#/types/quant:index/SlackBotBot:SlackBotBot"
+                    },
+                    "botId": {
+                        "type": "string",
+                        "description": "The Slack bot ID"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Keywords that trigger the bot"
+                    },
+                    "keywordsEnabled": {
+                        "type": "boolean",
+                        "description": "Whether keyword triggers are enabled"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "The organisation ID"
+                    },
+                    "sessionTtlDays": {
+                        "type": "integer",
+                        "description": "Session TTL in days"
+                    },
+                    "setupType": {
+                        "type": "string",
+                        "description": "Whether to use Quant-managed or customer-provided Slack app"
+                    },
+                    "slashCommands": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Slash commands the bot responds to"
+                    }
+                },
+                "type": "object"
+            }
+        },
         "quant:index:Volume": {
             "properties": {
                 "accessPointArn": {
-                    "type": "string",
-                    "description": "EFS access point ARN"
+                    "type": "string"
                 },
                 "accessPointId": {
-                    "type": "string",
-                    "description": "EFS access point ID"
+                    "type": "string"
                 },
                 "application": {
                     "type": "string",
-                    "description": "Application name"
+                    "description": "The application ID"
                 },
                 "createdAt": {
-                    "type": "string",
-                    "description": "Creation timestamp"
+                    "type": "string"
                 },
                 "description": {
                     "type": "string",
@@ -7488,23 +9751,25 @@
                 },
                 "environment": {
                     "type": "string",
-                    "description": "Environment name"
+                    "description": "The environment ID"
                 },
                 "environmentEfsId": {
-                    "type": "string",
-                    "description": "EFS filesystem ID"
+                    "type": "string"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 },
                 "rootDirectory": {
                     "type": "string",
                     "description": "Root directory path"
                 },
-                "volumeId": {
+                "volume": {
                     "type": "string",
-                    "description": "Volume ID"
+                    "description": "The volume ID"
+                },
+                "volumeId": {
+                    "type": "string"
                 },
                 "volumeName": {
                     "type": "string",
@@ -7519,15 +9784,16 @@
                 "description",
                 "environment",
                 "environmentEfsId",
-                "organization",
+                "organisation",
                 "rootDirectory",
+                "volume",
                 "volumeId",
                 "volumeName"
             ],
             "inputProperties": {
                 "application": {
                     "type": "string",
-                    "description": "Application name"
+                    "description": "The application ID"
                 },
                 "description": {
                     "type": "string",
@@ -7535,15 +9801,19 @@
                 },
                 "environment": {
                     "type": "string",
-                    "description": "Environment name"
+                    "description": "The environment ID"
                 },
-                "organization": {
+                "organisation": {
                     "type": "string",
-                    "description": "Organization machine name (defaults to provider organization)"
+                    "description": "The organisation ID"
                 },
                 "rootDirectory": {
                     "type": "string",
                     "description": "Root directory path"
+                },
+                "volume": {
+                    "type": "string",
+                    "description": "The volume ID"
                 },
                 "volumeName": {
                     "type": "string",
@@ -7551,28 +9821,23 @@
                 }
             },
             "requiredInputs": [
-                "application",
-                "environment",
                 "volumeName"
             ],
             "stateInputs": {
                 "description": "Input properties used for looking up and filtering Volume resources.\n",
                 "properties": {
                     "accessPointArn": {
-                        "type": "string",
-                        "description": "EFS access point ARN"
+                        "type": "string"
                     },
                     "accessPointId": {
-                        "type": "string",
-                        "description": "EFS access point ID"
+                        "type": "string"
                     },
                     "application": {
                         "type": "string",
-                        "description": "Application name"
+                        "description": "The application ID"
                     },
                     "createdAt": {
-                        "type": "string",
-                        "description": "Creation timestamp"
+                        "type": "string"
                     },
                     "description": {
                         "type": "string",
@@ -7580,23 +9845,25 @@
                     },
                     "environment": {
                         "type": "string",
-                        "description": "Environment name"
+                        "description": "The environment ID"
                     },
                     "environmentEfsId": {
-                        "type": "string",
-                        "description": "EFS filesystem ID"
+                        "type": "string"
                     },
-                    "organization": {
+                    "organisation": {
                         "type": "string",
-                        "description": "Organization machine name (defaults to provider organization)"
+                        "description": "The organisation ID"
                     },
                     "rootDirectory": {
                         "type": "string",
                         "description": "Root directory path"
                     },
-                    "volumeId": {
+                    "volume": {
                         "type": "string",
-                        "description": "Volume ID"
+                        "description": "The volume ID"
+                    },
+                    "volumeId": {
+                        "type": "string"
                     },
                     "volumeName": {
                         "type": "string",

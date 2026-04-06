@@ -2,21 +2,21 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_environment"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_environment"
 )
 
 var (
@@ -151,8 +151,8 @@ func (r *environmentResource) ImportState(ctx context.Context, req resource.Impo
 }
 
 func (r *environmentResource) getOrg(data *resource_environment.EnvironmentModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -190,32 +190,56 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 		sdkReq.MergeEnvironment = &v
 	}
 
-	// Parse compose definition if provided
+	// ComposeDefinition — build the SDK Compose struct field-by-field from
+	// the typed Terraform value to avoid json.Marshal on Terraform internal types.
 	if !data.ComposeDefinition.IsNull() && !data.ComposeDefinition.IsUnknown() {
-		var compose quantadmingo.Compose
-		if err := json.Unmarshal([]byte(data.ComposeDefinition.ValueString()), &compose); err != nil {
-			diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition JSON", err.Error())
+		cd := data.ComposeDefinition
+		cf := composeFields{
+			Architecture:             cd.Architecture,
+			Containers:               cd.Containers,
+			EnableCrossAppNetworking: cd.EnableCrossAppNetworking,
+			EnableCrossEnvNetworking: cd.EnableCrossEnvNetworking,
+			MaxCapacity:              cd.MaxCapacity,
+			MinCapacity:              cd.MinCapacity,
+			SpotConfiguration:        cd.SpotConfiguration,
+			TaskCpu:                  cd.TaskCpu,
+			TaskMemory:               cd.TaskMemory,
+		}
+		compose, d := buildSDKCompose(ctx, cf)
+		diags.Append(d...)
+		if diags.HasError() {
 			return
 		}
 		sdkReq.ComposeDefinition = &compose
 	}
 
-	// Parse spot configuration if provided
+	// SpotConfiguration — build from typed Terraform value.
 	if !data.SpotConfiguration.IsNull() && !data.SpotConfiguration.IsUnknown() {
-		var spot quantadmingo.SpotConfiguration
-		if err := json.Unmarshal([]byte(data.SpotConfiguration.ValueString()), &spot); err != nil {
-			diags.AddAttributeError(path.Root("spot_configuration"), "Invalid spot_configuration JSON", err.Error())
-			return
+		if !data.SpotConfiguration.Strategy.IsNull() && !data.SpotConfiguration.Strategy.IsUnknown() {
+			spot := quantadmingo.NewSpotConfiguration(data.SpotConfiguration.Strategy.ValueString())
+			sdkReq.SpotConfiguration = spot
 		}
-		sdkReq.SpotConfiguration = &spot
 	}
 
-	// Parse environment variables if provided
-	if !data.EnvironmentVariables.IsNull() && !data.EnvironmentVariables.IsUnknown() {
-		var envVars []quantadmingo.CreateEnvironmentRequestEnvironmentInner
-		if err := json.Unmarshal([]byte(data.EnvironmentVariables.ValueString()), &envVars); err != nil {
-			diags.AddAttributeError(path.Root("environment_variables"), "Invalid environment_variables JSON", err.Error())
+	// Environment variables — now a types.List of nested EnvironmentValue objects.
+	if !data.Environment.IsNull() && !data.Environment.IsUnknown() {
+		var envValues []resource_environment.EnvironmentValue
+		diags.Append(data.Environment.ElementsAs(ctx, &envValues, false)...)
+		if diags.HasError() {
 			return
+		}
+		var envVars []quantadmingo.CreateEnvironmentRequestEnvironmentInner
+		for _, ev := range envValues {
+			item := quantadmingo.NewCreateEnvironmentRequestEnvironmentInner()
+			if !ev.Name.IsNull() && !ev.Name.IsUnknown() {
+				v := ev.Name.ValueString()
+				item.Name = &v
+			}
+			if !ev.Value.IsNull() && !ev.Value.IsUnknown() {
+				v := ev.Value.ValueString()
+				item.Value = &v
+			}
+			envVars = append(envVars, *item)
 		}
 		sdkReq.Environment = envVars
 	}
@@ -242,7 +266,7 @@ func callEnvironmentCreateAPI(ctx context.Context, r *environmentResource, data 
 	}
 
 	data.EnvName = types.StringValue(envResp.GetEnvName())
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
 	// Poll until environment is ready
 	createStateConf := retry.StateChangeConf{
@@ -317,71 +341,164 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 		return
 	}
 
+	// --- Scalar fields ---
 	data.EnvName = types.StringValue(env.GetEnvName())
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
 
-	if env.Status != nil {
-		data.Status = types.StringValue(*env.Status)
+	if env.HasStatus() {
+		data.Status = types.StringValue(env.GetStatus())
 	} else {
 		data.Status = types.StringNull()
 	}
 
-	if env.RunningCount != nil {
-		data.RunningCount = types.Int64Value(int64(*env.RunningCount))
+	if env.HasRunningCount() {
+		data.RunningCount = types.Int64Value(int64(env.GetRunningCount()))
 	} else {
 		data.RunningCount = types.Int64Null()
 	}
 
-	if env.DesiredCount != nil {
-		data.DesiredCount = types.Int64Value(int64(*env.DesiredCount))
+	if env.HasDesiredCount() {
+		data.DesiredCount = types.Int64Value(int64(env.GetDesiredCount()))
 	} else {
 		data.DesiredCount = types.Int64Null()
 	}
 
-	if env.MinCapacity != nil {
-		data.MinCapacity = types.Int64Value(int64(*env.MinCapacity))
+	if env.HasMinCapacity() {
+		data.MinCapacity = types.Int64Value(int64(env.GetMinCapacity()))
+	} else {
+		data.MinCapacity = types.Int64Null()
 	}
 
-	if env.MaxCapacity != nil {
-		data.MaxCapacity = types.Int64Value(int64(*env.MaxCapacity))
+	if env.HasMaxCapacity() {
+		data.MaxCapacity = types.Int64Value(int64(env.GetMaxCapacity()))
+	} else {
+		data.MaxCapacity = types.Int64Null()
 	}
 
-	if env.DeploymentStatus != nil {
-		data.DeploymentStatus = types.StringValue(*env.DeploymentStatus)
+	if env.HasDeploymentStatus() {
+		data.DeploymentStatus = types.StringValue(env.GetDeploymentStatus())
 	} else {
 		data.DeploymentStatus = types.StringNull()
 	}
 
-	if env.CreatedAt != nil {
-		data.CreatedAt = types.StringValue(env.CreatedAt.Format(time.RFC3339))
+	if env.HasDeploymentFailureType() {
+		data.DeploymentFailureType = types.StringValue(env.GetDeploymentFailureType())
 	} else {
-		data.CreatedAt = types.StringNull()
+		data.DeploymentFailureType = types.StringNull()
 	}
 
-	if env.UpdatedAt != nil {
-		data.UpdatedAt = types.StringValue(env.UpdatedAt.Format(time.RFC3339))
+	if env.HasDeploymentFailureReason() {
+		data.DeploymentFailureReason = types.StringValue(env.GetDeploymentFailureReason())
 	} else {
-		data.UpdatedAt = types.StringNull()
+		data.DeploymentFailureReason = types.StringNull()
 	}
 
-	// Resolve unknown optional/computed fields to null
+	if env.HasPublicIpAddress() {
+		data.PublicIpAddress = types.StringValue(env.GetPublicIpAddress())
+	} else {
+		data.PublicIpAddress = types.StringNull()
+	}
+
+	data.CreatedAt = optionalTime(env.GetCreatedAtOk())
+	data.UpdatedAt = optionalTime(env.GetUpdatedAtOk())
+
+	// --- Volumes ---
+	if env.HasVolumes() {
+		volList, d := buildEnvVolumesListFromSDK(ctx, env.GetVolumes())
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Volumes = volList
+		}
+	} else {
+		data.Volumes = types.ListNull(resource_environment.VolumesValue{}.Type(ctx))
+	}
+
+	// --- Cron ---
+	if env.HasCron() {
+		cronList, d := buildEnvCronListFromSDK(ctx, env.GetCron())
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Cron = cronList
+		}
+	} else {
+		data.Cron = types.ListNull(resource_environment.CronValue{}.Type(ctx))
+	}
+
+	// --- ContainerNames ---
+	// EnvironmentResponse returns containers as []map[string]interface{};
+	// extract "name" from each for the containerNames list.
+	if env.HasContainers() {
+		sdkContainers := env.GetContainers()
+		names := make([]string, 0, len(sdkContainers))
+		for _, c := range sdkContainers {
+			if name, ok := c["name"]; ok {
+				if nameStr, ok := name.(string); ok && nameStr != "" {
+					names = append(names, nameStr)
+				}
+			}
+		}
+		if len(names) > 0 {
+			namesList, d := types.ListValueFrom(ctx, types.StringType, names)
+			diags.Append(d...)
+			data.ContainerNames = namesList
+		} else {
+			data.ContainerNames = types.ListNull(types.StringType)
+		}
+	} else {
+		data.ContainerNames = types.ListNull(types.StringType)
+	}
+
+	// --- ComposeDefinition ---
+	// The EnvironmentResponse SDK model does not include composeDefinition.
+	// Preserve user-configured state if known; null out unknowns.
+	if data.ComposeDefinition.IsUnknown() {
+		data.ComposeDefinition = resource_environment.NewComposeDefinitionValueNull()
+	}
+
+	// --- SpotConfiguration ---
+	// The EnvironmentResponse SDK model does not include spotConfiguration.
+	// Preserve user-configured state if known; null out unknowns.
+	if data.SpotConfiguration.IsUnknown() {
+		data.SpotConfiguration = resource_environment.NewSpotConfigurationValueNull()
+	}
+
+	// --- Environment (env vars) ---
+	// The EnvironmentResponse SDK model does not include environment variables.
+	// Preserve user-configured state if known; null out unknowns.
+	// Build a canonical EnvironmentValue to get the correct DocumentsType
+	// (zero-value types would have empty AttrTypes → dynamic element type).
+	if data.Environment.IsUnknown() || data.Environment.IsNull() || data.Environment.ElementType(ctx) == nil {
+		envAttrTypes := resource_environment.EnvironmentValue{}.AttributeTypes(ctx)
+		canonicalEnv, _ := resource_environment.NewEnvironmentValue(envAttrTypes, map[string]attr.Value{
+			"name":  types.StringNull(),
+			"value": types.StringNull(),
+		})
+		data.Environment = types.ListNull(canonicalEnv.Type(ctx))
+	}
+
+	// --- Read-only server infrastructure fields ---
+	// These are readOnly=true in the OA spec (users never set them).
+	// Null them to avoid drift issues with opaque server-side data.
+	data.AlbRouting = resource_environment.NewAlbRoutingValueNull()
+	data.LoadBalancer = resource_environment.NewLoadBalancerValueNull()
+	data.SecurityGroup = resource_environment.NewSecurityGroupValueNull()
+	data.Service = resource_environment.NewServiceValueNull()
+	data.Subnet = resource_environment.NewSubnetValueNull()
+	data.TaskDefinition = resource_environment.NewTaskDefinitionValueNull()
+	data.Vpc = resource_environment.NewVpcValueNull()
+
+	// --- Create-only scalars: preserve if known, null out unknowns ---
 	if data.CloneConfigurationFrom.IsUnknown() {
 		data.CloneConfigurationFrom = types.StringNull()
 	}
 	if data.ImageSuffix.IsUnknown() {
 		data.ImageSuffix = types.StringNull()
 	}
-	if data.SpotConfiguration.IsUnknown() {
-		data.SpotConfiguration = types.StringNull()
-	}
-	if data.EnvironmentVariables.IsUnknown() {
-		data.EnvironmentVariables = types.StringNull()
-	}
 	if data.MergeEnvironment.IsUnknown() {
 		data.MergeEnvironment = types.BoolNull()
 	}
-	if data.ComposeDefinition.IsUnknown() {
-		data.ComposeDefinition = types.StringNull()
+	if data.Application.IsUnknown() {
+		data.Application = types.StringNull()
 	}
 
 	return
@@ -393,9 +510,21 @@ func callEnvironmentUpdateAPI(ctx context.Context, r *environmentResource, data 
 		return
 	}
 
-	var compose quantadmingo.Compose
-	if err := json.Unmarshal([]byte(data.ComposeDefinition.ValueString()), &compose); err != nil {
-		diags.AddAttributeError(path.Root("compose_definition"), "Invalid compose_definition JSON", err.Error())
+	cd := data.ComposeDefinition
+	cf := composeFields{
+		Architecture:             cd.Architecture,
+		Containers:               cd.Containers,
+		EnableCrossAppNetworking: cd.EnableCrossAppNetworking,
+		EnableCrossEnvNetworking: cd.EnableCrossEnvNetworking,
+		MaxCapacity:              cd.MaxCapacity,
+		MinCapacity:              cd.MinCapacity,
+		SpotConfiguration:        cd.SpotConfiguration,
+		TaskCpu:                  cd.TaskCpu,
+		TaskMemory:               cd.TaskMemory,
+	}
+	compose, d := buildSDKCompose(ctx, cf)
+	diags.Append(d...)
+	if diags.HasError() {
 		return
 	}
 

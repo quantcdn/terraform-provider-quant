@@ -132,8 +132,8 @@ func (r *volumeResource) ImportState(ctx context.Context, req resource.ImportSta
 }
 
 func (r *volumeResource) getOrg(data *resource_volume.VolumeModel) string {
-	if !data.Organization.IsNull() && !data.Organization.IsUnknown() {
-		return data.Organization.ValueString()
+	if !data.Organisation.IsNull() && !data.Organisation.IsUnknown() {
+		return data.Organisation.ValueString()
 	}
 	return r.client.Organization
 }
@@ -176,7 +176,18 @@ func callVolumeCreateAPI(ctx context.Context, r *volumeResource, data *resource_
 
 	// Map response to model
 	mapVolumeResponse(vol, data)
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
+
+	// Resolve any remaining unknown Computed fields not covered by mapVolumeResponse
+	if data.Application.IsUnknown() {
+		data.Application = types.StringNull()
+	}
+	if data.Environment.IsUnknown() {
+		data.Environment = types.StringNull()
+	}
+	if data.Volume.IsUnknown() {
+		data.Volume = types.StringNull()
+	}
 
 	return
 }
@@ -210,7 +221,18 @@ func callVolumeReadAPI(ctx context.Context, r *volumeResource, data *resource_vo
 	}
 
 	mapVolumeResponse(vol, data)
-	data.Organization = types.StringValue(org)
+	data.Organisation = types.StringValue(org)
+
+	// Resolve any remaining unknown Computed fields not covered by mapVolumeResponse
+	if data.Application.IsUnknown() {
+		data.Application = types.StringNull()
+	}
+	if data.Environment.IsUnknown() {
+		data.Environment = types.StringNull()
+	}
+	if data.Volume.IsUnknown() {
+		data.Volume = types.StringNull()
+	}
 
 	return
 }
@@ -237,8 +259,13 @@ func callVolumeDeleteAPI(ctx context.Context, r *volumeResource, data *resource_
 func mapVolumeResponse(vol *quantadmingo.Volume, data *resource_volume.VolumeModel) {
 	if vol.VolumeId != nil {
 		data.VolumeId = types.StringValue(*vol.VolumeId)
+		// Also set the "volume" alias field to the same value
+		data.Volume = types.StringValue(*vol.VolumeId)
 	} else {
 		data.VolumeId = types.StringNull()
+		if data.Volume.IsUnknown() {
+			data.Volume = types.StringNull()
+		}
 	}
 	if vol.VolumeName != nil {
 		data.VolumeName = types.StringValue(*vol.VolumeName)

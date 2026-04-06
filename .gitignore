@@ -34,3 +34,9 @@ pulumi/bin/
 # Test artifacts
 coverage.out
 coverage2.out
+
+# Plans and working docs
+docs/plans/
+
+# Pulumi test state artifacts
+pulumi/e2e/programs/*/Pulumi.test.yaml

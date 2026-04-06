@@ -5,16 +5,17 @@ SCHEMA_DIR := schema
 build: tfgen provider
 
 tfgen:
-	go build -o bin/pulumi-tfgen-quant ./cmd/pulumi-tfgen-quant
+	go build -o bin/pulumi-tfgen-quant ./provider/cmd/pulumi-tfgen-quant
 
 provider:
-	go build -o bin/pulumi-resource-quant ./cmd/pulumi-resource-quant
+	go build -o bin/pulumi-resource-quant ./provider/cmd/pulumi-resource-quant
 
 generate: tfgen
 	mkdir -p $(SCHEMA_DIR)
 	./bin/pulumi-tfgen-quant schema --out $(SCHEMA_DIR)
-	cp $(SCHEMA_DIR)/schema.json cmd/pulumi-resource-quant/schema.json
+	cp $(SCHEMA_DIR)/schema.json provider/cmd/pulumi-resource-quant/schema.json
 	cp $(SCHEMA_DIR)/bridge-metadata.json provider/bridge-metadata.json
+	cp $(SCHEMA_DIR)/bridge-metadata.json provider/cmd/pulumi-resource-quant/bridge-metadata.json
 
 test: ## Run mock acceptance tests (preview-based, no API needed)
 	go test -v -cover ./provider/
