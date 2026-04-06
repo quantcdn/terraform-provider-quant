@@ -15,18 +15,21 @@ import (
 )
 
 var projectResponse = map[string]interface{}{
-	"id":                 123,
-	"name":               "test-project",
-	"allow_query_params": false,
-	"region":             "au",
-	"uuid":               "123",
-	"machine_name":       "test-project",
-	"disable_revisions":  true,
-	"fastly_migrated":    1,
-	"project_type":       "normal",
-	"organization":       "test-organization",
-	"parent_project_id":  0,
-	"write_token":        "test-write-token-123",
+	"id":                           123,
+	"name":                         "test-project",
+	"allow_query_params":           false,
+	"region":                       "au",
+	"uuid":                         "123",
+	"machine_name":                 "test-project",
+	"disable_revisions":            true,
+	"fastly_migrated":              1,
+	"project_type":                 "normal",
+	"organization":                 "test-organization",
+	"parent_project_id":            0,
+	"write_token":                  "test-write-token-123",
+	// Provider Create polls until platform_provisioning_status == "deployed".
+	// Set it to "deployed" so the mock returns immediately.
+	"platform_provisioning_status": "deployed",
 }
 
 func mockProjectServer(t *testing.T, organizationID string, projectID string) {

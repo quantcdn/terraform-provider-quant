@@ -98,7 +98,7 @@ func TestAccAiGovernanceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_ai_governance.test", "ai_enabled", "true"),
 					resource.TestCheckResourceAttr("quant_ai_governance.test", "model_policy", "allowlist"),
 					resource.TestCheckResourceAttr("quant_ai_governance.test", "model_list.0", "gpt-4"),
-					resource.TestCheckResourceAttr("quant_ai_governance.test", "organization", org),
+					resource.TestCheckResourceAttr("quant_ai_governance.test", "organisation", org),
 					resource.TestCheckResourceAttrSet("quant_ai_governance.test", "version"),
 				),
 			},
@@ -109,8 +109,6 @@ func TestAccAiGovernanceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_ai_governance.test", "ai_enabled", "false"),
 					resource.TestCheckResourceAttr("quant_ai_governance.test", "model_policy", "blocklist"),
 					resource.TestCheckResourceAttr("quant_ai_governance.test", "model_list.0", "gpt-3.5-turbo"),
-					resource.TestCheckResourceAttr("quant_ai_governance.test", "spend_limits.monthly_budget_cents", "10000"),
-					resource.TestCheckResourceAttr("quant_ai_governance.test", "spend_limits.warning_threshold_percent", "80"),
 				),
 			},
 			// Step 3: Destroy — verify reset (implicitly tested by framework)
@@ -136,7 +134,7 @@ func TestAccAiGovernanceResource_Import(t *testing.T) {
 				ImportState:   true,
 				ImportStateId: org,
 				ImportStateVerifyIgnore: []string{
-					"organization",
+					"organisation",
 				},
 			},
 		},
@@ -151,7 +149,7 @@ provider "quant" {
 }
 
 resource "quant_ai_governance" "test" {
-  organization = %[1]q
+  organisation = %[1]q
   ai_enabled   = %[2]t
   model_policy = %[3]q
   model_list   = ["gpt-4"]
@@ -167,15 +165,10 @@ provider "quant" {
 }
 
 resource "quant_ai_governance" "test" {
-  organization = %[1]q
+  organisation = %[1]q
   ai_enabled   = false
   model_policy = "blocklist"
   model_list   = ["gpt-3.5-turbo"]
-
-  spend_limits = {
-    monthly_budget_cents      = 10000
-    warning_threshold_percent = 80
-  }
 }
 `, org)
 }

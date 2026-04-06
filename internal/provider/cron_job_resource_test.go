@@ -100,13 +100,14 @@ func TestAccCronJobResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccCronJobResourceConfig(org, app, env, cronName, "0 * * * *", `["echo","hello"]`),
+				Config: testAccCronJobResourceConfig(org, app, env, cronName, "0 * * * *", `["echo", "hello"]`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_cron_job.test", "name", "backup"),
 					resource.TestCheckResourceAttr("quant_cron_job.test", "application", "test-app"),
 					resource.TestCheckResourceAttr("quant_cron_job.test", "environment", "production"),
-					resource.TestCheckResourceAttr("quant_cron_job.test", "schedule", "0 * * * *"),
-					resource.TestCheckResourceAttr("quant_cron_job.test", "command", `["echo","hello"]`),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "schedule_expression", "0 * * * *"),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "command.0", "echo"),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "command.1", "hello"),
 				),
 			},
 			// Import testing
@@ -115,20 +116,20 @@ func TestAccCronJobResource(t *testing.T) {
 				ImportState:   true,
 				ImportStateId: fmt.Sprintf("%s/%s/%s", app, env, cronName),
 				ImportStateVerifyIgnore: []string{
-					"schedule_expression",
 					"description",
 					"target_container_name",
 					"is_enabled",
-					"organization",
+					"organisation",
 				},
 			},
 			// Update and Read testing
 			{
-				Config: testAccCronJobResourceConfig(org, app, env, cronName, "*/5 * * * *", `["echo","updated"]`),
+				Config: testAccCronJobResourceConfig(org, app, env, cronName, "*/5 * * * *", `["echo", "updated"]`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_cron_job.test", "name", "backup"),
 					resource.TestCheckResourceAttr("quant_cron_job.test", "schedule_expression", "*/5 * * * *"),
-					resource.TestCheckResourceAttr("quant_cron_job.test", "command", `["echo","updated"]`),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "command.0", "echo"),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "command.1", "updated"),
 				),
 			},
 		},
@@ -143,12 +144,12 @@ provider "quant" {
 }
 
 resource "quant_cron_job" "test" {
-  organization        = %[1]q
+  organisation        = %[1]q
   application         = %[2]q
   environment         = %[3]q
   name                = %[4]q
   schedule_expression = %[5]q
-  command             = %[6]q
+  command             = %[6]s
 }
 `, org, app, env, name, schedule, command)
 }
@@ -179,12 +180,12 @@ provider "quant" {
 }
 
 resource "quant_cron_job" "test" {
-  organization        = "test-org"
+  organisation        = "test-org"
   application         = "test-app"
   environment         = "production"
   name                = "error-test"
   schedule_expression = "0 * * * *"
-  command             = "[\"echo\",\"hello\"]"
+  command             = ["echo", "hello"]
 }
 `
 }

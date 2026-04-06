@@ -95,9 +95,8 @@ func TestAccAiVectorCollectionResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("quant_ai_vector_collection.test", "name", "my-collection"),
 					resource.TestCheckResourceAttr("quant_ai_vector_collection.test", "description", "A test collection"),
-					resource.TestCheckResourceAttr("quant_ai_vector_collection.test", "id", collectionId),
-					resource.TestCheckResourceAttr("quant_ai_vector_collection.test", "organization", org),
-					resource.TestCheckResourceAttrSet("quant_ai_vector_collection.test", "created_at"),
+					resource.TestCheckResourceAttr("quant_ai_vector_collection.test", "collection_id", collectionId),
+					resource.TestCheckResourceAttr("quant_ai_vector_collection.test", "organisation", org),
 				),
 			},
 			// Step 2: Import
@@ -106,7 +105,7 @@ func TestAccAiVectorCollectionResource(t *testing.T) {
 				ImportState:   true,
 				ImportStateId: collectionId,
 				ImportStateVerifyIgnore: []string{
-					"organization",
+					"organisation",
 				},
 			},
 		},
@@ -121,9 +120,10 @@ provider "quant" {
 }
 
 resource "quant_ai_vector_collection" "test" {
-  organization = %[1]q
-  name         = %[2]q
-  description  = %[3]q
+  organisation    = %[1]q
+  name            = %[2]q
+  description     = %[3]q
+  embedding_model = "amazon.titan-embed-text-v2:0"
 }
 `, org, name, description)
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -464,8 +465,15 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 	// --- Environment (env vars) ---
 	// The EnvironmentResponse SDK model does not include environment variables.
 	// Preserve user-configured state if known; null out unknowns.
-	if data.Environment.IsUnknown() {
-		data.Environment = types.ListNull(resource_environment.EnvironmentValue{}.Type(ctx))
+	// Build a canonical EnvironmentValue to get the correct DocumentsType
+	// (zero-value types would have empty AttrTypes → dynamic element type).
+	if data.Environment.IsUnknown() || data.Environment.IsNull() || data.Environment.ElementType(ctx) == nil {
+		envAttrTypes := resource_environment.EnvironmentValue{}.AttributeTypes(ctx)
+		canonicalEnv, _ := resource_environment.NewEnvironmentValue(envAttrTypes, map[string]attr.Value{
+			"name":  types.StringNull(),
+			"value": types.StringNull(),
+		})
+		data.Environment = types.ListNull(canonicalEnv.Type(ctx))
 	}
 
 	// --- Read-only server infrastructure fields ---
