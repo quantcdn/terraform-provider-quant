@@ -180,6 +180,25 @@ jobs:
           yarn install --no-lockfile
           yarn run build
 
+      - name: Prepare publishable package
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cd pulumi/sdk/nodejs
+          # tsc outputs to bin/ — copy package metadata into bin/ so we
+          # publish compiled .js + .d.ts (not raw .ts which Node 24 rejects).
+          cp package.json bin/
+          cp README.md bin/ 2>/dev/null || true
+          cp Pulumi.yaml bin/ 2>/dev/null || true
+          cd bin
+          # Set main/types to point at compiled output
+          node -e "
+            const pkg = require('./package.json');
+            pkg.main = 'index.js';
+            pkg.types = 'index.d.ts';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+
       - name: Publish to npm
         # Do NOT set NODE_AUTH_TOKEN — OIDC trusted publishing requires it absent
-        run: cd pulumi/sdk/nodejs && npm publish --access public
+        run: cd pulumi/sdk/nodejs/bin && npm publish --access public
