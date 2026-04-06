@@ -75,18 +75,23 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 			"spend_limits": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"daily_budget_cents": schema.Int64Attribute{
+						Optional: true,
 						Computed: true,
 					},
 					"monthly_budget_cents": schema.Int64Attribute{
+						Optional: true,
 						Computed: true,
 					},
 					"per_user_daily_budget_cents": schema.Int64Attribute{
+						Optional: true,
 						Computed: true,
 					},
 					"per_user_monthly_budget_cents": schema.Int64Attribute{
+						Optional: true,
 						Computed: true,
 					},
 					"warning_threshold_percent": schema.Int64Attribute{
+						Optional: true,
 						Computed: true,
 					},
 				},
