@@ -133,50 +133,6 @@ jobs:
           gh release upload "${{ github.ref_name }}" artifacts/*.tar.gz \
             --repo "${{ github.repository }}"
 
-  publish-npm:
-    name: Publish npm
-    needs: [version, goreleaser]
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Build tfgen
-        env:
-          VERSION: ${{ needs.version.outputs.version }}
-        run: |
-          cd pulumi
-          go build -ldflags "-X github.com/quantcdn/terraform-provider-quant/v5/pulumi/provider/pkg/version.Version=${VERSION}" \
-            -o ../bin/pulumi-tfgen-quant ./provider/cmd/pulumi-tfgen-quant
-
-      - name: Generate Node.js SDK
-        run: cd pulumi && ../bin/pulumi-tfgen-quant nodejs --out sdk/nodejs
-
-      - name: Set SDK version
-        env:
-          VERSION: ${{ needs.version.outputs.version }}
-        run: |
-          cd pulumi/sdk/nodejs
-          npm version "${VERSION}" --no-git-tag-version --allow-same-version
-
-      - name: Build SDK
-        run: |
-          cd pulumi/sdk/nodejs
-          yarn install --no-lockfile
-          yarn run build
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: cd pulumi/sdk/nodejs && npm publish --access public
+  # Note: Pulumi SDK is distributed via GitHub release binaries (pluginDownloadURL),
+  # not npm. The old pulumi-quant npm package is deprecated — users install the
+  # Pulumi provider from this repo's GitHub releases directly.
