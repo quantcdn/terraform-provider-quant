@@ -146,108 +146,119 @@ func (r *slackBotResource) ImportState(ctx context.Context, req resource.ImportS
 // API helpers
 // ---------------------------------------------------------------------------
 
-// slackBotExtraFields gathers all inline agent config fields from the TF model
-// into a map that can be fed to the SDK request's AdditionalProperties (the SDK
-// struct hasn't been regenerated for the new API shape yet).
-func slackBotExtraFields(ctx context.Context, data *resource_slack_bot.SlackBotModel) (extra map[string]interface{}, diags diag.Diagnostics) {
-	extra = make(map[string]interface{})
+// slackBotExtractStringList extracts a []string from a Terraform list attribute.
+func slackBotExtractStringList(ctx context.Context, list types.List, diags *diag.Diagnostics) ([]string, bool) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, false
+	}
+	var vals []string
+	diags.Append(list.ElementsAs(ctx, &vals, false)...)
+	return vals, !diags.HasError()
+}
 
-	if !data.Name.IsNull() && !data.Name.IsUnknown() {
-		extra["name"] = data.Name.ValueString()
+// slackBotSetListFields sets all string-list fields on a CreateSlackBotRequest using SDK setters.
+func slackBotSetListFields(ctx context.Context, req *quantadmingo.CreateSlackBotRequest, data *resource_slack_bot.SlackBotModel, diags *diag.Diagnostics) {
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedTools, diags); ok {
+		req.SetAllowedTools(vals)
 	}
-	if !data.SystemPrompt.IsNull() && !data.SystemPrompt.IsUnknown() {
-		extra["systemPrompt"] = data.SystemPrompt.ValueString()
+	if vals, ok := slackBotExtractStringList(ctx, data.AssignedSkills, diags); ok {
+		req.SetAssignedSkills(vals)
 	}
-	if !data.ModelId.IsNull() && !data.ModelId.IsUnknown() {
-		extra["modelId"] = data.ModelId.ValueString()
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedCollections, diags); ok {
+		req.SetAllowedCollections(vals)
 	}
-	if !data.Temperature.IsNull() && !data.Temperature.IsUnknown() {
-		f, _ := data.Temperature.ValueBigFloat().Float64()
-		extra["temperature"] = f
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedSubAgents, diags); ok {
+		req.SetAllowedSubAgents(vals)
 	}
-	if !data.MaxTokens.IsNull() && !data.MaxTokens.IsUnknown() {
-		extra["maxTokens"] = data.MaxTokens.ValueInt64()
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedUsers, diags); ok {
+		req.SetAllowedUsers(vals)
 	}
-	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
-		extra["longContext"] = data.LongContext.ValueBool()
+	if vals, ok := slackBotExtractStringList(ctx, data.DeniedUsers, diags); ok {
+		req.SetDeniedUsers(vals)
 	}
-	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
-		extra["guardrailPreset"] = data.GuardrailPreset.ValueString()
+	if vals, ok := slackBotExtractStringList(ctx, data.FilterPolicies, diags); ok {
+		req.SetFilterPolicies(vals)
 	}
-	if !data.HomeTabContent.IsNull() && !data.HomeTabContent.IsUnknown() {
-		extra["homeTabContent"] = data.HomeTabContent.ValueString()
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedChannels, diags); ok {
+		req.SetAllowedChannels(vals)
 	}
-	if !data.AllowGuests.IsNull() && !data.AllowGuests.IsUnknown() {
-		extra["allowGuests"] = data.AllowGuests.ValueBool()
+	if vals, ok := slackBotExtractStringList(ctx, data.Keywords, diags); ok {
+		req.SetKeywords(vals)
 	}
+}
 
-	// String list fields.
-	listFields := map[string]*types.List{
-		"allowedTools":       &data.AllowedTools,
-		"assignedSkills":     &data.AssignedSkills,
-		"allowedCollections": &data.AllowedCollections,
-		"allowedSubAgents":   &data.AllowedSubAgents,
-		"allowedUsers":       &data.AllowedUsers,
-		"deniedUsers":        &data.DeniedUsers,
-		"filterPolicies":     &data.FilterPolicies,
+// slackBotSetUpdateListFields sets all string-list fields on an UpdateSlackBotRequest using SDK setters.
+func slackBotSetUpdateListFields(ctx context.Context, req *quantadmingo.UpdateSlackBotRequest, data *resource_slack_bot.SlackBotModel, diags *diag.Diagnostics) {
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedTools, diags); ok {
+		req.SetAllowedTools(vals)
 	}
-	for key, listVal := range listFields {
-		if !listVal.IsNull() && !listVal.IsUnknown() {
-			var vals []string
-			diags.Append(listVal.ElementsAs(ctx, &vals, false)...)
-			if diags.HasError() {
-				return
-			}
-			extra[key] = vals
-		}
+	if vals, ok := slackBotExtractStringList(ctx, data.AssignedSkills, diags); ok {
+		req.SetAssignedSkills(vals)
 	}
-
-	return
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedCollections, diags); ok {
+		req.SetAllowedCollections(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedSubAgents, diags); ok {
+		req.SetAllowedSubAgents(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedUsers, diags); ok {
+		req.SetAllowedUsers(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.DeniedUsers, diags); ok {
+		req.SetDeniedUsers(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.FilterPolicies, diags); ok {
+		req.SetFilterPolicies(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedChannels, diags); ok {
+		req.SetAllowedChannels(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.Keywords, diags); ok {
+		req.SetKeywords(vals)
+	}
 }
 
 func callSlackBotCreateAPI(ctx context.Context, r *slackBotResource, data *resource_slack_bot.SlackBotModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	// The SDK constructor still requires (agentId, setupType). The API now
-	// auto-creates the backing agent, so we pass an empty agentId — it will
-	// be ignored by the server. The real agent config fields are sent via
-	// AdditionalProperties.
 	sdkReq := quantadmingo.NewCreateSlackBotRequest(
-		"", // agentId — server creates agent internally
+		data.Name.ValueString(),
 		data.SetupType.ValueString(),
+		data.SystemPrompt.ValueString(),
+		data.ModelId.ValueString(),
 	)
 
+	if !data.Temperature.IsNull() && !data.Temperature.IsUnknown() {
+		f, _ := data.Temperature.ValueBigFloat().Float32()
+		sdkReq.SetTemperature(f)
+	}
+	if !data.MaxTokens.IsNull() && !data.MaxTokens.IsUnknown() {
+		sdkReq.SetMaxTokens(int32(data.MaxTokens.ValueInt64()))
+	}
+	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
+		sdkReq.SetLongContext(data.LongContext.ValueBool())
+	}
+	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
+		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
+	}
+	if !data.HomeTabContent.IsNull() && !data.HomeTabContent.IsUnknown() {
+		sdkReq.SetHomeTabContent(data.HomeTabContent.ValueString())
+	}
+	if !data.AllowGuests.IsNull() && !data.AllowGuests.IsUnknown() {
+		sdkReq.SetAllowGuests(data.AllowGuests.ValueBool())
+	}
 	if !data.SessionTtlDays.IsNull() && !data.SessionTtlDays.IsUnknown() {
 		sdkReq.SetSessionTtlDays(int32(data.SessionTtlDays.ValueInt64()))
-	}
-	if !data.AllowedChannels.IsNull() && !data.AllowedChannels.IsUnknown() {
-		var chans []string
-		diags.Append(data.AllowedChannels.ElementsAs(ctx, &chans, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetAllowedChannels(chans)
 	}
 	if !data.KeywordsEnabled.IsNull() && !data.KeywordsEnabled.IsUnknown() {
 		sdkReq.SetKeywordsEnabled(data.KeywordsEnabled.ValueBool())
 	}
-	if !data.Keywords.IsNull() && !data.Keywords.IsUnknown() {
-		var kw []string
-		diags.Append(data.Keywords.ElementsAs(ctx, &kw, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetKeywords(kw)
-	}
 
-	// New inline agent config fields — not yet in SDK struct, sent via
-	// AdditionalProperties.
-	extra, d := slackBotExtraFields(ctx, data)
-	diags.Append(d...)
+	// String list fields.
+	slackBotSetListFields(ctx, sdkReq, data, &diags)
 	if diags.HasError() {
 		return
 	}
-	sdkReq.AdditionalProperties = extra
 
 	sdkResp, httpResp, err := r.client.Instance.AISlackBotsAPI.CreateSlackBot(r.client.AuthContext, org).
 		CreateSlackBotRequest(*sdkReq).Execute()
@@ -298,36 +309,46 @@ func callSlackBotUpdateAPI(ctx context.Context, r *slackBotResource, data *resou
 
 	sdkReq := quantadmingo.NewUpdateSlackBotRequest()
 
+	if !data.Name.IsNull() && !data.Name.IsUnknown() {
+		sdkReq.SetName(data.Name.ValueString())
+	}
+	if !data.SystemPrompt.IsNull() && !data.SystemPrompt.IsUnknown() {
+		sdkReq.SetSystemPrompt(data.SystemPrompt.ValueString())
+	}
+	if !data.ModelId.IsNull() && !data.ModelId.IsUnknown() {
+		sdkReq.SetModelId(data.ModelId.ValueString())
+	}
+	if !data.Temperature.IsNull() && !data.Temperature.IsUnknown() {
+		f, _ := data.Temperature.ValueBigFloat().Float32()
+		sdkReq.SetTemperature(f)
+	}
+	if !data.MaxTokens.IsNull() && !data.MaxTokens.IsUnknown() {
+		sdkReq.SetMaxTokens(int32(data.MaxTokens.ValueInt64()))
+	}
+	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
+		sdkReq.SetLongContext(data.LongContext.ValueBool())
+	}
+	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
+		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
+	}
+	if !data.HomeTabContent.IsNull() && !data.HomeTabContent.IsUnknown() {
+		sdkReq.SetHomeTabContent(data.HomeTabContent.ValueString())
+	}
+	if !data.AllowGuests.IsNull() && !data.AllowGuests.IsUnknown() {
+		sdkReq.SetAllowGuests(data.AllowGuests.ValueBool())
+	}
 	if !data.SessionTtlDays.IsNull() && !data.SessionTtlDays.IsUnknown() {
 		sdkReq.SetSessionTtlDays(int32(data.SessionTtlDays.ValueInt64()))
-	}
-	if !data.AllowedChannels.IsNull() && !data.AllowedChannels.IsUnknown() {
-		var chans []string
-		diags.Append(data.AllowedChannels.ElementsAs(ctx, &chans, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetAllowedChannels(chans)
 	}
 	if !data.KeywordsEnabled.IsNull() && !data.KeywordsEnabled.IsUnknown() {
 		sdkReq.SetKeywordsEnabled(data.KeywordsEnabled.ValueBool())
 	}
-	if !data.Keywords.IsNull() && !data.Keywords.IsUnknown() {
-		var kw []string
-		diags.Append(data.Keywords.ElementsAs(ctx, &kw, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetKeywords(kw)
-	}
 
-	// New inline agent config fields via AdditionalProperties.
-	extra, d := slackBotExtraFields(ctx, data)
-	diags.Append(d...)
+	// String list fields.
+	slackBotSetUpdateListFields(ctx, sdkReq, data, &diags)
 	if diags.HasError() {
 		return
 	}
-	sdkReq.AdditionalProperties = extra
 
 	sdkResp, httpResp, err := r.client.Instance.AISlackBotsAPI.UpdateSlackBot(r.client.AuthContext, org, data.BotId.ValueString()).
 		UpdateSlackBotRequest(*sdkReq).Execute()

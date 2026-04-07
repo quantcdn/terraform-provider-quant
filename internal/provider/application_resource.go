@@ -487,15 +487,9 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 	}
 
 	// --- EnvironmentNames ---
-	// The API returns environments as a list of objects with envName; extract names.
-	if app.HasEnvironments() {
-		envs := app.GetEnvironments()
-		names := make([]string, 0, len(envs))
-		for _, e := range envs {
-			if n, ok := e.GetEnvNameOk(); ok && n != nil {
-				names = append(names, *n)
-			}
-		}
+	// The API returns environment names as a flat string list.
+	if app.HasEnvironmentNames() {
+		names := app.GetEnvironmentNames()
 		namesList, d := types.ListValueFrom(ctx, types.StringType, names)
 		diags.Append(d...)
 		data.EnvironmentNames = namesList

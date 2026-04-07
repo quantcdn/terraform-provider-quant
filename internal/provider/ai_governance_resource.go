@@ -209,23 +209,23 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 	// spend_limits — SpendLimits is a SpendLimitsValue with fields directly accessible.
 	if !data.SpendLimits.IsNull() && !data.SpendLimits.IsUnknown() {
 		sl := data.SpendLimits
-		slMap := map[string]interface{}{}
+		sdkSL := quantadmingo.NewGetGovernanceConfig200ResponseSpendLimits()
 		if !sl.MonthlyBudgetCents.IsNull() && !sl.MonthlyBudgetCents.IsUnknown() {
-			slMap["monthlyBudgetCents"] = sl.MonthlyBudgetCents.ValueInt64()
+			sdkSL.SetMonthlyBudgetCents(int32(sl.MonthlyBudgetCents.ValueInt64()))
 		}
 		if !sl.DailyBudgetCents.IsNull() && !sl.DailyBudgetCents.IsUnknown() {
-			slMap["dailyBudgetCents"] = sl.DailyBudgetCents.ValueInt64()
+			sdkSL.SetDailyBudgetCents(int32(sl.DailyBudgetCents.ValueInt64()))
 		}
 		if !sl.PerUserMonthlyBudgetCents.IsNull() && !sl.PerUserMonthlyBudgetCents.IsUnknown() {
-			slMap["perUserMonthlyBudgetCents"] = sl.PerUserMonthlyBudgetCents.ValueInt64()
+			sdkSL.SetPerUserMonthlyBudgetCents(int32(sl.PerUserMonthlyBudgetCents.ValueInt64()))
 		}
 		if !sl.PerUserDailyBudgetCents.IsNull() && !sl.PerUserDailyBudgetCents.IsUnknown() {
-			slMap["perUserDailyBudgetCents"] = sl.PerUserDailyBudgetCents.ValueInt64()
+			sdkSL.SetPerUserDailyBudgetCents(int32(sl.PerUserDailyBudgetCents.ValueInt64()))
 		}
 		if !sl.WarningThresholdPercent.IsNull() && !sl.WarningThresholdPercent.IsUnknown() {
-			slMap["warningThresholdPercent"] = sl.WarningThresholdPercent.ValueInt64()
+			sdkSL.SetWarningThresholdPercent(int32(sl.WarningThresholdPercent.ValueInt64()))
 		}
-		sdkReq.SetSpendLimits(slMap)
+		sdkReq.SetSpendLimits(*sdkSL)
 	}
 
 	// version (optimistic concurrency)

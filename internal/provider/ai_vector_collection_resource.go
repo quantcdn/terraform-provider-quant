@@ -147,18 +147,14 @@ func (r *aiVectorCollectionResource) ImportState(ctx context.Context, req resour
 func callVectorCollectionCreateAPI(ctx context.Context, r *aiVectorCollectionResource, data *resource_ai_vector_collection.AiVectorCollectionModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	sdkReq := quantadmingo.NewCreateVectorCollectionRequest(data.Name.ValueString())
+	embeddingModel := "amazon.titan-embed-text-v2:0"
+	if !data.EmbeddingModel.IsNull() && !data.EmbeddingModel.IsUnknown() {
+		embeddingModel = data.EmbeddingModel.ValueString()
+	}
+	sdkReq := quantadmingo.NewCreateVectorCollectionRequest(data.Name.ValueString(), embeddingModel)
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
 		desc := data.Description.ValueString()
 		sdkReq.Description = &desc
-	}
-	if !data.EmbeddingModel.IsNull() && !data.EmbeddingModel.IsUnknown() {
-		model := data.EmbeddingModel.ValueString()
-		sdkReq.EmbeddingModel = &model
-	} else {
-		// Default embedding model when not specified
-		defaultModel := "amazon.titan-embed-text-v2:0"
-		sdkReq.EmbeddingModel = &defaultModel
 	}
 
 	sdkResp, httpResp, err := r.client.Instance.AIVectorDatabaseAPI.CreateVectorCollection(r.client.AuthContext, org).

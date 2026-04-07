@@ -425,18 +425,9 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 	}
 
 	// --- ContainerNames ---
-	// EnvironmentResponse returns containers as []map[string]interface{};
-	// extract "name" from each for the containerNames list.
-	if env.HasContainers() {
-		sdkContainers := env.GetContainers()
-		names := make([]string, 0, len(sdkContainers))
-		for _, c := range sdkContainers {
-			if name, ok := c["name"]; ok {
-				if nameStr, ok := name.(string); ok && nameStr != "" {
-					names = append(names, nameStr)
-				}
-			}
-		}
+	// EnvironmentResponse returns container names as a flat string list.
+	if env.HasContainerNames() {
+		names := env.GetContainerNames()
 		if len(names) > 0 {
 			namesList, d := types.ListValueFrom(ctx, types.StringType, names)
 			diags.Append(d...)
