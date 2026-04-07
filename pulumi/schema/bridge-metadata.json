@@ -692,23 +692,59 @@
                     "allowed_channels": {
                         "maxItemsOne": false
                     },
+                    "allowed_collections": {
+                        "maxItemsOne": false
+                    },
+                    "allowed_sub_agents": {
+                        "maxItemsOne": false
+                    },
+                    "allowed_tools": {
+                        "maxItemsOne": false
+                    },
+                    "allowed_users": {
+                        "maxItemsOne": false
+                    },
+                    "assigned_skills": {
+                        "maxItemsOne": false
+                    },
                     "bot": {
                         "fields": {
                             "allowed_channels": {
                                 "maxItemsOne": false
                             },
-                            "keywords": {
+                            "allowed_collections": {
                                 "maxItemsOne": false
                             },
-                            "slash_commands": {
+                            "allowed_sub_agents": {
+                                "maxItemsOne": false
+                            },
+                            "allowed_tools": {
+                                "maxItemsOne": false
+                            },
+                            "allowed_users": {
+                                "maxItemsOne": false
+                            },
+                            "assigned_skills": {
+                                "maxItemsOne": false
+                            },
+                            "denied_users": {
+                                "maxItemsOne": false
+                            },
+                            "filter_policies": {
+                                "maxItemsOne": false
+                            },
+                            "keywords": {
                                 "maxItemsOne": false
                             }
                         }
                     },
-                    "keywords": {
+                    "denied_users": {
                         "maxItemsOne": false
                     },
-                    "slash_commands": {
+                    "filter_policies": {
+                        "maxItemsOne": false
+                    },
+                    "keywords": {
                         "maxItemsOne": false
                     }
                 }

@@ -2414,12 +2414,48 @@
                 }
             }
         },
+        "quant:index/SlackBotAgentAccessControl:SlackBotAgentAccessControl": {
+            "type": "object"
+        },
         "quant:index/SlackBotBot:SlackBotBot": {
             "properties": {
-                "agentId": {
-                    "type": "string"
+                "agentAccessControl": {
+                    "$ref": "#/types/quant:index/SlackBotBotAgentAccessControl:SlackBotBotAgentAccessControl"
+                },
+                "allowGuests": {
+                    "type": "boolean"
                 },
                 "allowedChannels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedSubAgents": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedUsers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkills": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -2434,6 +2470,24 @@
                 "createdAt": {
                     "type": "string"
                 },
+                "deniedUsers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "guardrailPreset": {
+                    "type": "string"
+                },
+                "homeTabContent": {
+                    "type": "string"
+                },
                 "keywords": {
                     "type": "array",
                     "items": {
@@ -2443,20 +2497,32 @@
                 "keywordsEnabled": {
                     "type": "boolean"
                 },
+                "longContext": {
+                    "type": "boolean"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
                 "sessionTtlDays": {
                     "type": "integer"
                 },
                 "setupType": {
                     "type": "string"
                 },
-                "slashCommands": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "status": {
                     "type": "string"
+                },
+                "systemPrompt": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
                 },
                 "updatedAt": {
                     "type": "string"
@@ -2466,21 +2532,39 @@
             "language": {
                 "nodejs": {
                     "requiredOutputs": [
-                        "agentId",
+                        "agentAccessControl",
+                        "allowGuests",
                         "allowedChannels",
+                        "allowedCollections",
+                        "allowedSubAgents",
+                        "allowedTools",
+                        "allowedUsers",
+                        "assignedSkills",
                         "botId",
                         "connected",
                         "createdAt",
+                        "deniedUsers",
+                        "filterPolicies",
+                        "guardrailPreset",
+                        "homeTabContent",
                         "keywords",
                         "keywordsEnabled",
+                        "longContext",
+                        "maxTokens",
+                        "modelId",
+                        "name",
                         "sessionTtlDays",
                         "setupType",
-                        "slashCommands",
                         "status",
+                        "systemPrompt",
+                        "temperature",
                         "updatedAt"
                     ]
                 }
             }
+        },
+        "quant:index/SlackBotBotAgentAccessControl:SlackBotBotAgentAccessControl": {
+            "type": "object"
         },
         "quant:index/getProjectsProject:getProjectsProject": {
             "properties": {
@@ -9563,9 +9647,13 @@
         },
         "quant:index:SlackBot": {
             "properties": {
-                "agentId": {
-                    "type": "string",
-                    "description": "The AI agent that powers this bot"
+                "agentAccessControl": {
+                    "$ref": "#/types/quant:index/SlackBotAgentAccessControl:SlackBotAgentAccessControl",
+                    "description": "Agent-level access control settings"
+                },
+                "allowGuests": {
+                    "type": "boolean",
+                    "description": "Whether guest users may interact with the bot"
                 },
                 "allowedChannels": {
                     "type": "array",
@@ -9573,6 +9661,41 @@
                         "type": "string"
                     },
                     "description": "Slack channel IDs the bot may respond in"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Vector DB collections the agent may query"
+                },
+                "allowedSubAgents": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Sub-agents the agent may call"
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tools the agent may use"
+                },
+                "allowedUsers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack user IDs allowed to interact with the bot"
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Skills assigned to the agent"
                 },
                 "bot": {
                     "$ref": "#/types/quant:index/SlackBotBot:SlackBotBot"
@@ -9581,6 +9704,28 @@
                     "type": "string",
                     "description": "The Slack bot ID"
                 },
+                "deniedUsers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack user IDs denied from interacting with the bot"
+                },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Content filter policies"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name"
+                },
+                "homeTabContent": {
+                    "type": "string",
+                    "description": "Content shown on the bot's Home tab in Slack"
+                },
                 "keywords": {
                     "type": "array",
                     "items": {
@@ -9591,6 +9736,22 @@
                 "keywordsEnabled": {
                     "type": "boolean",
                     "description": "Whether keyword triggers are enabled"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Enable long context mode"
+                },
+                "maxTokens": {
+                    "type": "integer",
+                    "description": "Maximum response tokens"
+                },
+                "modelId": {
+                    "type": "string",
+                    "description": "AI model identifier"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Display name for the bot"
                 },
                 "organisation": {
                     "type": "string",
@@ -9604,30 +9765,50 @@
                     "type": "string",
                     "description": "Whether to use Quant-managed or customer-provided Slack app"
                 },
-                "slashCommands": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "description": "Slash commands the bot responds to"
+                "systemPrompt": {
+                    "type": "string",
+                    "description": "System prompt for the backing AI agent"
+                },
+                "temperature": {
+                    "type": "number",
+                    "description": "Sampling temperature"
                 }
             },
             "required": [
-                "agentId",
+                "agentAccessControl",
+                "allowGuests",
                 "allowedChannels",
+                "allowedCollections",
+                "allowedSubAgents",
+                "allowedTools",
+                "allowedUsers",
+                "assignedSkills",
                 "bot",
                 "botId",
+                "deniedUsers",
+                "filterPolicies",
+                "guardrailPreset",
+                "homeTabContent",
                 "keywords",
                 "keywordsEnabled",
+                "longContext",
+                "maxTokens",
+                "modelId",
+                "name",
                 "organisation",
                 "sessionTtlDays",
                 "setupType",
-                "slashCommands"
+                "systemPrompt",
+                "temperature"
             ],
             "inputProperties": {
-                "agentId": {
-                    "type": "string",
-                    "description": "The AI agent that powers this bot"
+                "agentAccessControl": {
+                    "$ref": "#/types/quant:index/SlackBotAgentAccessControl:SlackBotAgentAccessControl",
+                    "description": "Agent-level access control settings"
+                },
+                "allowGuests": {
+                    "type": "boolean",
+                    "description": "Whether guest users may interact with the bot"
                 },
                 "allowedChannels": {
                     "type": "array",
@@ -9636,9 +9817,66 @@
                     },
                     "description": "Slack channel IDs the bot may respond in"
                 },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Vector DB collections the agent may query"
+                },
+                "allowedSubAgents": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Sub-agents the agent may call"
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tools the agent may use"
+                },
+                "allowedUsers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack user IDs allowed to interact with the bot"
+                },
+                "assignedSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Skills assigned to the agent"
+                },
                 "botId": {
                     "type": "string",
                     "description": "The Slack bot ID"
+                },
+                "deniedUsers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Slack user IDs denied from interacting with the bot"
+                },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Content filter policies"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset name"
+                },
+                "homeTabContent": {
+                    "type": "string",
+                    "description": "Content shown on the bot's Home tab in Slack"
                 },
                 "keywords": {
                     "type": "array",
@@ -9650,6 +9888,22 @@
                 "keywordsEnabled": {
                     "type": "boolean",
                     "description": "Whether keyword triggers are enabled"
+                },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Enable long context mode"
+                },
+                "maxTokens": {
+                    "type": "integer",
+                    "description": "Maximum response tokens"
+                },
+                "modelId": {
+                    "type": "string",
+                    "description": "AI model identifier"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Display name for the bot"
                 },
                 "organisation": {
                     "type": "string",
@@ -9663,24 +9917,30 @@
                     "type": "string",
                     "description": "Whether to use Quant-managed or customer-provided Slack app"
                 },
-                "slashCommands": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "description": "Slash commands the bot responds to"
+                "systemPrompt": {
+                    "type": "string",
+                    "description": "System prompt for the backing AI agent"
+                },
+                "temperature": {
+                    "type": "number",
+                    "description": "Sampling temperature"
                 }
             },
             "requiredInputs": [
-                "agentId",
-                "setupType"
+                "modelId",
+                "setupType",
+                "systemPrompt"
             ],
             "stateInputs": {
                 "description": "Input properties used for looking up and filtering SlackBot resources.\n",
                 "properties": {
-                    "agentId": {
-                        "type": "string",
-                        "description": "The AI agent that powers this bot"
+                    "agentAccessControl": {
+                        "$ref": "#/types/quant:index/SlackBotAgentAccessControl:SlackBotAgentAccessControl",
+                        "description": "Agent-level access control settings"
+                    },
+                    "allowGuests": {
+                        "type": "boolean",
+                        "description": "Whether guest users may interact with the bot"
                     },
                     "allowedChannels": {
                         "type": "array",
@@ -9689,12 +9949,69 @@
                         },
                         "description": "Slack channel IDs the bot may respond in"
                     },
+                    "allowedCollections": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Vector DB collections the agent may query"
+                    },
+                    "allowedSubAgents": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Sub-agents the agent may call"
+                    },
+                    "allowedTools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Tools the agent may use"
+                    },
+                    "allowedUsers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Slack user IDs allowed to interact with the bot"
+                    },
+                    "assignedSkills": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Skills assigned to the agent"
+                    },
                     "bot": {
                         "$ref": "#/types/quant:index/SlackBotBot:SlackBotBot"
                     },
                     "botId": {
                         "type": "string",
                         "description": "The Slack bot ID"
+                    },
+                    "deniedUsers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Slack user IDs denied from interacting with the bot"
+                    },
+                    "filterPolicies": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Content filter policies"
+                    },
+                    "guardrailPreset": {
+                        "type": "string",
+                        "description": "Guardrail preset name"
+                    },
+                    "homeTabContent": {
+                        "type": "string",
+                        "description": "Content shown on the bot's Home tab in Slack"
                     },
                     "keywords": {
                         "type": "array",
@@ -9706,6 +10023,22 @@
                     "keywordsEnabled": {
                         "type": "boolean",
                         "description": "Whether keyword triggers are enabled"
+                    },
+                    "longContext": {
+                        "type": "boolean",
+                        "description": "Enable long context mode"
+                    },
+                    "maxTokens": {
+                        "type": "integer",
+                        "description": "Maximum response tokens"
+                    },
+                    "modelId": {
+                        "type": "string",
+                        "description": "AI model identifier"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Display name for the bot"
                     },
                     "organisation": {
                         "type": "string",
@@ -9719,12 +10052,13 @@
                         "type": "string",
                         "description": "Whether to use Quant-managed or customer-provided Slack app"
                     },
-                    "slashCommands": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Slash commands the bot responds to"
+                    "systemPrompt": {
+                        "type": "string",
+                        "description": "System prompt for the backing AI agent"
+                    },
+                    "temperature": {
+                        "type": "number",
+                        "description": "Sampling temperature"
                     }
                 },
                 "type": "object"
