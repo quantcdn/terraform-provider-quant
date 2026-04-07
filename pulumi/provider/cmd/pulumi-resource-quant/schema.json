@@ -201,6 +201,69 @@
                 }
             }
         },
+        "quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema": {
+            "type": "object"
+        },
+        "quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema": {
+            "type": "object"
+        },
+        "quant:index/AiCustomToolTool:AiCustomToolTool": {
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "edgeFunctionUrl": {
+                    "type": "string"
+                },
+                "inputSchema": {
+                    "$ref": "#/types/quant:index/AiCustomToolToolInputSchema:AiCustomToolToolInputSchema"
+                },
+                "isAsync": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "outputSchema": {
+                    "$ref": "#/types/quant:index/AiCustomToolToolOutputSchema:AiCustomToolToolOutputSchema"
+                },
+                "outputSchemaDescription": {
+                    "type": "string"
+                },
+                "responseMode": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "category",
+                        "createdAt",
+                        "description",
+                        "edgeFunctionUrl",
+                        "inputSchema",
+                        "isAsync",
+                        "name",
+                        "outputSchema",
+                        "outputSchemaDescription",
+                        "responseMode"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiCustomToolToolInputSchema:AiCustomToolToolInputSchema": {
+            "type": "object"
+        },
+        "quant:index/AiCustomToolToolOutputSchema:AiCustomToolToolOutputSchema": {
+            "type": "object"
+        },
         "quant:index/AiGovernanceConfig:AiGovernanceConfig": {
             "type": "object"
         },
@@ -2924,6 +2987,202 @@
                     },
                     "temperature": {
                         "type": "number"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "quant:index:AiCustomTool": {
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "description": "Category to group related tools"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Human-readable description of what the tool does"
+                },
+                "edgeFunctionUrl": {
+                    "type": "string",
+                    "description": "HTTPS URL of the edge function"
+                },
+                "inputSchema": {
+                    "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
+                    "description": "JSON Schema defining the tool's input parameters"
+                },
+                "isAsync": {
+                    "type": "boolean",
+                    "description": "Whether this tool runs asynchronously (\u003e5 seconds)"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Unique tool name (alphanumeric and underscores only)"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "outputSchema": {
+                    "$ref": "#/types/quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema",
+                    "description": "JSON Schema defining the tool's output structure"
+                },
+                "outputSchemaDescription": {
+                    "type": "string",
+                    "description": "Human-readable description of the tool's output"
+                },
+                "responseMode": {
+                    "type": "string",
+                    "description": "How the tool response is handled: llm (passed back to model) or direct (returned to user)"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "description": "Tool execution timeout"
+                },
+                "tool": {
+                    "$ref": "#/types/quant:index/AiCustomToolTool:AiCustomToolTool"
+                },
+                "toolName": {
+                    "type": "string",
+                    "description": "The tool name to retrieve"
+                }
+            },
+            "required": [
+                "category",
+                "description",
+                "edgeFunctionUrl",
+                "inputSchema",
+                "isAsync",
+                "message",
+                "name",
+                "organisation",
+                "outputSchema",
+                "outputSchemaDescription",
+                "responseMode",
+                "success",
+                "timeoutSeconds",
+                "tool",
+                "toolName"
+            ],
+            "inputProperties": {
+                "category": {
+                    "type": "string",
+                    "description": "Category to group related tools"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Human-readable description of what the tool does"
+                },
+                "edgeFunctionUrl": {
+                    "type": "string",
+                    "description": "HTTPS URL of the edge function"
+                },
+                "inputSchema": {
+                    "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
+                    "description": "JSON Schema defining the tool's input parameters"
+                },
+                "isAsync": {
+                    "type": "boolean",
+                    "description": "Whether this tool runs asynchronously (\u003e5 seconds)"
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Unique tool name (alphanumeric and underscores only)"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "outputSchema": {
+                    "$ref": "#/types/quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema",
+                    "description": "JSON Schema defining the tool's output structure"
+                },
+                "outputSchemaDescription": {
+                    "type": "string",
+                    "description": "Human-readable description of the tool's output"
+                },
+                "responseMode": {
+                    "type": "string",
+                    "description": "How the tool response is handled: llm (passed back to model) or direct (returned to user)"
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "description": "Tool execution timeout"
+                },
+                "toolName": {
+                    "type": "string",
+                    "description": "The tool name to retrieve"
+                }
+            },
+            "requiredInputs": [
+                "description",
+                "edgeFunctionUrl",
+                "inputSchema"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiCustomTool resources.\n",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Category to group related tools"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Human-readable description of what the tool does"
+                    },
+                    "edgeFunctionUrl": {
+                        "type": "string",
+                        "description": "HTTPS URL of the edge function"
+                    },
+                    "inputSchema": {
+                        "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
+                        "description": "JSON Schema defining the tool's input parameters"
+                    },
+                    "isAsync": {
+                        "type": "boolean",
+                        "description": "Whether this tool runs asynchronously (\u003e5 seconds)"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Unique tool name (alphanumeric and underscores only)"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "The organisation ID"
+                    },
+                    "outputSchema": {
+                        "$ref": "#/types/quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema",
+                        "description": "JSON Schema defining the tool's output structure"
+                    },
+                    "outputSchemaDescription": {
+                        "type": "string",
+                        "description": "Human-readable description of the tool's output"
+                    },
+                    "responseMode": {
+                        "type": "string",
+                        "description": "How the tool response is handled: llm (passed back to model) or direct (returned to user)"
+                    },
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "timeoutSeconds": {
+                        "type": "integer",
+                        "description": "Tool execution timeout"
+                    },
+                    "tool": {
+                        "$ref": "#/types/quant:index/AiCustomToolTool:AiCustomToolTool"
+                    },
+                    "toolName": {
+                        "type": "string",
+                        "description": "The tool name to retrieve"
                     }
                 },
                 "type": "object"

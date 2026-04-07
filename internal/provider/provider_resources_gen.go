@@ -36,5 +36,6 @@ func GeneratedResources() []func() resource.Resource {
 		NewAiSkillResource,
 		NewAiAgentResource,
 		NewSlackBotResource,
+		NewAiCustomToolResource,
 	}
 }

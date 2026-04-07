@@ -31,6 +31,9 @@
                     }
                 }
             },
+            "quant_ai_custom_tool": {
+                "current": "quant:index:AiCustomTool"
+            },
             "quant_ai_governance": {
                 "current": "quant:index:AiGovernance",
                 "fields": {

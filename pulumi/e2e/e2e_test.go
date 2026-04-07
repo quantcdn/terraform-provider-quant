@@ -516,6 +516,29 @@ func TestE2E_SlackBot(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// E2E Test: AI Custom Tool (create, update, destroy)
+// ---------------------------------------------------------------------------
+
+func TestE2E_AICustomTool(t *testing.T) {
+	suffix := uniqueSuffix()
+	result, cleanup := createStack(t, "ai-custom-tool", map[string]string{
+		"e2e-ai-custom-tool:testSuffix": fmt.Sprintf("e2e_%s", suffix),
+	})
+	defer cleanup()
+
+	assert.NotEmpty(t, result.outputs["toolName"].Value, "toolName should be set")
+	t.Logf("Created custom tool: name=%v", result.outputs["toolName"].Value)
+
+	// Test update: change description
+	ctx := context.Background()
+	_ = result.stack.SetConfig(ctx, "e2e-ai-custom-tool:toolDescription", auto.ConfigValue{Value: "Updated E2E test tool description"})
+	t.Log("Updating custom tool (description)...")
+	outputs := updateStack(t, result.stack)
+	assert.NotEmpty(t, outputs["toolName"].Value, "toolName should still be set after update")
+	t.Log("Custom tool update succeeded")
+}
+
+// ---------------------------------------------------------------------------
 // E2E Test: Environment lifecycle (create → verify → update scaling → destroy)
 // ---------------------------------------------------------------------------
 
@@ -1215,9 +1238,7 @@ func TestE2E_Import_AIVectorCollection(t *testing.T) {
 	collectionName := fmt.Sprintf("e2e-import-col-%s", suffix)
 	t.Logf("Creating vector collection '%s' via API...", collectionName)
 
-	createReq := quantadmingo.NewCreateVectorCollectionRequest(collectionName)
-	model := "amazon.titan-embed-text-v2:0"
-	createReq.EmbeddingModel = &model
+	createReq := quantadmingo.NewCreateVectorCollectionRequest(collectionName, "amazon.titan-embed-text-v2:0")
 
 	resp, _, err := apiClient.Instance.AIVectorDatabaseAPI.CreateVectorCollection(apiClient.AuthContext, apiClient.Organization).
 		CreateVectorCollectionRequest(*createReq).Execute()
@@ -1288,9 +1309,7 @@ func TestE2E_Import_AIVectorDocument(t *testing.T) {
 	collectionName := fmt.Sprintf("e2e-import-doc-col-%s", suffix)
 	t.Logf("Creating vector collection '%s' via API...", collectionName)
 
-	createReq := quantadmingo.NewCreateVectorCollectionRequest(collectionName)
-	model := "amazon.titan-embed-text-v2:0"
-	createReq.EmbeddingModel = &model
+	createReq := quantadmingo.NewCreateVectorCollectionRequest(collectionName, "amazon.titan-embed-text-v2:0")
 
 	colResp, _, err := apiClient.Instance.AIVectorDatabaseAPI.CreateVectorCollection(apiClient.AuthContext, apiClient.Organization).
 		CreateVectorCollectionRequest(*createReq).Execute()
@@ -1550,7 +1569,7 @@ func TestE2E_Import_SlackBot(t *testing.T) {
 
 	// Now create the Slack bot.
 	t.Logf("Creating Slack bot via API with agent %s...", agentId)
-	botReq := quantadmingo.NewCreateSlackBotRequest(agentId, "quant")
+	botReq := quantadmingo.NewCreateSlackBotRequest("Import Test Bot", "quant", "You are a test bot.", "anthropic.claude-3-5-sonnet-20241022-v2:0")
 	botResp, _, err := apiClient.Instance.AISlackBotsAPI.CreateSlackBot(apiClient.AuthContext, apiClient.Organization).
 		CreateSlackBotRequest(*botReq).Execute()
 	require.NoError(t, err, "API slack bot create failed")

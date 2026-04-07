@@ -445,7 +445,7 @@ func TestProviderInfo_ResourceCount(t *testing.T) {
 	info := Provider()
 	// Both Resources() and bridge mappings are generated from generator_config.yml.
 	// If this count changes, update it — but it should match the registrations section.
-	assert.Equal(t, 26, len(info.Resources), "resource count must match generator_config.yml registrations")
+	assert.Equal(t, 27, len(info.Resources), "resource count must match generator_config.yml registrations")
 }
 
 func TestProviderInfo_DataSourceCount(t *testing.T) {

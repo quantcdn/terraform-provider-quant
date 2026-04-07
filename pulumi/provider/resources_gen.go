@@ -40,6 +40,7 @@ func GeneratedResourceMap() map[string]*tfbridge.ResourceInfo {
 		"quant_ai_skill": {Tok: "quant:index:AiSkill", ComputeID: fieldComputeID("skillId")},
 		"quant_ai_agent": {Tok: "quant:index:AiAgent", ComputeID: fieldComputeID("agentId")},
 		"quant_slack_bot": {Tok: "quant:index:SlackBot", ComputeID: fieldComputeID("botId")},
+		"quant_ai_custom_tool": {Tok: "quant:index:AiCustomTool", ComputeID: fieldComputeID("toolName")},
 	}
 }
 

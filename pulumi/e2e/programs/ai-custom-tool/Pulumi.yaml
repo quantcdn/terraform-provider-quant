@@ -1,0 +1,30 @@
+name: e2e-ai-custom-tool
+runtime: yaml
+description: E2E test for AI Custom Tool resource
+config:
+  testSuffix:
+    type: string
+    default: e2e-test
+  toolDescription:
+    type: string
+    default: A test tool for E2E testing
+resources:
+  testTool:
+    type: quant:index:AiCustomTool
+    properties:
+      name: e2e_tool_${testSuffix}
+      toolName: e2e_tool_${testSuffix}
+      description: ${toolDescription}
+      edgeFunctionUrl: "https://example.quantcdn.io/api/e2e-test"
+      inputSchema:
+        type: object
+        properties:
+          query:
+            type: string
+            description: The search query
+        required:
+          - query
+      responseMode: llm
+      timeoutSeconds: 30
+outputs:
+  toolName: ${testTool.toolName}
