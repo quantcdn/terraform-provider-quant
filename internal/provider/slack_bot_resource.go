@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -145,43 +146,118 @@ func (r *slackBotResource) ImportState(ctx context.Context, req resource.ImportS
 // API helpers
 // ---------------------------------------------------------------------------
 
+// slackBotExtractStringList extracts a []string from a Terraform list attribute.
+func slackBotExtractStringList(ctx context.Context, list types.List, diags *diag.Diagnostics) ([]string, bool) {
+	if list.IsNull() || list.IsUnknown() {
+		return nil, false
+	}
+	var vals []string
+	diags.Append(list.ElementsAs(ctx, &vals, false)...)
+	return vals, !diags.HasError()
+}
+
+// slackBotSetListFields sets all string-list fields on a CreateSlackBotRequest using SDK setters.
+func slackBotSetListFields(ctx context.Context, req *quantadmingo.CreateSlackBotRequest, data *resource_slack_bot.SlackBotModel, diags *diag.Diagnostics) {
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedTools, diags); ok {
+		req.SetAllowedTools(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AssignedSkills, diags); ok {
+		req.SetAssignedSkills(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedCollections, diags); ok {
+		req.SetAllowedCollections(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedSubAgents, diags); ok {
+		req.SetAllowedSubAgents(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedUsers, diags); ok {
+		req.SetAllowedUsers(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.DeniedUsers, diags); ok {
+		req.SetDeniedUsers(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.FilterPolicies, diags); ok {
+		req.SetFilterPolicies(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedChannels, diags); ok {
+		req.SetAllowedChannels(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.Keywords, diags); ok {
+		req.SetKeywords(vals)
+	}
+}
+
+// slackBotSetUpdateListFields sets all string-list fields on an UpdateSlackBotRequest using SDK setters.
+func slackBotSetUpdateListFields(ctx context.Context, req *quantadmingo.UpdateSlackBotRequest, data *resource_slack_bot.SlackBotModel, diags *diag.Diagnostics) {
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedTools, diags); ok {
+		req.SetAllowedTools(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AssignedSkills, diags); ok {
+		req.SetAssignedSkills(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedCollections, diags); ok {
+		req.SetAllowedCollections(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedSubAgents, diags); ok {
+		req.SetAllowedSubAgents(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedUsers, diags); ok {
+		req.SetAllowedUsers(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.DeniedUsers, diags); ok {
+		req.SetDeniedUsers(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.FilterPolicies, diags); ok {
+		req.SetFilterPolicies(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.AllowedChannels, diags); ok {
+		req.SetAllowedChannels(vals)
+	}
+	if vals, ok := slackBotExtractStringList(ctx, data.Keywords, diags); ok {
+		req.SetKeywords(vals)
+	}
+}
+
 func callSlackBotCreateAPI(ctx context.Context, r *slackBotResource, data *resource_slack_bot.SlackBotModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
 	sdkReq := quantadmingo.NewCreateSlackBotRequest(
-		data.AgentId.ValueString(),
+		data.Name.ValueString(),
 		data.SetupType.ValueString(),
+		data.SystemPrompt.ValueString(),
+		data.ModelId.ValueString(),
 	)
 
+	if !data.Temperature.IsNull() && !data.Temperature.IsUnknown() {
+		f, _ := data.Temperature.ValueBigFloat().Float32()
+		sdkReq.SetTemperature(f)
+	}
+	if !data.MaxTokens.IsNull() && !data.MaxTokens.IsUnknown() {
+		sdkReq.SetMaxTokens(int32(data.MaxTokens.ValueInt64()))
+	}
+	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
+		sdkReq.SetLongContext(data.LongContext.ValueBool())
+	}
+	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
+		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
+	}
+	if !data.HomeTabContent.IsNull() && !data.HomeTabContent.IsUnknown() {
+		sdkReq.SetHomeTabContent(data.HomeTabContent.ValueString())
+	}
+	if !data.AllowGuests.IsNull() && !data.AllowGuests.IsUnknown() {
+		sdkReq.SetAllowGuests(data.AllowGuests.ValueBool())
+	}
 	if !data.SessionTtlDays.IsNull() && !data.SessionTtlDays.IsUnknown() {
 		sdkReq.SetSessionTtlDays(int32(data.SessionTtlDays.ValueInt64()))
-	}
-	if !data.AllowedChannels.IsNull() && !data.AllowedChannels.IsUnknown() {
-		var chans []string
-		diags.Append(data.AllowedChannels.ElementsAs(ctx, &chans, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetAllowedChannels(chans)
 	}
 	if !data.KeywordsEnabled.IsNull() && !data.KeywordsEnabled.IsUnknown() {
 		sdkReq.SetKeywordsEnabled(data.KeywordsEnabled.ValueBool())
 	}
-	if !data.Keywords.IsNull() && !data.Keywords.IsUnknown() {
-		var kw []string
-		diags.Append(data.Keywords.ElementsAs(ctx, &kw, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetKeywords(kw)
-	}
-	if !data.SlashCommands.IsNull() && !data.SlashCommands.IsUnknown() {
-		var cmds []string
-		diags.Append(data.SlashCommands.ElementsAs(ctx, &cmds, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetSlashCommands(cmds)
+
+	// String list fields.
+	slackBotSetListFields(ctx, sdkReq, data, &diags)
+	if diags.HasError() {
+		return
 	}
 
 	sdkResp, httpResp, err := r.client.Instance.AISlackBotsAPI.CreateSlackBot(r.client.AuthContext, org).
@@ -233,38 +309,45 @@ func callSlackBotUpdateAPI(ctx context.Context, r *slackBotResource, data *resou
 
 	sdkReq := quantadmingo.NewUpdateSlackBotRequest()
 
-	if !data.AgentId.IsNull() && !data.AgentId.IsUnknown() {
-		sdkReq.SetAgentId(data.AgentId.ValueString())
+	if !data.Name.IsNull() && !data.Name.IsUnknown() {
+		sdkReq.SetName(data.Name.ValueString())
+	}
+	if !data.SystemPrompt.IsNull() && !data.SystemPrompt.IsUnknown() {
+		sdkReq.SetSystemPrompt(data.SystemPrompt.ValueString())
+	}
+	if !data.ModelId.IsNull() && !data.ModelId.IsUnknown() {
+		sdkReq.SetModelId(data.ModelId.ValueString())
+	}
+	if !data.Temperature.IsNull() && !data.Temperature.IsUnknown() {
+		f, _ := data.Temperature.ValueBigFloat().Float32()
+		sdkReq.SetTemperature(f)
+	}
+	if !data.MaxTokens.IsNull() && !data.MaxTokens.IsUnknown() {
+		sdkReq.SetMaxTokens(int32(data.MaxTokens.ValueInt64()))
+	}
+	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
+		sdkReq.SetLongContext(data.LongContext.ValueBool())
+	}
+	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
+		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
+	}
+	if !data.HomeTabContent.IsNull() && !data.HomeTabContent.IsUnknown() {
+		sdkReq.SetHomeTabContent(data.HomeTabContent.ValueString())
+	}
+	if !data.AllowGuests.IsNull() && !data.AllowGuests.IsUnknown() {
+		sdkReq.SetAllowGuests(data.AllowGuests.ValueBool())
 	}
 	if !data.SessionTtlDays.IsNull() && !data.SessionTtlDays.IsUnknown() {
 		sdkReq.SetSessionTtlDays(int32(data.SessionTtlDays.ValueInt64()))
 	}
-	if !data.AllowedChannels.IsNull() && !data.AllowedChannels.IsUnknown() {
-		var chans []string
-		diags.Append(data.AllowedChannels.ElementsAs(ctx, &chans, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetAllowedChannels(chans)
-	}
 	if !data.KeywordsEnabled.IsNull() && !data.KeywordsEnabled.IsUnknown() {
 		sdkReq.SetKeywordsEnabled(data.KeywordsEnabled.ValueBool())
 	}
-	if !data.Keywords.IsNull() && !data.Keywords.IsUnknown() {
-		var kw []string
-		diags.Append(data.Keywords.ElementsAs(ctx, &kw, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetKeywords(kw)
-	}
-	if !data.SlashCommands.IsNull() && !data.SlashCommands.IsUnknown() {
-		var cmds []string
-		diags.Append(data.SlashCommands.ElementsAs(ctx, &cmds, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetSlashCommands(cmds)
+
+	// String list fields.
+	slackBotSetUpdateListFields(ctx, sdkReq, data, &diags)
+	if diags.HasError() {
+		return
 	}
 
 	sdkResp, httpResp, err := r.client.Instance.AISlackBotsAPI.UpdateSlackBot(r.client.AuthContext, org, data.BotId.ValueString()).
@@ -304,106 +387,234 @@ func callSlackBotDeleteAPI(ctx context.Context, r *slackBotResource, data *resou
 	return
 }
 
+// ---------------------------------------------------------------------------
+// Response mapping helpers
+// ---------------------------------------------------------------------------
+
 // mapSlackBotFromMap converts a generic map (Create/Update response) into
-// the TF model by first deserialising into a typed struct.
+// the TF model. The API returns a flattened object with both bot-level and
+// agent-level fields at the top level.
 func mapSlackBotFromMap(ctx context.Context, m map[string]interface{}, org string, data *resource_slack_bot.SlackBotModel) (diags diag.Diagnostics) {
 	if m == nil {
 		return
 	}
-	bot := &quantadmingo.GetSlackBot200ResponseBot{}
-	if v, ok := m["botId"].(string); ok {
-		bot.BotId = &v
-	}
-	if v, ok := m["agentId"].(string); ok {
-		bot.AgentId = &v
-	}
-	if v, ok := m["setupType"].(string); ok {
-		bot.SetupType = &v
-	}
-	if v, ok := m["status"].(string); ok {
-		bot.Status = &v
-	}
-	if v, ok := m["connected"].(bool); ok {
-		bot.Connected = &v
-	}
-	if v, ok := m["sessionTtlDays"].(float64); ok {
-		n := int32(v)
-		bot.SessionTtlDays = &n
-	}
-	if v, ok := m["keywordsEnabled"].(bool); ok {
-		bot.KeywordsEnabled = &v
-	}
-	if v, ok := m["allowedChannels"].([]interface{}); ok {
-		bot.AllowedChannels = stringSliceFromInterface(v)
-	}
-	if v, ok := m["keywords"].([]interface{}); ok {
-		bot.Keywords = stringSliceFromInterface(v)
-	}
-	if v, ok := m["slashCommands"].([]interface{}); ok {
-		bot.SlashCommands = stringSliceFromInterface(v)
-	}
-	if v, ok := m["createdAt"].(string); ok && v != "" {
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			bot.CreatedAt = &t
-		}
-	}
-	if v, ok := m["updatedAt"].(string); ok && v != "" {
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			bot.UpdatedAt = &t
-		}
-	}
-	return mapSlackBotResponse(ctx, bot, org, data)
+
+	// --- Top-level configurable fields ---
+	data.BotId = mapStringFromAny(m, "botId")
+	data.SetupType = mapStringFromAny(m, "setupType")
+	data.Name = mapStringFromAny(m, "name")
+	data.SystemPrompt = mapStringFromAny(m, "systemPrompt")
+	data.ModelId = mapStringFromAny(m, "modelId")
+	data.GuardrailPreset = mapStringFromAny(m, "guardrailPreset")
+	data.HomeTabContent = mapStringFromAny(m, "homeTabContent")
+
+	data.SessionTtlDays = mapInt64FromAny(m, "sessionTtlDays")
+	data.MaxTokens = mapInt64FromAny(m, "maxTokens")
+
+	data.KeywordsEnabled = mapBoolFromAny(m, "keywordsEnabled")
+	data.AllowGuests = mapBoolFromAny(m, "allowGuests")
+	data.LongContext = mapBoolFromAny(m, "longContext")
+
+	data.Temperature = mapNumberFromAny(m, "temperature")
+
+	data.AllowedChannels = mapStringListFromAny(ctx, m, "allowedChannels")
+	data.Keywords = mapStringListFromAny(ctx, m, "keywords")
+	data.AllowedTools = mapStringListFromAny(ctx, m, "allowedTools")
+	data.AssignedSkills = mapStringListFromAny(ctx, m, "assignedSkills")
+	data.AllowedCollections = mapStringListFromAny(ctx, m, "allowedCollections")
+	data.AllowedSubAgents = mapStringListFromAny(ctx, m, "allowedSubAgents")
+	data.AllowedUsers = mapStringListFromAny(ctx, m, "allowedUsers")
+	data.DeniedUsers = mapStringListFromAny(ctx, m, "deniedUsers")
+	data.FilterPolicies = mapStringListFromAny(ctx, m, "filterPolicies")
+
+	// AgentAccessControl — empty object for now.
+	data.AgentAccessControl = resource_slack_bot.NewAgentAccessControlValueMust(
+		resource_slack_bot.AgentAccessControlValue{}.AttributeTypes(ctx),
+		map[string]attr.Value{},
+	)
+
+	// --- Nested computed bot object (mirrors all fields + read-only metadata) ---
+	diags.Append(buildBotObject(ctx, m, data)...)
+
+	// Silence unused import.
+	_ = basetypes.StringValue{}
+	return
 }
 
 // mapSlackBotResponse maps a typed GetSlackBot200ResponseBot into the TF model.
+// New fields that aren't in the SDK struct are read from AdditionalProperties.
 func mapSlackBotResponse(ctx context.Context, bot *quantadmingo.GetSlackBot200ResponseBot, org string, data *resource_slack_bot.SlackBotModel) (diags diag.Diagnostics) {
 	if bot == nil {
 		return
 	}
 
-	data.BotId = optionalStringPtrValue(bot.BotId)
-	data.AgentId = optionalStringPtrValue(bot.AgentId)
-	data.SetupType = optionalStringPtrValue(bot.SetupType)
+	// Build a unified map from typed fields + additional properties so we
+	// can use the same mapping logic as mapSlackBotFromMap.
+	m := make(map[string]interface{})
 
+	// Typed fields the SDK knows about.
+	if bot.BotId != nil {
+		m["botId"] = *bot.BotId
+	}
+	if bot.SetupType != nil {
+		m["setupType"] = *bot.SetupType
+	}
+	if bot.Status != nil {
+		m["status"] = *bot.Status
+	}
+	if bot.Connected != nil {
+		m["connected"] = *bot.Connected
+	}
 	if bot.SessionTtlDays != nil {
-		data.SessionTtlDays = types.Int64Value(int64(*bot.SessionTtlDays))
-	} else {
-		data.SessionTtlDays = types.Int64Null()
+		m["sessionTtlDays"] = float64(*bot.SessionTtlDays)
 	}
 	if bot.KeywordsEnabled != nil {
-		data.KeywordsEnabled = types.BoolValue(*bot.KeywordsEnabled)
-	} else {
-		data.KeywordsEnabled = types.BoolNull()
+		m["keywordsEnabled"] = *bot.KeywordsEnabled
+	}
+	if bot.AllowedChannels != nil {
+		iface := make([]interface{}, len(bot.AllowedChannels))
+		for i, v := range bot.AllowedChannels {
+			iface[i] = v
+		}
+		m["allowedChannels"] = iface
+	}
+	if bot.Keywords != nil {
+		iface := make([]interface{}, len(bot.Keywords))
+		for i, v := range bot.Keywords {
+			iface[i] = v
+		}
+		m["keywords"] = iface
+	}
+	if bot.CreatedAt != nil {
+		m["createdAt"] = bot.CreatedAt.Format(time.RFC3339)
+	}
+	if bot.UpdatedAt != nil {
+		m["updatedAt"] = bot.UpdatedAt.Format(time.RFC3339)
 	}
 
-	data.AllowedChannels = stringListFromSlice(ctx, bot.AllowedChannels)
-	data.Keywords = stringListFromSlice(ctx, bot.Keywords)
-	data.SlashCommands = stringListFromSlice(ctx, bot.SlashCommands)
+	// New fields from AdditionalProperties.
+	for k, v := range bot.AdditionalProperties {
+		m[k] = v
+	}
 
-	// Nested bot object — all computed, mirrors top-level plus read-only
-	// metadata (status, connected, timestamps).
+	diags.Append(mapSlackBotFromMap(ctx, m, org, data)...)
+	return
+}
+
+// buildBotObject constructs the nested computed `bot` attribute from the
+// flat API response map.
+func buildBotObject(ctx context.Context, m map[string]interface{}, data *resource_slack_bot.SlackBotModel) (diags diag.Diagnostics) {
 	botAttrTypes := resource_slack_bot.BotValue{}.AttributeTypes(ctx)
 	botAttrs := map[string]attr.Value{
-		"bot_id":           data.BotId,
-		"agent_id":         data.AgentId,
-		"setup_type":       data.SetupType,
-		"status":           optionalStringPtrValue(bot.Status),
-		"connected":        boolPtrToValue(bot.Connected),
-		"session_ttl_days": data.SessionTtlDays,
-		"allowed_channels": data.AllowedChannels,
-		"keywords_enabled": data.KeywordsEnabled,
-		"keywords":         data.Keywords,
-		"slash_commands":   data.SlashCommands,
-		"created_at":       timePtrToString(bot.CreatedAt),
-		"updated_at":       timePtrToString(bot.UpdatedAt),
+		"bot_id":              data.BotId,
+		"setup_type":          data.SetupType,
+		"name":                data.Name,
+		"system_prompt":       data.SystemPrompt,
+		"model_id":            data.ModelId,
+		"guardrail_preset":    data.GuardrailPreset,
+		"home_tab_content":    data.HomeTabContent,
+		"session_ttl_days":    data.SessionTtlDays,
+		"max_tokens":          data.MaxTokens,
+		"keywords_enabled":    data.KeywordsEnabled,
+		"allow_guests":        data.AllowGuests,
+		"long_context":        data.LongContext,
+		"temperature":         data.Temperature,
+		"allowed_channels":    data.AllowedChannels,
+		"keywords":            data.Keywords,
+		"allowed_tools":       data.AllowedTools,
+		"assigned_skills":     data.AssignedSkills,
+		"allowed_collections": data.AllowedCollections,
+		"allowed_sub_agents":  data.AllowedSubAgents,
+		"allowed_users":       data.AllowedUsers,
+		"denied_users":        data.DeniedUsers,
+		"filter_policies":     data.FilterPolicies,
+		// Read-only metadata.
+		"status":    mapStringFromAny(m, "status"),
+		"connected": mapBoolFromAny(m, "connected"),
+		"created_at": func() basetypes.StringValue {
+			if v, ok := m["createdAt"].(string); ok && v != "" {
+				return types.StringValue(v)
+			}
+			return types.StringNull()
+		}(),
+		"updated_at": func() basetypes.StringValue {
+			if v, ok := m["updatedAt"].(string); ok && v != "" {
+				return types.StringValue(v)
+			}
+			return types.StringNull()
+		}(),
+		"agent_access_control": func() basetypes.ObjectValue {
+			v, d := types.ObjectValue(
+				resource_slack_bot.AgentAccessControlValue{}.AttributeTypes(ctx),
+				map[string]attr.Value{},
+			)
+			diags.Append(d...)
+			return v
+		}(),
 	}
+
 	botValue, d := resource_slack_bot.NewBotValue(botAttrTypes, botAttrs)
 	diags.Append(d...)
 	if !diags.HasError() {
 		data.Bot = botValue
 	}
-
-	// Silence unused import
-	_ = basetypes.StringValue{}
 	return
+}
+
+// ---------------------------------------------------------------------------
+// Generic map → TF value helpers
+// ---------------------------------------------------------------------------
+
+func mapStringFromAny(m map[string]interface{}, key string) types.String {
+	if v, ok := m[key].(string); ok {
+		return types.StringValue(v)
+	}
+	return types.StringNull()
+}
+
+func mapBoolFromAny(m map[string]interface{}, key string) basetypes.BoolValue {
+	if v, ok := m[key].(bool); ok {
+		return types.BoolValue(v)
+	}
+	return types.BoolNull()
+}
+
+func mapInt64FromAny(m map[string]interface{}, key string) types.Int64 {
+	switch v := m[key].(type) {
+	case float64:
+		return types.Int64Value(int64(v))
+	case int64:
+		return types.Int64Value(v)
+	case int32:
+		return types.Int64Value(int64(v))
+	case int:
+		return types.Int64Value(int64(v))
+	}
+	return types.Int64Null()
+}
+
+func mapNumberFromAny(m map[string]interface{}, key string) basetypes.NumberValue {
+	switch v := m[key].(type) {
+	case float64:
+		return types.NumberValue(big.NewFloat(v))
+	case float32:
+		return types.NumberValue(big.NewFloat(float64(v)))
+	}
+	return types.NumberNull()
+}
+
+func mapStringListFromAny(ctx context.Context, m map[string]interface{}, key string) types.List {
+	switch v := m[key].(type) {
+	case []interface{}:
+		strs := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				strs = append(strs, s)
+			}
+		}
+		return stringListFromSlice(ctx, strs)
+	case []string:
+		return stringListFromSlice(ctx, v)
+	}
+	return types.ListNull(types.StringType)
 }

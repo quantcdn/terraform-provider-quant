@@ -21,10 +21,23 @@ import (
 func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"agent_id": schema.StringAttribute{
-				Required:            true,
-				Description:         "The AI agent that powers this bot",
-				MarkdownDescription: "The AI agent that powers this bot",
+			"agent_access_control": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{},
+				CustomType: AgentAccessControlType{
+					ObjectType: types.ObjectType{
+						AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Agent-level access control settings",
+				MarkdownDescription: "Agent-level access control settings",
+			},
+			"allow_guests": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Whether guest users may interact with the bot",
+				MarkdownDescription: "Whether guest users may interact with the bot",
 			},
 			"allowed_channels": schema.ListAttribute{
 				ElementType:         types.StringType,
@@ -33,12 +46,76 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Slack channel IDs the bot may respond in",
 				MarkdownDescription: "Slack channel IDs the bot may respond in",
 			},
+			"allowed_collections": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Vector DB collections the agent may query",
+				MarkdownDescription: "Vector DB collections the agent may query",
+			},
+			"allowed_sub_agents": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Sub-agents the agent may call",
+				MarkdownDescription: "Sub-agents the agent may call",
+			},
+			"allowed_tools": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Tools the agent may use",
+				MarkdownDescription: "Tools the agent may use",
+			},
+			"allowed_users": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Slack user IDs allowed to interact with the bot",
+				MarkdownDescription: "Slack user IDs allowed to interact with the bot",
+			},
+			"assigned_skills": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Skills assigned to the agent",
+				MarkdownDescription: "Skills assigned to the agent",
+			},
 			"bot": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
-					"agent_id": schema.StringAttribute{
+					"agent_access_control": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{},
+						CustomType: AgentAccessControlType{
+							ObjectType: types.ObjectType{
+								AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+							},
+						},
+						Computed: true,
+					},
+					"allow_guests": schema.BoolAttribute{
 						Computed: true,
 					},
 					"allowed_channels": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"allowed_collections": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"allowed_sub_agents": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"allowed_tools": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"allowed_users": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"assigned_skills": schema.ListAttribute{
 						ElementType: types.StringType,
 						Computed:    true,
 					},
@@ -51,11 +128,37 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 					"created_at": schema.StringAttribute{
 						Computed: true,
 					},
+					"denied_users": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"filter_policies": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
+					"guardrail_preset": schema.StringAttribute{
+						Computed: true,
+					},
+					"home_tab_content": schema.StringAttribute{
+						Computed: true,
+					},
 					"keywords": schema.ListAttribute{
 						ElementType: types.StringType,
 						Computed:    true,
 					},
 					"keywords_enabled": schema.BoolAttribute{
+						Computed: true,
+					},
+					"long_context": schema.BoolAttribute{
+						Computed: true,
+					},
+					"max_tokens": schema.Int64Attribute{
+						Computed: true,
+					},
+					"model_id": schema.StringAttribute{
+						Computed: true,
+					},
+					"name": schema.StringAttribute{
 						Computed: true,
 					},
 					"session_ttl_days": schema.Int64Attribute{
@@ -64,11 +167,13 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 					"setup_type": schema.StringAttribute{
 						Computed: true,
 					},
-					"slash_commands": schema.ListAttribute{
-						ElementType: types.StringType,
-						Computed:    true,
-					},
 					"status": schema.StringAttribute{
+						Computed: true,
+					},
+					"system_prompt": schema.StringAttribute{
+						Computed: true,
+					},
+					"temperature": schema.NumberAttribute{
 						Computed: true,
 					},
 					"updated_at": schema.StringAttribute{
@@ -88,6 +193,32 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "The Slack bot ID",
 				MarkdownDescription: "The Slack bot ID",
 			},
+			"denied_users": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Slack user IDs denied from interacting with the bot",
+				MarkdownDescription: "Slack user IDs denied from interacting with the bot",
+			},
+			"filter_policies": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Content filter policies",
+				MarkdownDescription: "Content filter policies",
+			},
+			"guardrail_preset": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Guardrail preset name",
+				MarkdownDescription: "Guardrail preset name",
+			},
+			"home_tab_content": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Content shown on the bot's Home tab in Slack",
+				MarkdownDescription: "Content shown on the bot's Home tab in Slack",
+			},
 			"keywords": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
@@ -100,6 +231,31 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "Whether keyword triggers are enabled",
 				MarkdownDescription: "Whether keyword triggers are enabled",
+			},
+			"long_context": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Enable long context mode",
+				MarkdownDescription: "Enable long context mode",
+			},
+			"max_tokens": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Maximum response tokens",
+				MarkdownDescription: "Maximum response tokens",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"model_id": schema.StringAttribute{
+				Required:            true,
+				Description:         "AI model identifier",
+				MarkdownDescription: "AI model identifier",
+			},
+			"name": schema.StringAttribute{
+				Required:            true,
+				Description:         "Display name for the bot",
+				MarkdownDescription: "Display name for the bot",
 			},
 			"organisation": schema.StringAttribute{
 				Optional:            true,
@@ -127,28 +283,307 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 					),
 				},
 			},
-			"slash_commands": schema.ListAttribute{
-				ElementType:         types.StringType,
+			"system_prompt": schema.StringAttribute{
+				Required:            true,
+				Description:         "System prompt for the backing AI agent",
+				MarkdownDescription: "System prompt for the backing AI agent",
+			},
+			"temperature": schema.NumberAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Slash commands the bot responds to",
-				MarkdownDescription: "Slash commands the bot responds to",
+				Description:         "Sampling temperature",
+				MarkdownDescription: "Sampling temperature",
 			},
 		},
 	}
 }
 
 type SlackBotModel struct {
-	AgentId         types.String `tfsdk:"agent_id"`
-	AllowedChannels types.List   `tfsdk:"allowed_channels"`
-	Bot             BotValue     `tfsdk:"bot"`
-	BotId           types.String `tfsdk:"bot_id"`
-	Keywords        types.List   `tfsdk:"keywords"`
-	KeywordsEnabled types.Bool   `tfsdk:"keywords_enabled"`
-	Organisation    types.String `tfsdk:"organisation"`
-	SessionTtlDays  types.Int64  `tfsdk:"session_ttl_days"`
-	SetupType       types.String `tfsdk:"setup_type"`
-	SlashCommands   types.List   `tfsdk:"slash_commands"`
+	AgentAccessControl AgentAccessControlValue `tfsdk:"agent_access_control"`
+	AllowGuests        types.Bool              `tfsdk:"allow_guests"`
+	AllowedChannels    types.List              `tfsdk:"allowed_channels"`
+	AllowedCollections types.List              `tfsdk:"allowed_collections"`
+	AllowedSubAgents   types.List              `tfsdk:"allowed_sub_agents"`
+	AllowedTools       types.List              `tfsdk:"allowed_tools"`
+	AllowedUsers       types.List              `tfsdk:"allowed_users"`
+	AssignedSkills     types.List              `tfsdk:"assigned_skills"`
+	Bot                BotValue                `tfsdk:"bot"`
+	BotId              types.String            `tfsdk:"bot_id"`
+	DeniedUsers        types.List              `tfsdk:"denied_users"`
+	FilterPolicies     types.List              `tfsdk:"filter_policies"`
+	GuardrailPreset    types.String            `tfsdk:"guardrail_preset"`
+	HomeTabContent     types.String            `tfsdk:"home_tab_content"`
+	Keywords           types.List              `tfsdk:"keywords"`
+	KeywordsEnabled    types.Bool              `tfsdk:"keywords_enabled"`
+	LongContext        types.Bool              `tfsdk:"long_context"`
+	MaxTokens          types.Int64             `tfsdk:"max_tokens"`
+	ModelId            types.String            `tfsdk:"model_id"`
+	Name               types.String            `tfsdk:"name"`
+	Organisation       types.String            `tfsdk:"organisation"`
+	SessionTtlDays     types.Int64             `tfsdk:"session_ttl_days"`
+	SetupType          types.String            `tfsdk:"setup_type"`
+	SystemPrompt       types.String            `tfsdk:"system_prompt"`
+	Temperature        types.Number            `tfsdk:"temperature"`
+}
+
+var _ basetypes.ObjectTypable = AgentAccessControlType{}
+
+type AgentAccessControlType struct {
+	basetypes.ObjectType
+}
+
+func (t AgentAccessControlType) Equal(o attr.Type) bool {
+	other, ok := o.(AgentAccessControlType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t AgentAccessControlType) String() string {
+	return "AgentAccessControlType"
+}
+
+func (t AgentAccessControlType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return AgentAccessControlValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewAgentAccessControlValueNull() AgentAccessControlValue {
+	return AgentAccessControlValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewAgentAccessControlValueUnknown() AgentAccessControlValue {
+	return AgentAccessControlValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewAgentAccessControlValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (AgentAccessControlValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing AgentAccessControlValue Attribute Value",
+				"While creating a AgentAccessControlValue value, a missing attribute value was detected. "+
+					"A AgentAccessControlValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("AgentAccessControlValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid AgentAccessControlValue Attribute Type",
+				"While creating a AgentAccessControlValue value, an invalid attribute value was detected. "+
+					"A AgentAccessControlValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("AgentAccessControlValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("AgentAccessControlValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra AgentAccessControlValue Attribute Value",
+				"While creating a AgentAccessControlValue value, an extra attribute value was detected. "+
+					"A AgentAccessControlValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra AgentAccessControlValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewAgentAccessControlValueUnknown(), diags
+	}
+
+	if diags.HasError() {
+		return NewAgentAccessControlValueUnknown(), diags
+	}
+
+	return AgentAccessControlValue{
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewAgentAccessControlValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) AgentAccessControlValue {
+	object, diags := NewAgentAccessControlValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewAgentAccessControlValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t AgentAccessControlType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewAgentAccessControlValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewAgentAccessControlValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewAgentAccessControlValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewAgentAccessControlValueMust(AgentAccessControlValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t AgentAccessControlType) ValueType(ctx context.Context) attr.Value {
+	return AgentAccessControlValue{}
+}
+
+var _ basetypes.ObjectValuable = AgentAccessControlValue{}
+
+type AgentAccessControlValue struct {
+	state attr.ValueState
+}
+
+func (v AgentAccessControlValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 0)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 0)
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v AgentAccessControlValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v AgentAccessControlValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v AgentAccessControlValue) String() string {
+	return "AgentAccessControlValue"
+}
+
+func (v AgentAccessControlValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{})
+
+	return objVal, diags
+}
+
+func (v AgentAccessControlValue) Equal(o attr.Value) bool {
+	other, ok := o.(AgentAccessControlValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	return true
+}
+
+func (v AgentAccessControlValue) Type(ctx context.Context) attr.Type {
+	return AgentAccessControlType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v AgentAccessControlValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{}
 }
 
 var _ basetypes.ObjectTypable = BotType{}
@@ -176,22 +611,40 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 
 	attributes := in.Attributes()
 
-	agentIdAttribute, ok := attributes["agent_id"]
+	agentAccessControlAttribute, ok := attributes["agent_access_control"]
 
 	if !ok {
 		diags.AddError(
 			"Attribute Missing",
-			`agent_id is missing from object`)
+			`agent_access_control is missing from object`)
 
 		return nil, diags
 	}
 
-	agentIdVal, ok := agentIdAttribute.(basetypes.StringValue)
+	agentAccessControlVal, ok := agentAccessControlAttribute.(basetypes.ObjectValue)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`agent_id expected to be basetypes.StringValue, was: %T`, agentIdAttribute))
+			fmt.Sprintf(`agent_access_control expected to be basetypes.ObjectValue, was: %T`, agentAccessControlAttribute))
+	}
+
+	allowGuestsAttribute, ok := attributes["allow_guests"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allow_guests is missing from object`)
+
+		return nil, diags
+	}
+
+	allowGuestsVal, ok := allowGuestsAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allow_guests expected to be basetypes.BoolValue, was: %T`, allowGuestsAttribute))
 	}
 
 	allowedChannelsAttribute, ok := attributes["allowed_channels"]
@@ -210,6 +663,96 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`allowed_channels expected to be basetypes.ListValue, was: %T`, allowedChannelsAttribute))
+	}
+
+	allowedCollectionsAttribute, ok := attributes["allowed_collections"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_collections is missing from object`)
+
+		return nil, diags
+	}
+
+	allowedCollectionsVal, ok := allowedCollectionsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_collections expected to be basetypes.ListValue, was: %T`, allowedCollectionsAttribute))
+	}
+
+	allowedSubAgentsAttribute, ok := attributes["allowed_sub_agents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_sub_agents is missing from object`)
+
+		return nil, diags
+	}
+
+	allowedSubAgentsVal, ok := allowedSubAgentsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_sub_agents expected to be basetypes.ListValue, was: %T`, allowedSubAgentsAttribute))
+	}
+
+	allowedToolsAttribute, ok := attributes["allowed_tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_tools is missing from object`)
+
+		return nil, diags
+	}
+
+	allowedToolsVal, ok := allowedToolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_tools expected to be basetypes.ListValue, was: %T`, allowedToolsAttribute))
+	}
+
+	allowedUsersAttribute, ok := attributes["allowed_users"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_users is missing from object`)
+
+		return nil, diags
+	}
+
+	allowedUsersVal, ok := allowedUsersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_users expected to be basetypes.ListValue, was: %T`, allowedUsersAttribute))
+	}
+
+	assignedSkillsAttribute, ok := attributes["assigned_skills"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`assigned_skills is missing from object`)
+
+		return nil, diags
+	}
+
+	assignedSkillsVal, ok := assignedSkillsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`assigned_skills expected to be basetypes.ListValue, was: %T`, assignedSkillsAttribute))
 	}
 
 	botIdAttribute, ok := attributes["bot_id"]
@@ -266,6 +809,78 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 			fmt.Sprintf(`created_at expected to be basetypes.StringValue, was: %T`, createdAtAttribute))
 	}
 
+	deniedUsersAttribute, ok := attributes["denied_users"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`denied_users is missing from object`)
+
+		return nil, diags
+	}
+
+	deniedUsersVal, ok := deniedUsersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`denied_users expected to be basetypes.ListValue, was: %T`, deniedUsersAttribute))
+	}
+
+	filterPoliciesAttribute, ok := attributes["filter_policies"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`filter_policies is missing from object`)
+
+		return nil, diags
+	}
+
+	filterPoliciesVal, ok := filterPoliciesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`filter_policies expected to be basetypes.ListValue, was: %T`, filterPoliciesAttribute))
+	}
+
+	guardrailPresetAttribute, ok := attributes["guardrail_preset"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`guardrail_preset is missing from object`)
+
+		return nil, diags
+	}
+
+	guardrailPresetVal, ok := guardrailPresetAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`guardrail_preset expected to be basetypes.StringValue, was: %T`, guardrailPresetAttribute))
+	}
+
+	homeTabContentAttribute, ok := attributes["home_tab_content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`home_tab_content is missing from object`)
+
+		return nil, diags
+	}
+
+	homeTabContentVal, ok := homeTabContentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`home_tab_content expected to be basetypes.StringValue, was: %T`, homeTabContentAttribute))
+	}
+
 	keywordsAttribute, ok := attributes["keywords"]
 
 	if !ok {
@@ -300,6 +915,78 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`keywords_enabled expected to be basetypes.BoolValue, was: %T`, keywordsEnabledAttribute))
+	}
+
+	longContextAttribute, ok := attributes["long_context"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`long_context is missing from object`)
+
+		return nil, diags
+	}
+
+	longContextVal, ok := longContextAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`long_context expected to be basetypes.BoolValue, was: %T`, longContextAttribute))
+	}
+
+	maxTokensAttribute, ok := attributes["max_tokens"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`max_tokens is missing from object`)
+
+		return nil, diags
+	}
+
+	maxTokensVal, ok := maxTokensAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`max_tokens expected to be basetypes.Int64Value, was: %T`, maxTokensAttribute))
+	}
+
+	modelIdAttribute, ok := attributes["model_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`model_id is missing from object`)
+
+		return nil, diags
+	}
+
+	modelIdVal, ok := modelIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`model_id expected to be basetypes.StringValue, was: %T`, modelIdAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return nil, diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
 	}
 
 	sessionTtlDaysAttribute, ok := attributes["session_ttl_days"]
@@ -338,24 +1025,6 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 			fmt.Sprintf(`setup_type expected to be basetypes.StringValue, was: %T`, setupTypeAttribute))
 	}
 
-	slashCommandsAttribute, ok := attributes["slash_commands"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`slash_commands is missing from object`)
-
-		return nil, diags
-	}
-
-	slashCommandsVal, ok := slashCommandsAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`slash_commands expected to be basetypes.ListValue, was: %T`, slashCommandsAttribute))
-	}
-
 	statusAttribute, ok := attributes["status"]
 
 	if !ok {
@@ -372,6 +1041,42 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`status expected to be basetypes.StringValue, was: %T`, statusAttribute))
+	}
+
+	systemPromptAttribute, ok := attributes["system_prompt"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`system_prompt is missing from object`)
+
+		return nil, diags
+	}
+
+	systemPromptVal, ok := systemPromptAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`system_prompt expected to be basetypes.StringValue, was: %T`, systemPromptAttribute))
+	}
+
+	temperatureAttribute, ok := attributes["temperature"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`temperature is missing from object`)
+
+		return nil, diags
+	}
+
+	temperatureVal, ok := temperatureAttribute.(basetypes.NumberValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`temperature expected to be basetypes.NumberValue, was: %T`, temperatureAttribute))
 	}
 
 	updatedAtAttribute, ok := attributes["updated_at"]
@@ -397,19 +1102,34 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 	}
 
 	return BotValue{
-		AgentId:         agentIdVal,
-		AllowedChannels: allowedChannelsVal,
-		BotId:           botIdVal,
-		Connected:       connectedVal,
-		CreatedAt:       createdAtVal,
-		Keywords:        keywordsVal,
-		KeywordsEnabled: keywordsEnabledVal,
-		SessionTtlDays:  sessionTtlDaysVal,
-		SetupType:       setupTypeVal,
-		SlashCommands:   slashCommandsVal,
-		Status:          statusVal,
-		UpdatedAt:       updatedAtVal,
-		state:           attr.ValueStateKnown,
+		AgentAccessControl: agentAccessControlVal,
+		AllowGuests:        allowGuestsVal,
+		AllowedChannels:    allowedChannelsVal,
+		AllowedCollections: allowedCollectionsVal,
+		AllowedSubAgents:   allowedSubAgentsVal,
+		AllowedTools:       allowedToolsVal,
+		AllowedUsers:       allowedUsersVal,
+		AssignedSkills:     assignedSkillsVal,
+		BotId:              botIdVal,
+		Connected:          connectedVal,
+		CreatedAt:          createdAtVal,
+		DeniedUsers:        deniedUsersVal,
+		FilterPolicies:     filterPoliciesVal,
+		GuardrailPreset:    guardrailPresetVal,
+		HomeTabContent:     homeTabContentVal,
+		Keywords:           keywordsVal,
+		KeywordsEnabled:    keywordsEnabledVal,
+		LongContext:        longContextVal,
+		MaxTokens:          maxTokensVal,
+		ModelId:            modelIdVal,
+		Name:               nameVal,
+		SessionTtlDays:     sessionTtlDaysVal,
+		SetupType:          setupTypeVal,
+		Status:             statusVal,
+		SystemPrompt:       systemPromptVal,
+		Temperature:        temperatureVal,
+		UpdatedAt:          updatedAtVal,
+		state:              attr.ValueStateKnown,
 	}, diags
 }
 
@@ -476,22 +1196,40 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 		return NewBotValueUnknown(), diags
 	}
 
-	agentIdAttribute, ok := attributes["agent_id"]
+	agentAccessControlAttribute, ok := attributes["agent_access_control"]
 
 	if !ok {
 		diags.AddError(
 			"Attribute Missing",
-			`agent_id is missing from object`)
+			`agent_access_control is missing from object`)
 
 		return NewBotValueUnknown(), diags
 	}
 
-	agentIdVal, ok := agentIdAttribute.(basetypes.StringValue)
+	agentAccessControlVal, ok := agentAccessControlAttribute.(basetypes.ObjectValue)
 
 	if !ok {
 		diags.AddError(
 			"Attribute Wrong Type",
-			fmt.Sprintf(`agent_id expected to be basetypes.StringValue, was: %T`, agentIdAttribute))
+			fmt.Sprintf(`agent_access_control expected to be basetypes.ObjectValue, was: %T`, agentAccessControlAttribute))
+	}
+
+	allowGuestsAttribute, ok := attributes["allow_guests"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allow_guests is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	allowGuestsVal, ok := allowGuestsAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allow_guests expected to be basetypes.BoolValue, was: %T`, allowGuestsAttribute))
 	}
 
 	allowedChannelsAttribute, ok := attributes["allowed_channels"]
@@ -510,6 +1248,96 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`allowed_channels expected to be basetypes.ListValue, was: %T`, allowedChannelsAttribute))
+	}
+
+	allowedCollectionsAttribute, ok := attributes["allowed_collections"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_collections is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	allowedCollectionsVal, ok := allowedCollectionsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_collections expected to be basetypes.ListValue, was: %T`, allowedCollectionsAttribute))
+	}
+
+	allowedSubAgentsAttribute, ok := attributes["allowed_sub_agents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_sub_agents is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	allowedSubAgentsVal, ok := allowedSubAgentsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_sub_agents expected to be basetypes.ListValue, was: %T`, allowedSubAgentsAttribute))
+	}
+
+	allowedToolsAttribute, ok := attributes["allowed_tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_tools is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	allowedToolsVal, ok := allowedToolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_tools expected to be basetypes.ListValue, was: %T`, allowedToolsAttribute))
+	}
+
+	allowedUsersAttribute, ok := attributes["allowed_users"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`allowed_users is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	allowedUsersVal, ok := allowedUsersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`allowed_users expected to be basetypes.ListValue, was: %T`, allowedUsersAttribute))
+	}
+
+	assignedSkillsAttribute, ok := attributes["assigned_skills"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`assigned_skills is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	assignedSkillsVal, ok := assignedSkillsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`assigned_skills expected to be basetypes.ListValue, was: %T`, assignedSkillsAttribute))
 	}
 
 	botIdAttribute, ok := attributes["bot_id"]
@@ -566,6 +1394,78 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 			fmt.Sprintf(`created_at expected to be basetypes.StringValue, was: %T`, createdAtAttribute))
 	}
 
+	deniedUsersAttribute, ok := attributes["denied_users"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`denied_users is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	deniedUsersVal, ok := deniedUsersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`denied_users expected to be basetypes.ListValue, was: %T`, deniedUsersAttribute))
+	}
+
+	filterPoliciesAttribute, ok := attributes["filter_policies"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`filter_policies is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	filterPoliciesVal, ok := filterPoliciesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`filter_policies expected to be basetypes.ListValue, was: %T`, filterPoliciesAttribute))
+	}
+
+	guardrailPresetAttribute, ok := attributes["guardrail_preset"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`guardrail_preset is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	guardrailPresetVal, ok := guardrailPresetAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`guardrail_preset expected to be basetypes.StringValue, was: %T`, guardrailPresetAttribute))
+	}
+
+	homeTabContentAttribute, ok := attributes["home_tab_content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`home_tab_content is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	homeTabContentVal, ok := homeTabContentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`home_tab_content expected to be basetypes.StringValue, was: %T`, homeTabContentAttribute))
+	}
+
 	keywordsAttribute, ok := attributes["keywords"]
 
 	if !ok {
@@ -600,6 +1500,78 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`keywords_enabled expected to be basetypes.BoolValue, was: %T`, keywordsEnabledAttribute))
+	}
+
+	longContextAttribute, ok := attributes["long_context"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`long_context is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	longContextVal, ok := longContextAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`long_context expected to be basetypes.BoolValue, was: %T`, longContextAttribute))
+	}
+
+	maxTokensAttribute, ok := attributes["max_tokens"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`max_tokens is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	maxTokensVal, ok := maxTokensAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`max_tokens expected to be basetypes.Int64Value, was: %T`, maxTokensAttribute))
+	}
+
+	modelIdAttribute, ok := attributes["model_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`model_id is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	modelIdVal, ok := modelIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`model_id expected to be basetypes.StringValue, was: %T`, modelIdAttribute))
+	}
+
+	nameAttribute, ok := attributes["name"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`name is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	nameVal, ok := nameAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
 	}
 
 	sessionTtlDaysAttribute, ok := attributes["session_ttl_days"]
@@ -638,24 +1610,6 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 			fmt.Sprintf(`setup_type expected to be basetypes.StringValue, was: %T`, setupTypeAttribute))
 	}
 
-	slashCommandsAttribute, ok := attributes["slash_commands"]
-
-	if !ok {
-		diags.AddError(
-			"Attribute Missing",
-			`slash_commands is missing from object`)
-
-		return NewBotValueUnknown(), diags
-	}
-
-	slashCommandsVal, ok := slashCommandsAttribute.(basetypes.ListValue)
-
-	if !ok {
-		diags.AddError(
-			"Attribute Wrong Type",
-			fmt.Sprintf(`slash_commands expected to be basetypes.ListValue, was: %T`, slashCommandsAttribute))
-	}
-
 	statusAttribute, ok := attributes["status"]
 
 	if !ok {
@@ -672,6 +1626,42 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`status expected to be basetypes.StringValue, was: %T`, statusAttribute))
+	}
+
+	systemPromptAttribute, ok := attributes["system_prompt"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`system_prompt is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	systemPromptVal, ok := systemPromptAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`system_prompt expected to be basetypes.StringValue, was: %T`, systemPromptAttribute))
+	}
+
+	temperatureAttribute, ok := attributes["temperature"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`temperature is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	temperatureVal, ok := temperatureAttribute.(basetypes.NumberValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`temperature expected to be basetypes.NumberValue, was: %T`, temperatureAttribute))
 	}
 
 	updatedAtAttribute, ok := attributes["updated_at"]
@@ -697,19 +1687,34 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 	}
 
 	return BotValue{
-		AgentId:         agentIdVal,
-		AllowedChannels: allowedChannelsVal,
-		BotId:           botIdVal,
-		Connected:       connectedVal,
-		CreatedAt:       createdAtVal,
-		Keywords:        keywordsVal,
-		KeywordsEnabled: keywordsEnabledVal,
-		SessionTtlDays:  sessionTtlDaysVal,
-		SetupType:       setupTypeVal,
-		SlashCommands:   slashCommandsVal,
-		Status:          statusVal,
-		UpdatedAt:       updatedAtVal,
-		state:           attr.ValueStateKnown,
+		AgentAccessControl: agentAccessControlVal,
+		AllowGuests:        allowGuestsVal,
+		AllowedChannels:    allowedChannelsVal,
+		AllowedCollections: allowedCollectionsVal,
+		AllowedSubAgents:   allowedSubAgentsVal,
+		AllowedTools:       allowedToolsVal,
+		AllowedUsers:       allowedUsersVal,
+		AssignedSkills:     assignedSkillsVal,
+		BotId:              botIdVal,
+		Connected:          connectedVal,
+		CreatedAt:          createdAtVal,
+		DeniedUsers:        deniedUsersVal,
+		FilterPolicies:     filterPoliciesVal,
+		GuardrailPreset:    guardrailPresetVal,
+		HomeTabContent:     homeTabContentVal,
+		Keywords:           keywordsVal,
+		KeywordsEnabled:    keywordsEnabledVal,
+		LongContext:        longContextVal,
+		MaxTokens:          maxTokensVal,
+		ModelId:            modelIdVal,
+		Name:               nameVal,
+		SessionTtlDays:     sessionTtlDaysVal,
+		SetupType:          setupTypeVal,
+		Status:             statusVal,
+		SystemPrompt:       systemPromptVal,
+		Temperature:        temperatureVal,
+		UpdatedAt:          updatedAtVal,
+		state:              attr.ValueStateKnown,
 	}, diags
 }
 
@@ -781,59 +1786,111 @@ func (t BotType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = BotValue{}
 
 type BotValue struct {
-	AgentId         basetypes.StringValue `tfsdk:"agent_id"`
-	AllowedChannels basetypes.ListValue   `tfsdk:"allowed_channels"`
-	BotId           basetypes.StringValue `tfsdk:"bot_id"`
-	Connected       basetypes.BoolValue   `tfsdk:"connected"`
-	CreatedAt       basetypes.StringValue `tfsdk:"created_at"`
-	Keywords        basetypes.ListValue   `tfsdk:"keywords"`
-	KeywordsEnabled basetypes.BoolValue   `tfsdk:"keywords_enabled"`
-	SessionTtlDays  basetypes.Int64Value  `tfsdk:"session_ttl_days"`
-	SetupType       basetypes.StringValue `tfsdk:"setup_type"`
-	SlashCommands   basetypes.ListValue   `tfsdk:"slash_commands"`
-	Status          basetypes.StringValue `tfsdk:"status"`
-	UpdatedAt       basetypes.StringValue `tfsdk:"updated_at"`
-	state           attr.ValueState
+	AgentAccessControl basetypes.ObjectValue `tfsdk:"agent_access_control"`
+	AllowGuests        basetypes.BoolValue   `tfsdk:"allow_guests"`
+	AllowedChannels    basetypes.ListValue   `tfsdk:"allowed_channels"`
+	AllowedCollections basetypes.ListValue   `tfsdk:"allowed_collections"`
+	AllowedSubAgents   basetypes.ListValue   `tfsdk:"allowed_sub_agents"`
+	AllowedTools       basetypes.ListValue   `tfsdk:"allowed_tools"`
+	AllowedUsers       basetypes.ListValue   `tfsdk:"allowed_users"`
+	AssignedSkills     basetypes.ListValue   `tfsdk:"assigned_skills"`
+	BotId              basetypes.StringValue `tfsdk:"bot_id"`
+	Connected          basetypes.BoolValue   `tfsdk:"connected"`
+	CreatedAt          basetypes.StringValue `tfsdk:"created_at"`
+	DeniedUsers        basetypes.ListValue   `tfsdk:"denied_users"`
+	FilterPolicies     basetypes.ListValue   `tfsdk:"filter_policies"`
+	GuardrailPreset    basetypes.StringValue `tfsdk:"guardrail_preset"`
+	HomeTabContent     basetypes.StringValue `tfsdk:"home_tab_content"`
+	Keywords           basetypes.ListValue   `tfsdk:"keywords"`
+	KeywordsEnabled    basetypes.BoolValue   `tfsdk:"keywords_enabled"`
+	LongContext        basetypes.BoolValue   `tfsdk:"long_context"`
+	MaxTokens          basetypes.Int64Value  `tfsdk:"max_tokens"`
+	ModelId            basetypes.StringValue `tfsdk:"model_id"`
+	Name               basetypes.StringValue `tfsdk:"name"`
+	SessionTtlDays     basetypes.Int64Value  `tfsdk:"session_ttl_days"`
+	SetupType          basetypes.StringValue `tfsdk:"setup_type"`
+	Status             basetypes.StringValue `tfsdk:"status"`
+	SystemPrompt       basetypes.StringValue `tfsdk:"system_prompt"`
+	Temperature        basetypes.NumberValue `tfsdk:"temperature"`
+	UpdatedAt          basetypes.StringValue `tfsdk:"updated_at"`
+	state              attr.ValueState
 }
 
 func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 12)
+	attrTypes := make(map[string]tftypes.Type, 27)
 
 	var val tftypes.Value
 	var err error
 
-	attrTypes["agent_id"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["agent_access_control"] = basetypes.ObjectType{
+		AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
+	attrTypes["allow_guests"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["allowed_channels"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["allowed_collections"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["allowed_sub_agents"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["allowed_tools"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["allowed_users"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["assigned_skills"] = basetypes.ListType{
 		ElemType: types.StringType,
 	}.TerraformType(ctx)
 	attrTypes["bot_id"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["connected"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["created_at"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["denied_users"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["filter_policies"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["guardrail_preset"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["home_tab_content"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["keywords"] = basetypes.ListType{
 		ElemType: types.StringType,
 	}.TerraformType(ctx)
 	attrTypes["keywords_enabled"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["long_context"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["max_tokens"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["model_id"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["session_ttl_days"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["setup_type"] = basetypes.StringType{}.TerraformType(ctx)
-	attrTypes["slash_commands"] = basetypes.ListType{
-		ElemType: types.StringType,
-	}.TerraformType(ctx)
 	attrTypes["status"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["system_prompt"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["temperature"] = basetypes.NumberType{}.TerraformType(ctx)
 	attrTypes["updated_at"] = basetypes.StringType{}.TerraformType(ctx)
 
 	objectType := tftypes.Object{AttributeTypes: attrTypes}
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 12)
+		vals := make(map[string]tftypes.Value, 27)
 
-		val, err = v.AgentId.ToTerraformValue(ctx)
+		val, err = v.AgentAccessControl.ToTerraformValue(ctx)
 
 		if err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
 		}
 
-		vals["agent_id"] = val
+		vals["agent_access_control"] = val
+
+		val, err = v.AllowGuests.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["allow_guests"] = val
 
 		val, err = v.AllowedChannels.ToTerraformValue(ctx)
 
@@ -842,6 +1899,46 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 		}
 
 		vals["allowed_channels"] = val
+
+		val, err = v.AllowedCollections.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["allowed_collections"] = val
+
+		val, err = v.AllowedSubAgents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["allowed_sub_agents"] = val
+
+		val, err = v.AllowedTools.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["allowed_tools"] = val
+
+		val, err = v.AllowedUsers.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["allowed_users"] = val
+
+		val, err = v.AssignedSkills.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["assigned_skills"] = val
 
 		val, err = v.BotId.ToTerraformValue(ctx)
 
@@ -867,6 +1964,38 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 
 		vals["created_at"] = val
 
+		val, err = v.DeniedUsers.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["denied_users"] = val
+
+		val, err = v.FilterPolicies.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["filter_policies"] = val
+
+		val, err = v.GuardrailPreset.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["guardrail_preset"] = val
+
+		val, err = v.HomeTabContent.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["home_tab_content"] = val
+
 		val, err = v.Keywords.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -882,6 +2011,38 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 		}
 
 		vals["keywords_enabled"] = val
+
+		val, err = v.LongContext.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["long_context"] = val
+
+		val, err = v.MaxTokens.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["max_tokens"] = val
+
+		val, err = v.ModelId.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["model_id"] = val
+
+		val, err = v.Name.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["name"] = val
 
 		val, err = v.SessionTtlDays.ToTerraformValue(ctx)
 
@@ -899,14 +2060,6 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 
 		vals["setup_type"] = val
 
-		val, err = v.SlashCommands.ToTerraformValue(ctx)
-
-		if err != nil {
-			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
-		}
-
-		vals["slash_commands"] = val
-
 		val, err = v.Status.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -914,6 +2067,22 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 		}
 
 		vals["status"] = val
+
+		val, err = v.SystemPrompt.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["system_prompt"] = val
+
+		val, err = v.Temperature.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["temperature"] = val
 
 		val, err = v.UpdatedAt.ToTerraformValue(ctx)
 
@@ -952,6 +2121,27 @@ func (v BotValue) String() string {
 func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
+	var agentAccessControl basetypes.ObjectValue
+
+	if v.AgentAccessControl.IsNull() {
+		agentAccessControl = types.ObjectNull(
+			AgentAccessControlValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.AgentAccessControl.IsUnknown() {
+		agentAccessControl = types.ObjectUnknown(
+			AgentAccessControlValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.AgentAccessControl.IsNull() && !v.AgentAccessControl.IsUnknown() {
+		agentAccessControl = types.ObjectValueMust(
+			AgentAccessControlValue{}.AttributeTypes(ctx),
+			v.AgentAccessControl.Attributes(),
+		)
+	}
+
 	var allowedChannelsVal basetypes.ListValue
 	switch {
 	case v.AllowedChannels.IsUnknown():
@@ -966,24 +2156,501 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 
 	if diags.HasError() {
 		return types.ObjectUnknown(map[string]attr.Type{
-			"agent_id": basetypes.StringType{},
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
 			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
 				ElemType: types.StringType,
 			},
 			"bot_id":     basetypes.StringType{},
 			"connected":  basetypes.BoolType{},
 			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
 			"keywords": basetypes.ListType{
 				ElemType: types.StringType,
 			},
 			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
-			"slash_commands": basetypes.ListType{
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var allowedCollectionsVal basetypes.ListValue
+	switch {
+	case v.AllowedCollections.IsUnknown():
+		allowedCollectionsVal = types.ListUnknown(types.StringType)
+	case v.AllowedCollections.IsNull():
+		allowedCollectionsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		allowedCollectionsVal, d = types.ListValue(types.StringType, v.AllowedCollections.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
+			"allowed_channels": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"status":     basetypes.StringType{},
-			"updated_at": basetypes.StringType{},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"bot_id":     basetypes.StringType{},
+			"connected":  basetypes.BoolType{},
+			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
+			"keywords": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"session_ttl_days": basetypes.Int64Type{},
+			"setup_type":       basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var allowedSubAgentsVal basetypes.ListValue
+	switch {
+	case v.AllowedSubAgents.IsUnknown():
+		allowedSubAgentsVal = types.ListUnknown(types.StringType)
+	case v.AllowedSubAgents.IsNull():
+		allowedSubAgentsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		allowedSubAgentsVal, d = types.ListValue(types.StringType, v.AllowedSubAgents.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
+			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"bot_id":     basetypes.StringType{},
+			"connected":  basetypes.BoolType{},
+			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
+			"keywords": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"session_ttl_days": basetypes.Int64Type{},
+			"setup_type":       basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var allowedToolsVal basetypes.ListValue
+	switch {
+	case v.AllowedTools.IsUnknown():
+		allowedToolsVal = types.ListUnknown(types.StringType)
+	case v.AllowedTools.IsNull():
+		allowedToolsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		allowedToolsVal, d = types.ListValue(types.StringType, v.AllowedTools.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
+			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"bot_id":     basetypes.StringType{},
+			"connected":  basetypes.BoolType{},
+			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
+			"keywords": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"session_ttl_days": basetypes.Int64Type{},
+			"setup_type":       basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var allowedUsersVal basetypes.ListValue
+	switch {
+	case v.AllowedUsers.IsUnknown():
+		allowedUsersVal = types.ListUnknown(types.StringType)
+	case v.AllowedUsers.IsNull():
+		allowedUsersVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		allowedUsersVal, d = types.ListValue(types.StringType, v.AllowedUsers.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
+			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"bot_id":     basetypes.StringType{},
+			"connected":  basetypes.BoolType{},
+			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
+			"keywords": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"session_ttl_days": basetypes.Int64Type{},
+			"setup_type":       basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var assignedSkillsVal basetypes.ListValue
+	switch {
+	case v.AssignedSkills.IsUnknown():
+		assignedSkillsVal = types.ListUnknown(types.StringType)
+	case v.AssignedSkills.IsNull():
+		assignedSkillsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		assignedSkillsVal, d = types.ListValue(types.StringType, v.AssignedSkills.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
+			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"bot_id":     basetypes.StringType{},
+			"connected":  basetypes.BoolType{},
+			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
+			"keywords": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"session_ttl_days": basetypes.Int64Type{},
+			"setup_type":       basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var deniedUsersVal basetypes.ListValue
+	switch {
+	case v.DeniedUsers.IsUnknown():
+		deniedUsersVal = types.ListUnknown(types.StringType)
+	case v.DeniedUsers.IsNull():
+		deniedUsersVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		deniedUsersVal, d = types.ListValue(types.StringType, v.DeniedUsers.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
+			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"bot_id":     basetypes.StringType{},
+			"connected":  basetypes.BoolType{},
+			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
+			"keywords": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"session_ttl_days": basetypes.Int64Type{},
+			"setup_type":       basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var filterPoliciesVal basetypes.ListValue
+	switch {
+	case v.FilterPolicies.IsUnknown():
+		filterPoliciesVal = types.ListUnknown(types.StringType)
+	case v.FilterPolicies.IsNull():
+		filterPoliciesVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		filterPoliciesVal, d = types.ListValue(types.StringType, v.FilterPolicies.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
+			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"bot_id":     basetypes.StringType{},
+			"connected":  basetypes.BoolType{},
+			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
+			"keywords": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"session_ttl_days": basetypes.Int64Type{},
+			"setup_type":       basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
 		}), diags
 	}
 
@@ -1001,81 +2668,104 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 
 	if diags.HasError() {
 		return types.ObjectUnknown(map[string]attr.Type{
-			"agent_id": basetypes.StringType{},
+			"agent_access_control": basetypes.ObjectType{
+				AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+			},
+			"allow_guests": basetypes.BoolType{},
 			"allowed_channels": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_sub_agents": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
 				ElemType: types.StringType,
 			},
 			"bot_id":     basetypes.StringType{},
 			"connected":  basetypes.BoolType{},
 			"created_at": basetypes.StringType{},
+			"denied_users": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"home_tab_content": basetypes.StringType{},
 			"keywords": basetypes.ListType{
 				ElemType: types.StringType,
 			},
 			"keywords_enabled": basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
-			"slash_commands": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"status":     basetypes.StringType{},
-			"updated_at": basetypes.StringType{},
-		}), diags
-	}
-
-	var slashCommandsVal basetypes.ListValue
-	switch {
-	case v.SlashCommands.IsUnknown():
-		slashCommandsVal = types.ListUnknown(types.StringType)
-	case v.SlashCommands.IsNull():
-		slashCommandsVal = types.ListNull(types.StringType)
-	default:
-		var d diag.Diagnostics
-		slashCommandsVal, d = types.ListValue(types.StringType, v.SlashCommands.Elements())
-		diags.Append(d...)
-	}
-
-	if diags.HasError() {
-		return types.ObjectUnknown(map[string]attr.Type{
-			"agent_id": basetypes.StringType{},
-			"allowed_channels": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"bot_id":     basetypes.StringType{},
-			"connected":  basetypes.BoolType{},
-			"created_at": basetypes.StringType{},
-			"keywords": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"keywords_enabled": basetypes.BoolType{},
-			"session_ttl_days": basetypes.Int64Type{},
-			"setup_type":       basetypes.StringType{},
-			"slash_commands": basetypes.ListType{
-				ElemType: types.StringType,
-			},
-			"status":     basetypes.StringType{},
-			"updated_at": basetypes.StringType{},
+			"status":           basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
 		}), diags
 	}
 
 	attributeTypes := map[string]attr.Type{
-		"agent_id": basetypes.StringType{},
+		"agent_access_control": basetypes.ObjectType{
+			AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+		},
+		"allow_guests": basetypes.BoolType{},
 		"allowed_channels": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_collections": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_sub_agents": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_users": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"assigned_skills": basetypes.ListType{
 			ElemType: types.StringType,
 		},
 		"bot_id":     basetypes.StringType{},
 		"connected":  basetypes.BoolType{},
 		"created_at": basetypes.StringType{},
+		"denied_users": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"filter_policies": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"guardrail_preset": basetypes.StringType{},
+		"home_tab_content": basetypes.StringType{},
 		"keywords": basetypes.ListType{
 			ElemType: types.StringType,
 		},
 		"keywords_enabled": basetypes.BoolType{},
+		"long_context":     basetypes.BoolType{},
+		"max_tokens":       basetypes.Int64Type{},
+		"model_id":         basetypes.StringType{},
+		"name":             basetypes.StringType{},
 		"session_ttl_days": basetypes.Int64Type{},
 		"setup_type":       basetypes.StringType{},
-		"slash_commands": basetypes.ListType{
-			ElemType: types.StringType,
-		},
-		"status":     basetypes.StringType{},
-		"updated_at": basetypes.StringType{},
+		"status":           basetypes.StringType{},
+		"system_prompt":    basetypes.StringType{},
+		"temperature":      basetypes.NumberType{},
+		"updated_at":       basetypes.StringType{},
 	}
 
 	if v.IsNull() {
@@ -1089,18 +2779,33 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
-			"agent_id":         v.AgentId,
-			"allowed_channels": allowedChannelsVal,
-			"bot_id":           v.BotId,
-			"connected":        v.Connected,
-			"created_at":       v.CreatedAt,
-			"keywords":         keywordsVal,
-			"keywords_enabled": v.KeywordsEnabled,
-			"session_ttl_days": v.SessionTtlDays,
-			"setup_type":       v.SetupType,
-			"slash_commands":   slashCommandsVal,
-			"status":           v.Status,
-			"updated_at":       v.UpdatedAt,
+			"agent_access_control": agentAccessControl,
+			"allow_guests":         v.AllowGuests,
+			"allowed_channels":     allowedChannelsVal,
+			"allowed_collections":  allowedCollectionsVal,
+			"allowed_sub_agents":   allowedSubAgentsVal,
+			"allowed_tools":        allowedToolsVal,
+			"allowed_users":        allowedUsersVal,
+			"assigned_skills":      assignedSkillsVal,
+			"bot_id":               v.BotId,
+			"connected":            v.Connected,
+			"created_at":           v.CreatedAt,
+			"denied_users":         deniedUsersVal,
+			"filter_policies":      filterPoliciesVal,
+			"guardrail_preset":     v.GuardrailPreset,
+			"home_tab_content":     v.HomeTabContent,
+			"keywords":             keywordsVal,
+			"keywords_enabled":     v.KeywordsEnabled,
+			"long_context":         v.LongContext,
+			"max_tokens":           v.MaxTokens,
+			"model_id":             v.ModelId,
+			"name":                 v.Name,
+			"session_ttl_days":     v.SessionTtlDays,
+			"setup_type":           v.SetupType,
+			"status":               v.Status,
+			"system_prompt":        v.SystemPrompt,
+			"temperature":          v.Temperature,
+			"updated_at":           v.UpdatedAt,
 		})
 
 	return objVal, diags
@@ -1121,11 +2826,35 @@ func (v BotValue) Equal(o attr.Value) bool {
 		return true
 	}
 
-	if !v.AgentId.Equal(other.AgentId) {
+	if !v.AgentAccessControl.Equal(other.AgentAccessControl) {
+		return false
+	}
+
+	if !v.AllowGuests.Equal(other.AllowGuests) {
 		return false
 	}
 
 	if !v.AllowedChannels.Equal(other.AllowedChannels) {
+		return false
+	}
+
+	if !v.AllowedCollections.Equal(other.AllowedCollections) {
+		return false
+	}
+
+	if !v.AllowedSubAgents.Equal(other.AllowedSubAgents) {
+		return false
+	}
+
+	if !v.AllowedTools.Equal(other.AllowedTools) {
+		return false
+	}
+
+	if !v.AllowedUsers.Equal(other.AllowedUsers) {
+		return false
+	}
+
+	if !v.AssignedSkills.Equal(other.AssignedSkills) {
 		return false
 	}
 
@@ -1141,11 +2870,43 @@ func (v BotValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.DeniedUsers.Equal(other.DeniedUsers) {
+		return false
+	}
+
+	if !v.FilterPolicies.Equal(other.FilterPolicies) {
+		return false
+	}
+
+	if !v.GuardrailPreset.Equal(other.GuardrailPreset) {
+		return false
+	}
+
+	if !v.HomeTabContent.Equal(other.HomeTabContent) {
+		return false
+	}
+
 	if !v.Keywords.Equal(other.Keywords) {
 		return false
 	}
 
 	if !v.KeywordsEnabled.Equal(other.KeywordsEnabled) {
+		return false
+	}
+
+	if !v.LongContext.Equal(other.LongContext) {
+		return false
+	}
+
+	if !v.MaxTokens.Equal(other.MaxTokens) {
+		return false
+	}
+
+	if !v.ModelId.Equal(other.ModelId) {
+		return false
+	}
+
+	if !v.Name.Equal(other.Name) {
 		return false
 	}
 
@@ -1157,11 +2918,15 @@ func (v BotValue) Equal(o attr.Value) bool {
 		return false
 	}
 
-	if !v.SlashCommands.Equal(other.SlashCommands) {
+	if !v.Status.Equal(other.Status) {
 		return false
 	}
 
-	if !v.Status.Equal(other.Status) {
+	if !v.SystemPrompt.Equal(other.SystemPrompt) {
+		return false
+	}
+
+	if !v.Temperature.Equal(other.Temperature) {
 		return false
 	}
 
@@ -1182,23 +2947,75 @@ func (v BotValue) Type(ctx context.Context) attr.Type {
 
 func (v BotValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
-		"agent_id": basetypes.StringType{},
+		"agent_access_control": basetypes.ObjectType{
+			AttrTypes: AgentAccessControlValue{}.AttributeTypes(ctx),
+		},
+		"allow_guests": basetypes.BoolType{},
 		"allowed_channels": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_collections": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_sub_agents": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"allowed_users": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"assigned_skills": basetypes.ListType{
 			ElemType: types.StringType,
 		},
 		"bot_id":     basetypes.StringType{},
 		"connected":  basetypes.BoolType{},
 		"created_at": basetypes.StringType{},
+		"denied_users": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"filter_policies": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"guardrail_preset": basetypes.StringType{},
+		"home_tab_content": basetypes.StringType{},
 		"keywords": basetypes.ListType{
 			ElemType: types.StringType,
 		},
 		"keywords_enabled": basetypes.BoolType{},
+		"long_context":     basetypes.BoolType{},
+		"max_tokens":       basetypes.Int64Type{},
+		"model_id":         basetypes.StringType{},
+		"name":             basetypes.StringType{},
 		"session_ttl_days": basetypes.Int64Type{},
 		"setup_type":       basetypes.StringType{},
-		"slash_commands": basetypes.ListType{
-			ElemType: types.StringType,
-		},
-		"status":     basetypes.StringType{},
-		"updated_at": basetypes.StringType{},
+		"status":           basetypes.StringType{},
+		"system_prompt":    basetypes.StringType{},
+		"temperature":      basetypes.NumberType{},
+		"updated_at":       basetypes.StringType{},
 	}
 }
+
+var _ basetypes.ObjectTypable = AgentAccessControlType{}
+
+
+
+
+
+
+
+
+
+
+
+var _ basetypes.ObjectValuable = AgentAccessControlValue{}
+
+
+
+
+
+
+
+
+
