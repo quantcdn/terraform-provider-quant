@@ -37,10 +37,15 @@ func AiCustomToolResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Human-readable description of what the tool does",
 				MarkdownDescription: "Human-readable description of what the tool does",
 			},
-			"edge_function_url": schema.StringAttribute{
+			"edge_function_code": schema.StringAttribute{
 				Required:            true,
-				Description:         "HTTPS URL of the edge function",
-				MarkdownDescription: "HTTPS URL of the edge function",
+				Description:         "JavaScript source code for the edge function",
+				MarkdownDescription: "JavaScript source code for the edge function",
+			},
+			"edge_function_url": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Computed edge function URL (read-only)",
+				MarkdownDescription: "Computed edge function URL (read-only)",
 			},
 			"input_schema": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{},
@@ -59,6 +64,11 @@ func AiCustomToolResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Whether this tool runs asynchronously (>5 seconds)",
 				MarkdownDescription: "Whether this tool runs asynchronously (>5 seconds)",
 				Default:             booldefault.StaticBool(false),
+			},
+			"is_update": schema.BoolAttribute{
+				Computed:            true,
+				Description:         "Whether this was an update to an existing tool",
+				MarkdownDescription: "Whether this was an update to an existing tool",
 			},
 			"message": schema.StringAttribute{
 				Computed: true,
@@ -128,6 +138,11 @@ func AiCustomToolResourceSchema(ctx context.Context) schema.Schema {
 					"description": schema.StringAttribute{
 						Computed: true,
 					},
+					"edge_function_code": schema.StringAttribute{
+						Computed:            true,
+						Description:         "The deployed edge function source code",
+						MarkdownDescription: "The deployed edge function source code",
+					},
 					"edge_function_url": schema.StringAttribute{
 						Computed: true,
 					},
@@ -182,9 +197,11 @@ func AiCustomToolResourceSchema(ctx context.Context) schema.Schema {
 type AiCustomToolModel struct {
 	Category                types.String      `tfsdk:"category"`
 	Description             types.String      `tfsdk:"description"`
+	EdgeFunctionCode        types.String      `tfsdk:"edge_function_code"`
 	EdgeFunctionUrl         types.String      `tfsdk:"edge_function_url"`
 	InputSchema             InputSchemaValue  `tfsdk:"input_schema"`
 	IsAsync                 types.Bool        `tfsdk:"is_async"`
+	IsUpdate                types.Bool        `tfsdk:"is_update"`
 	Message                 types.String      `tfsdk:"message"`
 	Name                    types.String      `tfsdk:"name"`
 	Organisation            types.String      `tfsdk:"organisation"`
@@ -796,6 +813,24 @@ func (t ToolType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue)
 			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
 	}
 
+	edgeFunctionCodeAttribute, ok := attributes["edge_function_code"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`edge_function_code is missing from object`)
+
+		return nil, diags
+	}
+
+	edgeFunctionCodeVal, ok := edgeFunctionCodeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`edge_function_code expected to be basetypes.StringValue, was: %T`, edgeFunctionCodeAttribute))
+	}
+
 	edgeFunctionUrlAttribute, ok := attributes["edge_function_url"]
 
 	if !ok {
@@ -930,6 +965,7 @@ func (t ToolType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue)
 		Category:                categoryVal,
 		CreatedAt:               createdAtVal,
 		Description:             descriptionVal,
+		EdgeFunctionCode:        edgeFunctionCodeVal,
 		EdgeFunctionUrl:         edgeFunctionUrlVal,
 		InputSchema:             inputSchemaVal,
 		IsAsync:                 isAsyncVal,
@@ -1058,6 +1094,24 @@ func NewToolValue(attributeTypes map[string]attr.Type, attributes map[string]att
 			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
 	}
 
+	edgeFunctionCodeAttribute, ok := attributes["edge_function_code"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`edge_function_code is missing from object`)
+
+		return NewToolValueUnknown(), diags
+	}
+
+	edgeFunctionCodeVal, ok := edgeFunctionCodeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`edge_function_code expected to be basetypes.StringValue, was: %T`, edgeFunctionCodeAttribute))
+	}
+
 	edgeFunctionUrlAttribute, ok := attributes["edge_function_url"]
 
 	if !ok {
@@ -1192,6 +1246,7 @@ func NewToolValue(attributeTypes map[string]attr.Type, attributes map[string]att
 		Category:                categoryVal,
 		CreatedAt:               createdAtVal,
 		Description:             descriptionVal,
+		EdgeFunctionCode:        edgeFunctionCodeVal,
 		EdgeFunctionUrl:         edgeFunctionUrlVal,
 		InputSchema:             inputSchemaVal,
 		IsAsync:                 isAsyncVal,
@@ -1274,6 +1329,7 @@ type ToolValue struct {
 	Category                basetypes.StringValue `tfsdk:"category"`
 	CreatedAt               basetypes.StringValue `tfsdk:"created_at"`
 	Description             basetypes.StringValue `tfsdk:"description"`
+	EdgeFunctionCode        basetypes.StringValue `tfsdk:"edge_function_code"`
 	EdgeFunctionUrl         basetypes.StringValue `tfsdk:"edge_function_url"`
 	InputSchema             basetypes.ObjectValue `tfsdk:"input_schema"`
 	IsAsync                 basetypes.BoolValue   `tfsdk:"is_async"`
@@ -1285,7 +1341,7 @@ type ToolValue struct {
 }
 
 func (v ToolValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 10)
+	attrTypes := make(map[string]tftypes.Type, 11)
 
 	var val tftypes.Value
 	var err error
@@ -1293,6 +1349,7 @@ func (v ToolValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) 
 	attrTypes["category"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["created_at"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["description"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["edge_function_code"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["edge_function_url"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["input_schema"] = basetypes.ObjectType{
 		AttrTypes: InputSchemaValue{}.AttributeTypes(ctx),
@@ -1309,7 +1366,7 @@ func (v ToolValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) 
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 10)
+		vals := make(map[string]tftypes.Value, 11)
 
 		val, err = v.Category.ToTerraformValue(ctx)
 
@@ -1334,6 +1391,14 @@ func (v ToolValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) 
 		}
 
 		vals["description"] = val
+
+		val, err = v.EdgeFunctionCode.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["edge_function_code"] = val
 
 		val, err = v.EdgeFunctionUrl.ToTerraformValue(ctx)
 
@@ -1463,10 +1528,11 @@ func (v ToolValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, di
 	}
 
 	attributeTypes := map[string]attr.Type{
-		"category":          basetypes.StringType{},
-		"created_at":        basetypes.StringType{},
-		"description":       basetypes.StringType{},
-		"edge_function_url": basetypes.StringType{},
+		"category":           basetypes.StringType{},
+		"created_at":         basetypes.StringType{},
+		"description":        basetypes.StringType{},
+		"edge_function_code": basetypes.StringType{},
+		"edge_function_url":  basetypes.StringType{},
 		"input_schema": basetypes.ObjectType{
 			AttrTypes: InputSchemaValue{}.AttributeTypes(ctx),
 		},
@@ -1493,6 +1559,7 @@ func (v ToolValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, di
 			"category":                  v.Category,
 			"created_at":                v.CreatedAt,
 			"description":               v.Description,
+			"edge_function_code":        v.EdgeFunctionCode,
 			"edge_function_url":         v.EdgeFunctionUrl,
 			"input_schema":              inputSchema,
 			"is_async":                  v.IsAsync,
@@ -1529,6 +1596,10 @@ func (v ToolValue) Equal(o attr.Value) bool {
 	}
 
 	if !v.Description.Equal(other.Description) {
+		return false
+	}
+
+	if !v.EdgeFunctionCode.Equal(other.EdgeFunctionCode) {
 		return false
 	}
 
@@ -1573,10 +1644,11 @@ func (v ToolValue) Type(ctx context.Context) attr.Type {
 
 func (v ToolValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
-		"category":          basetypes.StringType{},
-		"created_at":        basetypes.StringType{},
-		"description":       basetypes.StringType{},
-		"edge_function_url": basetypes.StringType{},
+		"category":           basetypes.StringType{},
+		"created_at":         basetypes.StringType{},
+		"description":        basetypes.StringType{},
+		"edge_function_code": basetypes.StringType{},
+		"edge_function_url":  basetypes.StringType{},
 		"input_schema": basetypes.ObjectType{
 			AttrTypes: InputSchemaValue{}.AttributeTypes(ctx),
 		},
