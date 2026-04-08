@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -287,6 +288,22 @@ func callSlackBotReadAPI(ctx context.Context, r *slackBotResource, data *resourc
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 			data.BotId = types.StringNull()
 			return
+		}
+		// The SDK may fail to deserialize the flattened response (which has
+		// inline agent fields the SDK struct doesn't know about). If the HTTP
+		// status is 200, try parsing the raw response body as a map.
+		if httpResp != nil && httpResp.StatusCode == http.StatusOK {
+			body, readErr := io.ReadAll(httpResp.Body)
+			if readErr == nil {
+				var envelope struct {
+					Bot map[string]interface{} `json:"bot"`
+				}
+				if jsonErr := json.Unmarshal(body, &envelope); jsonErr == nil && envelope.Bot != nil {
+					diags.Append(mapSlackBotFromMap(ctx, envelope.Bot, org, data)...)
+					data.Organisation = types.StringValue(org)
+					return
+				}
+			}
 		}
 		if httpResp != nil && httpResp.Body != nil {
 			body, _ := io.ReadAll(httpResp.Body)

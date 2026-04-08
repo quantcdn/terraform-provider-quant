@@ -501,15 +501,14 @@ func TestE2E_SlackBot(t *testing.T) {
 	})
 	defer cleanup()
 
-	assert.NotEmpty(t, result.outputs["agentId"].Value, "agentId should be set")
 	assert.NotEmpty(t, result.outputs["botId"].Value, "botId should be set")
-	t.Logf("Created Slack bot: agent=%v bot=%v status=%v",
-		result.outputs["agentId"].Value, result.outputs["botId"].Value, result.outputs["botStatus"].Value)
+	t.Logf("Created Slack bot: bot=%v", result.outputs["botId"].Value)
 
-	// Test update: change sessionTtlDays
+	// Test update: change systemPrompt and sessionTtlDays
 	ctx := context.Background()
+	_ = result.stack.SetConfig(ctx, "e2e-slack-bot:systemPrompt", auto.ConfigValue{Value: "You are an updated test assistant."})
 	_ = result.stack.SetConfig(ctx, "e2e-slack-bot:sessionTtl", auto.ConfigValue{Value: "14"})
-	t.Log("Updating Slack bot (sessionTtlDays)...")
+	t.Log("Updating Slack bot (systemPrompt, sessionTtlDays)...")
 	outputs := updateStack(t, result.stack)
 	assert.NotEmpty(t, outputs["botId"].Value, "botId should still be set after update")
 	t.Log("Slack bot update succeeded")
@@ -520,9 +519,9 @@ func TestE2E_SlackBot(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestE2E_AICustomTool(t *testing.T) {
-	suffix := uniqueSuffix()
+	suffix := fmt.Sprintf("%d", time.Now().Unix()%100000) // numeric only, no hyphens
 	result, cleanup := createStack(t, "ai-custom-tool", map[string]string{
-		"e2e-ai-custom-tool:testSuffix": fmt.Sprintf("e2e_%s", suffix),
+		"e2e-ai-custom-tool:testSuffix": suffix,
 	})
 	defer cleanup()
 
@@ -1540,36 +1539,15 @@ func TestE2E_Import_SlackBot(t *testing.T) {
 	apiClient := newAPIClient(t)
 	defer apiClient.Close()
 
-	// Slack bot needs an agent — create one first.
+	// Create bot via API — agent is auto-created inline
 	suffix := uniqueSuffix()
-	agentName := fmt.Sprintf("e2e-import-bot-agent-%s", suffix)
-	t.Logf("Creating backing AI agent '%s' via API...", agentName)
-
-	agentReq := quantadmingo.NewCreateAIAgentRequest(
-		agentName,
-		"Agent for Slack bot import test",
-		"You are a Slack assistant for import testing.",
+	t.Logf("Creating Slack bot via API...")
+	botReq := quantadmingo.NewCreateSlackBotRequest(
+		fmt.Sprintf("Import Test Bot %s", suffix),
+		"quant",
+		"You are a test bot for import testing.",
 		"anthropic.claude-3-5-sonnet-20241022-v2:0",
 	)
-	agentResp, _, err := apiClient.Instance.AIAgentsAPI.CreateAIAgent(apiClient.AuthContext, apiClient.Organization).
-		CreateAIAgentRequest(*agentReq).Execute()
-	require.NoError(t, err, "API agent create failed")
-
-	agentId := ""
-	if agentResp != nil && agentResp.Agent != nil {
-		if id, ok := agentResp.Agent["agentId"].(string); ok {
-			agentId = id
-		}
-	}
-	require.NotEmpty(t, agentId, "agentId should be returned")
-
-	defer func() {
-		_, _, _ = apiClient.Instance.AIAgentsAPI.DeleteAIAgent(apiClient.AuthContext, apiClient.Organization, agentId).Execute()
-	}()
-
-	// Now create the Slack bot.
-	t.Logf("Creating Slack bot via API with agent %s...", agentId)
-	botReq := quantadmingo.NewCreateSlackBotRequest("Import Test Bot", "quant", "You are a test bot.", "anthropic.claude-3-5-sonnet-20241022-v2:0")
 	botResp, _, err := apiClient.Instance.AISlackBotsAPI.CreateSlackBot(apiClient.AuthContext, apiClient.Organization).
 		CreateSlackBotRequest(*botReq).Execute()
 	require.NoError(t, err, "API slack bot create failed")
