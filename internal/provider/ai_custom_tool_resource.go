@@ -259,7 +259,7 @@ func callCustomToolReadAPI(ctx context.Context, r *aiCustomToolResource, data *r
 			fmt.Sprintf("Error: %s", err.Error()))
 		return
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	body, _ := io.ReadAll(httpResp.Body)
 
