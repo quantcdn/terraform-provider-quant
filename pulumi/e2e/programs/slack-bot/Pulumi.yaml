@@ -1,6 +1,6 @@
 name: e2e-slack-bot
 runtime: yaml
-description: E2E test for Slack Bot resource (creates an agent + bot)
+description: E2E test for Slack Bot resource with inline agent config
 config:
   testSuffix:
     type: string
@@ -8,23 +8,20 @@ config:
   sessionTtl:
     type: integer
     default: 7
+  systemPrompt:
+    type: string
+    default: You are a helpful Slack assistant for E2E testing.
 resources:
-  testAgent:
-    type: quant:index:AiAgent
-    properties:
-      name: e2e-bot-agent-${testSuffix}
-      description: Agent for E2E Slack bot test
-      systemPrompt: You are a helpful Slack assistant for E2E testing.
-      modelId: anthropic.claude-3-5-sonnet-20241022-v2:0
-      temperature: 0.5
   testBot:
     type: quant:index:SlackBot
     properties:
-      agentId: ${testAgent.agentId}
+      name: e2e-bot-${testSuffix}
       setupType: quant
+      systemPrompt: ${systemPrompt}
+      modelId: anthropic.claude-3-5-sonnet-20241022-v2:0
+      temperature: 0.5
+      maxTokens: 4096
       sessionTtlDays: ${sessionTtl}
       keywordsEnabled: false
 outputs:
-  agentId: ${testAgent.agentId}
   botId: ${testBot.botId}
-  botStatus: ${testBot.bot.status}

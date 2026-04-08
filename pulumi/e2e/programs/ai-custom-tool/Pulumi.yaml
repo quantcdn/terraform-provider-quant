@@ -20,19 +20,11 @@ resources:
           const body = await request.json();
           return new Response(JSON.stringify({
             success: true,
-            result: { message: "E2E test tool response", input: body.input }
+            result: { message: "E2E test response", input: body.input }
           }), { headers: { "Content-Type": "application/json" } });
         }
-      inputSchema:
-        type: object
-        properties:
-          query:
-            type: string
-            description: The search query
-        required:
-          - query
+      inputSchema: {}
       responseMode: llm
       timeoutSeconds: 30
 outputs:
   toolName: ${testTool.toolName}
-  edgeFunctionUrl: ${testTool.edgeFunctionUrl}

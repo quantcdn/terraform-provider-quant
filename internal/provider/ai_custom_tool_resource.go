@@ -173,7 +173,7 @@ func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data 
 		data.Name.ValueString(),
 		data.Description.ValueString(),
 		"", // edgeFunctionUrl — computed by API from edgeFunctionCode
-		map[string]interface{}{}, // inputSchema — will be overridden below if present
+		map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}, // inputSchema default
 	)
 
 	if !data.IsAsync.IsNull() && !data.IsAsync.IsUnknown() {
@@ -336,8 +336,14 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 	data.OutputSchemaDescription = mapStringFromAny(m, "outputSchemaDescription")
 	data.ResponseMode = mapStringFromAny(m, "responseMode")
 
-	// ToolName — the API returns the canonical name as "name".
-	data.ToolName = data.Name
+	// ToolName — try both "toolName" and "name" from API response.
+	data.ToolName = mapStringFromAny(m, "toolName")
+	if data.ToolName.IsNull() {
+		data.ToolName = data.Name
+	}
+	if data.Name.IsNull() {
+		data.Name = data.ToolName
+	}
 
 	// IsAsync
 	data.IsAsync = mapBoolFromAny(m, "isAsync")
@@ -412,6 +418,7 @@ func buildToolObject(ctx context.Context, m map[string]interface{}, data *resour
 		"name":                      data.Name,
 		"description":               data.Description,
 		"edge_function_url":         data.EdgeFunctionUrl,
+		"edge_function_code":        data.EdgeFunctionCode,
 		"category":                  data.Category,
 		"output_schema_description": data.OutputSchemaDescription,
 		"response_mode":             data.ResponseMode,
