@@ -166,10 +166,13 @@ func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data 
 	// Build the SDK request. InputSchema is a typed empty object in the TF
 	// schema (no nested attributes) so we pass an empty map — the API accepts
 	// any valid JSON Schema object.
+	// The SDK constructor still expects edgeFunctionUrl but the API now
+	// auto-generates it from edgeFunctionCode. Pass empty string for the
+	// URL and set edgeFunctionCode via AdditionalProperties.
 	sdkReq := quantadmingo.NewCreateCustomToolRequest(
 		data.Name.ValueString(),
 		data.Description.ValueString(),
-		data.EdgeFunctionUrl.ValueString(),
+		"", // edgeFunctionUrl — computed by API from edgeFunctionCode
 		map[string]interface{}{}, // inputSchema — will be overridden below if present
 	)
 
@@ -184,6 +187,8 @@ func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data 
 	if sdkReq.AdditionalProperties == nil {
 		sdkReq.AdditionalProperties = make(map[string]interface{})
 	}
+	// edgeFunctionCode is required — the API deploys it and computes the URL.
+	sdkReq.AdditionalProperties["edgeFunctionCode"] = data.EdgeFunctionCode.ValueString()
 	if !data.Category.IsNull() && !data.Category.IsUnknown() {
 		sdkReq.AdditionalProperties["category"] = data.Category.ValueString()
 	}
@@ -326,6 +331,7 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 	data.Name = mapStringFromAny(m, "name")
 	data.Description = mapStringFromAny(m, "description")
 	data.EdgeFunctionUrl = mapStringFromAny(m, "edgeFunctionUrl")
+	data.EdgeFunctionCode = mapStringFromAny(m, "edgeFunctionCode")
 	data.Category = mapStringFromAny(m, "category")
 	data.OutputSchemaDescription = mapStringFromAny(m, "outputSchemaDescription")
 	data.ResponseMode = mapStringFromAny(m, "responseMode")
@@ -368,6 +374,7 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 	// Computed-only response metadata.
 	data.Message = types.StringNull()
 	data.Success = types.BoolValue(true)
+	data.IsUpdate = mapBoolFromAny(m, "isUpdate")
 
 	// Nested computed `tool` object.
 	diags.Append(buildToolObject(ctx, m, data)...)
