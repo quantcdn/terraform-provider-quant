@@ -1,6 +1,6 @@
 name: e2e-ai-custom-tool
 runtime: yaml
-description: E2E test for AI Custom Tool resource
+description: E2E test for AI Custom Tool resource with inline edge function
 config:
   testSuffix:
     type: string
@@ -15,7 +15,14 @@ resources:
       name: e2e_tool_${testSuffix}
       toolName: e2e_tool_${testSuffix}
       description: ${toolDescription}
-      edgeFunctionUrl: "https://example.quantcdn.io/api/e2e-test"
+      edgeFunctionCode: |
+        export default async function handler(request) {
+          const body = await request.json();
+          return new Response(JSON.stringify({
+            success: true,
+            result: { message: "E2E test tool response", input: body.input }
+          }), { headers: { "Content-Type": "application/json" } });
+        }
       inputSchema:
         type: object
         properties:
@@ -28,3 +35,4 @@ resources:
       timeoutSeconds: 30
 outputs:
   toolName: ${testTool.toolName}
+  edgeFunctionUrl: ${testTool.edgeFunctionUrl}

@@ -218,6 +218,10 @@
                 "description": {
                     "type": "string"
                 },
+                "edgeFunctionCode": {
+                    "type": "string",
+                    "description": "The deployed edge function source code\n"
+                },
                 "edgeFunctionUrl": {
                     "type": "string"
                 },
@@ -247,6 +251,7 @@
                         "category",
                         "createdAt",
                         "description",
+                        "edgeFunctionCode",
                         "edgeFunctionUrl",
                         "inputSchema",
                         "isAsync",
@@ -3002,9 +3007,13 @@
                     "type": "string",
                     "description": "Human-readable description of what the tool does"
                 },
+                "edgeFunctionCode": {
+                    "type": "string",
+                    "description": "JavaScript source code for the edge function"
+                },
                 "edgeFunctionUrl": {
                     "type": "string",
-                    "description": "HTTPS URL of the edge function"
+                    "description": "Computed edge function URL (read-only)"
                 },
                 "inputSchema": {
                     "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
@@ -3013,6 +3022,10 @@
                 "isAsync": {
                     "type": "boolean",
                     "description": "Whether this tool runs asynchronously (\u003e5 seconds)"
+                },
+                "isUpdate": {
+                    "type": "boolean",
+                    "description": "Whether this was an update to an existing tool"
                 },
                 "message": {
                     "type": "string"
@@ -3055,9 +3068,11 @@
             "required": [
                 "category",
                 "description",
+                "edgeFunctionCode",
                 "edgeFunctionUrl",
                 "inputSchema",
                 "isAsync",
+                "isUpdate",
                 "message",
                 "name",
                 "organisation",
@@ -3078,9 +3093,9 @@
                     "type": "string",
                     "description": "Human-readable description of what the tool does"
                 },
-                "edgeFunctionUrl": {
+                "edgeFunctionCode": {
                     "type": "string",
-                    "description": "HTTPS URL of the edge function"
+                    "description": "JavaScript source code for the edge function"
                 },
                 "inputSchema": {
                     "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
@@ -3121,7 +3136,7 @@
             },
             "requiredInputs": [
                 "description",
-                "edgeFunctionUrl",
+                "edgeFunctionCode",
                 "inputSchema"
             ],
             "stateInputs": {
@@ -3135,9 +3150,13 @@
                         "type": "string",
                         "description": "Human-readable description of what the tool does"
                     },
+                    "edgeFunctionCode": {
+                        "type": "string",
+                        "description": "JavaScript source code for the edge function"
+                    },
                     "edgeFunctionUrl": {
                         "type": "string",
-                        "description": "HTTPS URL of the edge function"
+                        "description": "Computed edge function URL (read-only)"
                     },
                     "inputSchema": {
                         "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
@@ -3146,6 +3165,10 @@
                     "isAsync": {
                         "type": "boolean",
                         "description": "Whether this tool runs asynchronously (\u003e5 seconds)"
+                    },
+                    "isUpdate": {
+                        "type": "boolean",
+                        "description": "Whether this was an update to an existing tool"
                     },
                     "message": {
                         "type": "string"
