@@ -201,6 +201,113 @@
                 }
             }
         },
+        "quant:index/AiAgentOverlayBase:AiAgentOverlayBase": {
+            "properties": {
+                "agentId": {
+                    "type": "string"
+                },
+                "allowedTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "assignedSkillIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "agentId",
+                        "allowedTools",
+                        "assignedSkillIds",
+                        "modelId",
+                        "name"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiAgentOverlayOverlay:AiAgentOverlayOverlay": {
+            "properties": {
+                "additionalSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "additionalTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "disabledSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "disabledTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "guardrailPreset": {
+                    "type": "string"
+                },
+                "maxTokens": {
+                    "type": "integer"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "systemPromptAppend": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "additionalSkills",
+                        "additionalTools",
+                        "allowedCollections",
+                        "disabledSkills",
+                        "disabledTools",
+                        "guardrailPreset",
+                        "maxTokens",
+                        "modelId",
+                        "systemPromptAppend",
+                        "temperature",
+                        "version"
+                    ]
+                }
+            }
+        },
         "quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema": {
             "type": "object"
         },
@@ -2992,6 +3099,250 @@
                     },
                     "temperature": {
                         "type": "number"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "quant:index:AiAgentOverlay": {
+            "properties": {
+                "additionalSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Org-owned skill IDs to add"
+                },
+                "additionalTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tool names to add"
+                },
+                "agentId": {
+                    "type": "string",
+                    "description": "Global agent identifier (e.g., 'quantgov-code')"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Vector DB collections"
+                },
+                "base": {
+                    "$ref": "#/types/quant:index/AiAgentOverlayBase:AiAgentOverlayBase",
+                    "description": "Base global agent metadata"
+                },
+                "disabledSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Global skill IDs to exclude"
+                },
+                "disabledTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tool names to remove"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset"
+                },
+                "maxTokens": {
+                    "type": "integer",
+                    "description": "Override max tokens"
+                },
+                "modelId": {
+                    "type": "string",
+                    "description": "Override the base agent's model"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "overlay": {
+                    "$ref": "#/types/quant:index/AiAgentOverlayOverlay:AiAgentOverlayOverlay"
+                },
+                "systemPromptAppend": {
+                    "type": "string",
+                    "description": "Text appended to base system prompt"
+                },
+                "temperature": {
+                    "type": "number",
+                    "description": "Override temperature"
+                },
+                "version": {
+                    "type": "integer",
+                    "description": "Current version for optimistic concurrency"
+                }
+            },
+            "required": [
+                "additionalSkills",
+                "additionalTools",
+                "agentId",
+                "allowedCollections",
+                "base",
+                "disabledSkills",
+                "disabledTools",
+                "guardrailPreset",
+                "maxTokens",
+                "modelId",
+                "organisation",
+                "overlay",
+                "systemPromptAppend",
+                "temperature",
+                "version"
+            ],
+            "inputProperties": {
+                "additionalSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Org-owned skill IDs to add"
+                },
+                "additionalTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tool names to add"
+                },
+                "agentId": {
+                    "type": "string",
+                    "description": "Global agent identifier (e.g., 'quantgov-code')"
+                },
+                "allowedCollections": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Vector DB collections"
+                },
+                "disabledSkills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Global skill IDs to exclude"
+                },
+                "disabledTools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tool names to remove"
+                },
+                "guardrailPreset": {
+                    "type": "string",
+                    "description": "Guardrail preset"
+                },
+                "maxTokens": {
+                    "type": "integer",
+                    "description": "Override max tokens"
+                },
+                "modelId": {
+                    "type": "string",
+                    "description": "Override the base agent's model"
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "systemPromptAppend": {
+                    "type": "string",
+                    "description": "Text appended to base system prompt"
+                },
+                "temperature": {
+                    "type": "number",
+                    "description": "Override temperature"
+                },
+                "version": {
+                    "type": "integer",
+                    "description": "Current version for optimistic concurrency"
+                }
+            },
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiAgentOverlay resources.\n",
+                "properties": {
+                    "additionalSkills": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Org-owned skill IDs to add"
+                    },
+                    "additionalTools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Tool names to add"
+                    },
+                    "agentId": {
+                        "type": "string",
+                        "description": "Global agent identifier (e.g., 'quantgov-code')"
+                    },
+                    "allowedCollections": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Vector DB collections"
+                    },
+                    "base": {
+                        "$ref": "#/types/quant:index/AiAgentOverlayBase:AiAgentOverlayBase",
+                        "description": "Base global agent metadata"
+                    },
+                    "disabledSkills": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Global skill IDs to exclude"
+                    },
+                    "disabledTools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Tool names to remove"
+                    },
+                    "guardrailPreset": {
+                        "type": "string",
+                        "description": "Guardrail preset"
+                    },
+                    "maxTokens": {
+                        "type": "integer",
+                        "description": "Override max tokens"
+                    },
+                    "modelId": {
+                        "type": "string",
+                        "description": "Override the base agent's model"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "The organisation ID"
+                    },
+                    "overlay": {
+                        "$ref": "#/types/quant:index/AiAgentOverlayOverlay:AiAgentOverlayOverlay"
+                    },
+                    "systemPromptAppend": {
+                        "type": "string",
+                        "description": "Text appended to base system prompt"
+                    },
+                    "temperature": {
+                        "type": "number",
+                        "description": "Override temperature"
+                    },
+                    "version": {
+                        "type": "integer",
+                        "description": "Current version for optimistic concurrency"
                     }
                 },
                 "type": "object"
