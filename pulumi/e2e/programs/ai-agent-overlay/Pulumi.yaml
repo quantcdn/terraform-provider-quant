@@ -1,0 +1,29 @@
+name: e2e-ai-agent-overlay
+runtime: yaml
+description: E2E test for the AiAgentOverlay resource
+config:
+  testSuffix:
+    type: string
+    default: e2e-test
+  agentId:
+    type: string
+    default: quantgov-code
+  systemPromptAppend:
+    type: string
+    default: E2E-test-append
+  temperature:
+    type: string
+    default: "0.25"
+resources:
+  testOverlay:
+    type: quant:index:AiAgentOverlay
+    properties:
+      agentId: ${agentId}
+      modelId: anthropic.claude-sonnet-4-6
+      temperature: ${temperature}
+      maxTokens: 2048
+      systemPromptAppend: ${systemPromptAppend}
+      guardrailPreset: official
+outputs:
+  overlayAgentId: ${testOverlay.agentId}
+  overlayVersion: ${testOverlay.version}
