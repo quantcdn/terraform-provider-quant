@@ -35,6 +35,7 @@ func GeneratedResourceMap() map[string]*tfbridge.ResourceInfo {
 		"quant_kv_store": {Tok: "quant:index:KvStore", ComputeID: fieldComputeID("storeId")},
 		"quant_kv_item": {Tok: "quant:index:KvItem", ComputeID: fieldComputeID("key")},
 		"quant_ai_governance": {Tok: "quant:index:AiGovernance"},
+		"quant_ai_agent_overlay": {Tok: "quant:index:AiAgentOverlay"},
 		"quant_ai_vector_collection": {Tok: "quant:index:AiVectorCollection", ComputeID: fieldComputeID("collectionId")},
 		"quant_ai_vector_document": {Tok: "quant:index:AiVectorDocument"},
 		"quant_ai_skill": {Tok: "quant:index:AiSkill", ComputeID: fieldComputeID("skillId")},
