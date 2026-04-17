@@ -131,7 +131,7 @@ func TestAccAiAgentOverlayResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "model_id", "anthropic.claude-sonnet-4-6"),
 					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "temperature", "0.5"),
 					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "max_tokens", "4096"),
-					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "system_prompt_append", "You work at Salsa Digital."),
+					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "system_prompt_append", "Additional org-specific context for this agent."),
 					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "guardrail_preset", "official"),
 					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "version", "1"),
 					resource.TestCheckResourceAttr("quant_ai_agent_overlay.test", "base.agent_id", "code"),
@@ -262,7 +262,7 @@ resource "quant_ai_agent_overlay" "test" {
   model_id             = "anthropic.claude-sonnet-4-6"
   temperature          = 0.5
   max_tokens           = 4096
-  system_prompt_append = "You work at Salsa Digital."
+  system_prompt_append = "Additional org-specific context for this agent."
   disabled_tools       = ["code_execution"]
   additional_skills    = ["drupal-expertise"]
   guardrail_preset     = "official"
@@ -298,7 +298,7 @@ resource "quant_ai_agent_overlay" "test" {
   model_id             = "anthropic.claude-sonnet-4-6"
   temperature          = 0.5
   max_tokens           = 4096
-  system_prompt_append = "You work at Salsa Digital."
+  system_prompt_append = "Additional org-specific context for this agent."
   guardrail_preset     = "official"
 }
 `, org, agentId)
