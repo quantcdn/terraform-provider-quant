@@ -31,6 +31,7 @@ func GeneratedResources() []func() resource.Resource {
 		NewKVStoreResource,
 		NewKVItemResource,
 		NewAiGovernanceResource,
+		NewAiAgentOverlayResource,
 		NewAiVectorCollectionResource,
 		NewAiVectorDocumentResource,
 		NewAiSkillResource,

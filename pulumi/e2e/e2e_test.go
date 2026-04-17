@@ -491,6 +491,37 @@ func TestE2E_AIAgent(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// E2E Test: AI Agent Overlay (create, update, destroy)
+// ---------------------------------------------------------------------------
+
+func TestE2E_AIAgentOverlay(t *testing.T) {
+	suffix := uniqueSuffix()
+	result, cleanup := createStack(t, "ai-agent-overlay", map[string]string{
+		"e2e-ai-agent-overlay:testSuffix":         fmt.Sprintf("e2e-%s", suffix),
+		"e2e-ai-agent-overlay:systemPromptAppend": fmt.Sprintf("E2E run %s", suffix),
+	})
+	defer cleanup()
+
+	assert.NotEmpty(t, result.outputs["overlayAgentId"].Value, "overlayAgentId should be set")
+	assert.NotEmpty(t, result.outputs["overlayVersion"].Value, "overlayVersion should be set")
+	t.Logf("Created AI agent overlay: agentId=%v version=%v",
+		result.outputs["overlayAgentId"].Value,
+		result.outputs["overlayVersion"].Value,
+	)
+
+	// Update: flip systemPromptAppend and temperature. Expect version to advance.
+	ctx := context.Background()
+	_ = result.stack.SetConfig(ctx, "e2e-ai-agent-overlay:systemPromptAppend",
+		auto.ConfigValue{Value: fmt.Sprintf("E2E updated %s", suffix)})
+	_ = result.stack.SetConfig(ctx, "e2e-ai-agent-overlay:temperature",
+		auto.ConfigValue{Value: "0.75"})
+	t.Log("Updating overlay (systemPromptAppend, temperature)...")
+	outputs := updateStack(t, result.stack)
+	assert.NotEmpty(t, outputs["overlayAgentId"].Value, "overlayAgentId should still be set after update")
+	t.Log("Overlay update succeeded")
+}
+
+// ---------------------------------------------------------------------------
 // E2E Test: Slack Bot (create agent + bot, update, destroy)
 // ---------------------------------------------------------------------------
 

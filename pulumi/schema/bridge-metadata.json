@@ -31,6 +31,55 @@
                     }
                 }
             },
+            "quant_ai_agent_overlay": {
+                "current": "quant:index:AiAgentOverlay",
+                "fields": {
+                    "additional_skills": {
+                        "maxItemsOne": false
+                    },
+                    "additional_tools": {
+                        "maxItemsOne": false
+                    },
+                    "allowed_collections": {
+                        "maxItemsOne": false
+                    },
+                    "base": {
+                        "fields": {
+                            "allowed_tools": {
+                                "maxItemsOne": false
+                            },
+                            "assigned_skill_ids": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    },
+                    "disabled_skills": {
+                        "maxItemsOne": false
+                    },
+                    "disabled_tools": {
+                        "maxItemsOne": false
+                    },
+                    "overlay": {
+                        "fields": {
+                            "additional_skills": {
+                                "maxItemsOne": false
+                            },
+                            "additional_tools": {
+                                "maxItemsOne": false
+                            },
+                            "allowed_collections": {
+                                "maxItemsOne": false
+                            },
+                            "disabled_skills": {
+                                "maxItemsOne": false
+                            },
+                            "disabled_tools": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    }
+                }
+            },
             "quant_ai_custom_tool": {
                 "current": "quant:index:AiCustomTool"
             },
