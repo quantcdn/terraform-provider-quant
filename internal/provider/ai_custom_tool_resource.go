@@ -7,11 +7,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_ai_custom_tool"
@@ -377,29 +375,12 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 		data.TimeoutSeconds = types.Int64Null()
 	}
 
-	// InputSchema — JSON string from the API response object.
-	if v, ok := m["inputSchema"]; ok && v != nil {
-		schemaJSON, err := json.Marshal(v)
-		if err == nil {
-			data.InputSchema = types.StringValue(string(schemaJSON))
-		} else {
-			data.InputSchema = types.StringNull()
-		}
-	} else {
-		data.InputSchema = types.StringNull()
-	}
+	// InputSchema — JSON string. Keep the user's original string if it's
+	// semantically equivalent to the API response (avoids key-ordering diffs).
+	data.InputSchema = normalizeJSONSchemaField(m, "inputSchema", data.InputSchema)
 
-	// OutputSchema — JSON string from the API response object, null if absent.
-	if v, ok := m["outputSchema"]; ok && v != nil {
-		schemaJSON, err := json.Marshal(v)
-		if err == nil {
-			data.OutputSchema = types.StringValue(string(schemaJSON))
-		} else {
-			data.OutputSchema = types.StringNull()
-		}
-	} else {
-		data.OutputSchema = types.StringNull()
-	}
+	// OutputSchema — same treatment.
+	data.OutputSchema = normalizeJSONSchemaField(m, "outputSchema", data.OutputSchema)
 
 	data.Organisation = types.StringValue(org)
 
@@ -408,41 +389,41 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 	data.Success = types.BoolValue(true)
 	data.IsUpdate = mapBoolFromAny(m, "isUpdate")
 
-	// Nested computed `tool` object.
-	diags.Append(buildToolObject(ctx, m, data)...)
+	// Nested computed `tool` object — set to null to avoid perpetual bridge
+	// diffs. All tool fields are already available at the top level.
+	data.Tool = resource_ai_custom_tool.NewToolValueNull()
 
 	return
 }
 
-// buildToolObject constructs the nested computed `tool` attribute from the
-// API response map.
-func buildToolObject(ctx context.Context, m map[string]interface{}, data *resource_ai_custom_tool.AiCustomToolModel) (diags diag.Diagnostics) {
-	toolAttrTypes := resource_ai_custom_tool.ToolValue{}.AttributeTypes(ctx)
+// normalizeJSONSchemaField compares the API response value to the existing state
+// value. If they're semantically equivalent JSON objects, keep the state string
+// to avoid perpetual diffs from key reordering.
+func normalizeJSONSchemaField(m map[string]interface{}, key string, existing types.String) types.String {
+	apiVal, ok := m[key]
+	if !ok || apiVal == nil {
+		return types.StringNull()
+	}
 
-	toolAttrs := map[string]attr.Value{
-		"name":                      data.Name,
-		"description":               data.Description,
-		"edge_function_url":         data.EdgeFunctionUrl,
-		"edge_function_code":        data.EdgeFunctionCode,
-		"category":                  data.Category,
-		"output_schema_description": data.OutputSchemaDescription,
-		"response_mode":             data.ResponseMode,
-		"is_async":                  data.IsAsync,
-		"input_schema":              data.InputSchema,
-		"output_schema":             data.OutputSchema,
-		"created_at": func() basetypes.StringValue {
-			if v, ok := m["createdAt"].(string); ok && v != "" {
-				return types.StringValue(v)
+	apiJSON, err := json.Marshal(apiVal)
+	if err != nil {
+		return types.StringNull()
+	}
+
+	// If state already has a value, check semantic equality.
+	if !existing.IsNull() && !existing.IsUnknown() {
+		var stateObj, apiObj interface{}
+		if json.Unmarshal([]byte(existing.ValueString()), &stateObj) == nil &&
+			json.Unmarshal(apiJSON, &apiObj) == nil {
+			stateNorm, _ := json.Marshal(stateObj)
+			apiNorm, _ := json.Marshal(apiObj)
+			if string(stateNorm) == string(apiNorm) {
+				return existing // Keep user's original string.
 			}
-			return types.StringNull()
-		}(),
+		}
 	}
 
-	toolValue, d := resource_ai_custom_tool.NewToolValue(toolAttrTypes, toolAttrs)
-	diags.Append(d...)
-	if !diags.HasError() {
-		data.Tool = toolValue
-	}
-
-	return
+	return types.StringValue(string(apiJSON))
 }
+
+
