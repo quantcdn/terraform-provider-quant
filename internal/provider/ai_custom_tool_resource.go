@@ -36,7 +36,11 @@ func (r *aiCustomToolResource) Metadata(_ context.Context, req resource.Metadata
 }
 
 func (r *aiCustomToolResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_ai_custom_tool.AiCustomToolResourceSchema(ctx)
+	s := resource_ai_custom_tool.AiCustomToolResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	// These change on every create/update — must not carry state forward.
+	clearPlanModifiers(s.Attributes, "success", "is_update", "message")
+	resp.Schema = s
 }
 
 func (r *aiCustomToolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -359,8 +363,19 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 	// IsAsync
 	data.IsAsync = mapBoolFromAny(m, "isAsync")
 
-	// TimeoutSeconds
-	data.TimeoutSeconds = mapInt64FromAny(m, "timeoutSeconds")
+	// TimeoutSeconds — API returns "timeout" in milliseconds, TF uses seconds.
+	if v, ok := m["timeout"]; ok {
+		switch t := v.(type) {
+		case float64:
+			data.TimeoutSeconds = types.Int64Value(int64(t) / 1000)
+		case int64:
+			data.TimeoutSeconds = types.Int64Value(t / 1000)
+		default:
+			data.TimeoutSeconds = types.Int64Null()
+		}
+	} else {
+		data.TimeoutSeconds = types.Int64Null()
+	}
 
 	// InputSchema — JSON string from the API response object.
 	if v, ok := m["inputSchema"]; ok && v != nil {
