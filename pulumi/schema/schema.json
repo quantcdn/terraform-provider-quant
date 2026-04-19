@@ -308,12 +308,6 @@
                 }
             }
         },
-        "quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema": {
-            "type": "object"
-        },
-        "quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema": {
-            "type": "object"
-        },
         "quant:index/AiCustomToolTool:AiCustomToolTool": {
             "properties": {
                 "category": {
@@ -333,7 +327,7 @@
                     "type": "string"
                 },
                 "inputSchema": {
-                    "$ref": "#/types/quant:index/AiCustomToolToolInputSchema:AiCustomToolToolInputSchema"
+                    "type": "string"
                 },
                 "isAsync": {
                     "type": "boolean"
@@ -342,7 +336,7 @@
                     "type": "string"
                 },
                 "outputSchema": {
-                    "$ref": "#/types/quant:index/AiCustomToolToolOutputSchema:AiCustomToolToolOutputSchema"
+                    "type": "string"
                 },
                 "outputSchemaDescription": {
                     "type": "string"
@@ -369,12 +363,6 @@
                     ]
                 }
             }
-        },
-        "quant:index/AiCustomToolToolInputSchema:AiCustomToolToolInputSchema": {
-            "type": "object"
-        },
-        "quant:index/AiCustomToolToolOutputSchema:AiCustomToolToolOutputSchema": {
-            "type": "object"
         },
         "quant:index/AiGovernanceConfig:AiGovernanceConfig": {
             "type": "object"
@@ -3367,8 +3355,8 @@
                     "description": "Computed edge function URL (read-only)"
                 },
                 "inputSchema": {
-                    "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
-                    "description": "JSON Schema defining the tool's input parameters"
+                    "type": "string",
+                    "description": "JSON-encoded JSON Schema object defining the tool's input parameters"
                 },
                 "isAsync": {
                     "type": "boolean",
@@ -3390,8 +3378,8 @@
                     "description": "The organisation ID"
                 },
                 "outputSchema": {
-                    "$ref": "#/types/quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema",
-                    "description": "JSON Schema defining the tool's output structure"
+                    "type": "string",
+                    "description": "JSON-encoded JSON Schema object defining the tool's output structure"
                 },
                 "outputSchemaDescription": {
                     "type": "string",
@@ -3449,8 +3437,8 @@
                     "description": "JavaScript source code for the edge function"
                 },
                 "inputSchema": {
-                    "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
-                    "description": "JSON Schema defining the tool's input parameters"
+                    "type": "string",
+                    "description": "JSON-encoded JSON Schema object defining the tool's input parameters"
                 },
                 "isAsync": {
                     "type": "boolean",
@@ -3465,8 +3453,8 @@
                     "description": "The organisation ID"
                 },
                 "outputSchema": {
-                    "$ref": "#/types/quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema",
-                    "description": "JSON Schema defining the tool's output structure"
+                    "type": "string",
+                    "description": "JSON-encoded JSON Schema object defining the tool's output structure"
                 },
                 "outputSchemaDescription": {
                     "type": "string",
@@ -3510,8 +3498,8 @@
                         "description": "Computed edge function URL (read-only)"
                     },
                     "inputSchema": {
-                        "$ref": "#/types/quant:index/AiCustomToolInputSchema:AiCustomToolInputSchema",
-                        "description": "JSON Schema defining the tool's input parameters"
+                        "type": "string",
+                        "description": "JSON-encoded JSON Schema object defining the tool's input parameters"
                     },
                     "isAsync": {
                         "type": "boolean",
@@ -3533,8 +3521,8 @@
                         "description": "The organisation ID"
                     },
                     "outputSchema": {
-                        "$ref": "#/types/quant:index/AiCustomToolOutputSchema:AiCustomToolOutputSchema",
-                        "description": "JSON Schema defining the tool's output structure"
+                        "type": "string",
+                        "description": "JSON-encoded JSON Schema object defining the tool's output structure"
                     },
                     "outputSchemaDescription": {
                         "type": "string",

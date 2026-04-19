@@ -163,17 +163,23 @@ func getToolName(data *resource_ai_custom_tool.AiCustomToolModel) string {
 func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data *resource_ai_custom_tool.AiCustomToolModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	// Build the SDK request. InputSchema is a typed empty object in the TF
-	// schema (no nested attributes) so we pass an empty map — the API accepts
-	// any valid JSON Schema object.
-	// The SDK constructor still expects edgeFunctionUrl but the API now
-	// auto-generates it from edgeFunctionCode. Pass empty string for the
-	// URL and set edgeFunctionCode via AdditionalProperties.
+	// Build the SDK request. InputSchema is a JSON-encoded string in the TF
+	// schema; parse it to a map so the API receives a JSON object.
+	var inputSchema map[string]interface{}
+	if !data.InputSchema.IsNull() && !data.InputSchema.IsUnknown() {
+		if err := json.Unmarshal([]byte(data.InputSchema.ValueString()), &inputSchema); err != nil {
+			diags.AddError("Invalid input_schema JSON", fmt.Sprintf("Failed to parse input_schema: %s", err.Error()))
+			return
+		}
+	} else {
+		inputSchema = map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}
+	}
+
 	sdkReq := quantadmingo.NewCreateCustomToolRequest(
 		data.Name.ValueString(),
 		data.Description.ValueString(),
 		"", // edgeFunctionUrl — computed by API from edgeFunctionCode
-		map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}, // inputSchema default
+		inputSchema,
 	)
 
 	if !data.IsAsync.IsNull() && !data.IsAsync.IsUnknown() {
@@ -198,9 +204,14 @@ func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data 
 	if !data.ResponseMode.IsNull() && !data.ResponseMode.IsUnknown() {
 		sdkReq.AdditionalProperties["responseMode"] = data.ResponseMode.ValueString()
 	}
-	// OutputSchema — pass as empty map when known (same as InputSchema).
+	// OutputSchema — parse JSON string to object for the API.
 	if !data.OutputSchema.IsNull() && !data.OutputSchema.IsUnknown() {
-		sdkReq.AdditionalProperties["outputSchema"] = map[string]interface{}{}
+		var outputSchema map[string]interface{}
+		if err := json.Unmarshal([]byte(data.OutputSchema.ValueString()), &outputSchema); err != nil {
+			diags.AddError("Invalid output_schema JSON", fmt.Sprintf("Failed to parse output_schema: %s", err.Error()))
+			return
+		}
+		sdkReq.AdditionalProperties["outputSchema"] = outputSchema
 	}
 
 	sdkResp, httpResp, err := r.client.Instance.AICustomToolsAPI.CreateCustomTool(r.client.AuthContext, org).
@@ -351,28 +362,28 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 	// TimeoutSeconds
 	data.TimeoutSeconds = mapInt64FromAny(m, "timeoutSeconds")
 
-	// InputSchema — empty-attribute custom type; always set to "known".
-	data.InputSchema = resource_ai_custom_tool.InputSchemaValue{}
-	if _, ok := m["inputSchema"]; ok {
-		data.InputSchema = resource_ai_custom_tool.NewInputSchemaValueMust(
-			resource_ai_custom_tool.InputSchemaValue{}.AttributeTypes(ctx),
-			map[string]attr.Value{},
-		)
+	// InputSchema — JSON string from the API response object.
+	if v, ok := m["inputSchema"]; ok && v != nil {
+		schemaJSON, err := json.Marshal(v)
+		if err == nil {
+			data.InputSchema = types.StringValue(string(schemaJSON))
+		} else {
+			data.InputSchema = types.StringNull()
+		}
 	} else {
-		data.InputSchema = resource_ai_custom_tool.NewInputSchemaValueMust(
-			resource_ai_custom_tool.InputSchemaValue{}.AttributeTypes(ctx),
-			map[string]attr.Value{},
-		)
+		data.InputSchema = types.StringNull()
 	}
 
-	// OutputSchema — optional; null if not present.
-	if _, ok := m["outputSchema"]; ok {
-		data.OutputSchema = resource_ai_custom_tool.NewOutputSchemaValueMust(
-			resource_ai_custom_tool.OutputSchemaValue{}.AttributeTypes(ctx),
-			map[string]attr.Value{},
-		)
+	// OutputSchema — JSON string from the API response object, null if absent.
+	if v, ok := m["outputSchema"]; ok && v != nil {
+		schemaJSON, err := json.Marshal(v)
+		if err == nil {
+			data.OutputSchema = types.StringValue(string(schemaJSON))
+		} else {
+			data.OutputSchema = types.StringNull()
+		}
 	} else {
-		data.OutputSchema = resource_ai_custom_tool.NewOutputSchemaValueNull()
+		data.OutputSchema = types.StringNull()
 	}
 
 	data.Organisation = types.StringValue(org)
@@ -393,27 +404,6 @@ func mapCustomToolFromMap(ctx context.Context, m map[string]interface{}, org str
 func buildToolObject(ctx context.Context, m map[string]interface{}, data *resource_ai_custom_tool.AiCustomToolModel) (diags diag.Diagnostics) {
 	toolAttrTypes := resource_ai_custom_tool.ToolValue{}.AttributeTypes(ctx)
 
-	// InputSchema for the nested tool object — basetypes.ObjectValue
-	inputSchemaObj, d := types.ObjectValue(
-		resource_ai_custom_tool.InputSchemaValue{}.AttributeTypes(ctx),
-		map[string]attr.Value{},
-	)
-	diags.Append(d...)
-
-	// OutputSchema for the nested tool object — basetypes.ObjectValue
-	var outputSchemaObj basetypes.ObjectValue
-	if _, ok := m["outputSchema"]; ok {
-		outputSchemaObj, d = types.ObjectValue(
-			resource_ai_custom_tool.OutputSchemaValue{}.AttributeTypes(ctx),
-			map[string]attr.Value{},
-		)
-		diags.Append(d...)
-	} else {
-		outputSchemaObj = types.ObjectNull(
-			resource_ai_custom_tool.OutputSchemaValue{}.AttributeTypes(ctx),
-		)
-	}
-
 	toolAttrs := map[string]attr.Value{
 		"name":                      data.Name,
 		"description":               data.Description,
@@ -423,8 +413,8 @@ func buildToolObject(ctx context.Context, m map[string]interface{}, data *resour
 		"output_schema_description": data.OutputSchemaDescription,
 		"response_mode":             data.ResponseMode,
 		"is_async":                  data.IsAsync,
-		"input_schema":              inputSchemaObj,
-		"output_schema":             outputSchemaObj,
+		"input_schema":              data.InputSchema,
+		"output_schema":             data.OutputSchema,
 		"created_at": func() basetypes.StringValue {
 			if v, ok := m["createdAt"].(string); ok && v != "" {
 				return types.StringValue(v)
