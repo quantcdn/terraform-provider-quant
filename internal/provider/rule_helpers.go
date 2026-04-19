@@ -235,6 +235,30 @@ func clearStringPlanModifiers(attrs map[string]schema.Attribute, names ...string
 	}
 }
 
+// clearPlanModifiers strips plan modifiers from named attributes of any type.
+func clearPlanModifiers(attrs map[string]schema.Attribute, names ...string) {
+	for _, name := range names {
+		attr, ok := attrs[name]
+		if !ok {
+			continue
+		}
+		switch a := attr.(type) {
+		case schema.StringAttribute:
+			a.PlanModifiers = nil
+			attrs[name] = a
+		case schema.Int64Attribute:
+			a.PlanModifiers = nil
+			attrs[name] = a
+		case schema.BoolAttribute:
+			a.PlanModifiers = nil
+			attrs[name] = a
+		case schema.Float64Attribute:
+			a.PlanModifiers = nil
+			attrs[name] = a
+		}
+	}
+}
+
 // buildConditionalListsForRequest is a convenience wrapper that applies
 // buildConditionalList for all three standard conditional triplets (country,
 // ip, method) in one call.

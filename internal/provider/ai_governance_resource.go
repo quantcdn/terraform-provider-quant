@@ -35,7 +35,11 @@ func (r *aiGovernanceResource) Metadata(_ context.Context, req resource.Metadata
 }
 
 func (r *aiGovernanceResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_ai_governance.AiGovernanceResourceSchema(ctx)
+	s := resource_ai_governance.AiGovernanceResourceSchema(ctx)
+	addUseStateForUnknown(s.Attributes)
+	// version and success change on every update — must not carry state forward.
+	clearPlanModifiers(s.Attributes, "version", "success")
+	resp.Schema = s
 }
 
 func (r *aiGovernanceResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
