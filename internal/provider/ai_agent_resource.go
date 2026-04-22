@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"net/http"
 	"time"
@@ -476,7 +477,10 @@ func mapAiAgentResponse(ctx context.Context, agent *quantadmingo.GetAIAgent200Re
 	data.GuardrailPreset = optionalStringPtrValue(agent.GuardrailPreset)
 
 	if agent.Temperature != nil {
-		data.Temperature = types.NumberValue(big.NewFloat(float64(*agent.Temperature)))
+		// Round to 2 decimal places to avoid float32→float64 precision drift
+		// (e.g. 0.3 as float32 becomes 0.30000001192092896 as float64).
+		rounded := math.Round(float64(*agent.Temperature)*100) / 100
+		data.Temperature = types.NumberValue(big.NewFloat(rounded))
 	} else {
 		data.Temperature = types.NumberNull()
 	}

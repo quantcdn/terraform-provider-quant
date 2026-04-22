@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"net/http"
 	"strings"
@@ -407,7 +408,8 @@ func populateOverlay(ctx context.Context, overlay *quantadmingo.GetAgentOverlay2
 
 	// temperature — *float32 -> types.Number
 	if overlay.Temperature != nil {
-		data.Temperature = types.NumberValue(big.NewFloat(float64(*overlay.Temperature)))
+		rounded := math.Round(float64(*overlay.Temperature)*100) / 100
+		data.Temperature = types.NumberValue(big.NewFloat(rounded))
 	} else {
 		data.Temperature = types.NumberNull()
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"net/http"
 	"time"
@@ -613,9 +614,12 @@ func mapInt64FromAny(m map[string]interface{}, key string) types.Int64 {
 func mapNumberFromAny(m map[string]interface{}, key string) basetypes.NumberValue {
 	switch v := m[key].(type) {
 	case float64:
-		return types.NumberValue(big.NewFloat(v))
+		// Round to 2 decimal places to avoid float32→float64 precision drift
+		rounded := math.Round(v*100) / 100
+		return types.NumberValue(big.NewFloat(rounded))
 	case float32:
-		return types.NumberValue(big.NewFloat(float64(v)))
+		rounded := math.Round(float64(v)*100) / 100
+		return types.NumberValue(big.NewFloat(rounded))
 	}
 	return types.NumberNull()
 }
