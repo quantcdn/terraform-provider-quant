@@ -259,6 +259,20 @@ func clearPlanModifiers(attrs map[string]schema.Attribute, names ...string) {
 	}
 }
 
+// clearValidators removes all validators from the named string attributes.
+// Use this to relax generated OneOf validators that don't allow empty/null
+// values (e.g. guardrail_preset needs to accept "" to clear guardrails).
+func clearValidators(attrs map[string]schema.Attribute, names ...string) {
+	for _, name := range names {
+		if attr, ok := attrs[name]; ok {
+			if sa, ok := attr.(schema.StringAttribute); ok {
+				sa.Validators = nil
+				attrs[name] = sa
+			}
+		}
+	}
+}
+
 // buildConditionalListsForRequest is a convenience wrapper that applies
 // buildConditionalList for all three standard conditional triplets (country,
 // ip, method) in one call.

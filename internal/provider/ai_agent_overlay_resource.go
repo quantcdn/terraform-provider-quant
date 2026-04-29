@@ -38,7 +38,9 @@ func (r *aiAgentOverlayResource) Metadata(_ context.Context, req resource.Metada
 }
 
 func (r *aiAgentOverlayResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_ai_agent_overlay.AiAgentOverlayResourceSchema(ctx)
+	s := resource_ai_agent_overlay.AiAgentOverlayResourceSchema(ctx)
+	clearValidators(s.Attributes, "guardrail_preset")
+	resp.Schema = s
 }
 
 func (r *aiAgentOverlayResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

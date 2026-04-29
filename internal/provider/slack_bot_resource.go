@@ -39,7 +39,9 @@ func (r *slackBotResource) Metadata(_ context.Context, req resource.MetadataRequ
 }
 
 func (r *slackBotResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_slack_bot.SlackBotResourceSchema(ctx)
+	s := resource_slack_bot.SlackBotResourceSchema(ctx)
+	clearValidators(s.Attributes, "guardrail_preset")
+	resp.Schema = s
 }
 
 func (r *slackBotResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
