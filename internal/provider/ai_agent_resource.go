@@ -38,7 +38,11 @@ func (r *aiAgentResource) Metadata(_ context.Context, req resource.MetadataReque
 }
 
 func (r *aiAgentResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_ai_agent.AiAgentResourceSchema(ctx)
+	s := resource_ai_agent.AiAgentResourceSchema(ctx)
+	// Allow guardrail_preset to be empty (clear guardrails). The generated
+	// schema has a OneOf validator that only accepts the three presets.
+	clearValidators(s.Attributes, "guardrail_preset")
+	resp.Schema = s
 }
 
 func (r *aiAgentResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
