@@ -134,7 +134,7 @@ func (r *crawlerScheduleResource) ImportState(ctx context.Context, req resource.
 	parts := strings.Split(req.ID, ":")
 	if len(parts) != 3 {
 		resp.Diagnostics.AddError("Invalid Import ID",
-			"Import ID should be in the format 'project:crawler_uuid:schedule_id'")
+			"Import ID should be in the format `project:crawler_uuid:schedule_id`")
 		return
 	}
 
@@ -196,6 +196,11 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	if schedule.Project.IsNull() || schedule.Project.IsUnknown() {
 		diags.AddAttributeError(path.Root("project"), "Missing schedule.project attribute",
 			"To read schedule information, project must be provided.")
+		return
+	}
+	if schedule.Crawler.IsNull() || schedule.Crawler.IsUnknown() {
+		diags.AddAttributeError(path.Root("crawler"), "Missing schedule.crawler attribute",
+			"To read schedule information, crawler must be provided.")
 		return
 	}
 

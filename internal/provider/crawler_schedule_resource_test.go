@@ -135,11 +135,10 @@ func TestAccCrawlerScheduleResource_basic(t *testing.T) {
 			},
 			// Step 2: Import
 			{
-				ResourceName:            "quant_crawler_schedule.test",
-				ImportState:             true,
-				ImportStateId:           "test-project:test-crawler-uuid:1",
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"crawler"},
+				ResourceName:      "quant_crawler_schedule.test",
+				ImportState:       true,
+				ImportStateId:     "test-project:test-crawler-uuid:1",
+				ImportStateVerify: true,
 			},
 			// Step 3: Update
 			{
@@ -152,6 +151,46 @@ func TestAccCrawlerScheduleResource_basic(t *testing.T) {
 				),
 			},
 			// Step 4: Delete (implicit)
+		},
+	})
+}
+
+func TestAccCrawlerScheduleResource_ImportError(t *testing.T) {
+	setupCrawlerScheduleServer(t, "test-org", "test-project")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() {},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create a resource so a state entry exists to import against.
+			{
+				Config: testAccCrawlerScheduleResourceConfig("test-org", "test-project", "test-schedule", "0 0 * * *"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckCrawlerScheduleExists("quant_crawler_schedule.test"),
+				),
+			},
+			// Step 2: Too few parts (2).
+			{
+				ResourceName:  "quant_crawler_schedule.test",
+				ImportState:   true,
+				ImportStateId: "test-project:test-crawler-uuid",
+				ExpectError:   regexp.MustCompile("Invalid Import ID"),
+			},
+			// Step 3: Too many parts (4).
+			{
+				ResourceName:  "quant_crawler_schedule.test",
+				ImportState:   true,
+				ImportStateId: "a:b:c:d",
+				ExpectError:   regexp.MustCompile("Invalid Import ID"),
+			},
+			// Step 4: Non-integer schedule id.
+			{
+				ResourceName:  "quant_crawler_schedule.test",
+				ImportState:   true,
+				ImportStateId: "test-project:test-crawler-uuid:notanumber",
+				ExpectError:   regexp.MustCompile("Invalid Import ID"),
+			},
 		},
 	})
 }
