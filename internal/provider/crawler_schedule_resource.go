@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
+
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_crawler_schedule"
@@ -17,8 +19,9 @@ import (
 )
 
 var (
-	_ resource.Resource              = (*crawlerScheduleResource)(nil)
-	_ resource.ResourceWithConfigure = (*crawlerScheduleResource)(nil)
+	_ resource.Resource                = (*crawlerScheduleResource)(nil)
+	_ resource.ResourceWithConfigure   = (*crawlerScheduleResource)(nil)
+	_ resource.ResourceWithImportState = (*crawlerScheduleResource)(nil)
 )
 
 func NewCrawlerScheduleResource() resource.Resource {
@@ -122,6 +125,38 @@ func (r *crawlerScheduleResource) Delete(ctx context.Context, req resource.Delet
 	}
 
 	resp.Diagnostics.Append(callCrawlerScheduleDeleteAPI(ctx, r, &data)...)
+}
+
+// ---------------------------------------------------------------------------
+// ImportState
+// ---------------------------------------------------------------------------
+func (r *crawlerScheduleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	parts := strings.Split(req.ID, ":")
+	if len(parts) != 3 {
+		resp.Diagnostics.AddError("Invalid Import ID",
+			"Import ID should be in the format 'project:crawler_uuid:schedule_id'")
+		return
+	}
+
+	scheduleId, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Import ID",
+			fmt.Sprintf("Schedule id must be an integer, got %q: %s", parts[2], err.Error()))
+		return
+	}
+
+	var data resource_crawler_schedule.CrawlerScheduleModel
+	data.Project = types.StringValue(parts[0])
+	data.Crawler = types.StringValue(parts[1])
+	data.Id = types.Int64Value(scheduleId)
+
+	diags := callCrawlerScheduleReadAPI(ctx, r, &data)
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 // ---------------------------------------------------------------------------
