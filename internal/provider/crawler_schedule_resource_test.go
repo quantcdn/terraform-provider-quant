@@ -28,14 +28,14 @@ func setupCrawlerScheduleServer(t *testing.T, organizationID string, projectID s
 		return map[string]interface{}{
 			"id":                   1,
 			"name":                 currentName,
-			"project_id":          17,
+			"project_id":           17,
 			"schedule_cron_string": currentCron,
-			"crawler_schedule":    currentCron,
-			"crawler_uuid":        crawlerUUID,
-			"crawler_config_id":   5,
-			"crawler_last_run_id": 0,
-			"created_at":          "2024-06-28T03:33:02.000000Z",
-			"updated_at":          "2024-06-28T03:50:26.000000Z",
+			"crawler_schedule":     currentCron,
+			"crawler_uuid":         crawlerUUID,
+			"crawler_config_id":    5,
+			"crawler_last_run_id":  0,
+			"created_at":           "2024-06-28T03:33:02.000000Z",
+			"updated_at":           "2024-06-28T03:50:26.000000Z",
 		}
 	}
 
@@ -133,7 +133,14 @@ func TestAccCrawlerScheduleResource_basic(t *testing.T) {
 					testAccCheckCrawlerScheduleExists("quant_crawler_schedule.test"),
 				),
 			},
-			// Step 2: Update
+			// Step 2: Import
+			{
+				ResourceName:      "quant_crawler_schedule.test",
+				ImportState:       true,
+				ImportStateId:     "test-project:test-crawler-uuid:1",
+				ImportStateVerify: true,
+			},
+			// Step 3: Update
 			{
 				Config: testAccCrawlerScheduleResourceConfig("test-org", "test-project", "updated-schedule", "0 12 * * *"),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -143,7 +150,47 @@ func TestAccCrawlerScheduleResource_basic(t *testing.T) {
 					testAccCheckCrawlerScheduleExists("quant_crawler_schedule.test"),
 				),
 			},
-			// Step 3: Delete (implicit)
+			// Step 4: Delete (implicit)
+		},
+	})
+}
+
+func TestAccCrawlerScheduleResource_ImportError(t *testing.T) {
+	setupCrawlerScheduleServer(t, "test-org", "test-project")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() {},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: Create a resource so a state entry exists to import against.
+			{
+				Config: testAccCrawlerScheduleResourceConfig("test-org", "test-project", "test-schedule", "0 0 * * *"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckCrawlerScheduleExists("quant_crawler_schedule.test"),
+				),
+			},
+			// Step 2: Too few parts (2).
+			{
+				ResourceName:  "quant_crawler_schedule.test",
+				ImportState:   true,
+				ImportStateId: "test-project:test-crawler-uuid",
+				ExpectError:   regexp.MustCompile("Invalid Import ID"),
+			},
+			// Step 3: Too many parts (4).
+			{
+				ResourceName:  "quant_crawler_schedule.test",
+				ImportState:   true,
+				ImportStateId: "a:b:c:d",
+				ExpectError:   regexp.MustCompile("Invalid Import ID"),
+			},
+			// Step 4: Non-integer schedule id.
+			{
+				ResourceName:  "quant_crawler_schedule.test",
+				ImportState:   true,
+				ImportStateId: "test-project:test-crawler-uuid:notanumber",
+				ExpectError:   regexp.MustCompile("Invalid Import ID"),
+			},
 		},
 	})
 }
