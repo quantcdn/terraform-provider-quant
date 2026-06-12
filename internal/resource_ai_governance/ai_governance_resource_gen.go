@@ -78,6 +78,29 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 						Optional: true,
 						Computed: true,
 					},
+					"interface_limits": schema.MapNestedAttribute{
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"daily_cents": schema.Int64Attribute{
+									Optional: true,
+									Computed: true,
+								},
+								"monthly_cents": schema.Int64Attribute{
+									Optional: true,
+									Computed: true,
+								},
+							},
+							CustomType: InterfaceLimitsType{
+								ObjectType: types.ObjectType{
+									AttrTypes: InterfaceLimitsValue{}.AttributeTypes(ctx),
+								},
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket). Keys are interface labels.",
+						MarkdownDescription: "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket). Keys are interface labels.",
+					},
 					"monthly_budget_cents": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
@@ -89,6 +112,33 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 					"per_user_monthly_budget_cents": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
+					},
+					"user_overrides": schema.MapNestedAttribute{
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"daily_cents": schema.Int64Attribute{
+									Optional: true,
+									Computed: true,
+								},
+								"monthly_cents": schema.Int64Attribute{
+									Optional: true,
+									Computed: true,
+								},
+								"unlimited": schema.BoolAttribute{
+									Optional: true,
+									Computed: true,
+								},
+							},
+							CustomType: UserOverridesType{
+								ObjectType: types.ObjectType{
+									AttrTypes: UserOverridesValue{}.AttributeTypes(ctx),
+								},
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "Per-user budget overrides keyed by userId (numeric portal id, slack-<id>, or system:code-agent). Replaces the flat per-user budget for that user; unlimited=true exempts them.",
+						MarkdownDescription: "Per-user budget overrides keyed by userId (numeric portal id, slack-<id>, or system:code-agent). Replaces the flat per-user budget for that user; unlimited=true exempts them.",
 					},
 					"warning_threshold_percent": schema.Int64Attribute{
 						Optional: true,
@@ -431,6 +481,24 @@ func (t SpendLimitsType) ValueFromObject(ctx context.Context, in basetypes.Objec
 			fmt.Sprintf(`daily_budget_cents expected to be basetypes.Int64Value, was: %T`, dailyBudgetCentsAttribute))
 	}
 
+	interfaceLimitsAttribute, ok := attributes["interface_limits"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`interface_limits is missing from object`)
+
+		return nil, diags
+	}
+
+	interfaceLimitsVal, ok := interfaceLimitsAttribute.(basetypes.MapValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`interface_limits expected to be basetypes.MapValue, was: %T`, interfaceLimitsAttribute))
+	}
+
 	monthlyBudgetCentsAttribute, ok := attributes["monthly_budget_cents"]
 
 	if !ok {
@@ -485,6 +553,24 @@ func (t SpendLimitsType) ValueFromObject(ctx context.Context, in basetypes.Objec
 			fmt.Sprintf(`per_user_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserMonthlyBudgetCentsAttribute))
 	}
 
+	userOverridesAttribute, ok := attributes["user_overrides"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`user_overrides is missing from object`)
+
+		return nil, diags
+	}
+
+	userOverridesVal, ok := userOverridesAttribute.(basetypes.MapValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`user_overrides expected to be basetypes.MapValue, was: %T`, userOverridesAttribute))
+	}
+
 	warningThresholdPercentAttribute, ok := attributes["warning_threshold_percent"]
 
 	if !ok {
@@ -509,9 +595,11 @@ func (t SpendLimitsType) ValueFromObject(ctx context.Context, in basetypes.Objec
 
 	return SpendLimitsValue{
 		DailyBudgetCents:          dailyBudgetCentsVal,
+		InterfaceLimits:           interfaceLimitsVal,
 		MonthlyBudgetCents:        monthlyBudgetCentsVal,
 		PerUserDailyBudgetCents:   perUserDailyBudgetCentsVal,
 		PerUserMonthlyBudgetCents: perUserMonthlyBudgetCentsVal,
+		UserOverrides:             userOverridesVal,
 		WarningThresholdPercent:   warningThresholdPercentVal,
 		state:                     attr.ValueStateKnown,
 	}, diags
@@ -598,6 +686,24 @@ func NewSpendLimitsValue(attributeTypes map[string]attr.Type, attributes map[str
 			fmt.Sprintf(`daily_budget_cents expected to be basetypes.Int64Value, was: %T`, dailyBudgetCentsAttribute))
 	}
 
+	interfaceLimitsAttribute, ok := attributes["interface_limits"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`interface_limits is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	interfaceLimitsVal, ok := interfaceLimitsAttribute.(basetypes.MapValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`interface_limits expected to be basetypes.MapValue, was: %T`, interfaceLimitsAttribute))
+	}
+
 	monthlyBudgetCentsAttribute, ok := attributes["monthly_budget_cents"]
 
 	if !ok {
@@ -652,6 +758,24 @@ func NewSpendLimitsValue(attributeTypes map[string]attr.Type, attributes map[str
 			fmt.Sprintf(`per_user_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserMonthlyBudgetCentsAttribute))
 	}
 
+	userOverridesAttribute, ok := attributes["user_overrides"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`user_overrides is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	userOverridesVal, ok := userOverridesAttribute.(basetypes.MapValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`user_overrides expected to be basetypes.MapValue, was: %T`, userOverridesAttribute))
+	}
+
 	warningThresholdPercentAttribute, ok := attributes["warning_threshold_percent"]
 
 	if !ok {
@@ -676,9 +800,11 @@ func NewSpendLimitsValue(attributeTypes map[string]attr.Type, attributes map[str
 
 	return SpendLimitsValue{
 		DailyBudgetCents:          dailyBudgetCentsVal,
+		InterfaceLimits:           interfaceLimitsVal,
 		MonthlyBudgetCents:        monthlyBudgetCentsVal,
 		PerUserDailyBudgetCents:   perUserDailyBudgetCentsVal,
 		PerUserMonthlyBudgetCents: perUserMonthlyBudgetCentsVal,
+		UserOverrides:             userOverridesVal,
 		WarningThresholdPercent:   warningThresholdPercentVal,
 		state:                     attr.ValueStateKnown,
 	}, diags
@@ -753,30 +879,38 @@ var _ basetypes.ObjectValuable = SpendLimitsValue{}
 
 type SpendLimitsValue struct {
 	DailyBudgetCents          basetypes.Int64Value `tfsdk:"daily_budget_cents"`
+	InterfaceLimits           basetypes.MapValue   `tfsdk:"interface_limits"`
 	MonthlyBudgetCents        basetypes.Int64Value `tfsdk:"monthly_budget_cents"`
 	PerUserDailyBudgetCents   basetypes.Int64Value `tfsdk:"per_user_daily_budget_cents"`
 	PerUserMonthlyBudgetCents basetypes.Int64Value `tfsdk:"per_user_monthly_budget_cents"`
+	UserOverrides             basetypes.MapValue   `tfsdk:"user_overrides"`
 	WarningThresholdPercent   basetypes.Int64Value `tfsdk:"warning_threshold_percent"`
 	state                     attr.ValueState
 }
 
 func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 5)
+	attrTypes := make(map[string]tftypes.Type, 7)
 
 	var val tftypes.Value
 	var err error
 
 	attrTypes["daily_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["interface_limits"] = basetypes.MapType{
+		ElemType: InterfaceLimitsValue{}.Type(ctx),
+	}.TerraformType(ctx)
 	attrTypes["monthly_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["per_user_daily_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["per_user_monthly_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["user_overrides"] = basetypes.MapType{
+		ElemType: UserOverridesValue{}.Type(ctx),
+	}.TerraformType(ctx)
 	attrTypes["warning_threshold_percent"] = basetypes.Int64Type{}.TerraformType(ctx)
 
 	objectType := tftypes.Object{AttributeTypes: attrTypes}
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 5)
+		vals := make(map[string]tftypes.Value, 7)
 
 		val, err = v.DailyBudgetCents.ToTerraformValue(ctx)
 
@@ -785,6 +919,14 @@ func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, 
 		}
 
 		vals["daily_budget_cents"] = val
+
+		val, err = v.InterfaceLimits.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["interface_limits"] = val
 
 		val, err = v.MonthlyBudgetCents.ToTerraformValue(ctx)
 
@@ -809,6 +951,14 @@ func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, 
 		}
 
 		vals["per_user_monthly_budget_cents"] = val
+
+		val, err = v.UserOverrides.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["user_overrides"] = val
 
 		val, err = v.WarningThresholdPercent.ToTerraformValue(ctx)
 
@@ -847,12 +997,76 @@ func (v SpendLimitsValue) String() string {
 func (v SpendLimitsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
+	interfaceLimits := types.MapValueMust(
+		InterfaceLimitsType{
+			basetypes.ObjectType{
+				AttrTypes: InterfaceLimitsValue{}.AttributeTypes(ctx),
+			},
+		},
+		v.InterfaceLimits.Elements(),
+	)
+
+	if v.InterfaceLimits.IsNull() {
+		interfaceLimits = types.MapNull(
+			InterfaceLimitsType{
+				basetypes.ObjectType{
+					AttrTypes: InterfaceLimitsValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	if v.InterfaceLimits.IsUnknown() {
+		interfaceLimits = types.MapUnknown(
+			InterfaceLimitsType{
+				basetypes.ObjectType{
+					AttrTypes: InterfaceLimitsValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	userOverrides := types.MapValueMust(
+		UserOverridesType{
+			basetypes.ObjectType{
+				AttrTypes: UserOverridesValue{}.AttributeTypes(ctx),
+			},
+		},
+		v.UserOverrides.Elements(),
+	)
+
+	if v.UserOverrides.IsNull() {
+		userOverrides = types.MapNull(
+			UserOverridesType{
+				basetypes.ObjectType{
+					AttrTypes: UserOverridesValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	if v.UserOverrides.IsUnknown() {
+		userOverrides = types.MapUnknown(
+			UserOverridesType{
+				basetypes.ObjectType{
+					AttrTypes: UserOverridesValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
 	attributeTypes := map[string]attr.Type{
-		"daily_budget_cents":            basetypes.Int64Type{},
+		"daily_budget_cents": basetypes.Int64Type{},
+		"interface_limits": basetypes.MapType{
+			ElemType: InterfaceLimitsValue{}.Type(ctx),
+		},
 		"monthly_budget_cents":          basetypes.Int64Type{},
 		"per_user_daily_budget_cents":   basetypes.Int64Type{},
 		"per_user_monthly_budget_cents": basetypes.Int64Type{},
-		"warning_threshold_percent":     basetypes.Int64Type{},
+		"user_overrides": basetypes.MapType{
+			ElemType: UserOverridesValue{}.Type(ctx),
+		},
+		"warning_threshold_percent": basetypes.Int64Type{},
 	}
 
 	if v.IsNull() {
@@ -867,9 +1081,11 @@ func (v SpendLimitsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVa
 		attributeTypes,
 		map[string]attr.Value{
 			"daily_budget_cents":            v.DailyBudgetCents,
+			"interface_limits":              interfaceLimits,
 			"monthly_budget_cents":          v.MonthlyBudgetCents,
 			"per_user_daily_budget_cents":   v.PerUserDailyBudgetCents,
 			"per_user_monthly_budget_cents": v.PerUserMonthlyBudgetCents,
+			"user_overrides":                userOverrides,
 			"warning_threshold_percent":     v.WarningThresholdPercent,
 		})
 
@@ -895,6 +1111,10 @@ func (v SpendLimitsValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.InterfaceLimits.Equal(other.InterfaceLimits) {
+		return false
+	}
+
 	if !v.MonthlyBudgetCents.Equal(other.MonthlyBudgetCents) {
 		return false
 	}
@@ -904,6 +1124,10 @@ func (v SpendLimitsValue) Equal(o attr.Value) bool {
 	}
 
 	if !v.PerUserMonthlyBudgetCents.Equal(other.PerUserMonthlyBudgetCents) {
+		return false
+	}
+
+	if !v.UserOverrides.Equal(other.UserOverrides) {
 		return false
 	}
 
@@ -924,10 +1148,829 @@ func (v SpendLimitsValue) Type(ctx context.Context) attr.Type {
 
 func (v SpendLimitsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
-		"daily_budget_cents":            basetypes.Int64Type{},
+		"daily_budget_cents": basetypes.Int64Type{},
+		"interface_limits": basetypes.MapType{
+			ElemType: InterfaceLimitsValue{}.Type(ctx),
+		},
 		"monthly_budget_cents":          basetypes.Int64Type{},
 		"per_user_daily_budget_cents":   basetypes.Int64Type{},
 		"per_user_monthly_budget_cents": basetypes.Int64Type{},
-		"warning_threshold_percent":     basetypes.Int64Type{},
+		"user_overrides": basetypes.MapType{
+			ElemType: UserOverridesValue{}.Type(ctx),
+		},
+		"warning_threshold_percent": basetypes.Int64Type{},
+	}
+}
+
+var _ basetypes.ObjectTypable = InterfaceLimitsType{}
+
+type InterfaceLimitsType struct {
+	basetypes.ObjectType
+}
+
+func (t InterfaceLimitsType) Equal(o attr.Type) bool {
+	other, ok := o.(InterfaceLimitsType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t InterfaceLimitsType) String() string {
+	return "InterfaceLimitsType"
+}
+
+func (t InterfaceLimitsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	dailyCentsAttribute, ok := attributes["daily_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	dailyCentsVal, ok := dailyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_cents expected to be basetypes.Int64Value, was: %T`, dailyCentsAttribute))
+	}
+
+	monthlyCentsAttribute, ok := attributes["monthly_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	monthlyCentsVal, ok := monthlyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_cents expected to be basetypes.Int64Value, was: %T`, monthlyCentsAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return InterfaceLimitsValue{
+		DailyCents:   dailyCentsVal,
+		MonthlyCents: monthlyCentsVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewInterfaceLimitsValueNull() InterfaceLimitsValue {
+	return InterfaceLimitsValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewInterfaceLimitsValueUnknown() InterfaceLimitsValue {
+	return InterfaceLimitsValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewInterfaceLimitsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (InterfaceLimitsValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing InterfaceLimitsValue Attribute Value",
+				"While creating a InterfaceLimitsValue value, a missing attribute value was detected. "+
+					"A InterfaceLimitsValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("InterfaceLimitsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid InterfaceLimitsValue Attribute Type",
+				"While creating a InterfaceLimitsValue value, an invalid attribute value was detected. "+
+					"A InterfaceLimitsValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("InterfaceLimitsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("InterfaceLimitsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra InterfaceLimitsValue Attribute Value",
+				"While creating a InterfaceLimitsValue value, an extra attribute value was detected. "+
+					"A InterfaceLimitsValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra InterfaceLimitsValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewInterfaceLimitsValueUnknown(), diags
+	}
+
+	dailyCentsAttribute, ok := attributes["daily_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_cents is missing from object`)
+
+		return NewInterfaceLimitsValueUnknown(), diags
+	}
+
+	dailyCentsVal, ok := dailyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_cents expected to be basetypes.Int64Value, was: %T`, dailyCentsAttribute))
+	}
+
+	monthlyCentsAttribute, ok := attributes["monthly_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_cents is missing from object`)
+
+		return NewInterfaceLimitsValueUnknown(), diags
+	}
+
+	monthlyCentsVal, ok := monthlyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_cents expected to be basetypes.Int64Value, was: %T`, monthlyCentsAttribute))
+	}
+
+	if diags.HasError() {
+		return NewInterfaceLimitsValueUnknown(), diags
+	}
+
+	return InterfaceLimitsValue{
+		DailyCents:   dailyCentsVal,
+		MonthlyCents: monthlyCentsVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewInterfaceLimitsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) InterfaceLimitsValue {
+	object, diags := NewInterfaceLimitsValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewInterfaceLimitsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t InterfaceLimitsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewInterfaceLimitsValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewInterfaceLimitsValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewInterfaceLimitsValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewInterfaceLimitsValueMust(InterfaceLimitsValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t InterfaceLimitsType) ValueType(ctx context.Context) attr.Value {
+	return InterfaceLimitsValue{}
+}
+
+var _ basetypes.ObjectValuable = InterfaceLimitsValue{}
+
+type InterfaceLimitsValue struct {
+	DailyCents   basetypes.Int64Value `tfsdk:"daily_cents"`
+	MonthlyCents basetypes.Int64Value `tfsdk:"monthly_cents"`
+	state        attr.ValueState
+}
+
+func (v InterfaceLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["daily_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["monthly_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.DailyCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["daily_cents"] = val
+
+		val, err = v.MonthlyCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["monthly_cents"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v InterfaceLimitsValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v InterfaceLimitsValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v InterfaceLimitsValue) String() string {
+	return "InterfaceLimitsValue"
+}
+
+func (v InterfaceLimitsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"daily_cents":   basetypes.Int64Type{},
+		"monthly_cents": basetypes.Int64Type{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"daily_cents":   v.DailyCents,
+			"monthly_cents": v.MonthlyCents,
+		})
+
+	return objVal, diags
+}
+
+func (v InterfaceLimitsValue) Equal(o attr.Value) bool {
+	other, ok := o.(InterfaceLimitsValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.DailyCents.Equal(other.DailyCents) {
+		return false
+	}
+
+	if !v.MonthlyCents.Equal(other.MonthlyCents) {
+		return false
+	}
+
+	return true
+}
+
+func (v InterfaceLimitsValue) Type(ctx context.Context) attr.Type {
+	return InterfaceLimitsType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v InterfaceLimitsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"daily_cents":   basetypes.Int64Type{},
+		"monthly_cents": basetypes.Int64Type{},
+	}
+}
+
+var _ basetypes.ObjectTypable = UserOverridesType{}
+
+type UserOverridesType struct {
+	basetypes.ObjectType
+}
+
+func (t UserOverridesType) Equal(o attr.Type) bool {
+	other, ok := o.(UserOverridesType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t UserOverridesType) String() string {
+	return "UserOverridesType"
+}
+
+func (t UserOverridesType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	dailyCentsAttribute, ok := attributes["daily_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	dailyCentsVal, ok := dailyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_cents expected to be basetypes.Int64Value, was: %T`, dailyCentsAttribute))
+	}
+
+	monthlyCentsAttribute, ok := attributes["monthly_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	monthlyCentsVal, ok := monthlyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_cents expected to be basetypes.Int64Value, was: %T`, monthlyCentsAttribute))
+	}
+
+	unlimitedAttribute, ok := attributes["unlimited"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`unlimited is missing from object`)
+
+		return nil, diags
+	}
+
+	unlimitedVal, ok := unlimitedAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`unlimited expected to be basetypes.BoolValue, was: %T`, unlimitedAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return UserOverridesValue{
+		DailyCents:   dailyCentsVal,
+		MonthlyCents: monthlyCentsVal,
+		Unlimited:    unlimitedVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewUserOverridesValueNull() UserOverridesValue {
+	return UserOverridesValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewUserOverridesValueUnknown() UserOverridesValue {
+	return UserOverridesValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewUserOverridesValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (UserOverridesValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing UserOverridesValue Attribute Value",
+				"While creating a UserOverridesValue value, a missing attribute value was detected. "+
+					"A UserOverridesValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("UserOverridesValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid UserOverridesValue Attribute Type",
+				"While creating a UserOverridesValue value, an invalid attribute value was detected. "+
+					"A UserOverridesValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("UserOverridesValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("UserOverridesValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra UserOverridesValue Attribute Value",
+				"While creating a UserOverridesValue value, an extra attribute value was detected. "+
+					"A UserOverridesValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra UserOverridesValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewUserOverridesValueUnknown(), diags
+	}
+
+	dailyCentsAttribute, ok := attributes["daily_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_cents is missing from object`)
+
+		return NewUserOverridesValueUnknown(), diags
+	}
+
+	dailyCentsVal, ok := dailyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_cents expected to be basetypes.Int64Value, was: %T`, dailyCentsAttribute))
+	}
+
+	monthlyCentsAttribute, ok := attributes["monthly_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_cents is missing from object`)
+
+		return NewUserOverridesValueUnknown(), diags
+	}
+
+	monthlyCentsVal, ok := monthlyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_cents expected to be basetypes.Int64Value, was: %T`, monthlyCentsAttribute))
+	}
+
+	unlimitedAttribute, ok := attributes["unlimited"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`unlimited is missing from object`)
+
+		return NewUserOverridesValueUnknown(), diags
+	}
+
+	unlimitedVal, ok := unlimitedAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`unlimited expected to be basetypes.BoolValue, was: %T`, unlimitedAttribute))
+	}
+
+	if diags.HasError() {
+		return NewUserOverridesValueUnknown(), diags
+	}
+
+	return UserOverridesValue{
+		DailyCents:   dailyCentsVal,
+		MonthlyCents: monthlyCentsVal,
+		Unlimited:    unlimitedVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewUserOverridesValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) UserOverridesValue {
+	object, diags := NewUserOverridesValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewUserOverridesValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t UserOverridesType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewUserOverridesValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewUserOverridesValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewUserOverridesValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewUserOverridesValueMust(UserOverridesValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t UserOverridesType) ValueType(ctx context.Context) attr.Value {
+	return UserOverridesValue{}
+}
+
+var _ basetypes.ObjectValuable = UserOverridesValue{}
+
+type UserOverridesValue struct {
+	DailyCents   basetypes.Int64Value `tfsdk:"daily_cents"`
+	MonthlyCents basetypes.Int64Value `tfsdk:"monthly_cents"`
+	Unlimited    basetypes.BoolValue  `tfsdk:"unlimited"`
+	state        attr.ValueState
+}
+
+func (v UserOverridesValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["daily_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["monthly_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["unlimited"] = basetypes.BoolType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.DailyCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["daily_cents"] = val
+
+		val, err = v.MonthlyCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["monthly_cents"] = val
+
+		val, err = v.Unlimited.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["unlimited"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v UserOverridesValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v UserOverridesValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v UserOverridesValue) String() string {
+	return "UserOverridesValue"
+}
+
+func (v UserOverridesValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"daily_cents":   basetypes.Int64Type{},
+		"monthly_cents": basetypes.Int64Type{},
+		"unlimited":     basetypes.BoolType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"daily_cents":   v.DailyCents,
+			"monthly_cents": v.MonthlyCents,
+			"unlimited":     v.Unlimited,
+		})
+
+	return objVal, diags
+}
+
+func (v UserOverridesValue) Equal(o attr.Value) bool {
+	other, ok := o.(UserOverridesValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.DailyCents.Equal(other.DailyCents) {
+		return false
+	}
+
+	if !v.MonthlyCents.Equal(other.MonthlyCents) {
+		return false
+	}
+
+	if !v.Unlimited.Equal(other.Unlimited) {
+		return false
+	}
+
+	return true
+}
+
+func (v UserOverridesValue) Type(ctx context.Context) attr.Type {
+	return UserOverridesType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v UserOverridesValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"daily_cents":   basetypes.Int64Type{},
+		"monthly_cents": basetypes.Int64Type{},
+		"unlimited":     basetypes.BoolType{},
 	}
 }
