@@ -113,11 +113,11 @@ type imageRefRead struct {
 
 // deploymentInfoRead maps SDK ApplicationDeploymentInformationInner → TF DeploymentInformationValue.
 type deploymentInfoRead struct {
-	CreatedAt          *string `tfsdk:"created_at"`
-	DeploymentId       *string `tfsdk:"deployment_id"`
-	ImageTag           *string `tfsdk:"image_tag"`
-	Status             *string `tfsdk:"status"`
-	TaskDefinitionArn  *string `tfsdk:"task_definition_arn"`
+	CreatedAt         *string `tfsdk:"created_at"`
+	DeploymentId      *string `tfsdk:"deployment_id"`
+	ImageTag          *string `tfsdk:"image_tag"`
+	Status            *string `tfsdk:"status"`
+	TaskDefinitionArn *string `tfsdk:"task_definition_arn"`
 }
 
 // containerImageRefRead maps SDK ContainerImageReference → nested object.
@@ -142,8 +142,9 @@ type healthCheckRead struct {
 
 // originProtectionConfigRead maps SDK ContainerOriginProtectionConfig → nested object.
 type originProtectionConfigRead struct {
-	Enabled *bool      `tfsdk:"enabled"`
-	IpAllow types.List `tfsdk:"ip_allow"`
+	Enabled      *bool      `tfsdk:"enabled"`
+	IpAllow      types.List `tfsdk:"ip_allow"`
+	RedirectHost *string    `tfsdk:"redirect_host"`
 }
 
 // containerEnvRead maps SDK ContainerEnvironmentInner → TF EnvironmentValue.
@@ -283,8 +284,9 @@ func buildOriginProtectionConfigObject(ctx context.Context, c *quantadmingo.Cont
 	}
 
 	obj, d := types.ObjectValueFrom(ctx, attrTypes, originProtectionConfigRead{
-		Enabled: ptrBool(opc.GetEnabledOk()),
-		IpAllow: ipList,
+		Enabled:      ptrBool(opc.GetEnabledOk()),
+		IpAllow:      ipList,
+		RedirectHost: ptrStr(opc.GetRedirectHostOk()),
 	})
 	diags.Append(d...)
 	return obj, diags

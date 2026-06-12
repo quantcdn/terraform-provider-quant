@@ -165,16 +165,16 @@ func getToolName(data *resource_ai_custom_tool.AiCustomToolModel) string {
 func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data *resource_ai_custom_tool.AiCustomToolModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
-	// Build the SDK request. InputSchema is a JSON-encoded string in the TF
-	// schema; parse it to a map so the API receives a JSON object.
-	var inputSchema map[string]interface{}
-	if !data.InputSchema.IsNull() && !data.InputSchema.IsUnknown() {
-		if err := json.Unmarshal([]byte(data.InputSchema.ValueString()), &inputSchema); err != nil {
+	// Build the SDK request. InputSchema is a JSON-encoded string in both the TF
+	// schema and the SDK request (v4.19.0+); validate it and pass it through.
+	inputSchema := `{"type":"object","properties":{}}`
+	if !data.InputSchema.IsNull() && !data.InputSchema.IsUnknown() && data.InputSchema.ValueString() != "" {
+		inputSchema = data.InputSchema.ValueString()
+		var probe interface{}
+		if err := json.Unmarshal([]byte(inputSchema), &probe); err != nil {
 			diags.AddError("Invalid input_schema JSON", fmt.Sprintf("Failed to parse input_schema: %s", err.Error()))
 			return
 		}
-	} else {
-		inputSchema = map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}
 	}
 
 	sdkReq := quantadmingo.NewCreateCustomToolRequest(
@@ -425,5 +425,3 @@ func normalizeJSONSchemaField(m map[string]interface{}, key string, existing typ
 
 	return types.StringValue(string(apiJSON))
 }
-
-

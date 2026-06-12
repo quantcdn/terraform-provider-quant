@@ -492,10 +492,14 @@ func buildSDKContainer(ctx context.Context, cf containerFields, index int) (quan
 				}
 			}
 		}
+		if v, ok := opcAttrs["redirect_host"]; ok {
+			if sv, ok := v.(basetypes.StringValue); ok && !sv.IsNull() && !sv.IsUnknown() {
+				opc.SetRedirectHost(sv.ValueString())
+			}
+		}
 
 		container.SetOriginProtectionConfig(*opc)
 	}
 
 	return container, diags
 }
-
