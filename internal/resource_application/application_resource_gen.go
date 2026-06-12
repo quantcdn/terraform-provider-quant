@@ -290,6 +290,12 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 											Description:         "List of IP addresses or CIDR ranges that can bypass origin protection for direct access (e.g., VPN IPs)",
 											MarkdownDescription: "List of IP addresses or CIDR ranges that can bypass origin protection for direct access (e.g., VPN IPs)",
 										},
+										"redirect_host": schema.StringAttribute{
+											Optional:            true,
+											Computed:            true,
+											Description:         "Optional bare host (e.g. www.example.com). When set, requests denied by origin protection are 302-redirected to https://<redirectHost> with path and query preserved, instead of receiving a 403. Allowed IPs and valid-header (CDN) traffic are unaffected.",
+											MarkdownDescription: "Optional bare host (e.g. www.example.com). When set, requests denied by origin protection are 302-redirected to https://<redirectHost> with path and query preserved, instead of receiving a 403. Allowed IPs and valid-header (CDN) traffic are unaffected.",
+										},
 									},
 									CustomType: OriginProtectionConfigType{
 										ObjectType: types.ObjectType{
@@ -5432,14 +5438,33 @@ func (t OriginProtectionConfigType) ValueFromObject(ctx context.Context, in base
 			fmt.Sprintf(`ip_allow expected to be basetypes.ListValue, was: %T`, ipAllowAttribute))
 	}
 
+	redirectHostAttribute, ok := attributes["redirect_host"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`redirect_host is missing from object`)
+
+		return nil, diags
+	}
+
+	redirectHostVal, ok := redirectHostAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`redirect_host expected to be basetypes.StringValue, was: %T`, redirectHostAttribute))
+	}
+
 	if diags.HasError() {
 		return nil, diags
 	}
 
 	return OriginProtectionConfigValue{
-		Enabled: enabledVal,
-		IpAllow: ipAllowVal,
-		state:   attr.ValueStateKnown,
+		Enabled:      enabledVal,
+		IpAllow:      ipAllowVal,
+		RedirectHost: redirectHostVal,
+		state:        attr.ValueStateKnown,
 	}, diags
 }
 
@@ -5542,14 +5567,33 @@ func NewOriginProtectionConfigValue(attributeTypes map[string]attr.Type, attribu
 			fmt.Sprintf(`ip_allow expected to be basetypes.ListValue, was: %T`, ipAllowAttribute))
 	}
 
+	redirectHostAttribute, ok := attributes["redirect_host"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`redirect_host is missing from object`)
+
+		return NewOriginProtectionConfigValueUnknown(), diags
+	}
+
+	redirectHostVal, ok := redirectHostAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`redirect_host expected to be basetypes.StringValue, was: %T`, redirectHostAttribute))
+	}
+
 	if diags.HasError() {
 		return NewOriginProtectionConfigValueUnknown(), diags
 	}
 
 	return OriginProtectionConfigValue{
-		Enabled: enabledVal,
-		IpAllow: ipAllowVal,
-		state:   attr.ValueStateKnown,
+		Enabled:      enabledVal,
+		IpAllow:      ipAllowVal,
+		RedirectHost: redirectHostVal,
+		state:        attr.ValueStateKnown,
 	}, diags
 }
 
@@ -5621,13 +5665,14 @@ func (t OriginProtectionConfigType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = OriginProtectionConfigValue{}
 
 type OriginProtectionConfigValue struct {
-	Enabled basetypes.BoolValue `tfsdk:"enabled"`
-	IpAllow basetypes.ListValue `tfsdk:"ip_allow"`
-	state   attr.ValueState
+	Enabled      basetypes.BoolValue   `tfsdk:"enabled"`
+	IpAllow      basetypes.ListValue   `tfsdk:"ip_allow"`
+	RedirectHost basetypes.StringValue `tfsdk:"redirect_host"`
+	state        attr.ValueState
 }
 
 func (v OriginProtectionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 2)
+	attrTypes := make(map[string]tftypes.Type, 3)
 
 	var val tftypes.Value
 	var err error
@@ -5636,12 +5681,13 @@ func (v OriginProtectionConfigValue) ToTerraformValue(ctx context.Context) (tfty
 	attrTypes["ip_allow"] = basetypes.ListType{
 		ElemType: types.StringType,
 	}.TerraformType(ctx)
+	attrTypes["redirect_host"] = basetypes.StringType{}.TerraformType(ctx)
 
 	objectType := tftypes.Object{AttributeTypes: attrTypes}
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 2)
+		vals := make(map[string]tftypes.Value, 3)
 
 		val, err = v.Enabled.ToTerraformValue(ctx)
 
@@ -5658,6 +5704,14 @@ func (v OriginProtectionConfigValue) ToTerraformValue(ctx context.Context) (tfty
 		}
 
 		vals["ip_allow"] = val
+
+		val, err = v.RedirectHost.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["redirect_host"] = val
 
 		if err := tftypes.ValidateValue(objectType, vals); err != nil {
 			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
@@ -5706,6 +5760,7 @@ func (v OriginProtectionConfigValue) ToObjectValue(ctx context.Context) (basetyp
 			"ip_allow": basetypes.ListType{
 				ElemType: types.StringType,
 			},
+			"redirect_host": basetypes.StringType{},
 		}), diags
 	}
 
@@ -5714,6 +5769,7 @@ func (v OriginProtectionConfigValue) ToObjectValue(ctx context.Context) (basetyp
 		"ip_allow": basetypes.ListType{
 			ElemType: types.StringType,
 		},
+		"redirect_host": basetypes.StringType{},
 	}
 
 	if v.IsNull() {
@@ -5727,8 +5783,9 @@ func (v OriginProtectionConfigValue) ToObjectValue(ctx context.Context) (basetyp
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
-			"enabled":  v.Enabled,
-			"ip_allow": ipAllowVal,
+			"enabled":       v.Enabled,
+			"ip_allow":      ipAllowVal,
+			"redirect_host": v.RedirectHost,
 		})
 
 	return objVal, diags
@@ -5757,6 +5814,10 @@ func (v OriginProtectionConfigValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.RedirectHost.Equal(other.RedirectHost) {
+		return false
+	}
+
 	return true
 }
 
@@ -5774,6 +5835,7 @@ func (v OriginProtectionConfigValue) AttributeTypes(ctx context.Context) map[str
 		"ip_allow": basetypes.ListType{
 			ElemType: types.StringType,
 		},
+		"redirect_host": basetypes.StringType{},
 	}
 }
 

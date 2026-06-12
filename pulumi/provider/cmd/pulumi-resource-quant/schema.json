@@ -372,6 +372,13 @@
                 "dailyBudgetCents": {
                     "type": "integer"
                 },
+                "interfaceLimits": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/types/quant:index/AiGovernanceSpendLimitsInterfaceLimits:AiGovernanceSpendLimitsInterfaceLimits"
+                    },
+                    "description": "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket). Keys are interface labels.\n"
+                },
                 "monthlyBudgetCents": {
                     "type": "integer"
                 },
@@ -380,6 +387,13 @@
                 },
                 "perUserMonthlyBudgetCents": {
                     "type": "integer"
+                },
+                "userOverrides": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/types/quant:index/AiGovernanceSpendLimitsUserOverrides:AiGovernanceSpendLimitsUserOverrides"
+                    },
+                    "description": "Per-user budget overrides keyed by userId (numeric portal id, slack-\u003cid\u003e, or system:code-agent). Replaces the flat per-user budget for that user; unlimited=true exempts them.\n"
                 },
                 "warningThresholdPercent": {
                     "type": "integer"
@@ -390,10 +404,54 @@
                 "nodejs": {
                     "requiredOutputs": [
                         "dailyBudgetCents",
+                        "interfaceLimits",
                         "monthlyBudgetCents",
                         "perUserDailyBudgetCents",
                         "perUserMonthlyBudgetCents",
+                        "userOverrides",
                         "warningThresholdPercent"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiGovernanceSpendLimitsInterfaceLimits:AiGovernanceSpendLimitsInterfaceLimits": {
+            "properties": {
+                "dailyCents": {
+                    "type": "integer"
+                },
+                "monthlyCents": {
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "dailyCents",
+                        "monthlyCents"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiGovernanceSpendLimitsUserOverrides:AiGovernanceSpendLimitsUserOverrides": {
+            "properties": {
+                "dailyCents": {
+                    "type": "integer"
+                },
+                "monthlyCents": {
+                    "type": "integer"
+                },
+                "unlimited": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "dailyCents",
+                        "monthlyCents",
+                        "unlimited"
                     ]
                 }
             }
@@ -903,6 +961,10 @@
                         "type": "string"
                     },
                     "description": "List of IP addresses or CIDR ranges that can bypass origin protection for direct access (e.g., VPN IPs)\n"
+                },
+                "redirectHost": {
+                    "type": "string",
+                    "description": "Optional bare host (e.g. www.example.com). When set, requests denied by origin protection are 302-redirected to https://\u003credirectHost\u003e with path and query preserved, instead of receiving a 403. Allowed IPs and valid-header (CDN) traffic are unaffected.\n"
                 }
             },
             "type": "object",
@@ -910,7 +972,8 @@
                 "nodejs": {
                     "requiredOutputs": [
                         "enabled",
-                        "ipAllows"
+                        "ipAllows",
+                        "redirectHost"
                     ]
                 }
             }
@@ -1566,6 +1629,10 @@
                         "type": "string"
                     },
                     "description": "List of IP addresses or CIDR ranges that can bypass origin protection for direct access (e.g., VPN IPs)\n"
+                },
+                "redirectHost": {
+                    "type": "string",
+                    "description": "Optional bare host (e.g. www.example.com). When set, requests denied by origin protection are 302-redirected to https://\u003credirectHost\u003e with path and query preserved, instead of receiving a 403. Allowed IPs and valid-header (CDN) traffic are unaffected.\n"
                 }
             },
             "type": "object",
@@ -1573,7 +1640,8 @@
                 "nodejs": {
                     "requiredOutputs": [
                         "enabled",
-                        "ipAllows"
+                        "ipAllows",
+                        "redirectHost"
                     ]
                 }
             }

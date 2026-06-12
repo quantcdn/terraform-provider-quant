@@ -229,6 +229,16 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		if !sl.WarningThresholdPercent.IsNull() && !sl.WarningThresholdPercent.IsUnknown() {
 			sdkSL.SetWarningThresholdPercent(int32(sl.WarningThresholdPercent.ValueInt64()))
 		}
+		if !sl.InterfaceLimits.IsNull() && !sl.InterfaceLimits.IsUnknown() {
+			ilSDK, d := interfaceLimitsToSDK(ctx, sl.InterfaceLimits)
+			diags.Append(d...)
+			sdkSL.SetInterfaceLimits(ilSDK)
+		}
+		if !sl.UserOverrides.IsNull() && !sl.UserOverrides.IsUnknown() {
+			uoSDK, d := userOverridesToSDK(ctx, sl.UserOverrides)
+			diags.Append(d...)
+			sdkSL.SetUserOverrides(uoSDK)
+		}
 		sdkReq.SetSpendLimits(*sdkSL)
 	}
 
@@ -330,6 +340,10 @@ func mapGovernanceGetResponse(ctx context.Context, resp *quantadmingo.GetGoverna
 
 	// spend_limits — construct SpendLimitsValue via NewSpendLimitsValue.
 	if slPtr, ok := resp.GetSpendLimitsOk(); ok && slPtr != nil {
+		ilTF, ild := interfaceLimitsToTF(ctx, slPtr.GetInterfaceLimits())
+		diags.Append(ild...)
+		uoTF, uod := userOverridesToTF(ctx, slPtr.GetUserOverrides())
+		diags.Append(uod...)
 		slAttrTypes := resource_ai_governance.SpendLimitsValue{}.AttributeTypes(ctx)
 		slAttrs := map[string]attr.Value{
 			"monthly_budget_cents":          nullableInt32ToInt64(slPtr.MonthlyBudgetCents),
@@ -337,6 +351,8 @@ func mapGovernanceGetResponse(ctx context.Context, resp *quantadmingo.GetGoverna
 			"per_user_monthly_budget_cents": nullableInt32ToInt64(slPtr.PerUserMonthlyBudgetCents),
 			"per_user_daily_budget_cents":   nullableInt32ToInt64(slPtr.PerUserDailyBudgetCents),
 			"warning_threshold_percent":     nullableInt32ToInt64(slPtr.WarningThresholdPercent),
+			"interface_limits":              ilTF,
+			"user_overrides":                uoTF,
 		}
 		slVal, d := resource_ai_governance.NewSpendLimitsValue(slAttrTypes, slAttrs)
 		diags.Append(d...)
@@ -429,6 +445,10 @@ func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interf
 	// spend_limits — construct SpendLimitsValue via NewSpendLimitsValue.
 	if v, ok := configMap["spendLimits"]; ok && v != nil {
 		if slMap, ok := v.(map[string]interface{}); ok && len(slMap) > 0 {
+			ilTF, ild := interfaceLimitsFromRawMap(ctx, slMap["interfaceLimits"])
+			diags.Append(ild...)
+			uoTF, uod := userOverridesFromRawMap(ctx, slMap["userOverrides"])
+			diags.Append(uod...)
 			slAttrTypes := resource_ai_governance.SpendLimitsValue{}.AttributeTypes(ctx)
 			slAttrs := map[string]attr.Value{
 				"monthly_budget_cents":          optionalInt64FromMap(slMap, "monthlyBudgetCents"),
@@ -436,6 +456,8 @@ func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interf
 				"per_user_monthly_budget_cents": optionalInt64FromMap(slMap, "perUserMonthlyBudgetCents"),
 				"per_user_daily_budget_cents":   optionalInt64FromMap(slMap, "perUserDailyBudgetCents"),
 				"warning_threshold_percent":     optionalInt64FromMap(slMap, "warningThresholdPercent"),
+				"interface_limits":              ilTF,
+				"user_overrides":                uoTF,
 			}
 			slVal, d := resource_ai_governance.NewSpendLimitsValue(slAttrTypes, slAttrs)
 			diags.Append(d...)
