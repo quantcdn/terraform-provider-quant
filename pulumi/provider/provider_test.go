@@ -352,6 +352,65 @@ resources:
 `)
 }
 
+// Exercises the v4.19.0 governance spend-limit maps end-to-end through the
+// Pulumi schema + bridge: interface_limits (per-interface caps) and
+// user_overrides (named per-user caps incl. unlimited).
+func TestPreview_AiGovernanceSpendLimits(t *testing.T) {
+	previewProgram(t, "test-ai-governance", `
+name: test-ai-governance
+runtime: yaml
+resources:
+  testGov:
+    type: quant:index:AiGovernance
+    properties:
+      organisation: preview-test-org
+      aiEnabled: true
+      modelPolicy: blocklist
+      spendLimits:
+        monthlyBudgetCents: 1000000
+        interfaceLimits:
+          slack:
+            dailyCents: 5000
+            monthlyCents: 100000
+          autonomous:
+            monthlyCents: 250000
+        userOverrides:
+          "1234":
+            dailyCents: 20000
+            monthlyCents: 400000
+          "5678":
+            unlimited: true
+`)
+}
+
+// Exercises the v4.19.0 origin_protection_config.redirect_host on an application
+// container through the Pulumi schema + bridge.
+func TestPreview_ApplicationOriginProtectionRedirect(t *testing.T) {
+	previewProgram(t, "test-app-origin-redirect", `
+name: test-app-origin-redirect
+runtime: yaml
+resources:
+  testApp:
+    type: quant:index:Application
+    properties:
+      appName: preview-test-app-opc
+      application: preview-test-app-opc
+      composeDefinition:
+        containers:
+          - name: web
+            imageReference:
+              type: external
+              identifier: nginx:latest
+            cpu: 256
+            memory: 512
+            originProtectionConfig:
+              enabled: true
+              redirectHost: www.example.com
+              ipAllows:
+                - 10.0.0.0/8
+`)
+}
+
 func TestPreview_Volume(t *testing.T) {
 	previewProgram(t, "test-volume", `
 name: test-volume
