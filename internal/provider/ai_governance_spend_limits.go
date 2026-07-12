@@ -58,6 +58,31 @@ func userOverridesToSDK(ctx context.Context, m types.Map) (map[string]quantadmin
 	return out, diags
 }
 
+// tokenOverridesToSDK converts the Terraform token_overrides map into the SDK
+// map for a governance write. The SDK reuses the user-override value type for
+// token overrides (identical schema, deduplicated by the generator). The caller
+// guards against null/unknown.
+func tokenOverridesToSDK(ctx context.Context, m types.Map) (map[string]quantadmingo.GetGovernanceConfig200ResponseSpendLimitsUserOverridesValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	elems := map[string]resource_ai_governance.TokenOverridesValue{}
+	diags.Append(m.ElementsAs(ctx, &elems, false)...)
+	out := make(map[string]quantadmingo.GetGovernanceConfig200ResponseSpendLimitsUserOverridesValue, len(elems))
+	for label, to := range elems {
+		v := quantadmingo.NewGetGovernanceConfig200ResponseSpendLimitsUserOverridesValue()
+		if !to.DailyCents.IsNull() && !to.DailyCents.IsUnknown() {
+			v.SetDailyCents(int32(to.DailyCents.ValueInt64()))
+		}
+		if !to.MonthlyCents.IsNull() && !to.MonthlyCents.IsUnknown() {
+			v.SetMonthlyCents(int32(to.MonthlyCents.ValueInt64()))
+		}
+		if !to.Unlimited.IsNull() && !to.Unlimited.IsUnknown() {
+			v.SetUnlimited(to.Unlimited.ValueBool())
+		}
+		out[label] = *v
+	}
+	return out, diags
+}
+
 // interfaceLimitsToTF builds the Terraform interface_limits map from the typed
 // SDK response (Read / ImportState path).
 func interfaceLimitsToTF(ctx context.Context, sdkMap map[string]quantadmingo.GetGovernanceConfig200ResponseSpendLimitsInterfaceLimitsValue) (types.Map, diag.Diagnostics) {
@@ -96,6 +121,30 @@ func userOverridesToTF(ctx context.Context, sdkMap map[string]quantadmingo.GetGo
 			"daily_cents":   nullableInt32ToInt64(uo.DailyCents),
 			"monthly_cents": nullableInt32ToInt64(uo.MonthlyCents),
 			"unlimited":     nullableBoolToBool(uo.Unlimited),
+		})
+		diags.Append(d...)
+		elems[label] = v
+	}
+	out, d := types.MapValue(elemType, elems)
+	diags.Append(d...)
+	return out, diags
+}
+
+// tokenOverridesToTF builds the Terraform token_overrides map from the typed
+// SDK response (Read / ImportState path).
+func tokenOverridesToTF(ctx context.Context, sdkMap map[string]quantadmingo.GetGovernanceConfig200ResponseSpendLimitsUserOverridesValue) (types.Map, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	elemType := resource_ai_governance.TokenOverridesValue{}.Type(ctx)
+	if len(sdkMap) == 0 {
+		return types.MapNull(elemType), diags
+	}
+	attrTypes := resource_ai_governance.TokenOverridesValue{}.AttributeTypes(ctx)
+	elems := make(map[string]attr.Value, len(sdkMap))
+	for label, to := range sdkMap {
+		v, d := resource_ai_governance.NewTokenOverridesValue(attrTypes, map[string]attr.Value{
+			"daily_cents":   nullableInt32ToInt64(to.DailyCents),
+			"monthly_cents": nullableInt32ToInt64(to.MonthlyCents),
+			"unlimited":     nullableBoolToBool(to.Unlimited),
 		})
 		diags.Append(d...)
 		elems[label] = v
@@ -144,6 +193,32 @@ func userOverridesFromRawMap(ctx context.Context, raw interface{}) (types.Map, d
 	for label, rv := range m {
 		entry, _ := rv.(map[string]interface{})
 		v, d := resource_ai_governance.NewUserOverridesValue(attrTypes, map[string]attr.Value{
+			"daily_cents":   optionalInt64FromMap(entry, "dailyCents"),
+			"monthly_cents": optionalInt64FromMap(entry, "monthlyCents"),
+			"unlimited":     optionalBoolFromMap(entry, "unlimited"),
+		})
+		diags.Append(d...)
+		elems[label] = v
+	}
+	out, d := types.MapValue(elemType, elems)
+	diags.Append(d...)
+	return out, diags
+}
+
+// tokenOverridesFromRawMap builds the Terraform token_overrides map from the
+// raw config map returned by the PUT (UpdateGovernanceConfig) response.
+func tokenOverridesFromRawMap(ctx context.Context, raw interface{}) (types.Map, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	elemType := resource_ai_governance.TokenOverridesValue{}.Type(ctx)
+	m, ok := raw.(map[string]interface{})
+	if !ok || len(m) == 0 {
+		return types.MapNull(elemType), diags
+	}
+	attrTypes := resource_ai_governance.TokenOverridesValue{}.AttributeTypes(ctx)
+	elems := make(map[string]attr.Value, len(m))
+	for label, rv := range m {
+		entry, _ := rv.(map[string]interface{})
+		v, d := resource_ai_governance.NewTokenOverridesValue(attrTypes, map[string]attr.Value{
 			"daily_cents":   optionalInt64FromMap(entry, "dailyCents"),
 			"monthly_cents": optionalInt64FromMap(entry, "monthlyCents"),
 			"unlimited":     optionalBoolFromMap(entry, "unlimited"),

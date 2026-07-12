@@ -226,6 +226,12 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 		if !sl.PerUserDailyBudgetCents.IsNull() && !sl.PerUserDailyBudgetCents.IsUnknown() {
 			sdkSL.SetPerUserDailyBudgetCents(int32(sl.PerUserDailyBudgetCents.ValueInt64()))
 		}
+		if !sl.PerTokenMonthlyBudgetCents.IsNull() && !sl.PerTokenMonthlyBudgetCents.IsUnknown() {
+			sdkSL.SetPerTokenMonthlyBudgetCents(int32(sl.PerTokenMonthlyBudgetCents.ValueInt64()))
+		}
+		if !sl.PerTokenDailyBudgetCents.IsNull() && !sl.PerTokenDailyBudgetCents.IsUnknown() {
+			sdkSL.SetPerTokenDailyBudgetCents(int32(sl.PerTokenDailyBudgetCents.ValueInt64()))
+		}
 		if !sl.WarningThresholdPercent.IsNull() && !sl.WarningThresholdPercent.IsUnknown() {
 			sdkSL.SetWarningThresholdPercent(int32(sl.WarningThresholdPercent.ValueInt64()))
 		}
@@ -238,6 +244,11 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 			uoSDK, d := userOverridesToSDK(ctx, sl.UserOverrides)
 			diags.Append(d...)
 			sdkSL.SetUserOverrides(uoSDK)
+		}
+		if !sl.TokenOverrides.IsNull() && !sl.TokenOverrides.IsUnknown() {
+			toSDK, d := tokenOverridesToSDK(ctx, sl.TokenOverrides)
+			diags.Append(d...)
+			sdkSL.SetTokenOverrides(toSDK)
 		}
 		sdkReq.SetSpendLimits(*sdkSL)
 	}
@@ -344,15 +355,20 @@ func mapGovernanceGetResponse(ctx context.Context, resp *quantadmingo.GetGoverna
 		diags.Append(ild...)
 		uoTF, uod := userOverridesToTF(ctx, slPtr.GetUserOverrides())
 		diags.Append(uod...)
+		toTF, tod := tokenOverridesToTF(ctx, slPtr.GetTokenOverrides())
+		diags.Append(tod...)
 		slAttrTypes := resource_ai_governance.SpendLimitsValue{}.AttributeTypes(ctx)
 		slAttrs := map[string]attr.Value{
-			"monthly_budget_cents":          nullableInt32ToInt64(slPtr.MonthlyBudgetCents),
-			"daily_budget_cents":            nullableInt32ToInt64(slPtr.DailyBudgetCents),
-			"per_user_monthly_budget_cents": nullableInt32ToInt64(slPtr.PerUserMonthlyBudgetCents),
-			"per_user_daily_budget_cents":   nullableInt32ToInt64(slPtr.PerUserDailyBudgetCents),
-			"warning_threshold_percent":     nullableInt32ToInt64(slPtr.WarningThresholdPercent),
-			"interface_limits":              ilTF,
-			"user_overrides":                uoTF,
+			"monthly_budget_cents":           nullableInt32ToInt64(slPtr.MonthlyBudgetCents),
+			"daily_budget_cents":             nullableInt32ToInt64(slPtr.DailyBudgetCents),
+			"per_user_monthly_budget_cents":  nullableInt32ToInt64(slPtr.PerUserMonthlyBudgetCents),
+			"per_user_daily_budget_cents":    nullableInt32ToInt64(slPtr.PerUserDailyBudgetCents),
+			"per_token_monthly_budget_cents": nullableInt32ToInt64(slPtr.PerTokenMonthlyBudgetCents),
+			"per_token_daily_budget_cents":   nullableInt32ToInt64(slPtr.PerTokenDailyBudgetCents),
+			"warning_threshold_percent":      nullableInt32ToInt64(slPtr.WarningThresholdPercent),
+			"interface_limits":               ilTF,
+			"user_overrides":                 uoTF,
+			"token_overrides":                toTF,
 		}
 		slVal, d := resource_ai_governance.NewSpendLimitsValue(slAttrTypes, slAttrs)
 		diags.Append(d...)
@@ -449,15 +465,20 @@ func mapGovernanceConfigFromMap(ctx context.Context, configMap map[string]interf
 			diags.Append(ild...)
 			uoTF, uod := userOverridesFromRawMap(ctx, slMap["userOverrides"])
 			diags.Append(uod...)
+			toTF, tod := tokenOverridesFromRawMap(ctx, slMap["tokenOverrides"])
+			diags.Append(tod...)
 			slAttrTypes := resource_ai_governance.SpendLimitsValue{}.AttributeTypes(ctx)
 			slAttrs := map[string]attr.Value{
-				"monthly_budget_cents":          optionalInt64FromMap(slMap, "monthlyBudgetCents"),
-				"daily_budget_cents":            optionalInt64FromMap(slMap, "dailyBudgetCents"),
-				"per_user_monthly_budget_cents": optionalInt64FromMap(slMap, "perUserMonthlyBudgetCents"),
-				"per_user_daily_budget_cents":   optionalInt64FromMap(slMap, "perUserDailyBudgetCents"),
-				"warning_threshold_percent":     optionalInt64FromMap(slMap, "warningThresholdPercent"),
-				"interface_limits":              ilTF,
-				"user_overrides":                uoTF,
+				"monthly_budget_cents":           optionalInt64FromMap(slMap, "monthlyBudgetCents"),
+				"daily_budget_cents":             optionalInt64FromMap(slMap, "dailyBudgetCents"),
+				"per_user_monthly_budget_cents":  optionalInt64FromMap(slMap, "perUserMonthlyBudgetCents"),
+				"per_user_daily_budget_cents":    optionalInt64FromMap(slMap, "perUserDailyBudgetCents"),
+				"per_token_monthly_budget_cents": optionalInt64FromMap(slMap, "perTokenMonthlyBudgetCents"),
+				"per_token_daily_budget_cents":   optionalInt64FromMap(slMap, "perTokenDailyBudgetCents"),
+				"warning_threshold_percent":      optionalInt64FromMap(slMap, "warningThresholdPercent"),
+				"interface_limits":               ilTF,
+				"user_overrides":                 uoTF,
+				"token_overrides":                toTF,
 			}
 			slVal, d := resource_ai_governance.NewSpendLimitsValue(slAttrTypes, slAttrs)
 			diags.Append(d...)
