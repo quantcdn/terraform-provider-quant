@@ -170,3 +170,95 @@ func TestSpendLimitsMapsNullWhenEmpty(t *testing.T) {
 		t.Fatalf("interfaceLimitsFromRawMap(nil): %v", diags)
 	}
 }
+
+// TestTokenOverridesRoundTrip covers the typed SDK ↔ Terraform conversion for
+// token_overrides (API v4.20.0). The SDK reuses the user-override value type.
+func TestTokenOverridesRoundTrip(t *testing.T) {
+	ctx := context.Background()
+
+	sdkIn := map[string]quantadmingo.GetGovernanceConfig200ResponseSpendLimitsUserOverridesValue{}
+	capped := quantadmingo.NewGetGovernanceConfig200ResponseSpendLimitsUserOverridesValue()
+	capped.SetDailyCents(500)
+	capped.SetMonthlyCents(50000)
+	sdkIn["42"] = *capped
+	unlimited := quantadmingo.NewGetGovernanceConfig200ResponseSpendLimitsUserOverridesValue()
+	unlimited.SetUnlimited(true)
+	sdkIn["legacy-shared"] = *unlimited
+
+	tfMap, diags := tokenOverridesToTF(ctx, sdkIn)
+	if diags.HasError() {
+		t.Fatalf("tokenOverridesToTF: %v", diags)
+	}
+	if len(tfMap.Elements()) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(tfMap.Elements()))
+	}
+
+	sdkOut, diags := tokenOverridesToSDK(ctx, tfMap)
+	if diags.HasError() {
+		t.Fatalf("tokenOverridesToSDK: %v", diags)
+	}
+	cappedOut := sdkOut["42"]
+	if got := cappedOut.GetDailyCents(); got != 500 {
+		t.Errorf("token 42 daily_cents: want 500, got %d", got)
+	}
+	if got := cappedOut.GetMonthlyCents(); got != 50000 {
+		t.Errorf("token 42 monthly_cents: want 50000, got %d", got)
+	}
+	unlimitedOut := sdkOut["legacy-shared"]
+	if !unlimitedOut.GetUnlimited() {
+		t.Error("token legacy-shared unlimited: want true")
+	}
+	if _, ok := unlimitedOut.GetMonthlyCentsOk(); ok {
+		t.Error("token legacy-shared monthly_cents should remain unset")
+	}
+}
+
+// TestTokenOverridesFromRawMap covers the PUT-response path for token
+// overrides, including the unlimited bool and JSON-number (float64) cents.
+func TestTokenOverridesFromRawMap(t *testing.T) {
+	ctx := context.Background()
+	raw := map[string]interface{}{
+		"42": map[string]interface{}{
+			"monthlyCents": float64(50000),
+		},
+		"legacy-shared": map[string]interface{}{
+			"unlimited": true,
+		},
+	}
+	tfMap, diags := tokenOverridesFromRawMap(ctx, raw)
+	if diags.HasError() {
+		t.Fatalf("tokenOverridesFromRawMap: %v", diags)
+	}
+	sdkOut, diags := tokenOverridesToSDK(ctx, tfMap)
+	if diags.HasError() {
+		t.Fatalf("tokenOverridesToSDK: %v", diags)
+	}
+	cappedOut := sdkOut["42"]
+	if got := cappedOut.GetMonthlyCents(); got != 50000 {
+		t.Errorf("token 42 monthly_cents: want 50000, got %d", got)
+	}
+	unlimitedOut := sdkOut["legacy-shared"]
+	if !unlimitedOut.GetUnlimited() {
+		t.Error("token legacy-shared unlimited: want true")
+	}
+}
+
+// TestTokenOverridesNullWhenEmpty ensures empty/absent token_overrides map to
+// a null Terraform map (not an empty one), so plans stay stable.
+func TestTokenOverridesNullWhenEmpty(t *testing.T) {
+	ctx := context.Background()
+	to, diags := tokenOverridesToTF(ctx, nil)
+	if diags.HasError() {
+		t.Fatalf("tokenOverridesToTF(nil): %v", diags)
+	}
+	if !to.IsNull() {
+		t.Error("expected null token_overrides for empty input")
+	}
+	toRaw, diags := tokenOverridesFromRawMap(ctx, nil)
+	if diags.HasError() {
+		t.Fatalf("tokenOverridesFromRawMap(nil): %v", diags)
+	}
+	if !toRaw.IsNull() {
+		t.Error("expected null token_overrides for nil raw input")
+	}
+}
