@@ -36,6 +36,33 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "The application ID",
 				MarkdownDescription: "The application ID",
 			},
+			"cache": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"cache_endpoint": schema.StringAttribute{
+						Computed:            true,
+						Description:         "Cache cluster endpoint",
+						MarkdownDescription: "Cache cluster endpoint",
+					},
+					"cache_identifier": schema.StringAttribute{
+						Computed:            true,
+						Description:         "Cache cluster identifier",
+						MarkdownDescription: "Cache cluster identifier",
+					},
+					"data_storage_max_gb": schema.Int64Attribute{
+						Computed:            true,
+						Description:         "Maximum cache storage in GB",
+						MarkdownDescription: "Maximum cache storage in GB",
+					},
+				},
+				CustomType: CacheType{
+					ObjectType: types.ObjectType{
+						AttrTypes: CacheValue{}.AttributeTypes(ctx),
+					},
+				},
+				Computed:            true,
+				Description:         "Managed Valkey cache configuration",
+				MarkdownDescription: "Managed Valkey cache configuration",
+			},
 			"compose_definition": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"architecture": schema.StringAttribute{
@@ -381,6 +408,12 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 						Description:         "Minimum number of instances",
 						MarkdownDescription: "Minimum number of instances",
 					},
+					"single_task_only": schema.BoolAttribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Optional. Forces single-task mode for data-safe applications (max one running task). When true: capacity is locked to 1. When false: explicitly allows scaling. When omitted: the platform auto-detects stateful containers and enables single-task mode if found.",
+						MarkdownDescription: "Optional. Forces single-task mode for data-safe applications (max one running task). When true: capacity is locked to 1. When false: explicitly allows scaling. When omitted: the platform auto-detects stateful containers and enables single-task mode if found.",
+					},
 					"spot_configuration": schema.SingleNestedAttribute{
 						Attributes: map[string]schema.Attribute{
 							"strategy": schema.StringAttribute{
@@ -408,6 +441,16 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 						Computed:            true,
 						Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
 						MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
+					},
+					"startup_grace_period_seconds": schema.Int64Attribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						MarkdownDescription: "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						Validators: []validator.Int64{
+							int64validator.Between(0, 3600),
+						},
+						Default: int64default.StaticInt64(120),
 					},
 					"task_cpu": schema.Int64Attribute{
 						Optional:            true,
@@ -669,6 +712,7 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 type ApplicationModel struct {
 	AppName               types.String           `tfsdk:"app_name"`
 	Application           types.String           `tfsdk:"application"`
+	Cache                 CacheValue             `tfsdk:"cache"`
 	ComposeDefinition     ComposeDefinitionValue `tfsdk:"compose_definition"`
 	ContainerNames        types.List             `tfsdk:"container_names"`
 	Database              DatabaseValue          `tfsdk:"database"`
@@ -683,6 +727,440 @@ type ApplicationModel struct {
 	Organisation          types.String           `tfsdk:"organisation"`
 	RunningCount          types.Int64            `tfsdk:"running_count"`
 	Status                types.String           `tfsdk:"status"`
+}
+
+var _ basetypes.ObjectTypable = CacheType{}
+
+type CacheType struct {
+	basetypes.ObjectType
+}
+
+func (t CacheType) Equal(o attr.Type) bool {
+	other, ok := o.(CacheType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t CacheType) String() string {
+	return "CacheType"
+}
+
+func (t CacheType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	cacheEndpointAttribute, ok := attributes["cache_endpoint"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`cache_endpoint is missing from object`)
+
+		return nil, diags
+	}
+
+	cacheEndpointVal, ok := cacheEndpointAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`cache_endpoint expected to be basetypes.StringValue, was: %T`, cacheEndpointAttribute))
+	}
+
+	cacheIdentifierAttribute, ok := attributes["cache_identifier"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`cache_identifier is missing from object`)
+
+		return nil, diags
+	}
+
+	cacheIdentifierVal, ok := cacheIdentifierAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`cache_identifier expected to be basetypes.StringValue, was: %T`, cacheIdentifierAttribute))
+	}
+
+	dataStorageMaxGbAttribute, ok := attributes["data_storage_max_gb"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`data_storage_max_gb is missing from object`)
+
+		return nil, diags
+	}
+
+	dataStorageMaxGbVal, ok := dataStorageMaxGbAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`data_storage_max_gb expected to be basetypes.Int64Value, was: %T`, dataStorageMaxGbAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return CacheValue{
+		CacheEndpoint:    cacheEndpointVal,
+		CacheIdentifier:  cacheIdentifierVal,
+		DataStorageMaxGb: dataStorageMaxGbVal,
+		state:            attr.ValueStateKnown,
+	}, diags
+}
+
+func NewCacheValueNull() CacheValue {
+	return CacheValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewCacheValueUnknown() CacheValue {
+	return CacheValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewCacheValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (CacheValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing CacheValue Attribute Value",
+				"While creating a CacheValue value, a missing attribute value was detected. "+
+					"A CacheValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("CacheValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid CacheValue Attribute Type",
+				"While creating a CacheValue value, an invalid attribute value was detected. "+
+					"A CacheValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("CacheValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("CacheValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra CacheValue Attribute Value",
+				"While creating a CacheValue value, an extra attribute value was detected. "+
+					"A CacheValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra CacheValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewCacheValueUnknown(), diags
+	}
+
+	cacheEndpointAttribute, ok := attributes["cache_endpoint"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`cache_endpoint is missing from object`)
+
+		return NewCacheValueUnknown(), diags
+	}
+
+	cacheEndpointVal, ok := cacheEndpointAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`cache_endpoint expected to be basetypes.StringValue, was: %T`, cacheEndpointAttribute))
+	}
+
+	cacheIdentifierAttribute, ok := attributes["cache_identifier"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`cache_identifier is missing from object`)
+
+		return NewCacheValueUnknown(), diags
+	}
+
+	cacheIdentifierVal, ok := cacheIdentifierAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`cache_identifier expected to be basetypes.StringValue, was: %T`, cacheIdentifierAttribute))
+	}
+
+	dataStorageMaxGbAttribute, ok := attributes["data_storage_max_gb"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`data_storage_max_gb is missing from object`)
+
+		return NewCacheValueUnknown(), diags
+	}
+
+	dataStorageMaxGbVal, ok := dataStorageMaxGbAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`data_storage_max_gb expected to be basetypes.Int64Value, was: %T`, dataStorageMaxGbAttribute))
+	}
+
+	if diags.HasError() {
+		return NewCacheValueUnknown(), diags
+	}
+
+	return CacheValue{
+		CacheEndpoint:    cacheEndpointVal,
+		CacheIdentifier:  cacheIdentifierVal,
+		DataStorageMaxGb: dataStorageMaxGbVal,
+		state:            attr.ValueStateKnown,
+	}, diags
+}
+
+func NewCacheValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) CacheValue {
+	object, diags := NewCacheValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewCacheValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t CacheType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewCacheValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewCacheValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewCacheValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewCacheValueMust(CacheValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t CacheType) ValueType(ctx context.Context) attr.Value {
+	return CacheValue{}
+}
+
+var _ basetypes.ObjectValuable = CacheValue{}
+
+type CacheValue struct {
+	CacheEndpoint    basetypes.StringValue `tfsdk:"cache_endpoint"`
+	CacheIdentifier  basetypes.StringValue `tfsdk:"cache_identifier"`
+	DataStorageMaxGb basetypes.Int64Value  `tfsdk:"data_storage_max_gb"`
+	state            attr.ValueState
+}
+
+func (v CacheValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["cache_endpoint"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["cache_identifier"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["data_storage_max_gb"] = basetypes.Int64Type{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.CacheEndpoint.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["cache_endpoint"] = val
+
+		val, err = v.CacheIdentifier.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["cache_identifier"] = val
+
+		val, err = v.DataStorageMaxGb.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["data_storage_max_gb"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v CacheValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v CacheValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v CacheValue) String() string {
+	return "CacheValue"
+}
+
+func (v CacheValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"cache_endpoint":      basetypes.StringType{},
+		"cache_identifier":    basetypes.StringType{},
+		"data_storage_max_gb": basetypes.Int64Type{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"cache_endpoint":      v.CacheEndpoint,
+			"cache_identifier":    v.CacheIdentifier,
+			"data_storage_max_gb": v.DataStorageMaxGb,
+		})
+
+	return objVal, diags
+}
+
+func (v CacheValue) Equal(o attr.Value) bool {
+	other, ok := o.(CacheValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.CacheEndpoint.Equal(other.CacheEndpoint) {
+		return false
+	}
+
+	if !v.CacheIdentifier.Equal(other.CacheIdentifier) {
+		return false
+	}
+
+	if !v.DataStorageMaxGb.Equal(other.DataStorageMaxGb) {
+		return false
+	}
+
+	return true
+}
+
+func (v CacheValue) Type(ctx context.Context) attr.Type {
+	return CacheType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v CacheValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"cache_endpoint":      basetypes.StringType{},
+		"cache_identifier":    basetypes.StringType{},
+		"data_storage_max_gb": basetypes.Int64Type{},
+	}
 }
 
 var _ basetypes.ObjectTypable = ComposeDefinitionType{}
@@ -818,6 +1296,24 @@ func (t ComposeDefinitionType) ValueFromObject(ctx context.Context, in basetypes
 			fmt.Sprintf(`min_capacity expected to be basetypes.Int64Value, was: %T`, minCapacityAttribute))
 	}
 
+	singleTaskOnlyAttribute, ok := attributes["single_task_only"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`single_task_only is missing from object`)
+
+		return nil, diags
+	}
+
+	singleTaskOnlyVal, ok := singleTaskOnlyAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`single_task_only expected to be basetypes.BoolValue, was: %T`, singleTaskOnlyAttribute))
+	}
+
 	spotConfigurationAttribute, ok := attributes["spot_configuration"]
 
 	if !ok {
@@ -834,6 +1330,24 @@ func (t ComposeDefinitionType) ValueFromObject(ctx context.Context, in basetypes
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`spot_configuration expected to be basetypes.ObjectValue, was: %T`, spotConfigurationAttribute))
+	}
+
+	startupGracePeriodSecondsAttribute, ok := attributes["startup_grace_period_seconds"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`startup_grace_period_seconds is missing from object`)
+
+		return nil, diags
+	}
+
+	startupGracePeriodSecondsVal, ok := startupGracePeriodSecondsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`startup_grace_period_seconds expected to be basetypes.Int64Value, was: %T`, startupGracePeriodSecondsAttribute))
 	}
 
 	taskCpuAttribute, ok := attributes["task_cpu"]
@@ -877,16 +1391,18 @@ func (t ComposeDefinitionType) ValueFromObject(ctx context.Context, in basetypes
 	}
 
 	return ComposeDefinitionValue{
-		Architecture:             architectureVal,
-		Containers:               containersVal,
-		EnableCrossAppNetworking: enableCrossAppNetworkingVal,
-		EnableCrossEnvNetworking: enableCrossEnvNetworkingVal,
-		MaxCapacity:              maxCapacityVal,
-		MinCapacity:              minCapacityVal,
-		SpotConfiguration:        spotConfigurationVal,
-		TaskCpu:                  taskCpuVal,
-		TaskMemory:               taskMemoryVal,
-		state:                    attr.ValueStateKnown,
+		Architecture:              architectureVal,
+		Containers:                containersVal,
+		EnableCrossAppNetworking:  enableCrossAppNetworkingVal,
+		EnableCrossEnvNetworking:  enableCrossEnvNetworkingVal,
+		MaxCapacity:               maxCapacityVal,
+		MinCapacity:               minCapacityVal,
+		SingleTaskOnly:            singleTaskOnlyVal,
+		SpotConfiguration:         spotConfigurationVal,
+		StartupGracePeriodSeconds: startupGracePeriodSecondsVal,
+		TaskCpu:                   taskCpuVal,
+		TaskMemory:                taskMemoryVal,
+		state:                     attr.ValueStateKnown,
 	}, diags
 }
 
@@ -1061,6 +1577,24 @@ func NewComposeDefinitionValue(attributeTypes map[string]attr.Type, attributes m
 			fmt.Sprintf(`min_capacity expected to be basetypes.Int64Value, was: %T`, minCapacityAttribute))
 	}
 
+	singleTaskOnlyAttribute, ok := attributes["single_task_only"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`single_task_only is missing from object`)
+
+		return NewComposeDefinitionValueUnknown(), diags
+	}
+
+	singleTaskOnlyVal, ok := singleTaskOnlyAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`single_task_only expected to be basetypes.BoolValue, was: %T`, singleTaskOnlyAttribute))
+	}
+
 	spotConfigurationAttribute, ok := attributes["spot_configuration"]
 
 	if !ok {
@@ -1077,6 +1611,24 @@ func NewComposeDefinitionValue(attributeTypes map[string]attr.Type, attributes m
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`spot_configuration expected to be basetypes.ObjectValue, was: %T`, spotConfigurationAttribute))
+	}
+
+	startupGracePeriodSecondsAttribute, ok := attributes["startup_grace_period_seconds"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`startup_grace_period_seconds is missing from object`)
+
+		return NewComposeDefinitionValueUnknown(), diags
+	}
+
+	startupGracePeriodSecondsVal, ok := startupGracePeriodSecondsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`startup_grace_period_seconds expected to be basetypes.Int64Value, was: %T`, startupGracePeriodSecondsAttribute))
 	}
 
 	taskCpuAttribute, ok := attributes["task_cpu"]
@@ -1120,16 +1672,18 @@ func NewComposeDefinitionValue(attributeTypes map[string]attr.Type, attributes m
 	}
 
 	return ComposeDefinitionValue{
-		Architecture:             architectureVal,
-		Containers:               containersVal,
-		EnableCrossAppNetworking: enableCrossAppNetworkingVal,
-		EnableCrossEnvNetworking: enableCrossEnvNetworkingVal,
-		MaxCapacity:              maxCapacityVal,
-		MinCapacity:              minCapacityVal,
-		SpotConfiguration:        spotConfigurationVal,
-		TaskCpu:                  taskCpuVal,
-		TaskMemory:               taskMemoryVal,
-		state:                    attr.ValueStateKnown,
+		Architecture:              architectureVal,
+		Containers:                containersVal,
+		EnableCrossAppNetworking:  enableCrossAppNetworkingVal,
+		EnableCrossEnvNetworking:  enableCrossEnvNetworkingVal,
+		MaxCapacity:               maxCapacityVal,
+		MinCapacity:               minCapacityVal,
+		SingleTaskOnly:            singleTaskOnlyVal,
+		SpotConfiguration:         spotConfigurationVal,
+		StartupGracePeriodSeconds: startupGracePeriodSecondsVal,
+		TaskCpu:                   taskCpuVal,
+		TaskMemory:                taskMemoryVal,
+		state:                     attr.ValueStateKnown,
 	}, diags
 }
 
@@ -1201,20 +1755,22 @@ func (t ComposeDefinitionType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = ComposeDefinitionValue{}
 
 type ComposeDefinitionValue struct {
-	Architecture             basetypes.StringValue `tfsdk:"architecture"`
-	Containers               basetypes.ListValue   `tfsdk:"containers"`
-	EnableCrossAppNetworking basetypes.BoolValue   `tfsdk:"enable_cross_app_networking"`
-	EnableCrossEnvNetworking basetypes.BoolValue   `tfsdk:"enable_cross_env_networking"`
-	MaxCapacity              basetypes.Int64Value  `tfsdk:"max_capacity"`
-	MinCapacity              basetypes.Int64Value  `tfsdk:"min_capacity"`
-	SpotConfiguration        basetypes.ObjectValue `tfsdk:"spot_configuration"`
-	TaskCpu                  basetypes.Int64Value  `tfsdk:"task_cpu"`
-	TaskMemory               basetypes.Int64Value  `tfsdk:"task_memory"`
-	state                    attr.ValueState
+	Architecture              basetypes.StringValue `tfsdk:"architecture"`
+	Containers                basetypes.ListValue   `tfsdk:"containers"`
+	EnableCrossAppNetworking  basetypes.BoolValue   `tfsdk:"enable_cross_app_networking"`
+	EnableCrossEnvNetworking  basetypes.BoolValue   `tfsdk:"enable_cross_env_networking"`
+	MaxCapacity               basetypes.Int64Value  `tfsdk:"max_capacity"`
+	MinCapacity               basetypes.Int64Value  `tfsdk:"min_capacity"`
+	SingleTaskOnly            basetypes.BoolValue   `tfsdk:"single_task_only"`
+	SpotConfiguration         basetypes.ObjectValue `tfsdk:"spot_configuration"`
+	StartupGracePeriodSeconds basetypes.Int64Value  `tfsdk:"startup_grace_period_seconds"`
+	TaskCpu                   basetypes.Int64Value  `tfsdk:"task_cpu"`
+	TaskMemory                basetypes.Int64Value  `tfsdk:"task_memory"`
+	state                     attr.ValueState
 }
 
 func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 9)
+	attrTypes := make(map[string]tftypes.Type, 11)
 
 	var val tftypes.Value
 	var err error
@@ -1227,9 +1783,11 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 	attrTypes["enable_cross_env_networking"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["max_capacity"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["min_capacity"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["single_task_only"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["spot_configuration"] = basetypes.ObjectType{
 		AttrTypes: SpotConfigurationValue{}.AttributeTypes(ctx),
 	}.TerraformType(ctx)
+	attrTypes["startup_grace_period_seconds"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["task_cpu"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["task_memory"] = basetypes.Int64Type{}.TerraformType(ctx)
 
@@ -1237,7 +1795,7 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 9)
+		vals := make(map[string]tftypes.Value, 11)
 
 		val, err = v.Architecture.ToTerraformValue(ctx)
 
@@ -1287,6 +1845,14 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 
 		vals["min_capacity"] = val
 
+		val, err = v.SingleTaskOnly.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["single_task_only"] = val
+
 		val, err = v.SpotConfiguration.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -1294,6 +1860,14 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 		}
 
 		vals["spot_configuration"] = val
+
+		val, err = v.StartupGracePeriodSeconds.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["startup_grace_period_seconds"] = val
 
 		val, err = v.TaskCpu.ToTerraformValue(ctx)
 
@@ -1399,11 +1973,13 @@ func (v ComposeDefinitionValue) ToObjectValue(ctx context.Context) (basetypes.Ob
 		"enable_cross_env_networking": basetypes.BoolType{},
 		"max_capacity":                basetypes.Int64Type{},
 		"min_capacity":                basetypes.Int64Type{},
+		"single_task_only":            basetypes.BoolType{},
 		"spot_configuration": basetypes.ObjectType{
 			AttrTypes: SpotConfigurationValue{}.AttributeTypes(ctx),
 		},
-		"task_cpu":    basetypes.Int64Type{},
-		"task_memory": basetypes.Int64Type{},
+		"startup_grace_period_seconds": basetypes.Int64Type{},
+		"task_cpu":                     basetypes.Int64Type{},
+		"task_memory":                  basetypes.Int64Type{},
 	}
 
 	if v.IsNull() {
@@ -1417,15 +1993,17 @@ func (v ComposeDefinitionValue) ToObjectValue(ctx context.Context) (basetypes.Ob
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
-			"architecture":                v.Architecture,
-			"containers":                  containers,
-			"enable_cross_app_networking": v.EnableCrossAppNetworking,
-			"enable_cross_env_networking": v.EnableCrossEnvNetworking,
-			"max_capacity":                v.MaxCapacity,
-			"min_capacity":                v.MinCapacity,
-			"spot_configuration":          spotConfiguration,
-			"task_cpu":                    v.TaskCpu,
-			"task_memory":                 v.TaskMemory,
+			"architecture":                 v.Architecture,
+			"containers":                   containers,
+			"enable_cross_app_networking":  v.EnableCrossAppNetworking,
+			"enable_cross_env_networking":  v.EnableCrossEnvNetworking,
+			"max_capacity":                 v.MaxCapacity,
+			"min_capacity":                 v.MinCapacity,
+			"single_task_only":             v.SingleTaskOnly,
+			"spot_configuration":           spotConfiguration,
+			"startup_grace_period_seconds": v.StartupGracePeriodSeconds,
+			"task_cpu":                     v.TaskCpu,
+			"task_memory":                  v.TaskMemory,
 		})
 
 	return objVal, diags
@@ -1470,7 +2048,15 @@ func (v ComposeDefinitionValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.SingleTaskOnly.Equal(other.SingleTaskOnly) {
+		return false
+	}
+
 	if !v.SpotConfiguration.Equal(other.SpotConfiguration) {
+		return false
+	}
+
+	if !v.StartupGracePeriodSeconds.Equal(other.StartupGracePeriodSeconds) {
 		return false
 	}
 
@@ -1503,11 +2089,13 @@ func (v ComposeDefinitionValue) AttributeTypes(ctx context.Context) map[string]a
 		"enable_cross_env_networking": basetypes.BoolType{},
 		"max_capacity":                basetypes.Int64Type{},
 		"min_capacity":                basetypes.Int64Type{},
+		"single_task_only":            basetypes.BoolType{},
 		"spot_configuration": basetypes.ObjectType{
 			AttrTypes: SpotConfigurationValue{}.AttributeTypes(ctx),
 		},
-		"task_cpu":    basetypes.Int64Type{},
-		"task_memory": basetypes.Int64Type{},
+		"startup_grace_period_seconds": basetypes.Int64Type{},
+		"task_cpu":                     basetypes.Int64Type{},
+		"task_memory":                  basetypes.Int64Type{},
 	}
 }
 

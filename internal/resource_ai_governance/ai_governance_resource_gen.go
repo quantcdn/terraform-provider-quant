@@ -105,6 +105,18 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 						Optional: true,
 						Computed: true,
 					},
+					"per_token_daily_budget_cents": schema.Int64Attribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Flat daily cap in cents applied to every API token without a named override",
+						MarkdownDescription: "Flat daily cap in cents applied to every API token without a named override",
+					},
+					"per_token_monthly_budget_cents": schema.Int64Attribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Flat monthly cap in cents applied to every API token without a named override",
+						MarkdownDescription: "Flat monthly cap in cents applied to every API token without a named override",
+					},
 					"per_user_daily_budget_cents": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
@@ -112,6 +124,33 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 					"per_user_monthly_budget_cents": schema.Int64Attribute{
 						Optional: true,
 						Computed: true,
+					},
+					"token_overrides": schema.MapNestedAttribute{
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"daily_cents": schema.Int64Attribute{
+									Optional: true,
+									Computed: true,
+								},
+								"monthly_cents": schema.Int64Attribute{
+									Optional: true,
+									Computed: true,
+								},
+								"unlimited": schema.BoolAttribute{
+									Optional: true,
+									Computed: true,
+								},
+							},
+							CustomType: TokenOverridesType{
+								ObjectType: types.ObjectType{
+									AttrTypes: TokenOverridesValue{}.AttributeTypes(ctx),
+								},
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "Per-token budget overrides keyed by API token id. Replaces the flat per-token budget for that token; unlimited=true exempts it.",
+						MarkdownDescription: "Per-token budget overrides keyed by API token id. Replaces the flat per-token budget for that token; unlimited=true exempts it.",
 					},
 					"user_overrides": schema.MapNestedAttribute{
 						NestedObject: schema.NestedAttributeObject{
@@ -517,6 +556,42 @@ func (t SpendLimitsType) ValueFromObject(ctx context.Context, in basetypes.Objec
 			fmt.Sprintf(`monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, monthlyBudgetCentsAttribute))
 	}
 
+	perTokenDailyBudgetCentsAttribute, ok := attributes["per_token_daily_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_token_daily_budget_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	perTokenDailyBudgetCentsVal, ok := perTokenDailyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_token_daily_budget_cents expected to be basetypes.Int64Value, was: %T`, perTokenDailyBudgetCentsAttribute))
+	}
+
+	perTokenMonthlyBudgetCentsAttribute, ok := attributes["per_token_monthly_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_token_monthly_budget_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	perTokenMonthlyBudgetCentsVal, ok := perTokenMonthlyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_token_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perTokenMonthlyBudgetCentsAttribute))
+	}
+
 	perUserDailyBudgetCentsAttribute, ok := attributes["per_user_daily_budget_cents"]
 
 	if !ok {
@@ -551,6 +626,24 @@ func (t SpendLimitsType) ValueFromObject(ctx context.Context, in basetypes.Objec
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`per_user_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserMonthlyBudgetCentsAttribute))
+	}
+
+	tokenOverridesAttribute, ok := attributes["token_overrides"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`token_overrides is missing from object`)
+
+		return nil, diags
+	}
+
+	tokenOverridesVal, ok := tokenOverridesAttribute.(basetypes.MapValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`token_overrides expected to be basetypes.MapValue, was: %T`, tokenOverridesAttribute))
 	}
 
 	userOverridesAttribute, ok := attributes["user_overrides"]
@@ -594,14 +687,17 @@ func (t SpendLimitsType) ValueFromObject(ctx context.Context, in basetypes.Objec
 	}
 
 	return SpendLimitsValue{
-		DailyBudgetCents:          dailyBudgetCentsVal,
-		InterfaceLimits:           interfaceLimitsVal,
-		MonthlyBudgetCents:        monthlyBudgetCentsVal,
-		PerUserDailyBudgetCents:   perUserDailyBudgetCentsVal,
-		PerUserMonthlyBudgetCents: perUserMonthlyBudgetCentsVal,
-		UserOverrides:             userOverridesVal,
-		WarningThresholdPercent:   warningThresholdPercentVal,
-		state:                     attr.ValueStateKnown,
+		DailyBudgetCents:           dailyBudgetCentsVal,
+		InterfaceLimits:            interfaceLimitsVal,
+		MonthlyBudgetCents:         monthlyBudgetCentsVal,
+		PerTokenDailyBudgetCents:   perTokenDailyBudgetCentsVal,
+		PerTokenMonthlyBudgetCents: perTokenMonthlyBudgetCentsVal,
+		PerUserDailyBudgetCents:    perUserDailyBudgetCentsVal,
+		PerUserMonthlyBudgetCents:  perUserMonthlyBudgetCentsVal,
+		TokenOverrides:             tokenOverridesVal,
+		UserOverrides:              userOverridesVal,
+		WarningThresholdPercent:    warningThresholdPercentVal,
+		state:                      attr.ValueStateKnown,
 	}, diags
 }
 
@@ -722,6 +818,42 @@ func NewSpendLimitsValue(attributeTypes map[string]attr.Type, attributes map[str
 			fmt.Sprintf(`monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, monthlyBudgetCentsAttribute))
 	}
 
+	perTokenDailyBudgetCentsAttribute, ok := attributes["per_token_daily_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_token_daily_budget_cents is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	perTokenDailyBudgetCentsVal, ok := perTokenDailyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_token_daily_budget_cents expected to be basetypes.Int64Value, was: %T`, perTokenDailyBudgetCentsAttribute))
+	}
+
+	perTokenMonthlyBudgetCentsAttribute, ok := attributes["per_token_monthly_budget_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`per_token_monthly_budget_cents is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	perTokenMonthlyBudgetCentsVal, ok := perTokenMonthlyBudgetCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`per_token_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perTokenMonthlyBudgetCentsAttribute))
+	}
+
 	perUserDailyBudgetCentsAttribute, ok := attributes["per_user_daily_budget_cents"]
 
 	if !ok {
@@ -756,6 +888,24 @@ func NewSpendLimitsValue(attributeTypes map[string]attr.Type, attributes map[str
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`per_user_monthly_budget_cents expected to be basetypes.Int64Value, was: %T`, perUserMonthlyBudgetCentsAttribute))
+	}
+
+	tokenOverridesAttribute, ok := attributes["token_overrides"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`token_overrides is missing from object`)
+
+		return NewSpendLimitsValueUnknown(), diags
+	}
+
+	tokenOverridesVal, ok := tokenOverridesAttribute.(basetypes.MapValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`token_overrides expected to be basetypes.MapValue, was: %T`, tokenOverridesAttribute))
 	}
 
 	userOverridesAttribute, ok := attributes["user_overrides"]
@@ -799,14 +949,17 @@ func NewSpendLimitsValue(attributeTypes map[string]attr.Type, attributes map[str
 	}
 
 	return SpendLimitsValue{
-		DailyBudgetCents:          dailyBudgetCentsVal,
-		InterfaceLimits:           interfaceLimitsVal,
-		MonthlyBudgetCents:        monthlyBudgetCentsVal,
-		PerUserDailyBudgetCents:   perUserDailyBudgetCentsVal,
-		PerUserMonthlyBudgetCents: perUserMonthlyBudgetCentsVal,
-		UserOverrides:             userOverridesVal,
-		WarningThresholdPercent:   warningThresholdPercentVal,
-		state:                     attr.ValueStateKnown,
+		DailyBudgetCents:           dailyBudgetCentsVal,
+		InterfaceLimits:            interfaceLimitsVal,
+		MonthlyBudgetCents:         monthlyBudgetCentsVal,
+		PerTokenDailyBudgetCents:   perTokenDailyBudgetCentsVal,
+		PerTokenMonthlyBudgetCents: perTokenMonthlyBudgetCentsVal,
+		PerUserDailyBudgetCents:    perUserDailyBudgetCentsVal,
+		PerUserMonthlyBudgetCents:  perUserMonthlyBudgetCentsVal,
+		TokenOverrides:             tokenOverridesVal,
+		UserOverrides:              userOverridesVal,
+		WarningThresholdPercent:    warningThresholdPercentVal,
+		state:                      attr.ValueStateKnown,
 	}, diags
 }
 
@@ -878,18 +1031,21 @@ func (t SpendLimitsType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = SpendLimitsValue{}
 
 type SpendLimitsValue struct {
-	DailyBudgetCents          basetypes.Int64Value `tfsdk:"daily_budget_cents"`
-	InterfaceLimits           basetypes.MapValue   `tfsdk:"interface_limits"`
-	MonthlyBudgetCents        basetypes.Int64Value `tfsdk:"monthly_budget_cents"`
-	PerUserDailyBudgetCents   basetypes.Int64Value `tfsdk:"per_user_daily_budget_cents"`
-	PerUserMonthlyBudgetCents basetypes.Int64Value `tfsdk:"per_user_monthly_budget_cents"`
-	UserOverrides             basetypes.MapValue   `tfsdk:"user_overrides"`
-	WarningThresholdPercent   basetypes.Int64Value `tfsdk:"warning_threshold_percent"`
-	state                     attr.ValueState
+	DailyBudgetCents           basetypes.Int64Value `tfsdk:"daily_budget_cents"`
+	InterfaceLimits            basetypes.MapValue   `tfsdk:"interface_limits"`
+	MonthlyBudgetCents         basetypes.Int64Value `tfsdk:"monthly_budget_cents"`
+	PerTokenDailyBudgetCents   basetypes.Int64Value `tfsdk:"per_token_daily_budget_cents"`
+	PerTokenMonthlyBudgetCents basetypes.Int64Value `tfsdk:"per_token_monthly_budget_cents"`
+	PerUserDailyBudgetCents    basetypes.Int64Value `tfsdk:"per_user_daily_budget_cents"`
+	PerUserMonthlyBudgetCents  basetypes.Int64Value `tfsdk:"per_user_monthly_budget_cents"`
+	TokenOverrides             basetypes.MapValue   `tfsdk:"token_overrides"`
+	UserOverrides              basetypes.MapValue   `tfsdk:"user_overrides"`
+	WarningThresholdPercent    basetypes.Int64Value `tfsdk:"warning_threshold_percent"`
+	state                      attr.ValueState
 }
 
 func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 7)
+	attrTypes := make(map[string]tftypes.Type, 10)
 
 	var val tftypes.Value
 	var err error
@@ -899,8 +1055,13 @@ func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, 
 		ElemType: InterfaceLimitsValue{}.Type(ctx),
 	}.TerraformType(ctx)
 	attrTypes["monthly_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["per_token_daily_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["per_token_monthly_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["per_user_daily_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["per_user_monthly_budget_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["token_overrides"] = basetypes.MapType{
+		ElemType: TokenOverridesValue{}.Type(ctx),
+	}.TerraformType(ctx)
 	attrTypes["user_overrides"] = basetypes.MapType{
 		ElemType: UserOverridesValue{}.Type(ctx),
 	}.TerraformType(ctx)
@@ -910,7 +1071,7 @@ func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, 
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 7)
+		vals := make(map[string]tftypes.Value, 10)
 
 		val, err = v.DailyBudgetCents.ToTerraformValue(ctx)
 
@@ -936,6 +1097,22 @@ func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, 
 
 		vals["monthly_budget_cents"] = val
 
+		val, err = v.PerTokenDailyBudgetCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["per_token_daily_budget_cents"] = val
+
+		val, err = v.PerTokenMonthlyBudgetCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["per_token_monthly_budget_cents"] = val
+
 		val, err = v.PerUserDailyBudgetCents.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -951,6 +1128,14 @@ func (v SpendLimitsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, 
 		}
 
 		vals["per_user_monthly_budget_cents"] = val
+
+		val, err = v.TokenOverrides.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["token_overrides"] = val
 
 		val, err = v.UserOverrides.ToTerraformValue(ctx)
 
@@ -1026,6 +1211,35 @@ func (v SpendLimitsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVa
 		)
 	}
 
+	tokenOverrides := types.MapValueMust(
+		TokenOverridesType{
+			basetypes.ObjectType{
+				AttrTypes: TokenOverridesValue{}.AttributeTypes(ctx),
+			},
+		},
+		v.TokenOverrides.Elements(),
+	)
+
+	if v.TokenOverrides.IsNull() {
+		tokenOverrides = types.MapNull(
+			TokenOverridesType{
+				basetypes.ObjectType{
+					AttrTypes: TokenOverridesValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	if v.TokenOverrides.IsUnknown() {
+		tokenOverrides = types.MapUnknown(
+			TokenOverridesType{
+				basetypes.ObjectType{
+					AttrTypes: TokenOverridesValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
 	userOverrides := types.MapValueMust(
 		UserOverridesType{
 			basetypes.ObjectType{
@@ -1060,9 +1274,14 @@ func (v SpendLimitsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVa
 		"interface_limits": basetypes.MapType{
 			ElemType: InterfaceLimitsValue{}.Type(ctx),
 		},
-		"monthly_budget_cents":          basetypes.Int64Type{},
-		"per_user_daily_budget_cents":   basetypes.Int64Type{},
-		"per_user_monthly_budget_cents": basetypes.Int64Type{},
+		"monthly_budget_cents":           basetypes.Int64Type{},
+		"per_token_daily_budget_cents":   basetypes.Int64Type{},
+		"per_token_monthly_budget_cents": basetypes.Int64Type{},
+		"per_user_daily_budget_cents":    basetypes.Int64Type{},
+		"per_user_monthly_budget_cents":  basetypes.Int64Type{},
+		"token_overrides": basetypes.MapType{
+			ElemType: TokenOverridesValue{}.Type(ctx),
+		},
 		"user_overrides": basetypes.MapType{
 			ElemType: UserOverridesValue{}.Type(ctx),
 		},
@@ -1080,13 +1299,16 @@ func (v SpendLimitsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVa
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
-			"daily_budget_cents":            v.DailyBudgetCents,
-			"interface_limits":              interfaceLimits,
-			"monthly_budget_cents":          v.MonthlyBudgetCents,
-			"per_user_daily_budget_cents":   v.PerUserDailyBudgetCents,
-			"per_user_monthly_budget_cents": v.PerUserMonthlyBudgetCents,
-			"user_overrides":                userOverrides,
-			"warning_threshold_percent":     v.WarningThresholdPercent,
+			"daily_budget_cents":             v.DailyBudgetCents,
+			"interface_limits":               interfaceLimits,
+			"monthly_budget_cents":           v.MonthlyBudgetCents,
+			"per_token_daily_budget_cents":   v.PerTokenDailyBudgetCents,
+			"per_token_monthly_budget_cents": v.PerTokenMonthlyBudgetCents,
+			"per_user_daily_budget_cents":    v.PerUserDailyBudgetCents,
+			"per_user_monthly_budget_cents":  v.PerUserMonthlyBudgetCents,
+			"token_overrides":                tokenOverrides,
+			"user_overrides":                 userOverrides,
+			"warning_threshold_percent":      v.WarningThresholdPercent,
 		})
 
 	return objVal, diags
@@ -1119,11 +1341,23 @@ func (v SpendLimitsValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.PerTokenDailyBudgetCents.Equal(other.PerTokenDailyBudgetCents) {
+		return false
+	}
+
+	if !v.PerTokenMonthlyBudgetCents.Equal(other.PerTokenMonthlyBudgetCents) {
+		return false
+	}
+
 	if !v.PerUserDailyBudgetCents.Equal(other.PerUserDailyBudgetCents) {
 		return false
 	}
 
 	if !v.PerUserMonthlyBudgetCents.Equal(other.PerUserMonthlyBudgetCents) {
+		return false
+	}
+
+	if !v.TokenOverrides.Equal(other.TokenOverrides) {
 		return false
 	}
 
@@ -1152,9 +1386,14 @@ func (v SpendLimitsValue) AttributeTypes(ctx context.Context) map[string]attr.Ty
 		"interface_limits": basetypes.MapType{
 			ElemType: InterfaceLimitsValue{}.Type(ctx),
 		},
-		"monthly_budget_cents":          basetypes.Int64Type{},
-		"per_user_daily_budget_cents":   basetypes.Int64Type{},
-		"per_user_monthly_budget_cents": basetypes.Int64Type{},
+		"monthly_budget_cents":           basetypes.Int64Type{},
+		"per_token_daily_budget_cents":   basetypes.Int64Type{},
+		"per_token_monthly_budget_cents": basetypes.Int64Type{},
+		"per_user_daily_budget_cents":    basetypes.Int64Type{},
+		"per_user_monthly_budget_cents":  basetypes.Int64Type{},
+		"token_overrides": basetypes.MapType{
+			ElemType: TokenOverridesValue{}.Type(ctx),
+		},
 		"user_overrides": basetypes.MapType{
 			ElemType: UserOverridesValue{}.Type(ctx),
 		},
@@ -1538,6 +1777,440 @@ func (v InterfaceLimitsValue) AttributeTypes(ctx context.Context) map[string]att
 	return map[string]attr.Type{
 		"daily_cents":   basetypes.Int64Type{},
 		"monthly_cents": basetypes.Int64Type{},
+	}
+}
+
+var _ basetypes.ObjectTypable = TokenOverridesType{}
+
+type TokenOverridesType struct {
+	basetypes.ObjectType
+}
+
+func (t TokenOverridesType) Equal(o attr.Type) bool {
+	other, ok := o.(TokenOverridesType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t TokenOverridesType) String() string {
+	return "TokenOverridesType"
+}
+
+func (t TokenOverridesType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	dailyCentsAttribute, ok := attributes["daily_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	dailyCentsVal, ok := dailyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_cents expected to be basetypes.Int64Value, was: %T`, dailyCentsAttribute))
+	}
+
+	monthlyCentsAttribute, ok := attributes["monthly_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_cents is missing from object`)
+
+		return nil, diags
+	}
+
+	monthlyCentsVal, ok := monthlyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_cents expected to be basetypes.Int64Value, was: %T`, monthlyCentsAttribute))
+	}
+
+	unlimitedAttribute, ok := attributes["unlimited"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`unlimited is missing from object`)
+
+		return nil, diags
+	}
+
+	unlimitedVal, ok := unlimitedAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`unlimited expected to be basetypes.BoolValue, was: %T`, unlimitedAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return TokenOverridesValue{
+		DailyCents:   dailyCentsVal,
+		MonthlyCents: monthlyCentsVal,
+		Unlimited:    unlimitedVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewTokenOverridesValueNull() TokenOverridesValue {
+	return TokenOverridesValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewTokenOverridesValueUnknown() TokenOverridesValue {
+	return TokenOverridesValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewTokenOverridesValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (TokenOverridesValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing TokenOverridesValue Attribute Value",
+				"While creating a TokenOverridesValue value, a missing attribute value was detected. "+
+					"A TokenOverridesValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("TokenOverridesValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid TokenOverridesValue Attribute Type",
+				"While creating a TokenOverridesValue value, an invalid attribute value was detected. "+
+					"A TokenOverridesValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("TokenOverridesValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("TokenOverridesValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra TokenOverridesValue Attribute Value",
+				"While creating a TokenOverridesValue value, an extra attribute value was detected. "+
+					"A TokenOverridesValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra TokenOverridesValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewTokenOverridesValueUnknown(), diags
+	}
+
+	dailyCentsAttribute, ok := attributes["daily_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`daily_cents is missing from object`)
+
+		return NewTokenOverridesValueUnknown(), diags
+	}
+
+	dailyCentsVal, ok := dailyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`daily_cents expected to be basetypes.Int64Value, was: %T`, dailyCentsAttribute))
+	}
+
+	monthlyCentsAttribute, ok := attributes["monthly_cents"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`monthly_cents is missing from object`)
+
+		return NewTokenOverridesValueUnknown(), diags
+	}
+
+	monthlyCentsVal, ok := monthlyCentsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`monthly_cents expected to be basetypes.Int64Value, was: %T`, monthlyCentsAttribute))
+	}
+
+	unlimitedAttribute, ok := attributes["unlimited"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`unlimited is missing from object`)
+
+		return NewTokenOverridesValueUnknown(), diags
+	}
+
+	unlimitedVal, ok := unlimitedAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`unlimited expected to be basetypes.BoolValue, was: %T`, unlimitedAttribute))
+	}
+
+	if diags.HasError() {
+		return NewTokenOverridesValueUnknown(), diags
+	}
+
+	return TokenOverridesValue{
+		DailyCents:   dailyCentsVal,
+		MonthlyCents: monthlyCentsVal,
+		Unlimited:    unlimitedVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewTokenOverridesValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) TokenOverridesValue {
+	object, diags := NewTokenOverridesValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewTokenOverridesValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t TokenOverridesType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewTokenOverridesValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewTokenOverridesValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewTokenOverridesValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewTokenOverridesValueMust(TokenOverridesValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t TokenOverridesType) ValueType(ctx context.Context) attr.Value {
+	return TokenOverridesValue{}
+}
+
+var _ basetypes.ObjectValuable = TokenOverridesValue{}
+
+type TokenOverridesValue struct {
+	DailyCents   basetypes.Int64Value `tfsdk:"daily_cents"`
+	MonthlyCents basetypes.Int64Value `tfsdk:"monthly_cents"`
+	Unlimited    basetypes.BoolValue  `tfsdk:"unlimited"`
+	state        attr.ValueState
+}
+
+func (v TokenOverridesValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["daily_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["monthly_cents"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["unlimited"] = basetypes.BoolType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.DailyCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["daily_cents"] = val
+
+		val, err = v.MonthlyCents.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["monthly_cents"] = val
+
+		val, err = v.Unlimited.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["unlimited"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v TokenOverridesValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v TokenOverridesValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v TokenOverridesValue) String() string {
+	return "TokenOverridesValue"
+}
+
+func (v TokenOverridesValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"daily_cents":   basetypes.Int64Type{},
+		"monthly_cents": basetypes.Int64Type{},
+		"unlimited":     basetypes.BoolType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"daily_cents":   v.DailyCents,
+			"monthly_cents": v.MonthlyCents,
+			"unlimited":     v.Unlimited,
+		})
+
+	return objVal, diags
+}
+
+func (v TokenOverridesValue) Equal(o attr.Value) bool {
+	other, ok := o.(TokenOverridesValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.DailyCents.Equal(other.DailyCents) {
+		return false
+	}
+
+	if !v.MonthlyCents.Equal(other.MonthlyCents) {
+		return false
+	}
+
+	if !v.Unlimited.Equal(other.Unlimited) {
+		return false
+	}
+
+	return true
+}
+
+func (v TokenOverridesValue) Type(ctx context.Context) attr.Type {
+	return TokenOverridesType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v TokenOverridesValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"daily_cents":   basetypes.Int64Type{},
+		"monthly_cents": basetypes.Int64Type{},
+		"unlimited":     basetypes.BoolType{},
 	}
 }
 
