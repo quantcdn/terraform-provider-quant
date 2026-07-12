@@ -478,6 +478,16 @@ func callEnvironmentReadAPI(ctx context.Context, r *environmentResource, data *r
 	data.TaskDefinition = resource_environment.NewTaskDefinitionValueNull()
 	data.Vpc = resource_environment.NewVpcValueNull()
 
+	// --- v4.20.0 task-mode fields: preserve if known, null out unknowns ---
+	// The EnvironmentResponse SDK model does not surface these yet; the
+	// platform auto-detects when omitted.
+	if data.SingleTaskOnly.IsUnknown() {
+		data.SingleTaskOnly = types.BoolNull()
+	}
+	if data.StartupGracePeriodSeconds.IsUnknown() {
+		data.StartupGracePeriodSeconds = types.Int64Null()
+	}
+
 	// --- Create-only scalars: preserve if known, null out unknowns ---
 	if data.CloneConfigurationFrom.IsUnknown() {
 		data.CloneConfigurationFrom = types.StringNull()
