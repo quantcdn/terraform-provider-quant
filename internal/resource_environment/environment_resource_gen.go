@@ -393,6 +393,12 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 						Description:         "Minimum number of instances",
 						MarkdownDescription: "Minimum number of instances",
 					},
+					"single_task_only": schema.BoolAttribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Optional. Forces single-task mode for data-safe applications (max one running task). When true: capacity is locked to 1. When false: explicitly allows scaling. When omitted: the platform auto-detects stateful containers and enables single-task mode if found.",
+						MarkdownDescription: "Optional. Forces single-task mode for data-safe applications (max one running task). When true: capacity is locked to 1. When false: explicitly allows scaling. When omitted: the platform auto-detects stateful containers and enables single-task mode if found.",
+					},
 					"spot_configuration": schema.SingleNestedAttribute{
 						Attributes: map[string]schema.Attribute{
 							"strategy": schema.StringAttribute{
@@ -420,6 +426,16 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 						Computed:            true,
 						Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
 						MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
+					},
+					"startup_grace_period_seconds": schema.Int64Attribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						MarkdownDescription: "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						Validators: []validator.Int64{
+							int64validator.Between(0, 3600),
+						},
+						Default: int64default.StaticInt64(120),
 					},
 					"task_cpu": schema.Int64Attribute{
 						Optional:            true,
@@ -614,6 +630,12 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "ECS service details",
 				MarkdownDescription: "ECS service details",
 			},
+			"single_task_only": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Optional. Forces single-task mode (max one running task). When omitted, the platform auto-detects stateful containers.",
+				MarkdownDescription: "Optional. Forces single-task mode (max one running task). When omitted, the platform auto-detects stateful containers.",
+			},
 			"spot_configuration": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"strategy": schema.StringAttribute{
@@ -641,6 +663,16 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
 				MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
+			},
+			"startup_grace_period_seconds": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it. If not set, the value from composeDefinition (or default 120) is used.",
+				MarkdownDescription: "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it. If not set, the value from composeDefinition (or default 120) is used.",
+				Validators: []validator.Int64{
+					int64validator.Between(0, 3600),
+				},
+				Default: int64default.StaticInt64(120),
 			},
 			"status": schema.StringAttribute{
 				Computed:            true,
@@ -728,36 +760,38 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type EnvironmentModel struct {
-	AlbRouting              AlbRoutingValue        `tfsdk:"alb_routing"`
-	Application             types.String           `tfsdk:"application"`
-	CloneConfigurationFrom  types.String           `tfsdk:"clone_configuration_from"`
-	ComposeDefinition       ComposeDefinitionValue `tfsdk:"compose_definition"`
-	ContainerNames          types.List             `tfsdk:"container_names"`
-	CreatedAt               types.String           `tfsdk:"created_at"`
-	Cron                    types.List             `tfsdk:"cron"`
-	DeploymentFailureReason types.String           `tfsdk:"deployment_failure_reason"`
-	DeploymentFailureType   types.String           `tfsdk:"deployment_failure_type"`
-	DeploymentStatus        types.String           `tfsdk:"deployment_status"`
-	DesiredCount            types.Int64            `tfsdk:"desired_count"`
-	EnvName                 types.String           `tfsdk:"env_name"`
-	Environment             types.List             `tfsdk:"environment"`
-	ImageSuffix             types.String           `tfsdk:"image_suffix"`
-	LoadBalancer            LoadBalancerValue      `tfsdk:"load_balancer"`
-	MaxCapacity             types.Int64            `tfsdk:"max_capacity"`
-	MergeEnvironment        types.Bool             `tfsdk:"merge_environment"`
-	MinCapacity             types.Int64            `tfsdk:"min_capacity"`
-	Organisation            types.String           `tfsdk:"organisation"`
-	PublicIpAddress         types.String           `tfsdk:"public_ip_address"`
-	RunningCount            types.Int64            `tfsdk:"running_count"`
-	SecurityGroup           SecurityGroupValue     `tfsdk:"security_group"`
-	Service                 ServiceValue           `tfsdk:"service"`
-	SpotConfiguration       SpotConfigurationValue `tfsdk:"spot_configuration"`
-	Status                  types.String           `tfsdk:"status"`
-	Subnet                  SubnetValue            `tfsdk:"subnet"`
-	TaskDefinition          TaskDefinitionValue    `tfsdk:"task_definition"`
-	UpdatedAt               types.String           `tfsdk:"updated_at"`
-	Volumes                 types.List             `tfsdk:"volumes"`
-	Vpc                     VpcValue               `tfsdk:"vpc"`
+	AlbRouting                AlbRoutingValue        `tfsdk:"alb_routing"`
+	Application               types.String           `tfsdk:"application"`
+	CloneConfigurationFrom    types.String           `tfsdk:"clone_configuration_from"`
+	ComposeDefinition         ComposeDefinitionValue `tfsdk:"compose_definition"`
+	ContainerNames            types.List             `tfsdk:"container_names"`
+	CreatedAt                 types.String           `tfsdk:"created_at"`
+	Cron                      types.List             `tfsdk:"cron"`
+	DeploymentFailureReason   types.String           `tfsdk:"deployment_failure_reason"`
+	DeploymentFailureType     types.String           `tfsdk:"deployment_failure_type"`
+	DeploymentStatus          types.String           `tfsdk:"deployment_status"`
+	DesiredCount              types.Int64            `tfsdk:"desired_count"`
+	EnvName                   types.String           `tfsdk:"env_name"`
+	Environment               types.List             `tfsdk:"environment"`
+	ImageSuffix               types.String           `tfsdk:"image_suffix"`
+	LoadBalancer              LoadBalancerValue      `tfsdk:"load_balancer"`
+	MaxCapacity               types.Int64            `tfsdk:"max_capacity"`
+	MergeEnvironment          types.Bool             `tfsdk:"merge_environment"`
+	MinCapacity               types.Int64            `tfsdk:"min_capacity"`
+	Organisation              types.String           `tfsdk:"organisation"`
+	PublicIpAddress           types.String           `tfsdk:"public_ip_address"`
+	RunningCount              types.Int64            `tfsdk:"running_count"`
+	SecurityGroup             SecurityGroupValue     `tfsdk:"security_group"`
+	Service                   ServiceValue           `tfsdk:"service"`
+	SingleTaskOnly            types.Bool             `tfsdk:"single_task_only"`
+	SpotConfiguration         SpotConfigurationValue `tfsdk:"spot_configuration"`
+	StartupGracePeriodSeconds types.Int64            `tfsdk:"startup_grace_period_seconds"`
+	Status                    types.String           `tfsdk:"status"`
+	Subnet                    SubnetValue            `tfsdk:"subnet"`
+	TaskDefinition            TaskDefinitionValue    `tfsdk:"task_definition"`
+	UpdatedAt                 types.String           `tfsdk:"updated_at"`
+	Volumes                   types.List             `tfsdk:"volumes"`
+	Vpc                       VpcValue               `tfsdk:"vpc"`
 }
 
 var _ basetypes.ObjectTypable = AlbRoutingType{}
@@ -1153,6 +1187,24 @@ func (t ComposeDefinitionType) ValueFromObject(ctx context.Context, in basetypes
 			fmt.Sprintf(`min_capacity expected to be basetypes.Int64Value, was: %T`, minCapacityAttribute))
 	}
 
+	singleTaskOnlyAttribute, ok := attributes["single_task_only"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`single_task_only is missing from object`)
+
+		return nil, diags
+	}
+
+	singleTaskOnlyVal, ok := singleTaskOnlyAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`single_task_only expected to be basetypes.BoolValue, was: %T`, singleTaskOnlyAttribute))
+	}
+
 	spotConfigurationAttribute, ok := attributes["spot_configuration"]
 
 	if !ok {
@@ -1169,6 +1221,24 @@ func (t ComposeDefinitionType) ValueFromObject(ctx context.Context, in basetypes
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`spot_configuration expected to be basetypes.ObjectValue, was: %T`, spotConfigurationAttribute))
+	}
+
+	startupGracePeriodSecondsAttribute, ok := attributes["startup_grace_period_seconds"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`startup_grace_period_seconds is missing from object`)
+
+		return nil, diags
+	}
+
+	startupGracePeriodSecondsVal, ok := startupGracePeriodSecondsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`startup_grace_period_seconds expected to be basetypes.Int64Value, was: %T`, startupGracePeriodSecondsAttribute))
 	}
 
 	taskCpuAttribute, ok := attributes["task_cpu"]
@@ -1212,16 +1282,18 @@ func (t ComposeDefinitionType) ValueFromObject(ctx context.Context, in basetypes
 	}
 
 	return ComposeDefinitionValue{
-		Architecture:             architectureVal,
-		Containers:               containersVal,
-		EnableCrossAppNetworking: enableCrossAppNetworkingVal,
-		EnableCrossEnvNetworking: enableCrossEnvNetworkingVal,
-		MaxCapacity:              maxCapacityVal,
-		MinCapacity:              minCapacityVal,
-		SpotConfiguration:        spotConfigurationVal,
-		TaskCpu:                  taskCpuVal,
-		TaskMemory:               taskMemoryVal,
-		state:                    attr.ValueStateKnown,
+		Architecture:              architectureVal,
+		Containers:                containersVal,
+		EnableCrossAppNetworking:  enableCrossAppNetworkingVal,
+		EnableCrossEnvNetworking:  enableCrossEnvNetworkingVal,
+		MaxCapacity:               maxCapacityVal,
+		MinCapacity:               minCapacityVal,
+		SingleTaskOnly:            singleTaskOnlyVal,
+		SpotConfiguration:         spotConfigurationVal,
+		StartupGracePeriodSeconds: startupGracePeriodSecondsVal,
+		TaskCpu:                   taskCpuVal,
+		TaskMemory:                taskMemoryVal,
+		state:                     attr.ValueStateKnown,
 	}, diags
 }
 
@@ -1396,6 +1468,24 @@ func NewComposeDefinitionValue(attributeTypes map[string]attr.Type, attributes m
 			fmt.Sprintf(`min_capacity expected to be basetypes.Int64Value, was: %T`, minCapacityAttribute))
 	}
 
+	singleTaskOnlyAttribute, ok := attributes["single_task_only"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`single_task_only is missing from object`)
+
+		return NewComposeDefinitionValueUnknown(), diags
+	}
+
+	singleTaskOnlyVal, ok := singleTaskOnlyAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`single_task_only expected to be basetypes.BoolValue, was: %T`, singleTaskOnlyAttribute))
+	}
+
 	spotConfigurationAttribute, ok := attributes["spot_configuration"]
 
 	if !ok {
@@ -1412,6 +1502,24 @@ func NewComposeDefinitionValue(attributeTypes map[string]attr.Type, attributes m
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`spot_configuration expected to be basetypes.ObjectValue, was: %T`, spotConfigurationAttribute))
+	}
+
+	startupGracePeriodSecondsAttribute, ok := attributes["startup_grace_period_seconds"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`startup_grace_period_seconds is missing from object`)
+
+		return NewComposeDefinitionValueUnknown(), diags
+	}
+
+	startupGracePeriodSecondsVal, ok := startupGracePeriodSecondsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`startup_grace_period_seconds expected to be basetypes.Int64Value, was: %T`, startupGracePeriodSecondsAttribute))
 	}
 
 	taskCpuAttribute, ok := attributes["task_cpu"]
@@ -1455,16 +1563,18 @@ func NewComposeDefinitionValue(attributeTypes map[string]attr.Type, attributes m
 	}
 
 	return ComposeDefinitionValue{
-		Architecture:             architectureVal,
-		Containers:               containersVal,
-		EnableCrossAppNetworking: enableCrossAppNetworkingVal,
-		EnableCrossEnvNetworking: enableCrossEnvNetworkingVal,
-		MaxCapacity:              maxCapacityVal,
-		MinCapacity:              minCapacityVal,
-		SpotConfiguration:        spotConfigurationVal,
-		TaskCpu:                  taskCpuVal,
-		TaskMemory:               taskMemoryVal,
-		state:                    attr.ValueStateKnown,
+		Architecture:              architectureVal,
+		Containers:                containersVal,
+		EnableCrossAppNetworking:  enableCrossAppNetworkingVal,
+		EnableCrossEnvNetworking:  enableCrossEnvNetworkingVal,
+		MaxCapacity:               maxCapacityVal,
+		MinCapacity:               minCapacityVal,
+		SingleTaskOnly:            singleTaskOnlyVal,
+		SpotConfiguration:         spotConfigurationVal,
+		StartupGracePeriodSeconds: startupGracePeriodSecondsVal,
+		TaskCpu:                   taskCpuVal,
+		TaskMemory:                taskMemoryVal,
+		state:                     attr.ValueStateKnown,
 	}, diags
 }
 
@@ -1536,20 +1646,22 @@ func (t ComposeDefinitionType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = ComposeDefinitionValue{}
 
 type ComposeDefinitionValue struct {
-	Architecture             basetypes.StringValue `tfsdk:"architecture"`
-	Containers               basetypes.ListValue   `tfsdk:"containers"`
-	EnableCrossAppNetworking basetypes.BoolValue   `tfsdk:"enable_cross_app_networking"`
-	EnableCrossEnvNetworking basetypes.BoolValue   `tfsdk:"enable_cross_env_networking"`
-	MaxCapacity              basetypes.Int64Value  `tfsdk:"max_capacity"`
-	MinCapacity              basetypes.Int64Value  `tfsdk:"min_capacity"`
-	SpotConfiguration        basetypes.ObjectValue `tfsdk:"spot_configuration"`
-	TaskCpu                  basetypes.Int64Value  `tfsdk:"task_cpu"`
-	TaskMemory               basetypes.Int64Value  `tfsdk:"task_memory"`
-	state                    attr.ValueState
+	Architecture              basetypes.StringValue `tfsdk:"architecture"`
+	Containers                basetypes.ListValue   `tfsdk:"containers"`
+	EnableCrossAppNetworking  basetypes.BoolValue   `tfsdk:"enable_cross_app_networking"`
+	EnableCrossEnvNetworking  basetypes.BoolValue   `tfsdk:"enable_cross_env_networking"`
+	MaxCapacity               basetypes.Int64Value  `tfsdk:"max_capacity"`
+	MinCapacity               basetypes.Int64Value  `tfsdk:"min_capacity"`
+	SingleTaskOnly            basetypes.BoolValue   `tfsdk:"single_task_only"`
+	SpotConfiguration         basetypes.ObjectValue `tfsdk:"spot_configuration"`
+	StartupGracePeriodSeconds basetypes.Int64Value  `tfsdk:"startup_grace_period_seconds"`
+	TaskCpu                   basetypes.Int64Value  `tfsdk:"task_cpu"`
+	TaskMemory                basetypes.Int64Value  `tfsdk:"task_memory"`
+	state                     attr.ValueState
 }
 
 func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 9)
+	attrTypes := make(map[string]tftypes.Type, 11)
 
 	var val tftypes.Value
 	var err error
@@ -1562,9 +1674,11 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 	attrTypes["enable_cross_env_networking"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["max_capacity"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["min_capacity"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["single_task_only"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["spot_configuration"] = basetypes.ObjectType{
 		AttrTypes: SpotConfigurationValue{}.AttributeTypes(ctx),
 	}.TerraformType(ctx)
+	attrTypes["startup_grace_period_seconds"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["task_cpu"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["task_memory"] = basetypes.Int64Type{}.TerraformType(ctx)
 
@@ -1572,7 +1686,7 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 9)
+		vals := make(map[string]tftypes.Value, 11)
 
 		val, err = v.Architecture.ToTerraformValue(ctx)
 
@@ -1622,6 +1736,14 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 
 		vals["min_capacity"] = val
 
+		val, err = v.SingleTaskOnly.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["single_task_only"] = val
+
 		val, err = v.SpotConfiguration.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -1629,6 +1751,14 @@ func (v ComposeDefinitionValue) ToTerraformValue(ctx context.Context) (tftypes.V
 		}
 
 		vals["spot_configuration"] = val
+
+		val, err = v.StartupGracePeriodSeconds.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["startup_grace_period_seconds"] = val
 
 		val, err = v.TaskCpu.ToTerraformValue(ctx)
 
@@ -1734,11 +1864,13 @@ func (v ComposeDefinitionValue) ToObjectValue(ctx context.Context) (basetypes.Ob
 		"enable_cross_env_networking": basetypes.BoolType{},
 		"max_capacity":                basetypes.Int64Type{},
 		"min_capacity":                basetypes.Int64Type{},
+		"single_task_only":            basetypes.BoolType{},
 		"spot_configuration": basetypes.ObjectType{
 			AttrTypes: SpotConfigurationValue{}.AttributeTypes(ctx),
 		},
-		"task_cpu":    basetypes.Int64Type{},
-		"task_memory": basetypes.Int64Type{},
+		"startup_grace_period_seconds": basetypes.Int64Type{},
+		"task_cpu":                     basetypes.Int64Type{},
+		"task_memory":                  basetypes.Int64Type{},
 	}
 
 	if v.IsNull() {
@@ -1752,15 +1884,17 @@ func (v ComposeDefinitionValue) ToObjectValue(ctx context.Context) (basetypes.Ob
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
-			"architecture":                v.Architecture,
-			"containers":                  containers,
-			"enable_cross_app_networking": v.EnableCrossAppNetworking,
-			"enable_cross_env_networking": v.EnableCrossEnvNetworking,
-			"max_capacity":                v.MaxCapacity,
-			"min_capacity":                v.MinCapacity,
-			"spot_configuration":          spotConfiguration,
-			"task_cpu":                    v.TaskCpu,
-			"task_memory":                 v.TaskMemory,
+			"architecture":                 v.Architecture,
+			"containers":                   containers,
+			"enable_cross_app_networking":  v.EnableCrossAppNetworking,
+			"enable_cross_env_networking":  v.EnableCrossEnvNetworking,
+			"max_capacity":                 v.MaxCapacity,
+			"min_capacity":                 v.MinCapacity,
+			"single_task_only":             v.SingleTaskOnly,
+			"spot_configuration":           spotConfiguration,
+			"startup_grace_period_seconds": v.StartupGracePeriodSeconds,
+			"task_cpu":                     v.TaskCpu,
+			"task_memory":                  v.TaskMemory,
 		})
 
 	return objVal, diags
@@ -1805,7 +1939,15 @@ func (v ComposeDefinitionValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.SingleTaskOnly.Equal(other.SingleTaskOnly) {
+		return false
+	}
+
 	if !v.SpotConfiguration.Equal(other.SpotConfiguration) {
+		return false
+	}
+
+	if !v.StartupGracePeriodSeconds.Equal(other.StartupGracePeriodSeconds) {
 		return false
 	}
 
@@ -1838,11 +1980,13 @@ func (v ComposeDefinitionValue) AttributeTypes(ctx context.Context) map[string]a
 		"enable_cross_env_networking": basetypes.BoolType{},
 		"max_capacity":                basetypes.Int64Type{},
 		"min_capacity":                basetypes.Int64Type{},
+		"single_task_only":            basetypes.BoolType{},
 		"spot_configuration": basetypes.ObjectType{
 			AttrTypes: SpotConfigurationValue{}.AttributeTypes(ctx),
 		},
-		"task_cpu":    basetypes.Int64Type{},
-		"task_memory": basetypes.Int64Type{},
+		"startup_grace_period_seconds": basetypes.Int64Type{},
+		"task_cpu":                     basetypes.Int64Type{},
+		"task_memory":                  basetypes.Int64Type{},
 	}
 }
 
