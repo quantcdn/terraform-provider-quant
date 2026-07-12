@@ -353,8 +353,9 @@ resources:
 }
 
 // Exercises the v4.19.0 governance spend-limit maps end-to-end through the
-// Pulumi schema + bridge: interface_limits (per-interface caps) and
-// user_overrides (named per-user caps incl. unlimited).
+// Pulumi schema + bridge: interface_limits (per-interface caps),
+// user_overrides (named per-user caps incl. unlimited), and the v4.20.0
+// per-token budgets + token_overrides (named per-token caps incl. unlimited).
 func TestPreview_AiGovernanceSpendLimits(t *testing.T) {
 	previewProgram(t, "test-ai-governance", `
 name: test-ai-governance
@@ -368,6 +369,8 @@ resources:
       modelPolicy: blocklist
       spendLimits:
         monthlyBudgetCents: 1000000
+        perTokenMonthlyBudgetCents: 50000
+        perTokenDailyBudgetCents: 5000
         interfaceLimits:
           slack:
             dailyCents: 5000
@@ -379,6 +382,11 @@ resources:
             dailyCents: 20000
             monthlyCents: 400000
           "5678":
+            unlimited: true
+        tokenOverrides:
+          "42":
+            monthlyCents: 200000
+          "legacy-shared":
             unlimited: true
 `)
 }

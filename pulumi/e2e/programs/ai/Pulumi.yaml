@@ -32,6 +32,12 @@ resources:
         userOverrides:
           "system:code-agent":
             unlimited: true
+        perTokenMonthlyBudgetCents: 50000
+        tokenOverrides:
+          "e2e-test-token":
+            monthlyCents: 200000
+          "e2e-unlimited-token":
+            unlimited: true
   testSkill:
     type: quant:index:AiSkill
     properties:
