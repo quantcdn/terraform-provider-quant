@@ -382,11 +382,26 @@
                 "monthlyBudgetCents": {
                     "type": "integer"
                 },
+                "perTokenDailyBudgetCents": {
+                    "type": "integer",
+                    "description": "Flat daily cap in cents applied to every API token without a named override\n"
+                },
+                "perTokenMonthlyBudgetCents": {
+                    "type": "integer",
+                    "description": "Flat monthly cap in cents applied to every API token without a named override\n"
+                },
                 "perUserDailyBudgetCents": {
                     "type": "integer"
                 },
                 "perUserMonthlyBudgetCents": {
                     "type": "integer"
+                },
+                "tokenOverrides": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/types/quant:index/AiGovernanceSpendLimitsTokenOverrides:AiGovernanceSpendLimitsTokenOverrides"
+                    },
+                    "description": "Per-token budget overrides keyed by API token id. Replaces the flat per-token budget for that token; unlimited=true exempts it.\n"
                 },
                 "userOverrides": {
                     "type": "object",
@@ -406,8 +421,11 @@
                         "dailyBudgetCents",
                         "interfaceLimits",
                         "monthlyBudgetCents",
+                        "perTokenDailyBudgetCents",
+                        "perTokenMonthlyBudgetCents",
                         "perUserDailyBudgetCents",
                         "perUserMonthlyBudgetCents",
+                        "tokenOverrides",
                         "userOverrides",
                         "warningThresholdPercent"
                     ]
@@ -429,6 +447,29 @@
                     "requiredOutputs": [
                         "dailyCents",
                         "monthlyCents"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiGovernanceSpendLimitsTokenOverrides:AiGovernanceSpendLimitsTokenOverrides": {
+            "properties": {
+                "dailyCents": {
+                    "type": "integer"
+                },
+                "monthlyCents": {
+                    "type": "integer"
+                },
+                "unlimited": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "dailyCents",
+                        "monthlyCents",
+                        "unlimited"
                     ]
                 }
             }
@@ -642,6 +683,32 @@
                 }
             }
         },
+        "quant:index/ApplicationCache:ApplicationCache": {
+            "properties": {
+                "cacheEndpoint": {
+                    "type": "string",
+                    "description": "Cache cluster endpoint\n"
+                },
+                "cacheIdentifier": {
+                    "type": "string",
+                    "description": "Cache cluster identifier\n"
+                },
+                "dataStorageMaxGb": {
+                    "type": "integer",
+                    "description": "Maximum cache storage in GB\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "cacheEndpoint",
+                        "cacheIdentifier",
+                        "dataStorageMaxGb"
+                    ]
+                }
+            }
+        },
         "quant:index/ApplicationComposeDefinition:ApplicationComposeDefinition": {
             "properties": {
                 "architecture": {
@@ -670,9 +737,17 @@
                     "type": "integer",
                     "description": "Minimum number of instances\n"
                 },
+                "singleTaskOnly": {
+                    "type": "boolean",
+                    "description": "Optional. Forces single-task mode for data-safe applications (max one running task). When true: capacity is locked to 1. When false: explicitly allows scaling. When omitted: the platform auto-detects stateful containers and enables single-task mode if found.\n"
+                },
                 "spotConfiguration": {
                     "$ref": "#/types/quant:index/ApplicationComposeDefinitionSpotConfiguration:ApplicationComposeDefinitionSpotConfiguration",
                     "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.\n"
+                },
+                "startupGracePeriodSeconds": {
+                    "type": "integer",
+                    "description": "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.\n"
                 },
                 "taskCpu": {
                     "type": "integer",
@@ -693,7 +768,9 @@
                         "enableCrossEnvNetworking",
                         "maxCapacity",
                         "minCapacity",
+                        "singleTaskOnly",
                         "spotConfiguration",
+                        "startupGracePeriodSeconds",
                         "taskCpu",
                         "taskMemory"
                     ]
@@ -1338,9 +1415,17 @@
                     "type": "integer",
                     "description": "Minimum number of instances\n"
                 },
+                "singleTaskOnly": {
+                    "type": "boolean",
+                    "description": "Optional. Forces single-task mode for data-safe applications (max one running task). When true: capacity is locked to 1. When false: explicitly allows scaling. When omitted: the platform auto-detects stateful containers and enables single-task mode if found.\n"
+                },
                 "spotConfiguration": {
                     "$ref": "#/types/quant:index/EnvironmentComposeDefinitionSpotConfiguration:EnvironmentComposeDefinitionSpotConfiguration",
                     "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.\n"
+                },
+                "startupGracePeriodSeconds": {
+                    "type": "integer",
+                    "description": "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.\n"
                 },
                 "taskCpu": {
                     "type": "integer",
@@ -1361,7 +1446,9 @@
                         "enableCrossEnvNetworking",
                         "maxCapacity",
                         "minCapacity",
+                        "singleTaskOnly",
                         "spotConfiguration",
+                        "startupGracePeriodSeconds",
                         "taskCpu",
                         "taskMemory"
                     ]
@@ -4206,6 +4293,10 @@
                     "type": "string",
                     "description": "The application ID"
                 },
+                "cache": {
+                    "$ref": "#/types/quant:index/ApplicationCache:ApplicationCache",
+                    "description": "Managed Valkey cache configuration"
+                },
                 "composeDefinition": {
                     "$ref": "#/types/quant:index/ApplicationComposeDefinition:ApplicationComposeDefinition"
                 },
@@ -4277,6 +4368,7 @@
             "required": [
                 "appName",
                 "application",
+                "cache",
                 "composeDefinition",
                 "containerNames",
                 "database",
@@ -4342,6 +4434,10 @@
                     "application": {
                         "type": "string",
                         "description": "The application ID"
+                    },
+                    "cache": {
+                        "$ref": "#/types/quant:index/ApplicationCache:ApplicationCache",
+                        "description": "Managed Valkey cache configuration"
                     },
                     "composeDefinition": {
                         "$ref": "#/types/quant:index/ApplicationComposeDefinition:ApplicationComposeDefinition"
@@ -5385,9 +5481,17 @@
                     "$ref": "#/types/quant:index/EnvironmentService:EnvironmentService",
                     "description": "ECS service details"
                 },
+                "singleTaskOnly": {
+                    "type": "boolean",
+                    "description": "Optional. Forces single-task mode (max one running task). When omitted, the platform auto-detects stateful containers."
+                },
                 "spotConfiguration": {
                     "$ref": "#/types/quant:index/EnvironmentSpotConfiguration:EnvironmentSpotConfiguration",
                     "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments."
+                },
+                "startupGracePeriodSeconds": {
+                    "type": "integer",
+                    "description": "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it. If not set, the value from composeDefinition (or default 120) is used."
                 },
                 "status": {
                     "type": "string",
@@ -5441,7 +5545,9 @@
                 "runningCount",
                 "securityGroup",
                 "service",
+                "singleTaskOnly",
                 "spotConfiguration",
+                "startupGracePeriodSeconds",
                 "status",
                 "subnet",
                 "taskDefinition",
@@ -5492,9 +5598,17 @@
                     "type": "string",
                     "description": "The organisation ID"
                 },
+                "singleTaskOnly": {
+                    "type": "boolean",
+                    "description": "Optional. Forces single-task mode (max one running task). When omitted, the platform auto-detects stateful containers."
+                },
                 "spotConfiguration": {
                     "$ref": "#/types/quant:index/EnvironmentSpotConfiguration:EnvironmentSpotConfiguration",
                     "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments."
+                },
+                "startupGracePeriodSeconds": {
+                    "type": "integer",
+                    "description": "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it. If not set, the value from composeDefinition (or default 120) is used."
                 }
             },
             "requiredInputs": [
@@ -5603,9 +5717,17 @@
                         "$ref": "#/types/quant:index/EnvironmentService:EnvironmentService",
                         "description": "ECS service details"
                     },
+                    "singleTaskOnly": {
+                        "type": "boolean",
+                        "description": "Optional. Forces single-task mode (max one running task). When omitted, the platform auto-detects stateful containers."
+                    },
                     "spotConfiguration": {
                         "$ref": "#/types/quant:index/EnvironmentSpotConfiguration:EnvironmentSpotConfiguration",
                         "description": "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments."
+                    },
+                    "startupGracePeriodSeconds": {
+                        "type": "integer",
+                        "description": "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it. If not set, the value from composeDefinition (or default 120) is used."
                     },
                     "status": {
                         "type": "string",
