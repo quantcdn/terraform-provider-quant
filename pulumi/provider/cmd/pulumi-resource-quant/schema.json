@@ -2025,19 +2025,19 @@
             "properties": {
                 "applicationContainer": {
                     "type": "string",
-                    "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)\n"
+                    "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)\n"
                 },
                 "applicationEnvironment": {
                     "type": "string",
-                    "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)\n"
+                    "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)\n"
                 },
                 "applicationName": {
                     "type": "string",
-                    "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)\n"
+                    "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)\n"
                 },
                 "applicationPort": {
                     "type": "integer",
-                    "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)\n"
+                    "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)\n"
                 },
                 "applicationProxy": {
                     "type": "boolean",
@@ -2129,7 +2129,7 @@
                 },
                 "quantCloudSelection": {
                     "$ref": "#/types/quant:index/RuleProxyActionConfigQuantCloudSelection:RuleProxyActionConfigQuantCloudSelection",
-                    "description": "Quant Cloud application proxy selection (populated automatically when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis enabled)\n"
+                    "description": "Quant Cloud application proxy selection (populated automatically when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis enabled)\n"
                 },
                 "staticErrorPage": {
                     "type": "string",
@@ -4646,7 +4646,7 @@
                 },
                 "userAgent": {
                     "type": "string",
-                    "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \"\u003e browser_mode \u003c/span\u003eis false"
+                    "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis false"
                 },
                 "uuid": {
                     "type": "string",
@@ -4811,7 +4811,7 @@
                 },
                 "userAgent": {
                     "type": "string",
-                    "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \"\u003e browser_mode \u003c/span\u003eis false"
+                    "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis false"
                 },
                 "webhookAuthHeader": {
                     "type": "string",
@@ -4970,7 +4970,7 @@
                     },
                     "userAgent": {
                         "type": "string",
-                        "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \"\u003e browser_mode \u003c/span\u003eis false"
+                        "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis false"
                     },
                     "uuid": {
                         "type": "string",
@@ -8828,19 +8828,19 @@
                 },
                 "applicationContainer": {
                     "type": "string",
-                    "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationEnvironment": {
                     "type": "string",
-                    "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationName": {
                     "type": "string",
-                    "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationPort": {
                     "type": "integer",
-                    "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationProxy": {
                     "type": "boolean",
@@ -9116,19 +9116,19 @@
             "inputProperties": {
                 "applicationContainer": {
                     "type": "string",
-                    "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationEnvironment": {
                     "type": "string",
-                    "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationName": {
                     "type": "string",
-                    "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationPort": {
                     "type": "integer",
-                    "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                    "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                 },
                 "applicationProxy": {
                     "type": "boolean",
@@ -9358,19 +9358,19 @@
                     },
                     "applicationContainer": {
                         "type": "string",
-                        "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                        "description": "Quant Cloud application container (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                     },
                     "applicationEnvironment": {
                         "type": "string",
-                        "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                        "description": "Quant Cloud application environment (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                     },
                     "applicationName": {
                         "type": "string",
-                        "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                        "description": "Quant Cloud application name (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                     },
                     "applicationPort": {
                         "type": "integer",
-                        "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \"\u003e application_proxy \u003c/span\u003eis true)"
+                        "description": "Quant Cloud application port (required when\u003cspan pulumi-lang-nodejs=\" applicationProxy \" pulumi-lang-dotnet=\" ApplicationProxy \" pulumi-lang-go=\" applicationProxy \" pulumi-lang-python=\" application_proxy \" pulumi-lang-yaml=\" applicationProxy \" pulumi-lang-java=\" applicationProxy \" pulumi-lang-hcl=\" application_proxy \"\u003e applicationProxy \u003c/span\u003eis true)"
                     },
                     "applicationProxy": {
                         "type": "boolean",
@@ -11126,10 +11126,6 @@
             "outputs": {
                 "description": "A collection of values returned by getProjects.\n",
                 "properties": {
-                    "id": {
-                        "description": "The provider-assigned unique ID for this managed resource.",
-                        "type": "string"
-                    },
                     "projects": {
                         "items": {
                             "$ref": "#/types/quant:index/getProjectsProject:getProjectsProject"
@@ -11138,8 +11134,7 @@
                     }
                 },
                 "required": [
-                    "projects",
-                    "id"
+                    "projects"
                 ],
                 "type": "object"
             }
