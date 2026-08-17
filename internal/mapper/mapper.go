@@ -32,7 +32,7 @@ func ToSDK(ctx context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 	modelType := modelVal.Type()
 
 	// Dereference pointer if needed.
-	if modelVal.Kind() == reflect.Ptr {
+	if modelVal.Kind() == reflect.Pointer {
 		modelVal = modelVal.Elem()
 		modelType = modelVal.Type()
 	}
@@ -45,7 +45,7 @@ func ToSDK(ctx context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 
 	sdkVal := reflect.ValueOf(sdkReq)
 
-	if sdkVal.Kind() != reflect.Ptr {
+	if sdkVal.Kind() != reflect.Pointer {
 		diags.AddError("ToSDK: sdkReq must be a pointer",
 			fmt.Sprintf("got %s", sdkVal.Kind()))
 		return diags
@@ -206,7 +206,7 @@ func FromSDK(ctx context.Context, sdkResp any, tfModel any) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	modelVal := reflect.ValueOf(tfModel)
-	if modelVal.Kind() != reflect.Ptr {
+	if modelVal.Kind() != reflect.Pointer {
 		diags.AddError("FromSDK: tfModel must be a pointer",
 			fmt.Sprintf("got %s", modelVal.Kind()))
 		return diags
