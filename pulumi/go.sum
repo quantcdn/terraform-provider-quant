@@ -350,8 +350,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/iwdgo/sigintwindows v0.2.2 h1:P6oWzpvV7MrEAmhUgs+zmarrWkyL77ycZz4v7+1gYAE=
 github.com/iwdgo/sigintwindows v0.2.2/go.mod h1:70wPb8oz8OnxPvsj2QMUjgIVhb8hMu5TUgX8KfFl7QY=
-github.com/jarcoal/httpmock v1.4.1 h1:0Ju+VCFuARfFlhVXFc2HxlcQkfB+Xq12/EotHko+x2A=
-github.com/jarcoal/httpmock v1.4.1/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
+github.com/jarcoal/httpmock v1.4.2 h1:dKwiP/9zITCPfBLsDn3kchbSOu16JrnxtVEmL0fPRcI=
+github.com/jarcoal/httpmock v1.4.2/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
 github.com/jhump/protoreflect v1.17.0 h1:qOEr613fac2lOuTgWN4tPAtLL7fUSbuJL5X5XumQh94=
 github.com/jhump/protoreflect v1.17.0/go.mod h1:h9+vUUL38jiBzck8ck+6G/aeMX8Z4QUY/NiJPwPNi+8=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
@@ -447,6 +447,10 @@ github.com/opentofu/registry-address/v2 v2.0.0-20250611143131-d0a99bd8acdd h1:YA
 github.com/opentofu/registry-address/v2 v2.0.0-20250611143131-d0a99bd8acdd/go.mod h1:7M92SvuJm1WBriIpa4j0XmruU9pxkgPXmRdc6FfAvAk=
 github.com/opentofu/svchost v0.0.0-20250610175836-86c9e5e3d8c8 h1:J3pmsVB+nGdfNp5HWdEAC96asYgc7S6J724ICrYDCTk=
 github.com/opentofu/svchost v0.0.0-20250610175836-86c9e5e3d8c8/go.mod h1:0kKTcD9hUrbAz41GWp8USa/+OuI8QKirU3qdCWNa3jI=
+github.com/opentracing-contrib/go-grpc v0.1.4 h1:m9VukGYQ+tfcgtwdsifjjFtAoWRqmcbnGhgRQcZ+ZQA=
+github.com/opentracing-contrib/go-grpc v0.1.4/go.mod h1:xP8rkWX/qdQJVTkf01D6Fc002zN0WUMKsvuKg7Tf93E=
+github.com/opentracing-contrib/go-grpc/test v0.0.0-20260727233914-064b4d2bcbbf h1:xfFA+XblffDh3LsTrbSG1MHpmrXsY/9GQI4sbCnY+kI=
+github.com/opentracing-contrib/go-grpc/test v0.0.0-20260727233914-064b4d2bcbbf/go.mod h1:AYO7D5MbvWwD7/UggkDbqyW0pDt7KZyQkHCn4IC2i/w=
 github.com/opentracing/basictracer-go v1.1.0 h1:Oa1fTSBvAl8pa3U+IJYqrKm0NALwH9OsgwOqDv4xJW0=
 github.com/opentracing/basictracer-go v1.1.0/go.mod h1:V2HZueSJEp879yv285Aap1BS69fQMD+MNP1mRs6mBQc=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
@@ -600,8 +604,8 @@ go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 h1:8tvICD4
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0/go.mod h1:z9+yiacE0IHRqM4qFfkbt/JYlmYXgss8GY/jXoNuPJI=
 go.opentelemetry.io/otel v1.45.0 h1:pdrWmLHofpubmArBv1LgFSv1Z0Ie/ppdZzu+kUN5EeU=
 go.opentelemetry.io/otel v1.45.0/go.mod h1:XZxIqPapzEYnhNSScF5DIqXhm/rYi0FzCe2XddAwZfQ=
-go.opentelemetry.io/otel/bridge/opentracing v1.33.0 h1:eH88qvKdY7ns7Xu6WlJBQNOzZ3MVvBR6tEl2euaYS9w=
-go.opentelemetry.io/otel/bridge/opentracing v1.33.0/go.mod h1:FNai/nhRSn/kHyv+V1zaf/30BU8hO/DXo0MvV0PaUS8=
+go.opentelemetry.io/otel/bridge/opentracing v1.45.0 h1:hFf959SYHZpFc8ZWlqiYlnH3Ke5w4fcWZh7He+CmqXk=
+go.opentelemetry.io/otel/bridge/opentracing v1.45.0/go.mod h1:etOoQoentzhTX0XTaRJmwlsiQx8TXD7mHo76YxNeBYg=
 go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.21.0 h1:WseeVYf5dJZTsyPiyW5L14k5qsSibqXAMTSiFEDiWr0=
 go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.21.0/go.mod h1:SiLZnQS6Qk2eCpvr2CH/XMAOa64TWGXxEZJZCpD2Lmc=
 go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.45.0 h1:QRefszxJmfPdjXUUm3j6iDzY03mTPXMjqErFqQ67vUg=
