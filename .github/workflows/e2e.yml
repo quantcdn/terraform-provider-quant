@@ -8,13 +8,20 @@ on:
         required: false
         default: 'all'
         type: string
-  # NOTE: do not trigger on `release: published`. Releases are now created by
+  # Called by release.yml on a v* tag, BEFORE any artifact is built or
+  # published. A failing E2E therefore blocks the release.
+  #
+  # NOTE: do not trigger on `release: published`. Releases are created by
   # github-actions[bot] with GITHUB_TOKEN, and GitHub does not fire workflow
   # triggers for such events. That silently stopped E2E from running after
-  # v5.10.5. Tag pushes fire regardless of who publishes the release.
-  push:
-    tags:
-      - 'v*'
+  # v5.10.5.
+  workflow_call:
+    inputs:
+      stacks:
+        description: 'Stacks to test (comma-separated or "all")'
+        required: false
+        default: 'all'
+        type: string
 
 permissions:
   contents: read

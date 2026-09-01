@@ -24,8 +24,16 @@ jobs:
         id: get_version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+  # Gate the release on E2E against staging. Every build and publish job below
+  # needs this, so a broken provider cannot reach the Terraform Registry or npm.
+  # v5.11.0 shipped a 422 on every AiCustomTool write because E2E did not run.
+  e2e:
+    name: E2E (staging)
+    uses: ./.github/workflows/e2e.yml
+    secrets: inherit
+
   goreleaser:
-    needs: version
+    needs: [version, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -53,7 +61,7 @@ jobs:
 
   build-provider:
     name: Build Pulumi provider (${{ matrix.os }}-${{ matrix.arch }})
-    needs: version
+    needs: [version, e2e]
     runs-on: ubuntu-latest
     strategy:
       matrix:
