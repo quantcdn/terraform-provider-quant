@@ -59,6 +59,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
+  # NOTE: the jobs below build the pulumi/ module, so they must take their Go
+  # version from pulumi/go.mod, not the root one. The two diverged (root
+  # 1.25.8, pulumi 1.25.11) and setup-go pins GOTOOLCHAIN=local, so a root-
+  # pinned toolchain cannot build pulumi/ and cannot download a newer one:
+  #   go: go.mod requires go >= 1.25.11 (running go 1.25.8; GOTOOLCHAIN=local)
+  # That failed the v5.12.1 release after E2E and goreleaser had both passed.
   build-provider:
     name: Build Pulumi provider (${{ matrix.os }}-${{ matrix.arch }})
     needs: [version, e2e]
@@ -91,7 +97,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version-file: 'pulumi/go.mod'
           cache: true
 
       - name: Build Pulumi provider binary
@@ -153,7 +159,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version-file: 'pulumi/go.mod'
           cache: true
 
       - uses: actions/setup-node@v6
