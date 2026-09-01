@@ -7,7 +7,7 @@ config:
     default: pulumi-e2e-project-test
   region:
     type: string
-    default: au-govt
+    default: au
 resources:
   testProject:
     type: quant:index:Project

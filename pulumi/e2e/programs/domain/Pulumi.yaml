@@ -7,12 +7,15 @@ config:
   domainSuffix:
     type: string
     default: e2e
+  region:
+    type: string
+    default: au
 resources:
   testProject:
     type: quant:index:Project
     properties:
       name: ${projectName}
-      region: au-govt
+      region: ${region}
   testDomain:
     type: quant:index:Domain
     properties:

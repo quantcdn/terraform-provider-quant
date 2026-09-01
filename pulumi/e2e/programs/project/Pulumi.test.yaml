@@ -1,3 +1,4 @@
-encryptionsalt: v1:ZdiFJD8oHFI=:v1:XgVunPJcBXg+MphV:mTjX185Lw0I7/HKXZXepZ+KYH9g2dw==
+encryptionsalt: v1:zGyZdeCrvg8=:v1:QWHrvKLGXYnGWchZ:uu2FHH1AHy+wxV6bJ02J3752R4ws0w==
 config:
-  e2e-project:projectName: pulumi-e2e-import-86310-6351
+  e2e-project:projectName: pulumi-e2e-project-43064-5484
+  e2e-project:region: au-govt

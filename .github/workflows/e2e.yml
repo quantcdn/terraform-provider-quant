@@ -55,6 +55,9 @@ jobs:
           QUANTCDN_API_TOKEN: ${{ secrets.QUANTCDN_API_TOKEN }}
           QUANTCDN_ORGANIZATION: ${{ secrets.QUANTCDN_ORGANIZATION }}
           QUANTCDN_BASE_URL: ${{ vars.QUANTCDN_BASE_URL }}
+          # Project region for the platform under test: au/us/eu on the
+          # public (Fastly) platform, au-govt on AWS. Defaults to au.
+          QUANTCDN_E2E_REGION: ${{ vars.QUANTCDN_E2E_REGION }}
           # Fail instead of skipping when the staging credentials are missing.
           E2E_REQUIRED: '1'
         run: |
