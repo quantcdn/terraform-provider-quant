@@ -23,7 +23,12 @@ resources:
             result: { message: "E2E test response", input: body.input }
           }), { headers: { "Content-Type": "application/json" } });
         }
-      inputSchema: {}
+      # input_schema is a JSON-ENCODED STRING in the provider schema, but the
+      # API validates the decoded value with Laravel's `array` rule. A populated
+      # object here covers the v5.11.0 regression, where the provider sent the
+      # string straight through and the API answered 422.
+      inputSchema: '{"type":"object","properties":{"query":{"type":"string","description":"Search term"}},"required":["query"]}'
+      outputSchema: '{"type":"object","properties":{"message":{"type":"string"}}}'
       responseMode: llm
       timeoutSeconds: 30
 outputs:

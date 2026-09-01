@@ -60,13 +60,21 @@ func ensureProvider(t *testing.T) {
 	require.NoError(t, buildErr, "failed to build provider binary")
 }
 
+// checkE2EEnv skips the test when the staging credentials are absent.
+//
+// Set E2E_REQUIRED=1 to turn that skip into a failure. CI MUST set it. Without
+// it the whole suite skips silently and the job still reports success, which is
+// how the v5.11.0 inputSchema regression reached a release unnoticed.
 func checkE2EEnv(t *testing.T) {
 	t.Helper()
-	if os.Getenv("QUANTCDN_API_TOKEN") == "" {
-		t.Skip("QUANTCDN_API_TOKEN not set — skipping E2E test")
-	}
-	if os.Getenv("QUANTCDN_ORGANIZATION") == "" {
-		t.Skip("QUANTCDN_ORGANIZATION not set — skipping E2E test")
+	for _, name := range []string{"QUANTCDN_API_TOKEN", "QUANTCDN_ORGANIZATION"} {
+		if os.Getenv(name) != "" {
+			continue
+		}
+		if os.Getenv("E2E_REQUIRED") != "" {
+			t.Fatalf("%s not set and E2E_REQUIRED is set — E2E tests must not skip in CI", name)
+		}
+		t.Skipf("%s not set — skipping E2E test", name)
 	}
 }
 

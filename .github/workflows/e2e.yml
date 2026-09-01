@@ -8,8 +8,13 @@ on:
         required: false
         default: 'all'
         type: string
-  release:
-    types: [published]
+  # NOTE: do not trigger on `release: published`. Releases are now created by
+  # github-actions[bot] with GITHUB_TOKEN, and GitHub does not fire workflow
+  # triggers for such events. That silently stopped E2E from running after
+  # v5.10.5. Tag pushes fire regardless of who publishes the release.
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -42,6 +47,9 @@ jobs:
         env:
           QUANTCDN_API_TOKEN: ${{ secrets.QUANTCDN_API_TOKEN }}
           QUANTCDN_ORGANIZATION: ${{ secrets.QUANTCDN_ORGANIZATION }}
+          QUANTCDN_BASE_URL: ${{ vars.QUANTCDN_BASE_URL }}
+          # Fail instead of skipping when the staging credentials are missing.
+          E2E_REQUIRED: '1'
         run: |
           STACKS="${{ inputs.stacks || 'all' }}"
           if [ "$STACKS" = "all" ]; then
