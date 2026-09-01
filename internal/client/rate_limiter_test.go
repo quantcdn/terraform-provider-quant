@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -320,5 +321,56 @@ func TestClientIntegration(t *testing.T) {
 
 	if client.Organization != "test-org" {
 		t.Errorf("Expected Organization 'test-org', got %s", client.Organization)
+	}
+}
+
+// TestRetryConditionRulesLockConflict pins the 409 handling. The rules API
+// fast-fails with 409 when another request holds the per-project rules lock
+// and expects the client to back off and retry. Every other endpoint uses 409
+// to mean a genuine conflict, which must not be retried.
+func TestRetryConditionRulesLockConflict(t *testing.T) {
+	respFor := func(path string, status int) *http.Response {
+		u, err := url.Parse("https://dashboard.quantcdn.io" + path)
+		if err != nil {
+			t.Fatalf("parse url: %v", err)
+		}
+		return &http.Response{StatusCode: status, Request: &http.Request{URL: u}}
+	}
+
+	cases := []struct {
+		name string
+		path string
+		code int
+		want bool
+	}{
+		{"409 deleting a headers rule retries", "/api/v2/organizations/o/projects/p/rules/headers/abc", 409, true},
+		{"409 creating a proxy rule retries", "/api/v2/organizations/o/projects/p/rules/proxy", 409, true},
+		{"409 on a custom tool does not retry", "/api/v3/organizations/o/ai/custom-tools", 409, false},
+		{"409 on a project does not retry", "/api/v2/organizations/o/projects", 409, false},
+		{"429 on a rule still retries", "/api/v2/organizations/o/projects/p/rules/headers", 429, true},
+		{"200 on a rule does not retry", "/api/v2/organizations/o/projects/p/rules/headers", 200, false},
+		{"404 on a rule does not retry", "/api/v2/organizations/o/projects/p/rules/headers/abc", 404, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := DefaultRetryCondition(respFor(tc.path, tc.code), nil); got != tc.want {
+				t.Errorf("DefaultRetryCondition(%s, %d) = %v, want %v", tc.path, tc.code, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestIsRulesEndpointNilSafety — the retry path must never panic on a response
+// without a request, which is what a transport-level failure looks like.
+func TestIsRulesEndpointNilSafety(t *testing.T) {
+	if isRulesEndpoint(nil) {
+		t.Error("nil response must not be treated as a rules endpoint")
+	}
+	if isRulesEndpoint(&http.Response{}) {
+		t.Error("response with no request must not be treated as a rules endpoint")
+	}
+	if isRulesEndpoint(&http.Response{Request: &http.Request{}}) {
+		t.Error("request with no URL must not be treated as a rules endpoint")
 	}
 }
