@@ -74,10 +74,32 @@ func DefaultRetryCondition(resp *http.Response, err error) bool {
 			return true
 		case http.StatusRequestTimeout: // 408
 			return true
+		case http.StatusConflict: // 409
+			// Only the rules API. It takes a per-project lock and fast-fails
+			// with 409 on contention, explicitly delegating backoff to the
+			// client: "the public API contract fast-fails with 409 so the
+			// customer's client can drive its own backoff/retry"
+			// (portal Api/Rules.php). We were surfacing that as a hard error,
+			// which failed any apply or destroy touching several rules on one
+			// project — TestE2E_RulesDeep hit it deleting one of 20+ rules.
+			//
+			// Everywhere else 409 is a real conflict (a duplicate tool name,
+			// say) and retrying only repeats the same failure.
+			return isRulesEndpoint(resp)
 		}
 	}
 
 	return false
+}
+
+// isRulesEndpoint reports whether a response came from the project rules API,
+// the one endpoint family where 409 means "locked, try again" rather than
+// "this conflicts".
+func isRulesEndpoint(resp *http.Response) bool {
+	if resp == nil || resp.Request == nil || resp.Request.URL == nil {
+		return false
+	}
+	return strings.Contains(resp.Request.URL.Path, "/rules")
 }
 
 // RateLimitedRoundTripper implements http.RoundTripper with rate limiting and retry logic
