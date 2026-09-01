@@ -8,8 +8,20 @@ on:
         required: false
         default: 'all'
         type: string
-  release:
-    types: [published]
+  # Called by release.yml on a v* tag, BEFORE any artifact is built or
+  # published. A failing E2E therefore blocks the release.
+  #
+  # NOTE: do not trigger on `release: published`. Releases are created by
+  # github-actions[bot] with GITHUB_TOKEN, and GitHub does not fire workflow
+  # triggers for such events. That silently stopped E2E from running after
+  # v5.10.5.
+  workflow_call:
+    inputs:
+      stacks:
+        description: 'Stacks to test (comma-separated or "all")'
+        required: false
+        default: 'all'
+        type: string
 
 permissions:
   contents: read
@@ -42,6 +54,12 @@ jobs:
         env:
           QUANTCDN_API_TOKEN: ${{ secrets.QUANTCDN_API_TOKEN }}
           QUANTCDN_ORGANIZATION: ${{ secrets.QUANTCDN_ORGANIZATION }}
+          QUANTCDN_BASE_URL: ${{ vars.QUANTCDN_BASE_URL }}
+          # Project region for the platform under test: au/us/eu on the
+          # public (Fastly) platform, au-govt on AWS. Defaults to au.
+          QUANTCDN_E2E_REGION: ${{ vars.QUANTCDN_E2E_REGION }}
+          # Fail instead of skipping when the staging credentials are missing.
+          E2E_REQUIRED: '1'
         run: |
           STACKS="${{ inputs.stacks || 'all' }}"
           if [ "$STACKS" = "all" ]; then

@@ -464,6 +464,20 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 		data.Filesystem = resource_application.NewFilesystemValueNull()
 	}
 
+	// --- Cache ---
+	// `cache` is Computed. It MUST be set on every read, or it stays unknown
+	// after apply and the Pulumi bridge panics with
+	// "rawStateDeltaHelper cannot process unknown PropertyValue values".
+	if cachePtr, ok := app.GetCacheOk(); ok && cachePtr != nil {
+		cv, d := buildAppCacheValue(ctx, cachePtr)
+		diags.Append(d...)
+		if !diags.HasError() {
+			data.Cache = cv
+		}
+	} else {
+		data.Cache = resource_application.NewCacheValueNull()
+	}
+
 	// --- ImageReference ---
 	if irPtr, ok := app.GetImageReferenceOk(); ok && irPtr != nil {
 		ir, d := buildAppImageReferenceValue(ctx, irPtr)

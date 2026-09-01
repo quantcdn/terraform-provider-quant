@@ -162,22 +162,27 @@ func getToolName(data *resource_ai_custom_tool.AiCustomToolModel) string {
 	return data.Name.ValueString()
 }
 
-func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data *resource_ai_custom_tool.AiCustomToolModel) (diags diag.Diagnostics) {
-	org := r.getOrg(data)
-
+// buildCustomToolCreateRequest maps the Terraform model onto the SDK create
+// request. Split out from callCustomToolCreateAPI so the wire shape is unit
+// testable.
+func buildCustomToolCreateRequest(data *resource_ai_custom_tool.AiCustomToolModel) (sdkReq *quantadmingo.CreateCustomToolRequest, diags diag.Diagnostics) {
 	// Build the SDK request. InputSchema is a JSON-encoded string in both the TF
-	// schema and the SDK request (v4.19.0+); validate it and pass it through.
+	// schema and the SDK request (v4.19.0+), but the API validates inputSchema
+	// with an array/object rule and rejects a JSON string with 422. Decode it
+	// and send the object via AdditionalProperties (same pattern as
+	// outputSchema below) — AdditionalProperties is written after the typed
+	// fields in CreateCustomToolRequest.ToMap(), so it overrides them.
 	inputSchema := `{"type":"object","properties":{}}`
 	if !data.InputSchema.IsNull() && !data.InputSchema.IsUnknown() && data.InputSchema.ValueString() != "" {
 		inputSchema = data.InputSchema.ValueString()
-		var probe interface{}
-		if err := json.Unmarshal([]byte(inputSchema), &probe); err != nil {
-			diags.AddError("Invalid input_schema JSON", fmt.Sprintf("Failed to parse input_schema: %s", err.Error()))
-			return
-		}
+	}
+	var inputSchemaMap map[string]interface{}
+	if err := json.Unmarshal([]byte(inputSchema), &inputSchemaMap); err != nil {
+		diags.AddError("Invalid input_schema JSON", fmt.Sprintf("Failed to parse input_schema: %s", err.Error()))
+		return
 	}
 
-	sdkReq := quantadmingo.NewCreateCustomToolRequest(
+	sdkReq = quantadmingo.NewCreateCustomToolRequest(
 		data.Name.ValueString(),
 		data.Description.ValueString(),
 		"", // edgeFunctionUrl — computed by API from edgeFunctionCode
@@ -197,6 +202,8 @@ func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data 
 	}
 	// edgeFunctionCode is required — the API deploys it and computes the URL.
 	sdkReq.AdditionalProperties["edgeFunctionCode"] = data.EdgeFunctionCode.ValueString()
+	// InputSchema must reach the API as an object, not a JSON string.
+	sdkReq.AdditionalProperties["inputSchema"] = inputSchemaMap
 	if !data.Category.IsNull() && !data.Category.IsUnknown() {
 		sdkReq.AdditionalProperties["category"] = data.Category.ValueString()
 	}
@@ -214,6 +221,18 @@ func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data 
 			return
 		}
 		sdkReq.AdditionalProperties["outputSchema"] = outputSchema
+	}
+
+	return sdkReq, diags
+}
+
+func callCustomToolCreateAPI(ctx context.Context, r *aiCustomToolResource, data *resource_ai_custom_tool.AiCustomToolModel) (diags diag.Diagnostics) {
+	org := r.getOrg(data)
+
+	sdkReq, buildDiags := buildCustomToolCreateRequest(data)
+	diags.Append(buildDiags...)
+	if diags.HasError() {
+		return
 	}
 
 	sdkResp, httpResp, err := r.client.Instance.AICustomToolsAPI.CreateCustomTool(r.client.AuthContext, org).

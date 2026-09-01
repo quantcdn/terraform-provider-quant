@@ -10,7 +10,7 @@ config:
     default: e2e-test-value
   region:
     type: string
-    default: au-govt
+    default: au
 resources:
   testProject:
     type: quant:index:Project

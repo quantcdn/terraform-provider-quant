@@ -105,6 +105,13 @@ type filesystemRead struct {
 	Required     *bool   `tfsdk:"required"`
 }
 
+// cacheRead maps SDK ApplicationCache → TF CacheValue (top-level app).
+type cacheRead struct {
+	CacheEndpoint    *string `tfsdk:"cache_endpoint"`
+	CacheIdentifier  *string `tfsdk:"cache_identifier"`
+	DataStorageMaxGb *int64  `tfsdk:"data_storage_max_gb"`
+}
+
 // imageRefRead maps SDK ApplicationImageReference → TF ImageReferenceValue (top-level app).
 type imageRefRead struct {
 	Identifier *string `tfsdk:"identifier"`
@@ -380,6 +387,19 @@ func buildAppFilesystemValue(ctx context.Context, fs *quantadmingo.ApplicationFi
 			// required is create-only
 		},
 		resource_application.NewFilesystemValue,
+	)
+}
+
+// buildAppCacheValue builds a resource_application.CacheValue from the SDK response.
+func buildAppCacheValue(ctx context.Context, c *quantadmingo.ApplicationCache) (resource_application.CacheValue, diag.Diagnostics) {
+	return autoMap(ctx,
+		resource_application.CacheValue{}.AttributeTypes(ctx),
+		cacheRead{
+			CacheEndpoint:    ptrStr(c.GetCacheEndpointOk()),
+			CacheIdentifier:  ptrStr(c.GetCacheIdentifierOk()),
+			DataStorageMaxGb: ptrInt32AsInt64(c.GetDataStorageMaxGbOk()),
+		},
+		resource_application.NewCacheValue,
 	)
 }
 

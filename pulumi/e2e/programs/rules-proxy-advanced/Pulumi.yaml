@@ -5,12 +5,15 @@ config:
   projectName:
     type: string
     default: pulumi-e2e-proxy-adv
+  region:
+    type: string
+    default: au
 resources:
   testProject:
     type: quant:index:Project
     properties:
       name: ${projectName}
-      region: au-govt
+      region: ${region}
 
   # ── Proxy with failover mode, inject/strip headers, host override, cache ──
   proxyFailover:

@@ -28,8 +28,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optimport"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optup"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,6 +39,22 @@ var (
 	buildErr  error
 	binDir    string
 )
+
+// e2eRegion returns the project region every stack should use.
+//
+// The public platform (portal.stage.quantcdn.io) is Fastly-backed and takes
+// the standard regions au/us/eu. The AWS platform
+// (dash.stage.quantgov.cloud) takes au-govt. Neither may be hardcoded — both
+// have to be runnable — so this is the single place the choice is made.
+//
+//	QUANTCDN_BASE_URL=https://dash.stage.quantgov.cloud \
+//	QUANTCDN_E2E_REGION=au-govt go test -tags=e2e ./e2e/
+func e2eRegion() string {
+	if r := os.Getenv("QUANTCDN_E2E_REGION"); r != "" {
+		return r
+	}
+	return "au"
+}
 
 // uniqueSuffix returns a short unique string for resource naming to avoid collisions.
 func uniqueSuffix() string {
@@ -60,13 +76,21 @@ func ensureProvider(t *testing.T) {
 	require.NoError(t, buildErr, "failed to build provider binary")
 }
 
+// checkE2EEnv skips the test when the staging credentials are absent.
+//
+// Set E2E_REQUIRED=1 to turn that skip into a failure. CI MUST set it. Without
+// it the whole suite skips silently and the job still reports success, which is
+// how the v5.11.0 inputSchema regression reached a release unnoticed.
 func checkE2EEnv(t *testing.T) {
 	t.Helper()
-	if os.Getenv("QUANTCDN_API_TOKEN") == "" {
-		t.Skip("QUANTCDN_API_TOKEN not set — skipping E2E test")
-	}
-	if os.Getenv("QUANTCDN_ORGANIZATION") == "" {
-		t.Skip("QUANTCDN_ORGANIZATION not set — skipping E2E test")
+	for _, name := range []string{"QUANTCDN_API_TOKEN", "QUANTCDN_ORGANIZATION"} {
+		if os.Getenv(name) != "" {
+			continue
+		}
+		if os.Getenv("E2E_REQUIRED") != "" {
+			t.Fatalf("%s not set and E2E_REQUIRED is set — E2E tests must not skip in CI", name)
+		}
+		t.Skipf("%s not set — skipping E2E test", name)
 	}
 }
 
@@ -121,6 +145,13 @@ func createStack(t *testing.T, programName string, extraConfig ...map[string]str
 	err = stack.SetConfig(ctx, projectKey, auto.ConfigValue{Value: fmt.Sprintf("pulumi-e2e-%s-%s", programName, uniqueSuffix())})
 	if err != nil {
 		t.Logf("Note: could not set projectName config (program may not use it): %v", err)
+	}
+
+	// Every program declares a `region` config key; drive them all from one
+	// env var so the same suite can run against the public and AWS platforms.
+	regionKey := fmt.Sprintf("e2e-%s:region", programName)
+	if err := stack.SetConfig(ctx, regionKey, auto.ConfigValue{Value: e2eRegion()}); err != nil {
+		t.Logf("Note: could not set region config (program may not use it): %v", err)
 	}
 
 	// Apply extra config
@@ -977,7 +1008,7 @@ func TestE2E_Import_Project(t *testing.T) {
 
 	projReq := quantadmingo.NewV2ProjectRequestWithDefaults()
 	projReq.SetName(projectName)
-	projReq.SetRegion("au-govt")
+	projReq.SetRegion(e2eRegion())
 	createResp, _, err := apiClient.Instance.ProjectsAPI.ProjectsCreate(apiClient.AuthContext, apiClient.Organization).V2ProjectRequest(*projReq).Execute()
 	require.NoError(t, err, "API project create failed")
 	machineName := createResp.GetMachineName()
@@ -1057,7 +1088,7 @@ func TestE2E_Import_KVStore(t *testing.T) {
 
 	projReq := quantadmingo.NewV2ProjectRequestWithDefaults()
 	projReq.SetName(projectName)
-	projReq.SetRegion("au-govt")
+	projReq.SetRegion(e2eRegion())
 	createResp, _, err := apiClient.Instance.ProjectsAPI.ProjectsCreate(apiClient.AuthContext, apiClient.Organization).V2ProjectRequest(*projReq).Execute()
 	require.NoError(t, err, "API project create failed")
 	machineName := createResp.GetMachineName()
@@ -1419,7 +1450,7 @@ func TestE2E_Import_KVItem(t *testing.T) {
 
 	projReq := quantadmingo.NewV2ProjectRequestWithDefaults()
 	projReq.SetName(projectName)
-	projReq.SetRegion("au-govt")
+	projReq.SetRegion(e2eRegion())
 	createResp, _, err := apiClient.Instance.ProjectsAPI.ProjectsCreate(apiClient.AuthContext, apiClient.Organization).V2ProjectRequest(*projReq).Execute()
 	require.NoError(t, err, "API project create failed")
 	machineName := createResp.GetMachineName()

@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_project"
+	"io"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -203,6 +204,29 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// projectProvisioningState decides whether a freshly created project still
+// needs waiting on.
+//
+// CloudFront distribution deployment is asynchronous and takes 15-25 minutes,
+// and domains fail until it finishes, so AWS projects are polled until
+// platform_provisioning_status reaches "deployed".
+//
+// Fastly projects have no distribution to provision: the API leaves
+// platform_provisioning_status null forever. Polling one for "deployed"
+// burns the whole 45 minute timeout and then fails a create that actually
+// succeeded, so treat anything that is not AWS-backed as ready.
+func projectProvisioningState(props map[string]interface{}) string {
+	if status, ok := props["platform_provisioning_status"].(string); ok && status == "deployed" {
+		return "deployed"
+	}
+
+	if mode, ok := props["platform_mode"].(string); !ok || !strings.EqualFold(mode, "aws") {
+		return "deployed"
+	}
+
+	return "provisioning"
+}
+
 // Create project request.
 func callProjectCreateAPI(ctx context.Context, r *projectResource, project *resource_project.ProjectModel) (diags diag.Diagnostics) {
 	if project.Name.IsNull() || project.Name.IsUnknown() {
@@ -317,16 +341,7 @@ func callProjectCreateAPI(ctx context.Context, r *projectResource, project *reso
 				return nil, "", fmt.Errorf("error checking project status (HTTP %d): %v", statusCode, err)
 			}
 
-			// Project exists — check CDN provisioning status.
-			// CloudFront distribution deployment is asynchronous and can take
-			// 15-25 minutes. We wait for it here because downstream resources
-			// (domains) will fail until the CDN is fully provisioned.
-			if status, ok := projectResult.AdditionalProperties["platform_provisioning_status"].(string); ok && status == "deployed" {
-				return projectResult, "deployed", nil
-			}
-
-			// CDN not yet provisioned — keep polling.
-			return projectResult, "provisioning", nil
+			return projectResult, projectProvisioningState(projectResult.AdditionalProperties), nil
 		},
 		Timeout:      45 * time.Minute,
 		Delay:        10 * time.Second,
