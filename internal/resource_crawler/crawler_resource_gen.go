@@ -283,8 +283,8 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 			"user_agent": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Custom user agent, only when browser_mode is false",
-				MarkdownDescription: "Custom user agent, only when browser_mode is false",
+				Description:         "Custom user agent. Valid with or without browser_mode.",
+				MarkdownDescription: "Custom user agent. Valid with or without browser_mode.",
 			},
 			"uuid": schema.StringAttribute{
 				Computed:            true,

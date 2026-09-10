@@ -377,7 +377,7 @@
                     "additionalProperties": {
                         "$ref": "#/types/quant:index/AiGovernanceSpendLimitsInterfaceLimits:AiGovernanceSpendLimitsInterfaceLimits"
                     },
-                    "description": "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket). Keys are interface labels.\n"
+                    "description": "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket, durable, orchestration, workflow, embedding, ai-search). Keys are interface labels.\n"
                 },
                 "monthlyBudgetCents": {
                     "type": "integer"
@@ -4646,7 +4646,7 @@
                 },
                 "userAgent": {
                     "type": "string",
-                    "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis false"
+                    "description": "Custom user agent. Valid with or without browser_mode."
                 },
                 "uuid": {
                     "type": "string",
@@ -4811,7 +4811,7 @@
                 },
                 "userAgent": {
                     "type": "string",
-                    "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis false"
+                    "description": "Custom user agent. Valid with or without browser_mode."
                 },
                 "webhookAuthHeader": {
                     "type": "string",
@@ -4970,7 +4970,7 @@
                     },
                     "userAgent": {
                         "type": "string",
-                        "description": "Custom user agent, only when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis false"
+                        "description": "Custom user agent. Valid with or without browser_mode."
                     },
                     "uuid": {
                         "type": "string",
