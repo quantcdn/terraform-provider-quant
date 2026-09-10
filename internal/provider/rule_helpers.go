@@ -319,6 +319,14 @@ type notFoundDiagnostic struct {
 	diag.ErrorDiagnostic
 }
 
+// Equal keeps the not-found kind distinct: the embedded ErrorDiagnostic's Equal
+// type-asserts a plain ErrorDiagnostic and so would never match this wrapper,
+// which stops Diagnostics.Append de-duplicating two identical not-found diags.
+func (d notFoundDiagnostic) Equal(other diag.Diagnostic) bool {
+	o, ok := other.(notFoundDiagnostic)
+	return ok && d.ErrorDiagnostic.Equal(o.ErrorDiagnostic)
+}
+
 // readFailure builds the diagnostic for a failed Read API call. A 404 becomes a
 // notFoundDiagnostic so Read can remove the resource from state; any other
 // failure stays an ordinary error with the caller's summary and detail.

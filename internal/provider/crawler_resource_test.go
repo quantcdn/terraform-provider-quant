@@ -758,9 +758,13 @@ func TestAccCrawlerResource_DeletedOutsideTerraform(t *testing.T) {
 					httpmock.RegisterResponder("GET", readURL,
 						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
 				},
-				Config:             testAccCrawlerResourceConfigMock(),
-				PlanOnly:           true,
+				RefreshState:       true,
 				ExpectNonEmptyPlan: true,
+				RefreshPlanChecks: resource.RefreshPlanChecks{
+					PostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("quant_crawler.test", plancheck.ResourceActionCreate),
+					},
+				},
 			},
 		},
 	})
