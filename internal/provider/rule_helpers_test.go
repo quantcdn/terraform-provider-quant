@@ -897,3 +897,16 @@ func TestStripNotFound(t *testing.T) {
 		t.Fatal("a plain error must not be reported as not found")
 	}
 }
+
+func TestNotFoundDiagnosticEqual(t *testing.T) {
+	a := readFailure(&http.Response{StatusCode: http.StatusNotFound}, "gone", "x")
+	b := readFailure(&http.Response{StatusCode: http.StatusNotFound}, "gone", "x")
+	plain := diag.NewErrorDiagnostic("gone", "x")
+
+	if !a.Equal(b) {
+		t.Fatal("two identical not-found diagnostics must be equal, or Diagnostics.Append cannot de-duplicate them")
+	}
+	if a.Equal(plain) || plain.Equal(a) {
+		t.Fatal("a not-found diagnostic must not equal a plain error with the same text")
+	}
+}

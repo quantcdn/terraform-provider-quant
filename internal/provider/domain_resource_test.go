@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/jarcoal/httpmock"
 )
 
@@ -217,9 +218,13 @@ func TestDomainResource_DeletedOutsideTerraform(t *testing.T) {
 					httpmock.RegisterResponder("GET", readURL,
 						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
 				},
-				Config:             config,
-				PlanOnly:           true,
+				RefreshState:       true,
 				ExpectNonEmptyPlan: true,
+				RefreshPlanChecks: resource.RefreshPlanChecks{
+					PostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("quant_domain.test", plancheck.ResourceActionCreate),
+					},
+				},
 			},
 		},
 	})

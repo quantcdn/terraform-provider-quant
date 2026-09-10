@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jarcoal/httpmock"
 )
@@ -286,9 +287,13 @@ func TestAccCrawlerScheduleResource_DeletedOutsideTerraform(t *testing.T) {
 					httpmock.RegisterResponder("GET", readURL,
 						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
 				},
-				Config:             config,
-				PlanOnly:           true,
+				RefreshState:       true,
 				ExpectNonEmptyPlan: true,
+				RefreshPlanChecks: resource.RefreshPlanChecks{
+					PostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("quant_crawler_schedule.test", plancheck.ResourceActionCreate),
+					},
+				},
 			},
 		},
 	})
