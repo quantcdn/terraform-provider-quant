@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jarcoal/httpmock"
 )
@@ -758,6 +761,32 @@ func TestAccCrawlerResource_DeletedOutsideTerraform(t *testing.T) {
 				Config:             testAccCrawlerResourceConfigMock(),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+// Updating an unrelated attribute must not re-plan the unconfigured computed
+// assets object as unknown. Under the Pulumi bridge that unknown shows up as a
+// perpetual update on every crawler, even when nothing has changed.
+func TestAccCrawlerResource_AssetsStaysKnownOnUpdate(t *testing.T) {
+	setupCrawlerServer(t, "test-organization", "default")
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCrawlerResourceConfigMock(),
+			},
+			{
+				Config: testAccCrawlerResourceConfigUpdateMock(),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectKnownValue("quant_crawler.test", tfjsonpath.New("assets"), knownvalue.Null()),
+					},
+				},
 			},
 		},
 	})

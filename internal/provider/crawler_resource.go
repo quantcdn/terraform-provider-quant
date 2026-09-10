@@ -643,7 +643,22 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		}
 	}
 
+	// Changing any other attribute makes the framework re-plan unconfigured
+	// computed attributes as unknown. assets cannot take an attribute plan
+	// modifier (its generated type rejects the conversion), so keep the prior
+	// value here; otherwise the Pulumi bridge reports a perpetual update.
+	plan.Assets = keepPriorAssetsIfUnknown(plan.Assets, state.Assets)
+
 	resp.Plan.Set(ctx, &plan)
+}
+
+// keepPriorAssetsIfUnknown returns the prior assets when the planned value is
+// unknown, mirroring UseStateForUnknown for the generated assets type.
+func keepPriorAssetsIfUnknown(planned, prior resource_crawler.AssetsValue) resource_crawler.AssetsValue {
+	if planned.IsUnknown() {
+		return prior
+	}
+	return planned
 }
 
 // ---------------------------------------------------------------------------
