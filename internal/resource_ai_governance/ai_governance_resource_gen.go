@@ -98,8 +98,8 @@ func AiGovernanceResourceSchema(ctx context.Context) schema.Schema {
 						},
 						Optional:            true,
 						Computed:            true,
-						Description:         "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket). Keys are interface labels.",
-						MarkdownDescription: "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket). Keys are interface labels.",
+						Description:         "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket, durable, orchestration, workflow, embedding, ai-search). Keys are interface labels.",
+						MarkdownDescription: "Aggregate spend caps per interface label (slack, autonomous, api-gateway, streaming, websocket, durable, orchestration, workflow, embedding, ai-search). Keys are interface labels.",
 					},
 					"monthly_budget_cents": schema.Int64Attribute{
 						Optional: true,
