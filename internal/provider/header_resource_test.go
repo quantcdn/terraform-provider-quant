@@ -212,3 +212,33 @@ resource "quant_header" "test" {
 		},
 	})
 }
+
+// Custom headers whose project was deleted outside Terraform must drop out of
+// state on refresh, rather than failing every later plan with a 404.
+func TestAccHeaderResource_DeletedOutsideTerraform(t *testing.T) {
+	project := "testproject"
+	org := "testorg"
+	testAccHeaderPreCheck(t, org, project)
+	defer httpmock.DeactivateAndReset()
+
+	readURL := fmt.Sprintf("https://dashboard.quantcdn.io/api/v2/organizations/%s/projects/%s/custom-headers", org, project)
+	config := testAccHeaderResourceConfig(org, project)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testHeaderResourceFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+			{
+				PreConfig: func() {
+					httpmock.RegisterResponder("GET", readURL,
+						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
+				},
+				Config:             config,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}

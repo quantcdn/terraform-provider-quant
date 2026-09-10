@@ -265,3 +265,31 @@ func TestAccCrawlerScheduleResource_CreateError(t *testing.T) {
 		},
 	})
 }
+
+// A schedule deleted outside Terraform must drop out of state on refresh, rather
+// than failing every later plan with a 404.
+func TestAccCrawlerScheduleResource_DeletedOutsideTerraform(t *testing.T) {
+	setupCrawlerScheduleServer(t, "test-org", "test-project")
+	defer httpmock.DeactivateAndReset()
+
+	readURL := "https://dashboard.quantcdn.io/api/v2/organizations/test-org/projects/test-project/crawlers/test-crawler-uuid/schedules/1"
+	config := testAccCrawlerScheduleResourceConfig("test-org", "test-project", "test-schedule", "0 0 * * *")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+			{
+				PreConfig: func() {
+					httpmock.RegisterResponder("GET", readURL,
+						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
+				},
+				Config:             config,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}

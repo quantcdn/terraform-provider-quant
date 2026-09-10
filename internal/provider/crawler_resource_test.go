@@ -734,3 +734,31 @@ resource "quant_crawler" "test" {
 		},
 	})
 }
+
+// A crawler deleted outside Terraform must drop out of state on refresh, rather
+// than failing every later plan with a 404.
+func TestAccCrawlerResource_DeletedOutsideTerraform(t *testing.T) {
+	setupCrawlerServer(t, "test-organization", "default")
+	defer httpmock.DeactivateAndReset()
+
+	readURL := "https://dashboard.quantcdn.io/api/v2/organizations/test-organization/projects/default/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCrawlerResourceConfigMock(),
+			},
+			{
+				PreConfig: func() {
+					httpmock.RegisterResponder("GET", readURL,
+						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
+				},
+				Config:             testAccCrawlerResourceConfigMock(),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}

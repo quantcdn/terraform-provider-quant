@@ -134,7 +134,12 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	// Read API call logic
-	resp.Diagnostics.Append(callProjectReadAPI(ctx, r, &data)...)
+	readDiags, gone := stripNotFound(callProjectReadAPI(ctx, r, &data))
+	resp.Diagnostics.Append(readDiags...)
+	if gone {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -416,10 +421,10 @@ func callProjectReadAPI(ctx context.Context, r *projectResource, project *resour
 	if !project.WithToken.IsNull() {
 		withToken = project.WithToken.ValueBool()
 	}
-	api, _, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).WithToken(withToken).Execute()
+	api, httpResp, err := r.client.Instance.ProjectsAPI.ProjectsRead(r.client.AuthContext, r.client.Organization, project.MachineName.ValueString()).WithToken(withToken).Execute()
 
 	if err != nil {
-		diags.Append(diag.NewErrorDiagnostic(
+		diags.Append(readFailure(httpResp,
 			"Unable to read project data from API",
 			fmt.Sprintf("There was an issue with the request when requesting project information from the API, please check the error and update your configuration.\nError: %s", err.Error()),
 		))

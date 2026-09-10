@@ -85,7 +85,12 @@ func (r *crawlerResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	resp.Diagnostics.Append(callCrawlerReadAPI(ctx, r, &data)...)
+	readDiags, gone := stripNotFound(callCrawlerReadAPI(ctx, r, &data))
+	resp.Diagnostics.Append(readDiags...)
+	if gone {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -297,12 +302,12 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 		return
 	}
 
-	api, _, err := r.client.Instance.CrawlersAPI.CrawlersRead(
+	api, httpResp, err := r.client.Instance.CrawlersAPI.CrawlersRead(
 		r.client.AuthContext, r.client.Organization, crawler.Project.ValueString(), crawler.Uuid.ValueString(),
 	).Execute()
 
 	if err != nil {
-		diags.AddError("Unable to read crawler", fmt.Sprintf("Error: %s", err.Error()))
+		diags.Append(readFailure(httpResp, "Unable to read crawler", fmt.Sprintf("Error: %s", err.Error())))
 		return
 	}
 	if api == nil {

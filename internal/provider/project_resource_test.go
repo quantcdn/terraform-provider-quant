@@ -33,6 +33,12 @@ var projectResponse = map[string]interface{}{
 }
 
 func mockProjectServer(t *testing.T, organizationID string, projectID string) {
+	// The PATCH handler below writes these fields into the shared fixture. Reset
+	// them so every test starts from the same project, whichever ran before it.
+	projectResponse["name"] = "test-project"
+	projectResponse["allow_query_params"] = false
+	projectResponse["region"] = "au"
+
 	httpmock.Activate()
 	baseUrl := "https://dashboard.quantcdn.io/api/v2"
 
@@ -318,6 +324,36 @@ func TestProjectResource_CreateConflict409(t *testing.T) {
 			{
 				Config:      testProjectErrorConfig(),
 				ExpectError: regexp.MustCompile(`Project Already Exists`),
+			},
+		},
+	})
+}
+
+// A project deleted outside Terraform must drop out of state on refresh, rather
+// than failing every later plan with a 404.
+func TestProjectResource_DeletedOutsideTerraform(t *testing.T) {
+	organizationID := "test-organization"
+	projectID := "test-project"
+	mockProjectServer(t, organizationID, projectID)
+	defer httpmock.DeactivateAndReset()
+
+	readURL := fmt.Sprintf("https://dashboard.quantcdn.io/api/v2/organizations/%s/projects/%s", organizationID, projectID)
+	config := testProjectResourceConfig(organizationID, projectID, false)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testProjectResourceFactories(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+			{
+				PreConfig: func() {
+					httpmock.RegisterResponder("GET", readURL,
+						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
+				},
+				Config:             config,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
 			},
 		},
 	})

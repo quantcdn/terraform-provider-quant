@@ -310,3 +310,36 @@ func buildConditionalListsForRequest(
 
 	return diags
 }
+
+// notFoundDiagnostic reports that the remote resource no longer exists. Read
+// handlers turn it into state removal. Every other caller treats it as an
+// ordinary error, because a 404 during Create, Update or ImportState is a real
+// failure rather than a deletion made outside Terraform.
+type notFoundDiagnostic struct {
+	diag.ErrorDiagnostic
+}
+
+// readFailure builds the diagnostic for a failed Read API call. A 404 becomes a
+// notFoundDiagnostic so Read can remove the resource from state; any other
+// failure stays an ordinary error with the caller's summary and detail.
+func readFailure(resp *http.Response, summary, detail string) diag.Diagnostic {
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
+		return notFoundDiagnostic{diag.NewErrorDiagnostic(summary, detail)}
+	}
+	return diag.NewErrorDiagnostic(summary, detail)
+}
+
+// stripNotFound separates a not-found diagnostic from the others, so a Read
+// handler can remove a deleted resource from state instead of failing.
+func stripNotFound(diags diag.Diagnostics) (diag.Diagnostics, bool) {
+	var rest diag.Diagnostics
+	found := false
+	for _, d := range diags {
+		if _, ok := d.(notFoundDiagnostic); ok {
+			found = true
+			continue
+		}
+		rest = append(rest, d)
+	}
+	return rest, found
+}
