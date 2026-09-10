@@ -195,3 +195,32 @@ func TestDomainResource_CreateError(t *testing.T) {
 		},
 	})
 }
+
+// A domain deleted outside Terraform must drop out of state on refresh, rather
+// than failing every later plan with a 404.
+func TestDomainResource_DeletedOutsideTerraform(t *testing.T) {
+	organizationID := "test-organization"
+	mockDomainServer(t, organizationID)
+	defer httpmock.DeactivateAndReset()
+
+	readURL := fmt.Sprintf("https://dashboard.quantcdn.io/api/v2/organizations/%s/projects/default/domains/9555", organizationID)
+	config := testDomainResourceConfig(organizationID, "test-domain", "example.com")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testDomainResourceFactories(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+			{
+				PreConfig: func() {
+					httpmock.RegisterResponder("GET", readURL,
+						httpmock.NewStringResponder(404, `{"error":true,"message":"Unable to find matching result"}`))
+				},
+				Config:             config,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}

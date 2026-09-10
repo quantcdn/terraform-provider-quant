@@ -88,7 +88,12 @@ func (r *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	resp.Diagnostics.Append(callDomainReadAPI(ctx, r, &data)...)
+	readDiags, gone := stripNotFound(callDomainReadAPI(ctx, r, &data))
+	resp.Diagnostics.Append(readDiags...)
+	if gone {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -222,12 +227,12 @@ func callDomainReadAPI(ctx context.Context, r *domainResource, domain *resource_
 
 	org := r.client.Organization
 	project := domain.Project.ValueString()
-	apiResp, _, err := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).Execute()
+	apiResp, httpResp, err := r.client.Instance.DomainsAPI.DomainsRead(r.client.AuthContext, org, project, strconv.FormatInt(domain.Id.ValueInt64(), 10)).Execute()
 	if err != nil {
-		diags.AddError(
+		diags.Append(readFailure(httpResp,
 			"Error reading domain",
 			"Could not read domain, unexpected error: "+err.Error(),
-		)
+		))
 		return
 	}
 

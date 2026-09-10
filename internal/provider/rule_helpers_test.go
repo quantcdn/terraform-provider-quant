@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"bytes"
 	"context"
 	"errors"
@@ -852,4 +853,47 @@ func TestAddUseStateForUnknown(t *testing.T) {
 			t.Fatalf("expected 2 plan modifiers (existing + UseStateForUnknown), got %d", len(a.PlanModifiers))
 		}
 	})
+}
+
+func TestReadFailure(t *testing.T) {
+	t.Run("404 becomes a not-found diagnostic", func(t *testing.T) {
+		d := readFailure(&http.Response{StatusCode: http.StatusNotFound}, "summary", "detail")
+		if _, ok := d.(notFoundDiagnostic); !ok {
+			t.Fatalf("expected notFoundDiagnostic, got %T", d)
+		}
+		if d.Severity() != diag.SeverityError || d.Summary() != "summary" || d.Detail() != "detail" {
+			t.Fatalf("unexpected diagnostic: %v %q %q", d.Severity(), d.Summary(), d.Detail())
+		}
+	})
+
+	t.Run("other status stays an ordinary error", func(t *testing.T) {
+		d := readFailure(&http.Response{StatusCode: http.StatusInternalServerError}, "summary", "detail")
+		if _, ok := d.(notFoundDiagnostic); ok {
+			t.Fatal("a 500 must not be treated as not found")
+		}
+	})
+
+	t.Run("nil response stays an ordinary error", func(t *testing.T) {
+		if _, ok := readFailure(nil, "summary", "detail").(notFoundDiagnostic); ok {
+			t.Fatal("a transport error must not be treated as not found")
+		}
+	})
+}
+
+func TestStripNotFound(t *testing.T) {
+	other := diag.NewErrorDiagnostic("other", "boom")
+	var diags diag.Diagnostics
+	diags.Append(other, readFailure(&http.Response{StatusCode: http.StatusNotFound}, "gone", "x"))
+
+	rest, found := stripNotFound(diags)
+	if !found {
+		t.Fatal("expected the not-found diagnostic to be detected")
+	}
+	if len(rest) != 1 || !rest[0].Equal(other) {
+		t.Fatalf("expected only the unrelated error to remain, got %v", rest)
+	}
+
+	if _, found := stripNotFound(diag.Diagnostics{other}); found {
+		t.Fatal("a plain error must not be reported as not found")
+	}
 }

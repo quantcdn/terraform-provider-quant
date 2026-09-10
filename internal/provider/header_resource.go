@@ -109,7 +109,12 @@ func (r *headerResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	resp.Diagnostics.Append(callHeaderReadAPI(ctx, r, &data)...)
+	readDiags, gone := stripNotFound(callHeaderReadAPI(ctx, r, &data))
+	resp.Diagnostics.Append(readDiags...)
+	if gone {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -224,12 +229,12 @@ func callHeaderCreateUpdateAPI(ctx context.Context, h *headerResource, data *hea
 // callHeaderReadAPI reads custom headers from the API.
 func callHeaderReadAPI(ctx context.Context, h *headerResource, data *headerResourceModel) (diags diag.Diagnostics) {
 	org := h.getOrg(data)
-	allHeaders, _, err := h.client.Instance.HeadersAPI.HeadersList(
+	allHeaders, httpResp, err := h.client.Instance.HeadersAPI.HeadersList(
 		h.client.AuthContext, org, data.Project.ValueString(),
 	).Execute()
 
 	if err != nil {
-		diags.AddError("Error getting custom headers", err.Error())
+		diags.Append(readFailure(httpResp, "Error getting custom headers", err.Error()))
 		return
 	}
 

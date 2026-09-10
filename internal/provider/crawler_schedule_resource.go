@@ -85,7 +85,12 @@ func (r *crawlerScheduleResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	resp.Diagnostics.Append(callCrawlerScheduleReadAPI(ctx, r, &data)...)
+	readDiags, gone := stripNotFound(callCrawlerScheduleReadAPI(ctx, r, &data))
+	resp.Diagnostics.Append(readDiags...)
+	if gone {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -205,13 +210,13 @@ func callCrawlerScheduleReadAPI(ctx context.Context, r *crawlerScheduleResource,
 	}
 
 	scheduleId := strconv.FormatInt(schedule.Id.ValueInt64(), 10)
-	api, _, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesShow(
+	api, httpResp, err := r.client.Instance.CrawlerSchedulesAPI.CrawlerSchedulesShow(
 		r.client.AuthContext, r.client.Organization,
 		schedule.Project.ValueString(), schedule.Crawler.ValueString(), scheduleId,
 	).Execute()
 
 	if err != nil {
-		diags.AddError("Unable to load crawler schedule", fmt.Sprintf("Error: %s", err.Error()))
+		diags.Append(readFailure(httpResp, "Unable to load crawler schedule", fmt.Sprintf("Error: %s", err.Error())))
 		return
 	}
 
