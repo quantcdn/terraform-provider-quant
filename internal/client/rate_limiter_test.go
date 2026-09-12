@@ -454,3 +454,59 @@ func TestRetryPolicyByMethod(t *testing.T) {
 		})
 	}
 }
+
+func rulesLock() (*http.Response, error) {
+	u, _ := url.Parse("https://api.example/v2/organizations/o/projects/p/rules/proxy")
+	return &http.Response{StatusCode: http.StatusConflict, Body: http.NoBody, Header: http.Header{}, Request: &http.Request{URL: u}}, nil
+}
+
+func sendRulesVia(t *testing.T, tr *countingTransport) (*http.Response, error) {
+	t.Helper()
+	cfg := DefaultRateLimitConfig()
+	cfg.RequestsPerSecond = 0
+	cfg.BaseDelay = time.Millisecond
+	cfg.MaxDelay = 2 * time.Millisecond
+	cfg.LockRetryDelay = time.Millisecond
+	cfg.EnableJitter = false
+	rt := NewRateLimitedRoundTripper(tr, cfg)
+	defer rt.Close()
+	req, _ := http.NewRequest(http.MethodPost, "https://api.example/v2/organizations/o/projects/p/rules/proxy", strings.NewReader(`{}`))
+	return rt.RoundTrip(req)
+}
+
+func TestRulesLockHasItsOwnRetryBudget(t *testing.T) {
+	t.Run("a rules 409 is retried beyond MaxRetries", func(t *testing.T) {
+		answers := []func() (*http.Response, error){}
+		for i := 0; i < 6; i++ {
+			answers = append(answers, rulesLock)
+		}
+		answers = append(answers, status(200))
+		tr := &countingTransport{answers: answers}
+		resp, err := sendRulesVia(t, tr)
+		if err != nil || resp == nil || resp.StatusCode != 200 {
+			t.Fatalf("expected eventual 200, got resp=%v err=%v", resp, err)
+		}
+		if tr.calls != 7 {
+			t.Fatalf("sent %d times, want 7 (6 lock responses then success)", tr.calls)
+		}
+	})
+
+	t.Run("the lock budget is bounded", func(t *testing.T) {
+		tr := &countingTransport{answers: []func() (*http.Response, error){rulesLock}}
+		resp, _ := sendRulesVia(t, tr)
+		if resp == nil || resp.StatusCode != http.StatusConflict {
+			t.Fatalf("expected the final 409 to be returned, got %v", resp)
+		}
+		if tr.calls != DefaultRateLimitConfig().MaxLockRetries+1 {
+			t.Fatalf("sent %d times, want %d", tr.calls, DefaultRateLimitConfig().MaxLockRetries+1)
+		}
+	})
+
+	t.Run("ordinary retries still stop at MaxRetries", func(t *testing.T) {
+		tr := &countingTransport{answers: []func() (*http.Response, error){status(503)}}
+		_, _ = sendVia(t, tr, http.MethodGet)
+		if tr.calls != DefaultRateLimitConfig().MaxRetries+1 {
+			t.Fatalf("sent %d times, want %d", tr.calls, DefaultRateLimitConfig().MaxRetries+1)
+		}
+	})
+}

@@ -28,6 +28,12 @@ type RateLimitConfig struct {
 	RetryCondition func(*http.Response, error) bool
 	// Per-request timeout (optional, for fine-grained timeout control)
 	RequestTimeout time.Duration
+	// Retries allowed for the rules API's advisory 409 lock, counted separately
+	// from MaxRetries: the lock is expected contention, not a fault, and a
+	// project with many rules changing at once needs a longer wait.
+	MaxLockRetries int
+	// Minimum delay before re-sending after a rules lock 409
+	LockRetryDelay time.Duration
 }
 
 // DefaultRateLimitConfig returns sensible defaults for rate limiting
@@ -39,6 +45,8 @@ func DefaultRateLimitConfig() *RateLimitConfig {
 		MaxDelay:          30 * time.Second,
 		EnableJitter:      true,
 		RetryCondition:    DefaultRetryCondition,
+		MaxLockRetries:    10,
+		LockRetryDelay:    2 * time.Second,
 	}
 }
 
@@ -168,8 +176,6 @@ func NewRateLimitedRoundTripper(transport http.RoundTripper, config *RateLimitCo
 
 // RoundTrip implements the http.RoundTripper interface with rate limiting and retries
 func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	var lastResp *http.Response
-	var lastErr error
 
 	// Buffer the request body so retries can replay it. Without this,
 	// the body is consumed on the first attempt and retries send an empty
@@ -185,7 +191,8 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	}
 
-	for attempt := 0; attempt <= rt.config.MaxRetries; attempt++ {
+	attempt, lockRetries := 0, 0
+	for {
 		// Restore body for retries
 		if bodyBytes != nil {
 			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
@@ -217,13 +224,9 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 			cancel()
 		}
 
-		// Check if we should retry
-		if attempt < rt.config.MaxRetries && rt.shouldRetry(req, resp, err) {
-			lastResp = resp
-			lastErr = err
-
-			// Calculate delay with exponential backoff
-			delay := rt.calculateDelay(attempt, resp)
+		// Retry if the failure qualifies and its budget is not spent
+		if rt.shouldRetry(req, resp, err) && rt.charge(resp, &attempt, &lockRetries) {
+			delay := rt.retryDelay(attempt, resp)
 
 			// Wait before retrying, but respect context cancellation
 			select {
@@ -244,12 +247,9 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 			continue
 		}
 
-		// Success or non-retryable error
+		// Success, non-retryable error, or budget exhausted
 		return resp, err
 	}
-
-	// All retries exhausted
-	return lastResp, lastErr
 }
 
 // shouldRetry reports whether a failed attempt may be sent again.
@@ -267,6 +267,33 @@ func (rt *RateLimitedRoundTripper) shouldRetry(req *http.Request, resp *http.Res
 		return true
 	}
 	return resp != nil && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusConflict)
+}
+
+// isRulesLock reports whether a response is the rules API's advisory 409.
+func isRulesLock(resp *http.Response) bool {
+	return resp != nil && resp.StatusCode == http.StatusConflict && isRulesEndpoint(resp)
+}
+
+// charge spends one retry from the right budget and reports whether the retry
+// is allowed. A rules lock 409 draws on MaxLockRetries; everything else draws
+// on MaxRetries.
+func (rt *RateLimitedRoundTripper) charge(resp *http.Response, attempt, lockRetries *int) bool {
+	if isRulesLock(resp) {
+		*lockRetries++
+		return *lockRetries <= rt.config.MaxLockRetries
+	}
+	*attempt++
+	return *attempt <= rt.config.MaxRetries
+}
+
+// retryDelay is the backoff for the next attempt, with a floor for the rules
+// lock, which is expected contention rather than a fault.
+func (rt *RateLimitedRoundTripper) retryDelay(attempt int, resp *http.Response) time.Duration {
+	delay := rt.calculateDelay(attempt-1, resp)
+	if isRulesLock(resp) && delay < rt.config.LockRetryDelay {
+		delay = rt.config.LockRetryDelay
+	}
+	return delay
 }
 
 // isIdempotent reports whether re-sending a request with this method cannot

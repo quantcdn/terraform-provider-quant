@@ -26,6 +26,9 @@ The QuantCDN Terraform provider includes built-in API rate limiting and intellig
 - **Safe for creates**: a `POST` or `PATCH` is re-sent only after a 429, never after a
   timeout or 5xx, because the server may already have applied it and a second send
   would create a duplicate that fails with 409. Idempotent methods retry on everything above.
+- **Rules lock budget**: the rules API answers `409` while another change holds the project
+  lock. That is retried on its own budget (10 attempts, at least 2 s apart) instead of the
+  general 3, so many rules changing at once do not exhaust it.
 - **Jitter Support**: Adds randomisation to retry delays to prevent thundering herd effects
 - **Retry-After Support**: Respects API-provided retry timing headers
 - **Context-Aware**: Properly handles request cancellation and timeouts
