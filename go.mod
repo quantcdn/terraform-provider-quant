@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.40.1
 	github.com/hashicorp/terraform-plugin-testing v1.16.0
 	github.com/jarcoal/httpmock v1.4.2
-	github.com/quantcdn/quant-admin-go/v4 v4.20.0
+	github.com/quantcdn/quant-admin-go/v4 v4.22.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
