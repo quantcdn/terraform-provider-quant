@@ -218,7 +218,7 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 		}
 
 		// Check if we should retry
-		if attempt < rt.config.MaxRetries && rt.config.RetryCondition(resp, err) {
+		if attempt < rt.config.MaxRetries && rt.shouldRetry(req, resp, err) {
 			lastResp = resp
 			lastErr = err
 
@@ -250,6 +250,33 @@ func (rt *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response,
 
 	// All retries exhausted
 	return lastResp, lastErr
+}
+
+// shouldRetry reports whether a failed attempt may be sent again.
+//
+// Idempotent methods are re-sent whenever RetryCondition allows. A POST or
+// PATCH is re-sent only when the server certainly did not process it: a 429,
+// or the rules API's advisory 409. After a timeout or a 5xx the request may
+// already have been applied, and re-sending it creates a duplicate that then
+// fails with 409 and leaves an orphan behind.
+func (rt *RateLimitedRoundTripper) shouldRetry(req *http.Request, resp *http.Response, err error) bool {
+	if !rt.config.RetryCondition(resp, err) {
+		return false
+	}
+	if isIdempotent(req.Method) {
+		return true
+	}
+	return resp != nil && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusConflict)
+}
+
+// isIdempotent reports whether re-sending a request with this method cannot
+// apply it twice.
+func isIdempotent(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodPut, http.MethodDelete:
+		return true
+	}
+	return false
 }
 
 // calculateDelay calculates the delay for the next retry attempt

@@ -23,6 +23,9 @@ The QuantCDN Terraform provider includes built-in API rate limiting and intellig
 - **Token Bucket Rate Limiting**: Controls the number of requests per second to the QuantCDN API
 - **Exponential Backoff**: Automatically retries failed requests with increasing delays
 - **Smart Retry Logic**: Handles rate limiting (429), server errors (5xx), and network errors
+- **Safe for creates**: a `POST` or `PATCH` is re-sent only after a 429, never after a
+  timeout or 5xx, because the server may already have applied it and a second send
+  would create a duplicate that fails with 409. Idempotent methods retry on everything above.
 - **Jitter Support**: Adds randomisation to retry delays to prevent thundering herd effects
 - **Retry-After Support**: Respects API-provided retry timing headers
 - **Context-Aware**: Properly handles request cancellation and timeouts
