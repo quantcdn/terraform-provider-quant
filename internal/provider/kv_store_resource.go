@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_kv_store"
 
@@ -68,7 +69,14 @@ func (r *kvStoreResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// Record the store first: it exists even if the wait below fails, and
+	// the framework keeps state set before an error so it is not orphaned.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(waitForKVStoreReady(ctx, r, &data)...)
 }
 
 func (r *kvStoreResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -239,4 +247,41 @@ func callKVStoreDeleteAPI(ctx context.Context, r *kvStoreResource, data *resourc
 	}
 
 	return
+}
+
+// KVStoreReadyTimeout and KVStoreReadyInterval bound the wait after a create.
+// The API accepts a create before the DynamoDB table is active, and item
+// writes fail until it is. Variables so tests can shorten them.
+var (
+	KVStoreReadyTimeout  = 3 * time.Minute
+	KVStoreReadyInterval = 3 * time.Second
+)
+
+// waitForKVStoreReady polls the store's item list until it answers. The list
+// fails while the table is still creating and succeeds once it is active.
+func waitForKVStoreReady(ctx context.Context, r *kvStoreResource, data *resource_kv_store.KvStoreModel) (diags diag.Diagnostics) {
+	org, project, storeId := r.getOrg(data), data.Project.ValueString(), data.StoreId.ValueString()
+	deadline := time.Now().Add(KVStoreReadyTimeout)
+
+	for {
+		_, resp, err := r.client.Instance.KVAPI.KVItemsList(r.client.AuthContext, org, project, storeId).Execute()
+		if err == nil {
+			return
+		}
+		if resp != nil && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) {
+			diags.AddError("Unable to Check KV Store", extractAPIErrorMessage(resp, err))
+			return
+		}
+		if time.Now().After(deadline) {
+			diags.AddError("KV Store Not Ready", fmt.Sprintf("Store %q was created but did not become ready within %s. Last error: %s", storeId, KVStoreReadyTimeout, err.Error()))
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			diags.AddError("KV Store Not Ready", ctx.Err().Error())
+			return
+		case <-time.After(KVStoreReadyInterval):
+		}
+	}
 }
