@@ -60,6 +60,16 @@ func mockKVStoreServer(t *testing.T, org string, project string, storeId string)
 			return httpmock.NewJsonResponse(200, createResponse())
 		})
 
+	// GET KV store items: the store answers once its table is active.
+	httpmock.RegisterResponder("GET",
+		fmt.Sprintf("%s/organizations/%s/projects/%s/kv/%s/items", baseUrl, org, project, storeId),
+		func(req *http.Request) (*http.Response, error) {
+			if storeDeleted {
+				return httpmock.NewStringResponse(404, "Not Found"), nil
+			}
+			return httpmock.NewJsonResponse(200, map[string]interface{}{"data": []interface{}{}, "next_cursor": nil})
+		})
+
 	// PUT KV store (update)
 	httpmock.RegisterResponder("PUT",
 		fmt.Sprintf("%s/organizations/%s/projects/%s/kv/%s", baseUrl, org, project, storeId),
