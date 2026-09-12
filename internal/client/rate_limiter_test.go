@@ -1,10 +1,12 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -372,5 +374,83 @@ func TestIsRulesEndpointNilSafety(t *testing.T) {
 	}
 	if isRulesEndpoint(&http.Response{Request: &http.Request{}}) {
 		t.Error("request with no URL must not be treated as a rules endpoint")
+	}
+}
+
+// countingTransport records how many times a request was sent and answers
+// with a scripted sequence of responses or errors.
+type countingTransport struct {
+	calls   int
+	answers []func() (*http.Response, error)
+}
+
+func (c *countingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	i := c.calls
+	c.calls++
+	if i >= len(c.answers) {
+		i = len(c.answers) - 1
+	}
+	return c.answers[i]()
+}
+
+func status(code int) func() (*http.Response, error) {
+	return func() (*http.Response, error) {
+		return &http.Response{StatusCode: code, Body: http.NoBody, Header: http.Header{}}, nil
+	}
+}
+
+func transportError() (*http.Response, error) {
+	return nil, errors.New("read tcp: connection reset by peer")
+}
+
+func sendVia(t *testing.T, tr *countingTransport, method string) (*http.Response, error) {
+	t.Helper()
+	cfg := DefaultRateLimitConfig()
+	cfg.RequestsPerSecond = 0
+	cfg.BaseDelay = time.Millisecond
+	cfg.MaxDelay = time.Millisecond
+	cfg.EnableJitter = false
+	rt := NewRateLimitedRoundTripper(tr, cfg)
+	defer rt.Close()
+	req, err := http.NewRequest(method, "https://api.example/v2/organizations/o/projects/p/kv-stores", strings.NewReader(`{"name":"x"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rt.RoundTrip(req)
+}
+
+func TestRetryPolicyByMethod(t *testing.T) {
+	tests := []struct {
+		name      string
+		method    string
+		answers   []func() (*http.Response, error)
+		wantCalls int
+		wantCode  int
+	}{
+		{"POST is not re-sent after a 5xx: the server may have applied it", http.MethodPost, []func() (*http.Response, error){status(504), status(200)}, 1, 504},
+		{"POST is not re-sent after a transport error", http.MethodPost, []func() (*http.Response, error){transportError, status(200)}, 1, 0},
+		{"POST is re-sent after a 429: the server did not process it", http.MethodPost, []func() (*http.Response, error){status(429), status(200)}, 2, 200},
+		{"PATCH is not re-sent after a 5xx", http.MethodPatch, []func() (*http.Response, error){status(502), status(200)}, 1, 502},
+		{"GET is still re-sent after a 5xx", http.MethodGet, []func() (*http.Response, error){status(503), status(503), status(200)}, 3, 200},
+		{"PUT is still re-sent after a transport error", http.MethodPut, []func() (*http.Response, error){transportError, status(200)}, 2, 200},
+		{"DELETE is still re-sent after a 5xx", http.MethodDelete, []func() (*http.Response, error){status(500), status(200)}, 2, 200},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := &countingTransport{answers: tt.answers}
+			resp, err := sendVia(t, tr, tt.method)
+			if tr.calls != tt.wantCalls {
+				t.Fatalf("sent %d times, want %d", tr.calls, tt.wantCalls)
+			}
+			if tt.wantCode == 0 {
+				if err == nil {
+					t.Fatal("expected the transport error to be returned")
+				}
+				return
+			}
+			if err != nil || resp == nil || resp.StatusCode != tt.wantCode {
+				t.Fatalf("got resp=%v err=%v, want status %d", resp, err, tt.wantCode)
+			}
+		})
 	}
 }
