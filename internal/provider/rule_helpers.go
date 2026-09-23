@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/float64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -168,6 +168,18 @@ func setConditionalListsFromAPI(
 // addUseStateForUnknown adds UseStateForUnknown plan modifiers to all Computed
 // attributes in the schema. Without these, every plan cycle treats unconfigured
 // Optional+Computed fields as Unknown, causing perpetual drift.
+// addRequiresReplace marks string attributes as ForceNew.
+func addRequiresReplace(attrs map[string]schema.Attribute, names ...string) {
+	for _, name := range names {
+		a, ok := attrs[name].(schema.StringAttribute)
+		if !ok {
+			continue
+		}
+		a.PlanModifiers = append(a.PlanModifiers, stringplanmodifier.RequiresReplace())
+		attrs[name] = a
+	}
+}
+
 func addUseStateForUnknown(attrs map[string]schema.Attribute) {
 	for name, attr := range attrs {
 		switch a := attr.(type) {

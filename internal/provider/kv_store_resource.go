@@ -3,12 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
+	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_kv_store"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
-	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_kv_store"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -36,7 +36,12 @@ func (r *kvStoreResource) Metadata(ctx context.Context, req resource.MetadataReq
 }
 
 func (r *kvStoreResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = resource_kv_store.KvStoreResourceSchema(ctx)
+	s := resource_kv_store.KvStoreResourceSchema(ctx)
+	// The KV API only creates and deletes stores, so an identifying field can
+	// only change by replacement. Without this, a rename plans an in-place
+	// update and the apply fails on "Update Not Supported".
+	addRequiresReplace(s.Attributes, "name", "project", "organization")
+	resp.Schema = s
 }
 
 func (r *kvStoreResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
