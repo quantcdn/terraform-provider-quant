@@ -509,8 +509,8 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"deployment_failure_type": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Type of deployment failure",
-				MarkdownDescription: "Type of deployment failure",
+				Description:         "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it.",
+				MarkdownDescription: "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it.",
 			},
 			"deployment_status": schema.StringAttribute{
 				Computed:            true,

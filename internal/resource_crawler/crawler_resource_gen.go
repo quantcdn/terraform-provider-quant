@@ -263,6 +263,13 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "HTTP status codes that will result in content being captured and pushed to Quant",
 				MarkdownDescription: "HTTP status codes that will result in content being captured and pushed to Quant",
 			},
+			"tracking": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification.",
+				MarkdownDescription: "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification.",
+				Default:             booldefault.StaticBool(false),
+			},
 			"updated_at": schema.StringAttribute{
 				Computed:            true,
 				Description:         "Last update timestamp",
@@ -274,12 +281,6 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "URLs to crawl",
 				MarkdownDescription: "URLs to crawl",
-			},
-			"tracking": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Description:         "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification.",
-				MarkdownDescription: "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification.",
 			},
 			"urls_list": schema.StringAttribute{
 				Computed:            true,
