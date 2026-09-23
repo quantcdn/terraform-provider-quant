@@ -1,6 +1,7 @@
 package provider_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,8 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
-	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jarcoal/httpmock"
 )
 
@@ -491,7 +492,6 @@ func TestAccCrawlerResource_DomainVerifiedReset(t *testing.T) {
 	t.Skip("Skipping domain_verified test - computed field causes inconsistent result errors")
 }
 
-
 func testAccCheckCrawlerExists(n string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[n]
@@ -794,4 +794,137 @@ func TestAccCrawlerResource_AssetsStaysKnownOnUpdate(t *testing.T) {
 			},
 		},
 	})
+}
+
+// Content tracking is set through the crawler config, and the SDK may not
+// carry the field yet, so the create request must be checked on the wire: a
+// dropped flag would leave tracking off while the apply reported success.
+func TestAccCrawlerResource_Tracking(t *testing.T) {
+	var sentTracking interface{}
+	setupTrackingCrawlerServer(t, "test-organization", "default", &sentTracking)
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "quant" {
+  organization = "test-organization"
+  bearer = "testtoken"
+}
+
+resource "quant_crawler" "tracked" {
+  project  = "default"
+  name     = "tracked"
+  domain   = "https://www.quantcdn.io"
+  tracking = true
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_crawler.tracked", "tracking", "true"),
+					func(s *terraform.State) error {
+						if sentTracking != true {
+							return fmt.Errorf("create request did not send tracking=true, sent: %v", sentTracking)
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+// A crawler whose config has no cloud block reads back as tracking = false.
+func TestAccCrawlerResource_TrackingOffByDefault(t *testing.T) {
+	var sentTracking interface{}
+	setupTrackingCrawlerServer(t, "test-organization", "default", &sentTracking)
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccCrawlerPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "quant" {
+  organization = "test-organization"
+  bearer = "testtoken"
+}
+
+resource "quant_crawler" "plain" {
+  project = "default"
+  name    = "plain"
+  domain  = "https://www.quantcdn.io"
+}
+`,
+				Check: resource.TestCheckResourceAttr("quant_crawler.plain", "tracking", "false"),
+			},
+		},
+	})
+}
+
+// A mock whose stored config follows the tracking flag it was sent, like the
+// portal, which writes config.cloud.tracking.enabled.
+func setupTrackingCrawlerServer(t *testing.T, organizationID string, projectID string, sentTracking *interface{}) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+	tracking := false
+	name := "tracked"
+
+	body := func() map[string]interface{} {
+		out := make(map[string]interface{})
+		for k, v := range crawlerResponse {
+			out[k] = v
+		}
+		config := "config:\n    browser_mode: false\n    workers: 2\n"
+		if tracking {
+			config += "    cloud:\n      tracking:\n        enabled: true\n"
+		}
+		out["config"] = config + "domain: 'https://www.quantcdn.io'\n"
+		out["tracking"] = tracking
+		out["name"] = name
+		return out
+	}
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			if err != nil {
+				return httpmock.NewStringResponse(400, "bad body"), nil
+			}
+			var sent map[string]interface{}
+			if err := json.Unmarshal(raw, &sent); err != nil {
+				return httpmock.NewStringResponse(400, "bad json"), nil
+			}
+			*sentTracking = sent["tracking"]
+			tracking, _ = sent["tracking"].(bool)
+			if n, ok := sent["name"].(string); ok {
+				name = n
+			}
+			return httpmock.NewJsonResponse(200, body())
+		})
+
+	for _, method := range []string{"PUT", "PATCH"} {
+		httpmock.RegisterResponder(method, fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+			func(req *http.Request) (*http.Response, error) {
+				return httpmock.NewJsonResponse(200, body())
+			})
+	}
+
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, body())
+		})
+
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/%s/crawlers/29f1141b-ded6-483b-9a14-4439db01bc22", baseUrl, organizationID, projectID),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewStringResponse(204, ""), nil
+		})
 }

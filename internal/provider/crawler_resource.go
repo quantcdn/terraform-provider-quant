@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"strings"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_crawler"
+	"io"
+	"reflect"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -115,6 +116,7 @@ func (r *crawlerResource) Update(ctx context.Context, req resource.UpdateRequest
 	data.Domain = plan.Domain
 	data.Name = plan.Name
 	data.BrowserMode = plan.BrowserMode
+	data.Tracking = plan.Tracking
 	data.Workers = plan.Workers
 	data.Delay = plan.Delay
 	data.Depth = plan.Depth
@@ -178,6 +180,23 @@ func (r *crawlerResource) Delete(ctx context.Context, req resource.DeleteRequest
 // buildCrawlerRequest maps model fields to SDK request using mapper for simple
 // fields and manual handling for complex types (maps, int lists, nested objects).
 // ---------------------------------------------------------------------------
+// setCrawlerTracking puts the tracking flag on a create/edit request. The
+// generated SDK gained `tracking` with API spec v4.23; older versions carry it
+// as a free-form property, which the request marshals just the same.
+func setCrawlerTracking(req any, enabled bool) {
+	if setter := reflect.ValueOf(req).MethodByName("SetTracking"); setter.IsValid() {
+		setter.Call([]reflect.Value{reflect.ValueOf(enabled)})
+		return
+	}
+	switch r := req.(type) {
+	case *quantadmingo.V2CrawlerRequest:
+		if r.AdditionalProperties == nil {
+			r.AdditionalProperties = map[string]interface{}{}
+		}
+		r.AdditionalProperties["tracking"] = enabled
+	}
+}
+
 func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerModel) (*quantadmingo.V2CrawlerRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -190,6 +209,14 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 	diags.Append(mapper.ToSDK(ctx, crawler, req)...)
 	if diags.HasError() {
 		return nil, diags
+	}
+
+	// Tracking — set explicitly, because a silently skipped setter would look
+	// like success while the crawler kept tracking off. Uses the typed setter
+	// once the generated SDK carries the field, and the request's free-form
+	// properties until then.
+	if !crawler.Tracking.IsNull() && !crawler.Tracking.IsUnknown() {
+		setCrawlerTracking(req, crawler.Tracking.ValueBool())
 	}
 
 	// Headers — map[string]string, not supported by mapper.
@@ -384,6 +411,11 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 // CrawlerConfig is the structured representation of the YAML config blob.
 type CrawlerConfig struct {
 	Config struct {
+		Cloud struct {
+			Tracking struct {
+				Enabled bool `yaml:"enabled"`
+			} `yaml:"tracking"`
+		} `yaml:"cloud"`
 		UserAgent      string                   `yaml:"user_agent"`
 		BrowserMode    bool                     `yaml:"browser_mode"`
 		Workers        int                      `yaml:"workers"`
@@ -432,6 +464,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 
 	// Boolean fields.
 	crawler.BrowserMode = types.BoolValue(cfg.BrowserMode)
+	crawler.Tracking = types.BoolValue(cfg.Cloud.Tracking.Enabled)
 
 	// Numeric fields — null when zero/absent.
 	crawler.Workers = nullableInt64(int64(cfg.Workers), cfg.Workers > 0)
