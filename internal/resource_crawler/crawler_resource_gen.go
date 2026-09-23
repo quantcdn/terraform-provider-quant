@@ -275,6 +275,12 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "URLs to crawl",
 				MarkdownDescription: "URLs to crawl",
 			},
+			"tracking": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification.",
+				MarkdownDescription: "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification.",
+			},
 			"urls_list": schema.StringAttribute{
 				Computed:            true,
 				Description:         "URLs list (YAML)",
@@ -348,6 +354,7 @@ type CrawlerModel struct {
 	Sitemap           types.List    `tfsdk:"sitemap"`
 	StartUrls         types.List    `tfsdk:"start_urls"`
 	StatusOk          types.List    `tfsdk:"status_ok"`
+	Tracking          types.Bool    `tfsdk:"tracking"`
 	UpdatedAt         types.String  `tfsdk:"updated_at"`
 	Urls              types.List    `tfsdk:"urls"`
 	UrlsList          types.String  `tfsdk:"urls_list"`
