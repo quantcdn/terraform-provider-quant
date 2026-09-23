@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/jarcoal/httpmock"
 )
 
@@ -117,9 +118,7 @@ func TestAccKVStoreResource(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_kv_store.test", "project", "test-project"),
 				),
 			},
-			// Note: KV store Update is not supported — the resource returns an error on Update.
-			// The 'name' field lacks RequiresReplace, so changing it would attempt an in-place
-			// update and fail. No Update test step is added here.
+			// A rename is a replacement: see TestAccKVStoreResource_RenameForcesReplace.
 			// Import testing
 			{
 				ResourceName:  "quant_kv_store.test",
@@ -148,11 +147,11 @@ resource "quant_kv_store" "test" {
 `, org, project)
 }
 
-// ---------- KV Store Update error test ----------
-// The 'name' field has no RequiresReplace, so changing it triggers Update,
-// which returns an error because the KV API has no update endpoint.
+// ---------- KV Store rename test ----------
+// The KV API has no update endpoint and the resource's Update only returns an
+// error, so a changed name has to plan as a replacement.
 
-func TestAccKVStoreResource_UpdateError(t *testing.T) {
+func TestAccKVStoreResource_RenameForcesReplace(t *testing.T) {
 	org := "test-org"
 	project := "test-project"
 	storeId := "store-123"
@@ -169,10 +168,14 @@ func TestAccKVStoreResource_UpdateError(t *testing.T) {
 					resource.TestCheckResourceAttr("quant_kv_store.test", "name", "my-store"),
 				),
 			},
-			// Step 2: Change name to trigger Update -> expect error
+			// Step 2: a new name replaces the store instead of failing on Update.
 			{
-				Config:      testAccKVStoreResourceConfigWithName(org, project, "renamed-store"),
-				ExpectError: regexp.MustCompile(`Update Not Supported`),
+				Config: testAccKVStoreResourceConfigWithName(org, project, "renamed-store"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("quant_kv_store.test", plancheck.ResourceActionReplace),
+					},
+				},
 			},
 		},
 	})
