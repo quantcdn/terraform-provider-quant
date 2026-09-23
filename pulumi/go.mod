@@ -5,7 +5,7 @@ go 1.25.11
 require (
 	github.com/pulumi/pulumi-terraform-bridge/v3 v3.137.0
 	github.com/pulumi/pulumi/sdk/v3 v3.256.0
-	github.com/quantcdn/quant-admin-go/v4 v4.22.0
+	github.com/quantcdn/quant-admin-go/v4 v4.23.0
 	github.com/quantcdn/terraform-provider-quant/v5 v5.0.0
 	github.com/stretchr/testify v1.12.1
 )

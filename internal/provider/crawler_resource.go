@@ -8,7 +8,6 @@ import (
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_crawler"
 	"io"
-	"reflect"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -180,23 +179,6 @@ func (r *crawlerResource) Delete(ctx context.Context, req resource.DeleteRequest
 // buildCrawlerRequest maps model fields to SDK request using mapper for simple
 // fields and manual handling for complex types (maps, int lists, nested objects).
 // ---------------------------------------------------------------------------
-// setCrawlerTracking puts the tracking flag on a create/edit request. The
-// generated SDK gained `tracking` with API spec v4.23; older versions carry it
-// as a free-form property, which the request marshals just the same.
-func setCrawlerTracking(req any, enabled bool) {
-	if setter := reflect.ValueOf(req).MethodByName("SetTracking"); setter.IsValid() {
-		setter.Call([]reflect.Value{reflect.ValueOf(enabled)})
-		return
-	}
-	switch r := req.(type) {
-	case *quantadmingo.V2CrawlerRequest:
-		if r.AdditionalProperties == nil {
-			r.AdditionalProperties = map[string]interface{}{}
-		}
-		r.AdditionalProperties["tracking"] = enabled
-	}
-}
-
 func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerModel) (*quantadmingo.V2CrawlerRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -211,12 +193,10 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 		return nil, diags
 	}
 
-	// Tracking — set explicitly, because a silently skipped setter would look
-	// like success while the crawler kept tracking off. Uses the typed setter
-	// once the generated SDK carries the field, and the request's free-form
-	// properties until then.
+	// Tracking — set explicitly rather than through mapper.ToSDK, which skips a
+	// field silently when the SDK has no setter for it.
 	if !crawler.Tracking.IsNull() && !crawler.Tracking.IsUnknown() {
-		setCrawlerTracking(req, crawler.Tracking.ValueBool())
+		req.SetTracking(crawler.Tracking.ValueBool())
 	}
 
 	// Headers — map[string]string, not supported by mapper.
