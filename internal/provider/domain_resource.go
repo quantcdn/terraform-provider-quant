@@ -3,15 +3,17 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_domain"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
@@ -39,7 +41,24 @@ func (r *domainResource) Metadata(ctx context.Context, req resource.MetadataRequ
 func (r *domainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	s := resource_domain.DomainResourceSchema(ctx)
 	addUseStateForUnknown(s.Attributes)
+	// The V2 API only adds and deletes domains, so every identifying field has
+	// to be replaced rather than updated. Without this, a changed domain plans
+	// as an in-place update, Update is a no-op, and the apply reports success
+	// while the live record keeps its old host.
+	addRequiresReplace(s.Attributes, "domain", "project", "organization")
 	resp.Schema = s
+}
+
+// addRequiresReplace marks string attributes as ForceNew.
+func addRequiresReplace(attrs map[string]schema.Attribute, names ...string) {
+	for _, name := range names {
+		a, ok := attrs[name].(schema.StringAttribute)
+		if !ok {
+			continue
+		}
+		a.PlanModifiers = append(a.PlanModifiers, stringplanmodifier.RequiresReplace())
+		attrs[name] = a
+	}
 }
 
 func (r *domainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

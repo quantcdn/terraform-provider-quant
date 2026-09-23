@@ -229,3 +229,93 @@ func TestDomainResource_DeletedOutsideTerraform(t *testing.T) {
 		},
 	})
 }
+
+// The V2 API has no domain update route (POST /domains, DELETE /domains/{id}
+// only), and the provider's Update is a no-op. A changed domain must therefore
+// plan as a replacement, or the apply reports success and changes nothing.
+func TestDomainResource_RenameForcesReplace(t *testing.T) {
+	organizationID := "test-organization"
+	mockMutableDomainServer(t, organizationID)
+	defer httpmock.DeactivateAndReset()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testDomainResourceFactories(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testDomainRenameConfig(organizationID, "first.example.com"),
+				Check:  resource.TestCheckResourceAttr("quant_domain.test", "domain", "first.example.com"),
+			},
+			{
+				Config: testDomainRenameConfig(organizationID, "second.example.com"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("quant_domain.test", plancheck.ResourceActionReplace),
+					},
+				},
+				Check: resource.TestCheckResourceAttr("quant_domain.test", "domain", "second.example.com"),
+			},
+		},
+	})
+}
+
+// A mock that remembers the domain it was last asked to create, so a rename
+// does not read back as the old value.
+func mockMutableDomainServer(t *testing.T, organizationID string) {
+	httpmock.Activate()
+	baseUrl := "https://dashboard.quantcdn.io/api/v2"
+	current := "first.example.com"
+
+	body := func() map[string]interface{} {
+		out := make(map[string]interface{})
+		for k, v := range domainResponse {
+			out[k] = v
+		}
+		out["domain"] = current
+		return out
+	}
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+
+	httpmock.RegisterResponder("POST", fmt.Sprintf("%s/organizations/%s/projects/default/domains", baseUrl, organizationID),
+		func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			if err != nil {
+				return httpmock.NewStringResponse(400, "Failed to read request body"), nil
+			}
+			var sent struct {
+				Domain string `json:"domain"`
+			}
+			if err := json.Unmarshal(raw, &sent); err != nil {
+				return httpmock.NewStringResponse(400, "Invalid JSON"), nil
+			}
+			current = sent.Domain
+			return httpmock.NewJsonResponse(201, body())
+		})
+
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%s/organizations/%s/projects/default/domains/%d", baseUrl, organizationID, domainResponse["id"]),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewJsonResponse(200, body())
+		})
+
+	httpmock.RegisterResponder("DELETE", fmt.Sprintf("%s/organizations/%s/projects/default/domains/%d", baseUrl, organizationID, domainResponse["id"]),
+		func(req *http.Request) (*http.Response, error) {
+			return httpmock.NewStringResponse(204, ""), nil
+		})
+}
+
+func testDomainRenameConfig(organization string, domain string) string {
+	return fmt.Sprintf(`
+provider "quant" {
+	organization = %[1]q
+	bearer = "testtoken"
+}
+
+resource "quant_domain" "test" {
+  domain = %[2]q
+  project = "default"
+}
+`, organization, domain)
+}
