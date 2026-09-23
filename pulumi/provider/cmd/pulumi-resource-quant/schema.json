@@ -4629,6 +4629,10 @@
                     },
                     "description": "HTTP status codes that will result in content being captured and pushed to Quant"
                 },
+                "tracking": {
+                    "type": "boolean",
+                    "description": "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification."
+                },
                 "updatedAt": {
                     "type": "string",
                     "description": "Last update timestamp"
@@ -4694,6 +4698,7 @@
                 "sitemaps",
                 "startUrls",
                 "statusOks",
+                "tracking",
                 "updatedAt",
                 "urls",
                 "urlsList",
@@ -4801,6 +4806,10 @@
                         "type": "integer"
                     },
                     "description": "HTTP status codes that will result in content being captured and pushed to Quant"
+                },
+                "tracking": {
+                    "type": "boolean",
+                    "description": "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification."
                 },
                 "urls": {
                     "type": "array",
@@ -4952,6 +4961,10 @@
                             "type": "integer"
                         },
                         "description": "HTTP status codes that will result in content being captured and pushed to Quant"
+                    },
+                    "tracking": {
+                        "type": "boolean",
+                        "description": "Enable content tracking. Records crawl progress and per-page status against the project tracking site. Needs no domain verification."
                     },
                     "updatedAt": {
                         "type": "string",
@@ -5420,7 +5433,7 @@
                 },
                 "deploymentFailureType": {
                     "type": "string",
-                    "description": "Type of deployment failure"
+                    "description": "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it."
                 },
                 "deploymentStatus": {
                     "type": "string",
@@ -5656,7 +5669,7 @@
                     },
                     "deploymentFailureType": {
                         "type": "string",
-                        "description": "Type of deployment failure"
+                        "description": "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it."
                     },
                     "deploymentStatus": {
                         "type": "string",

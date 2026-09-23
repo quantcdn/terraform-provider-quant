@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"strings"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_crawler"
+	"io"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -115,6 +115,7 @@ func (r *crawlerResource) Update(ctx context.Context, req resource.UpdateRequest
 	data.Domain = plan.Domain
 	data.Name = plan.Name
 	data.BrowserMode = plan.BrowserMode
+	data.Tracking = plan.Tracking
 	data.Workers = plan.Workers
 	data.Delay = plan.Delay
 	data.Depth = plan.Depth
@@ -190,6 +191,12 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 	diags.Append(mapper.ToSDK(ctx, crawler, req)...)
 	if diags.HasError() {
 		return nil, diags
+	}
+
+	// Tracking — set explicitly rather than through mapper.ToSDK, which skips a
+	// field silently when the SDK has no setter for it.
+	if !crawler.Tracking.IsNull() && !crawler.Tracking.IsUnknown() {
+		req.SetTracking(crawler.Tracking.ValueBool())
 	}
 
 	// Headers — map[string]string, not supported by mapper.
@@ -384,6 +391,11 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 // CrawlerConfig is the structured representation of the YAML config blob.
 type CrawlerConfig struct {
 	Config struct {
+		Cloud struct {
+			Tracking struct {
+				Enabled bool `yaml:"enabled"`
+			} `yaml:"tracking"`
+		} `yaml:"cloud"`
 		UserAgent      string                   `yaml:"user_agent"`
 		BrowserMode    bool                     `yaml:"browser_mode"`
 		Workers        int                      `yaml:"workers"`
@@ -432,6 +444,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 
 	// Boolean fields.
 	crawler.BrowserMode = types.BoolValue(cfg.BrowserMode)
+	crawler.Tracking = types.BoolValue(cfg.Cloud.Tracking.Enabled)
 
 	// Numeric fields — null when zero/absent.
 	crawler.Workers = nullableInt64(int64(cfg.Workers), cfg.Workers > 0)
