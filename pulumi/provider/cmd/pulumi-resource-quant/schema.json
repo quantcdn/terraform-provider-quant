@@ -5433,7 +5433,7 @@
                 },
                 "deploymentFailureType": {
                     "type": "string",
-                    "description": "Type of deployment failure"
+                    "description": "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it."
                 },
                 "deploymentStatus": {
                     "type": "string",
@@ -5669,7 +5669,7 @@
                     },
                     "deploymentFailureType": {
                         "type": "string",
-                        "description": "Type of deployment failure"
+                        "description": "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it."
                     },
                     "deploymentStatus": {
                         "type": "string",
