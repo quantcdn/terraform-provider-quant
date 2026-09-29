@@ -3,18 +3,17 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strconv"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_rule_proxy"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/utils"
+	"net/http"
+	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
@@ -61,7 +60,6 @@ func (r *ruleProxyResource) Schema(ctx context.Context, req resource.SchemaReque
 	addUseStateForUnknown(s.Attributes)
 	resp.Schema = s
 }
-
 
 func (r *ruleProxyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -269,8 +267,14 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 
 		// Block lists
 		if !data.WafConfig.BlockLists.IsNull() && !data.WafConfig.BlockLists.IsUnknown() {
-			var blockListsObj resource_rule_proxy.BlockListsValue
-			diags.Append(data.WafConfig.BlockLists.As(ctx, &blockListsObj, basetypes.ObjectAsOptions{})...)
+			// WafConfigValue stores block_lists as a plain basetypes.ObjectValue,
+			// so ObjectValue.As into the generated BlockListsValue raises a
+			// framework Value Conversion Error. Build the value directly.
+			blockListsObj, d := resource_rule_proxy.NewBlockListsValue(
+				resource_rule_proxy.BlockListsValue{}.AttributeTypes(ctx),
+				data.WafConfig.BlockLists.Attributes(),
+			)
+			diags.Append(d...)
 			if !diags.HasError() {
 				blockLists := quantadmingo.NewWafConfigBlockLists()
 				blockLists.SetAi(blockListsObj.Ai.ValueBool())
@@ -321,8 +325,12 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 
 		// HTTPBL
 		if !data.WafConfig.Httpbl.IsNull() && !data.WafConfig.Httpbl.IsUnknown() {
-			var httpblObj resource_rule_proxy.HttpblValue
-			diags.Append(data.WafConfig.Httpbl.As(ctx, &httpblObj, basetypes.ObjectAsOptions{})...)
+			// Same as block_lists: httpbl is a plain basetypes.ObjectValue.
+			httpblObj, d := resource_rule_proxy.NewHttpblValue(
+				resource_rule_proxy.HttpblValue{}.AttributeTypes(ctx),
+				data.WafConfig.Httpbl.Attributes(),
+			)
+			diags.Append(d...)
 			if !diags.HasError() {
 				httpbl := quantadmingo.NewWafConfigHttpbl()
 				httpbl.SetHttpblEnabled(httpblObj.HttpblEnabled.ValueBool())

@@ -1126,3 +1126,83 @@ func TestSnakeToPascal(t *testing.T) {
 		}
 	}
 }
+
+type callerHandledSDKRequest struct {
+	name     *string
+	statusOk []int32
+}
+
+func (r *callerHandledSDKRequest) SetName(v string)      { r.name = &v }
+func (r *callerHandledSDKRequest) SetStatusOk(v []int32) { r.statusOk = v }
+
+// TestToSDK_CallerHandledFieldsAreSilent covers fields the caller maps itself.
+// The mapper cannot convert an integer list, and without the callerHandled
+// option it warns on every apply even though the caller sets the field.
+func TestToSDK_CallerHandledFieldsAreSilent(t *testing.T) {
+	type model struct {
+		Name     types.String `tfsdk:"name"`
+		StatusOk types.List   `tfsdk:"status_ok"`
+	}
+
+	m := model{
+		Name: types.StringValue("crawler"),
+		StatusOk: types.ListValueMust(types.Int64Type, []attr.Value{
+			types.Int64Value(200),
+		}),
+	}
+
+	// Without the option the mapper warns.
+	req := &callerHandledSDKRequest{}
+	diags := ToSDK(context.Background(), m, req)
+	if len(diags.Warnings()) != 1 {
+		t.Errorf("expected 1 warning without the option, got: %v", diags.Warnings())
+	}
+
+	// With the option the field is skipped silently.
+	req = &callerHandledSDKRequest{}
+	diags = ToSDK(context.Background(), m, req, "status_ok")
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+	if len(diags.Warnings()) != 0 {
+		t.Errorf("expected no warnings, got: %v", diags.Warnings())
+	}
+	if req.statusOk != nil {
+		t.Errorf("status_ok must stay unset for the caller to fill, got %v", req.statusOk)
+	}
+	if req.name == nil || *req.name != "crawler" {
+		t.Error("other fields must still be mapped")
+	}
+}
+
+type stringListMismatchRequest struct {
+	tags []int32
+}
+
+func (r *stringListMismatchRequest) SetTags(v []int32) { r.tags = v }
+
+// TestToSDK_StringListIntoWrongSliceDoesNotPanic covers the reflective setter
+// call: a string list must not be passed to a setter that expects another
+// slice type.
+func TestToSDK_StringListIntoWrongSliceDoesNotPanic(t *testing.T) {
+	type model struct {
+		Tags types.List `tfsdk:"tags"`
+	}
+
+	m := model{
+		Tags: types.ListValueMust(types.StringType, []attr.Value{types.StringValue("a")}),
+	}
+
+	req := &stringListMismatchRequest{}
+	diags := ToSDK(context.Background(), m, req)
+
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+	if len(diags.Warnings()) != 1 {
+		t.Errorf("expected 1 type mismatch warning, got: %v", diags.Warnings())
+	}
+	if req.tags != nil {
+		t.Errorf("tags must stay unset, got %v", req.tags)
+	}
+}

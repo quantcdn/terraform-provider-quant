@@ -188,7 +188,9 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 	// WebhookAuthHeader, WebhookExtraVars, Workers, Delay, Depth, MaxHits,
 	// MaxHtml, MaxErrors, UserAgent, Urls, StartUrls, Exclude, Include,
 	// AllowedDomains (all string/bool/int/float/string-list fields).
-	diags.Append(mapper.ToSDK(ctx, crawler, req)...)
+	// sitemap and status_ok are named as caller-handled: the mapper only maps
+	// string lists, and this function sets both fields itself further down.
+	diags.Append(mapper.ToSDK(ctx, crawler, req, "sitemap", "status_ok")...)
 	if diags.HasError() {
 		return nil, diags
 	}
@@ -237,23 +239,103 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 		}
 	}
 
-	// Assets — nested object with network_intercept sub-object.
-	if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
-		if !crawler.Assets.NetworkIntercept.IsNull() && !crawler.Assets.NetworkIntercept.IsUnknown() {
-			var networkIntercept resource_crawler.NetworkInterceptValue
-			diags.Append(crawler.Assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
-			if !diags.HasError() {
-				assetsObj := quantadmingo.NewV2CrawlerAssets()
-				niObj := quantadmingo.NewV2CrawlerAssetsNetworkIntercept()
-				niObj.SetEnabled(networkIntercept.Enabled.ValueBool())
-				niObj.SetTimeout(int32(networkIntercept.Timeout.ValueInt64()))
-				assetsObj.SetNetworkIntercept(*niObj)
-				req.SetAssets(*assetsObj)
-			}
-		}
-	}
+	// Assets — nested object with network_intercept and parser sub-objects.
+	diags.Append(setCrawlerAssets(ctx, crawler, req)...)
 
 	return req, diags
+}
+
+// setCrawlerAssets maps the assets block onto the request. AssetsValue stores
+// its sub-objects as plain basetypes.ObjectValue, so the attributes are read
+// directly. ObjectValue.As into a generated NetworkInterceptValue raises a
+// framework Value Conversion Error and must not be used here.
+func setCrawlerAssets(ctx context.Context, crawler *resource_crawler.CrawlerModel, req *quantadmingo.V2CrawlerRequest) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if crawler.Assets.IsNull() || crawler.Assets.IsUnknown() {
+		return diags
+	}
+
+	assetsObj := quantadmingo.NewV2CrawlerAssets()
+	set := false
+
+	niObj, d := buildNetworkIntercept(ctx, crawler.Assets.NetworkIntercept)
+	diags.Append(d...)
+	if niObj != nil {
+		assetsObj.SetNetworkIntercept(*niObj)
+		set = true
+	}
+
+	parserObj, d := buildAssetsParser(ctx, crawler.Assets.Parser)
+	diags.Append(d...)
+	if parserObj != nil {
+		assetsObj.SetParser(*parserObj)
+		set = true
+	}
+
+	if set && !diags.HasError() {
+		req.SetAssets(*assetsObj)
+	}
+	return diags
+}
+
+// buildNetworkIntercept converts the network_intercept object. It returns nil
+// when the object is absent.
+func buildNetworkIntercept(ctx context.Context, obj basetypes.ObjectValue) (*quantadmingo.V2CrawlerAssetsNetworkIntercept, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil, diags
+	}
+
+	value, d := resource_crawler.NewNetworkInterceptValue(
+		resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx), obj.Attributes(),
+	)
+	diags.Append(d...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	out := quantadmingo.NewV2CrawlerAssetsNetworkIntercept()
+	if isKnown(value.Enabled) {
+		out.SetEnabled(value.Enabled.ValueBool())
+	}
+	if isKnown(value.ExecuteJs) {
+		out.SetExecuteJs(value.ExecuteJs.ValueBool())
+	}
+	if isKnown(value.Timeout) {
+		out.SetTimeout(int32(value.Timeout.ValueInt64()))
+	}
+	return out, diags
+}
+
+// buildAssetsParser converts the parser object. It returns nil when the object
+// is absent.
+func buildAssetsParser(ctx context.Context, obj basetypes.ObjectValue) (*quantadmingo.V2CrawlerAssetsParser, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil, diags
+	}
+
+	value, d := resource_crawler.NewParserValue(
+		resource_crawler.ParserValue{}.AttributeTypes(ctx), obj.Attributes(),
+	)
+	diags.Append(d...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	out := quantadmingo.NewV2CrawlerAssetsParser()
+	if isKnown(value.Enabled) {
+		out.SetEnabled(value.Enabled.ValueBool())
+	}
+	return out, diags
+}
+
+// isKnown reports whether an attribute carries a usable value.
+func isKnown(v attr.Value) bool {
+	return !v.IsNull() && !v.IsUnknown()
 }
 
 // ---------------------------------------------------------------------------
@@ -396,29 +478,32 @@ type CrawlerConfig struct {
 				Enabled bool `yaml:"enabled"`
 			} `yaml:"tracking"`
 		} `yaml:"cloud"`
-		UserAgent      string                   `yaml:"user_agent"`
-		BrowserMode    bool                     `yaml:"browser_mode"`
-		Workers        int                      `yaml:"workers"`
-		Depth          int                      `yaml:"depth"`
-		MaxHits        int                      `yaml:"max_hits"`
-		MaxHtml        int                      `yaml:"max_html"`
-		MaxErrors      int                      `yaml:"max_errors"`
-		Cache          bool                     `yaml:"cache"`
-		Delay          float64                  `yaml:"delay"`
-		StatusOk       []int                    `yaml:"status_ok"`
-		Quant          map[string]interface{}   `yaml:"quant"`
-		StartUrl       []string                 `yaml:"start_url"`
-		Headers        map[string]string        `yaml:"headers"`
-		Exclude        []string                 `yaml:"exclude"`
-		Include        []string                 `yaml:"include"`
-		AllowedDomains []string                 `yaml:"allowed_domains"`
-		Sitemap        []map[string]interface{} `yaml:"sitemap"`
+		UserAgent      string                           `yaml:"user_agent"`
+		BrowserMode    bool                             `yaml:"browser_mode"`
+		Workers        int                              `yaml:"workers"`
+		Depth          int                              `yaml:"depth"`
+		MaxHits        int                              `yaml:"max_hits"`
+		MaxHtml        int                              `yaml:"max_html"`
+		MaxErrors      int                              `yaml:"max_errors"`
+		Cache          bool                             `yaml:"cache"`
+		Delay          float64                          `yaml:"delay"`
+		StatusOk       yamlList[int]                    `yaml:"status_ok"`
+		Quant          map[string]interface{}           `yaml:"quant"`
+		StartUrl       yamlList[string]                 `yaml:"start_url"`
+		Headers        map[string]string                `yaml:"headers"`
+		Exclude        yamlList[string]                 `yaml:"exclude"`
+		Include        yamlList[string]                 `yaml:"include"`
+		AllowedDomains yamlList[string]                 `yaml:"allowed_domains"`
+		Sitemap        yamlList[map[string]interface{}] `yaml:"sitemap"`
 		Assets         struct {
 			NetworkIntercept struct {
 				Enabled   bool `yaml:"enabled"`
 				ExecuteJs bool `yaml:"execute_js"`
 				Timeout   int  `yaml:"timeout"`
 			} `yaml:"network_intercept"`
+			Parser struct {
+				Enabled bool `yaml:"enabled"`
+			} `yaml:"parser"`
 		} `yaml:"assets"`
 		Webhook struct {
 			Url        string `yaml:"url"`
@@ -430,9 +515,43 @@ type CrawlerConfig struct {
 	Headers map[string]string `yaml:"headers"`
 }
 
+// plannedSubObject returns the planned value of an assets sub-block, or a null
+// object when there is no usable planned value to keep.
+func plannedSubObject(assets resource_crawler.AssetsValue, sub basetypes.ObjectValue, attrTypes map[string]attr.Type) basetypes.ObjectValue {
+	// A zero-value object carries no attribute types, which happens on import.
+	// Returning it verbatim would put an untyped object into state.
+	if assets.IsNull() || assets.IsUnknown() || sub.IsUnknown() ||
+		len(sub.AttributeTypes(context.Background())) == 0 {
+		return types.ObjectNull(attrTypes)
+	}
+	return sub
+}
+
+// yamlList decodes a YAML sequence into a slice, and also accepts the empty
+// mapping the API writes for an empty list field. A PHP empty array serialises
+// as "{  }", which a plain slice field cannot decode.
+type yamlList[T any] []T
+
+func (l *yamlList[T]) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.MappingNode && len(node.Content) == 0 {
+		*l = nil
+		return nil
+	}
+	var out []T
+	if err := node.Decode(&out); err != nil {
+		return err
+	}
+	*l = out
+	return nil
+}
+
 // parseCrawlerConfig extracts fields from the YAML config blob that are not
 // present on the top-level API response object.
 func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resource_crawler.CrawlerModel, api *quantadmingo.V2Crawler) (diags diag.Diagnostics) {
+	// yamlList already absorbs the empty mappings the API writes for empty list
+	// fields. Any error that still reaches here may be document level, which
+	// leaves the whole struct at its zero value, so the parse is discarded
+	// rather than applied over good state.
 	var parsed CrawlerConfig
 	if err := yaml.Unmarshal([]byte(configYAML), &parsed); err != nil {
 		diags.AddWarning("Unable to parse crawler config",
@@ -472,9 +591,9 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 	}
 
 	// String list fields — preserve plan values when API returns empty.
-	crawler.Exclude = stringListOrPreserve(cfg.Exclude, crawler.Exclude)
-	crawler.Include = stringListOrPreserve(cfg.Include, crawler.Include)
-	crawler.AllowedDomains = stringListOrPreserve(cfg.AllowedDomains, crawler.AllowedDomains)
+	crawler.Exclude = stringListOrPreserve([]string(cfg.Exclude), crawler.Exclude)
+	crawler.Include = stringListOrPreserve([]string(cfg.Include), crawler.Include)
+	crawler.AllowedDomains = stringListOrPreserve([]string(cfg.AllowedDomains), crawler.AllowedDomains)
 
 	// StatusOk — int list.
 	if len(cfg.StatusOk) > 0 {
@@ -483,7 +602,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			vals[i] = types.Int64Value(int64(v))
 		}
 		crawler.StatusOk = types.ListValueMust(types.Int64Type, vals)
-	} else if crawler.StatusOk.IsNull() || crawler.StatusOk.IsUnknown() {
+	} else if crawler.StatusOk.IsUnknown() || crawler.StatusOk.ElementType(ctx) == nil {
 		crawler.StatusOk = types.ListValueMust(types.Int64Type, []attr.Value{})
 	}
 
@@ -494,26 +613,17 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			headersMap[k] = types.StringValue(v)
 		}
 		crawler.Headers = types.MapValueMust(types.StringType, headersMap)
-	} else if crawler.Headers.IsNull() || crawler.Headers.IsUnknown() {
+	} else if crawler.Headers.IsUnknown() || crawler.Headers.ElementType(ctx) == nil {
 		crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 	}
 	// else: preserve existing headers from plan/state
 
-	// StartUrls — mapped from start_url in config.
-	if len(cfg.StartUrl) > 0 {
-		vals := make([]attr.Value, len(cfg.StartUrl))
-		for i, v := range cfg.StartUrl {
-			vals[i] = types.StringValue(v)
-		}
-		crawler.StartUrls = types.ListValueMust(types.StringType, vals)
-	} else {
-		crawler.StartUrls = types.ListValueMust(types.StringType, []attr.Value{})
-	}
+	// StartUrls — mapped from start_url in config. The config reports an empty
+	// list for a crawler that has none, so a planned value must be preserved.
+	crawler.StartUrls = stringListOrPreserve([]string(cfg.StartUrl), crawler.StartUrls)
 
-	// Urls — preserve from state; config YAML has no separate "urls" field.
-	if crawler.Urls.IsNull() || crawler.Urls.IsUnknown() {
-		crawler.Urls = types.ListValueMust(types.StringType, []attr.Value{})
-	}
+	// Urls — preserve from plan/state; config YAML has no separate "urls" field.
+	crawler.Urls = stringListOrPreserve(nil, crawler.Urls)
 
 	// Sitemap — nested objects.
 	sitemapEntryType := types.ObjectType{
@@ -543,36 +653,62 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			sitemapVals[i] = objVal
 		}
 		crawler.Sitemap, _ = types.ListValue(sitemapEntryType, sitemapVals)
-	} else if crawler.Sitemap.IsNull() || crawler.Sitemap.IsUnknown() {
+	} else if crawler.Sitemap.IsNull() || crawler.Sitemap.IsUnknown() ||
+		crawler.Sitemap.ElementType(ctx) == nil {
 		crawler.Sitemap = types.ListNull(sitemapEntryType)
 	}
 
-	// Assets — network_intercept nested object.
-	niAttrTypes := resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)
-	parserAttrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
-	assetsAttrTypes := resource_crawler.AssetsValue{}.AttributeTypes(ctx)
-
-	if cfg.Assets.NetworkIntercept.Enabled || cfg.Assets.NetworkIntercept.Timeout > 0 {
-		networkInterceptObj, _ := types.ObjectValue(
-			niAttrTypes,
-			map[string]attr.Value{
-				"enabled":    types.BoolValue(cfg.Assets.NetworkIntercept.Enabled),
-				"execute_js": types.BoolValue(cfg.Assets.NetworkIntercept.ExecuteJs),
-				"timeout":    types.Int64Value(int64(cfg.Assets.NetworkIntercept.Timeout)),
-			},
-		)
-		crawler.Assets = resource_crawler.NewAssetsValueMust(
-			assetsAttrTypes,
-			map[string]attr.Value{
-				"network_intercept": networkInterceptObj,
-				"parser":            types.ObjectNull(parserAttrTypes),
-			},
-		)
-	} else if crawler.Assets.IsNull() || crawler.Assets.IsUnknown() {
-		crawler.Assets = resource_crawler.NewAssetsValueNull()
-	}
+	// Assets — network_intercept and parser nested objects.
+	crawler.Assets = crawlerAssetsFromConfig(ctx, &parsed, crawler.Assets)
 
 	return
+}
+
+// crawlerAssetsFromConfig rebuilds the assets value from the crawler config the
+// API returned. current is the planned value; it is kept when the config
+// reports no assets, so that a crawler without assets is left untouched.
+func crawlerAssetsFromConfig(ctx context.Context, cfg *CrawlerConfig, current resource_crawler.AssetsValue) resource_crawler.AssetsValue {
+	niAttrTypes := resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)
+	parserAttrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
+
+	hasNetworkIntercept := cfg.Config.Assets.NetworkIntercept.Enabled ||
+		cfg.Config.Assets.NetworkIntercept.ExecuteJs ||
+		cfg.Config.Assets.NetworkIntercept.Timeout > 0
+	hasParser := cfg.Config.Assets.Parser.Enabled
+
+	if !hasNetworkIntercept && !hasParser {
+		if current.IsNull() || current.IsUnknown() {
+			return resource_crawler.NewAssetsValueNull()
+		}
+		return current
+	}
+
+	// The backend may echo one sub-block and not the other. A sub-block the
+	// config does not report keeps its planned value, or Terraform reports an
+	// inconsistent result after apply.
+	networkIntercept := plannedSubObject(current, current.NetworkIntercept, niAttrTypes)
+	if hasNetworkIntercept {
+		networkIntercept = types.ObjectValueMust(niAttrTypes, map[string]attr.Value{
+			"enabled":    types.BoolValue(cfg.Config.Assets.NetworkIntercept.Enabled),
+			"execute_js": types.BoolValue(cfg.Config.Assets.NetworkIntercept.ExecuteJs),
+			"timeout":    types.Int64Value(int64(cfg.Config.Assets.NetworkIntercept.Timeout)),
+		})
+	}
+
+	parser := plannedSubObject(current, current.Parser, parserAttrTypes)
+	if hasParser {
+		parser = types.ObjectValueMust(parserAttrTypes, map[string]attr.Value{
+			"enabled": types.BoolValue(true),
+		})
+	}
+
+	return resource_crawler.NewAssetsValueMust(
+		resource_crawler.AssetsValue{}.AttributeTypes(ctx),
+		map[string]attr.Value{
+			"network_intercept": networkIntercept,
+			"parser":            parser,
+		},
+	)
 }
 
 // ---------------------------------------------------------------------------
@@ -737,8 +873,14 @@ func stringListOrPreserve(vals []string, existing types.List) types.List {
 		}
 		return types.ListValueMust(types.StringType, attrVals)
 	}
-	if !existing.IsNull() && !existing.IsUnknown() {
-		return existing
+	// An unknown value must resolve: the framework forbids leaving one unknown
+	// after apply. A zero-value list carries no element type, which happens on
+	// import, where there is no prior plan or state; returning it verbatim puts
+	// an untyped list into state and State.Set rejects it. Otherwise a planned
+	// null, or a planned value, is returned unchanged so that the read never
+	// invents a list the user did not ask for.
+	if existing.IsUnknown() || existing.ElementType(context.Background()) == nil {
+		return types.ListValueMust(types.StringType, []attr.Value{})
 	}
-	return types.ListValueMust(types.StringType, []attr.Value{})
+	return existing
 }
