@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
@@ -516,6 +515,15 @@ type CrawlerConfig struct {
 	Headers map[string]string `yaml:"headers"`
 }
 
+// plannedSubObject returns the planned value of an assets sub-block, or a null
+// object when there is no usable planned value to keep.
+func plannedSubObject(assets resource_crawler.AssetsValue, sub basetypes.ObjectValue, attrTypes map[string]attr.Type) basetypes.ObjectValue {
+	if assets.IsNull() || assets.IsUnknown() || sub.IsUnknown() {
+		return types.ObjectNull(attrTypes)
+	}
+	return sub
+}
+
 // yamlList decodes a YAML sequence into a slice, and also accepts the empty
 // mapping the API writes for an empty list field. A PHP empty array serialises
 // as "{  }", which a plain slice field cannot decode.
@@ -537,18 +545,15 @@ func (l *yamlList[T]) UnmarshalYAML(node *yaml.Node) error {
 // parseCrawlerConfig extracts fields from the YAML config blob that are not
 // present on the top-level API response object.
 func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resource_crawler.CrawlerModel, api *quantadmingo.V2Crawler) (diags diag.Diagnostics) {
+	// yamlList already absorbs the empty mappings the API writes for empty list
+	// fields. Any error that still reaches here may be document level, which
+	// leaves the whole struct at its zero value, so the parse is discarded
+	// rather than applied over good state.
 	var parsed CrawlerConfig
 	if err := yaml.Unmarshal([]byte(configYAML), &parsed); err != nil {
-		// A type error is per-field: yaml still decodes every other field, so
-		// the parse is kept. Any other error leaves the struct empty.
-		var typeErr *yaml.TypeError
-		if !errors.As(err, &typeErr) {
-			diags.AddWarning("Unable to parse crawler config",
-				fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()))
-			return
-		}
-		diags.AddWarning("Some crawler config fields could not be parsed",
-			fmt.Sprintf("%s. The remaining fields were read normally.", err.Error()))
+		diags.AddWarning("Unable to parse crawler config",
+			fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()))
+		return
 	}
 
 	cfg := parsed.Config
@@ -594,7 +599,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			vals[i] = types.Int64Value(int64(v))
 		}
 		crawler.StatusOk = types.ListValueMust(types.Int64Type, vals)
-	} else if crawler.StatusOk.IsNull() || crawler.StatusOk.IsUnknown() {
+	} else if crawler.StatusOk.IsUnknown() {
 		crawler.StatusOk = types.ListValueMust(types.Int64Type, []attr.Value{})
 	}
 
@@ -605,26 +610,17 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			headersMap[k] = types.StringValue(v)
 		}
 		crawler.Headers = types.MapValueMust(types.StringType, headersMap)
-	} else if crawler.Headers.IsNull() || crawler.Headers.IsUnknown() {
+	} else if crawler.Headers.IsUnknown() {
 		crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 	}
 	// else: preserve existing headers from plan/state
 
-	// StartUrls — mapped from start_url in config.
-	if len(cfg.StartUrl) > 0 {
-		vals := make([]attr.Value, len(cfg.StartUrl))
-		for i, v := range cfg.StartUrl {
-			vals[i] = types.StringValue(v)
-		}
-		crawler.StartUrls = types.ListValueMust(types.StringType, vals)
-	} else {
-		crawler.StartUrls = types.ListValueMust(types.StringType, []attr.Value{})
-	}
+	// StartUrls — mapped from start_url in config. The config reports an empty
+	// list for a crawler that has none, so a planned value must be preserved.
+	crawler.StartUrls = stringListOrPreserve([]string(cfg.StartUrl), crawler.StartUrls)
 
-	// Urls — preserve from state; config YAML has no separate "urls" field.
-	if crawler.Urls.IsNull() || crawler.Urls.IsUnknown() {
-		crawler.Urls = types.ListValueMust(types.StringType, []attr.Value{})
-	}
+	// Urls — preserve from plan/state; config YAML has no separate "urls" field.
+	crawler.Urls = stringListOrPreserve(nil, crawler.Urls)
 
 	// Sitemap — nested objects.
 	sitemapEntryType := types.ObjectType{
@@ -672,6 +668,7 @@ func crawlerAssetsFromConfig(ctx context.Context, cfg *CrawlerConfig, current re
 	parserAttrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
 
 	hasNetworkIntercept := cfg.Config.Assets.NetworkIntercept.Enabled ||
+		cfg.Config.Assets.NetworkIntercept.ExecuteJs ||
 		cfg.Config.Assets.NetworkIntercept.Timeout > 0
 	hasParser := cfg.Config.Assets.Parser.Enabled
 
@@ -682,7 +679,10 @@ func crawlerAssetsFromConfig(ctx context.Context, cfg *CrawlerConfig, current re
 		return current
 	}
 
-	networkIntercept := types.ObjectNull(niAttrTypes)
+	// The backend may echo one sub-block and not the other. A sub-block the
+	// config does not report keeps its planned value, or Terraform reports an
+	// inconsistent result after apply.
+	networkIntercept := plannedSubObject(current, current.NetworkIntercept, niAttrTypes)
 	if hasNetworkIntercept {
 		networkIntercept = types.ObjectValueMust(niAttrTypes, map[string]attr.Value{
 			"enabled":    types.BoolValue(cfg.Config.Assets.NetworkIntercept.Enabled),
@@ -691,7 +691,7 @@ func crawlerAssetsFromConfig(ctx context.Context, cfg *CrawlerConfig, current re
 		})
 	}
 
-	parser := types.ObjectNull(parserAttrTypes)
+	parser := plannedSubObject(current, current.Parser, parserAttrTypes)
 	if hasParser {
 		parser = types.ObjectValueMust(parserAttrTypes, map[string]attr.Value{
 			"enabled": types.BoolValue(true),
@@ -869,8 +869,11 @@ func stringListOrPreserve(vals []string, existing types.List) types.List {
 		}
 		return types.ListValueMust(types.StringType, attrVals)
 	}
-	if !existing.IsNull() && !existing.IsUnknown() {
-		return existing
+	// An unknown value must resolve: the framework forbids leaving one unknown
+	// after apply. A planned null, or a planned value, is returned unchanged so
+	// that the read never invents a list the user did not ask for.
+	if existing.IsUnknown() {
+		return types.ListValueMust(types.StringType, []attr.Value{})
 	}
-	return types.ListValueMust(types.StringType, []attr.Value{})
+	return existing
 }

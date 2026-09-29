@@ -326,3 +326,169 @@ func TestParseCrawlerConfig_EmptyListsAreMappings(t *testing.T) {
 		t.Errorf("allowed_domains = %v, want empty or null", crawler.AllowedDomains)
 	}
 }
+
+// BLOCKER A. The config the API stores reports no start_url, include or
+// allowed_domains. A planned value for those, and for urls and headers, must
+// survive the read; the parse must not replace it with an empty collection.
+func TestParseCrawlerConfig_PlannedListValuesSurvive(t *testing.T) {
+	ctx := context.Background()
+
+	crawler := &resource_crawler.CrawlerModel{
+		Assets: resource_crawler.NewAssetsValueNull(),
+		StartUrls: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("https://example.com/a"),
+		}),
+		Urls: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("https://example.com/b"),
+		}),
+		Include: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("/keep"),
+		}),
+		AllowedDomains: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("example.org"),
+		}),
+		Headers: types.MapValueMust(types.StringType, map[string]attr.Value{
+			"x-token": types.StringValue("secret"),
+		}),
+	}
+
+	diags := parseCrawlerConfig(ctx, crawlerConfigYAMLWithEmptyLists, crawler, &quantadmingo.V2Crawler{})
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+
+	assertStringList(t, "start_urls", crawler.StartUrls, "https://example.com/a")
+	assertStringList(t, "urls", crawler.Urls, "https://example.com/b")
+	assertStringList(t, "include", crawler.Include, "/keep")
+	assertStringList(t, "allowed_domains", crawler.AllowedDomains, "example.org")
+
+	if got := len(crawler.Headers.Elements()); got != 1 {
+		t.Errorf("headers were wiped: %v", crawler.Headers)
+	}
+}
+
+func assertStringList(t *testing.T, name string, list types.List, want string) {
+	t.Helper()
+	elems := list.Elements()
+	if len(elems) != 1 {
+		t.Errorf("%s = %v, want one element %q", name, list, want)
+		return
+	}
+	if got, _ := elems[0].(types.String); got.ValueString() != want {
+		t.Errorf("%s[0] = %v, want %q", name, elems[0], want)
+	}
+}
+
+// BLOCKER A. A planned null must come back null, not an empty collection. An
+// unknown value must still resolve, because the framework forbids leaving one
+// unknown after apply.
+func TestParseCrawlerConfig_NullStaysNullUnknownResolves(t *testing.T) {
+	ctx := context.Background()
+
+	crawler := &resource_crawler.CrawlerModel{
+		Assets:    resource_crawler.NewAssetsValueNull(),
+		StartUrls: types.ListNull(types.StringType),
+		Include:   types.ListUnknown(types.StringType),
+	}
+
+	diags := parseCrawlerConfig(ctx, crawlerConfigYAMLWithEmptyLists, crawler, &quantadmingo.V2Crawler{})
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+
+	if !crawler.StartUrls.IsNull() {
+		t.Errorf("start_urls = %v, want null", crawler.StartUrls)
+	}
+	if crawler.Include.IsUnknown() {
+		t.Error("include must not stay unknown after the read")
+	}
+	if crawler.Include.IsNull() || len(crawler.Include.Elements()) != 0 {
+		t.Errorf("include = %v, want an empty list", crawler.Include)
+	}
+}
+
+// BLOCKER B. The backend echoes network_intercept but not assets.parser. The
+// planned parser must be preserved, or Terraform reports an inconsistent
+// result and the Pulumi bridge shows a perpetual diff.
+func TestCrawlerAssetsFromConfig_PreservesPlannedParserWhenNotEchoed(t *testing.T) {
+	ctx := context.Background()
+
+	var cfg CrawlerConfig
+	cfg.Config.Assets.NetworkIntercept.Enabled = true
+	cfg.Config.Assets.NetworkIntercept.Timeout = 30
+	// The backend does not echo assets.parser.
+
+	planned := resource_crawler.NewAssetsValueMust(
+		resource_crawler.AssetsValue{}.AttributeTypes(ctx),
+		map[string]attr.Value{
+			"network_intercept": types.ObjectNull(resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)),
+			"parser": types.ObjectValueMust(
+				resource_crawler.ParserValue{}.AttributeTypes(ctx),
+				map[string]attr.Value{"enabled": types.BoolValue(true)},
+			),
+		},
+	)
+
+	got := crawlerAssetsFromConfig(ctx, &cfg, planned)
+
+	if got.Parser.IsNull() || got.Parser.IsUnknown() {
+		t.Fatalf("planned parser was dropped: %v", got.Parser)
+	}
+	if v, _ := got.Parser.Attributes()["enabled"].(types.Bool); !v.ValueBool() {
+		t.Errorf("parser.enabled = %v, want true", got.Parser.Attributes()["enabled"])
+	}
+	if got.NetworkIntercept.IsNull() {
+		t.Error("network_intercept from the config was dropped")
+	}
+}
+
+// BLOCKER B. execute_js alone marks the network_intercept block as present.
+func TestCrawlerAssetsFromConfig_ExecuteJsAloneCounts(t *testing.T) {
+	ctx := context.Background()
+
+	var cfg CrawlerConfig
+	cfg.Config.Assets.NetworkIntercept.ExecuteJs = true
+
+	got := crawlerAssetsFromConfig(ctx, &cfg, resource_crawler.NewAssetsValueNull())
+
+	if got.IsNull() {
+		t.Fatal("assets = null, want the network_intercept block")
+	}
+	if v, _ := got.NetworkIntercept.Attributes()["execute_js"].(types.Bool); !v.ValueBool() {
+		t.Errorf("execute_js = %v, want true", got.NetworkIntercept.Attributes()["execute_js"])
+	}
+}
+
+// BLOCKER C. A document-level type error leaves the whole Config struct at its
+// zero value. The provider must warn and leave state alone rather than
+// overwrite it with defaults.
+func TestParseCrawlerConfig_DocumentLevelTypeErrorIsNotApplied(t *testing.T) {
+	ctx := context.Background()
+
+	crawler := &resource_crawler.CrawlerModel{
+		Assets:      resource_crawler.NewAssetsValueNull(),
+		BrowserMode: types.BoolValue(true),
+		Workers:     types.Int64Value(3),
+		StartUrls: types.ListValueMust(types.StringType, []attr.Value{
+			types.StringValue("https://example.com/a"),
+		}),
+	}
+
+	diags := parseCrawlerConfig(ctx, "config: 'a string not a map'\n", crawler, &quantadmingo.V2Crawler{})
+
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+	if len(diags.Warnings()) == 0 {
+		t.Error("expected a warning for an unparseable config")
+	}
+	if !crawler.BrowserMode.ValueBool() {
+		t.Error("browser_mode was overwritten with a default")
+	}
+	if crawler.Workers.ValueInt64() != 3 {
+		t.Errorf("workers = %v, was overwritten with a default", crawler.Workers)
+	}
+	if len(crawler.StartUrls.Elements()) != 1 {
+		t.Errorf("start_urls = %v, was overwritten with a default", crawler.StartUrls)
+	}
+}

@@ -731,15 +731,15 @@ func TestUnitStringListOrPreserve_NonEmptySlice(t *testing.T) {
 	}
 }
 
+// Contract change: a planned null is now preserved. The read must not invent a
+// list the user did not ask for. Only an unknown value has to resolve, which
+// the ExistingUnknown case below still pins.
 func TestUnitStringListOrPreserve_EmptySlice_ExistingNull(t *testing.T) {
 	existing := types.ListNull(types.StringType)
 	result := stringListOrPreserve([]string{}, existing)
 
-	if result.IsNull() {
-		t.Fatal("expected non-null empty list, got null")
-	}
-	if len(result.Elements()) != 0 {
-		t.Errorf("expected 0 elements, got %d", len(result.Elements()))
+	if !result.IsNull() {
+		t.Fatalf("expected null to be preserved, got %v", result)
 	}
 }
 
