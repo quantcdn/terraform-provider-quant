@@ -188,7 +188,9 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 	// WebhookAuthHeader, WebhookExtraVars, Workers, Delay, Depth, MaxHits,
 	// MaxHtml, MaxErrors, UserAgent, Urls, StartUrls, Exclude, Include,
 	// AllowedDomains (all string/bool/int/float/string-list fields).
-	diags.Append(mapper.ToSDK(ctx, crawler, req)...)
+	// sitemap and status_ok are named as caller-handled: the mapper only maps
+	// string lists, and this function sets both fields itself further down.
+	diags.Append(mapper.ToSDK(ctx, crawler, req, "sitemap", "status_ok")...)
 	if diags.HasError() {
 		return nil, diags
 	}
@@ -237,23 +239,103 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 		}
 	}
 
-	// Assets — nested object with network_intercept sub-object.
-	if !crawler.Assets.IsNull() && !crawler.Assets.IsUnknown() {
-		if !crawler.Assets.NetworkIntercept.IsNull() && !crawler.Assets.NetworkIntercept.IsUnknown() {
-			var networkIntercept resource_crawler.NetworkInterceptValue
-			diags.Append(crawler.Assets.NetworkIntercept.As(ctx, &networkIntercept, basetypes.ObjectAsOptions{})...)
-			if !diags.HasError() {
-				assetsObj := quantadmingo.NewV2CrawlerAssets()
-				niObj := quantadmingo.NewV2CrawlerAssetsNetworkIntercept()
-				niObj.SetEnabled(networkIntercept.Enabled.ValueBool())
-				niObj.SetTimeout(int32(networkIntercept.Timeout.ValueInt64()))
-				assetsObj.SetNetworkIntercept(*niObj)
-				req.SetAssets(*assetsObj)
-			}
-		}
-	}
+	// Assets — nested object with network_intercept and parser sub-objects.
+	diags.Append(setCrawlerAssets(ctx, crawler, req)...)
 
 	return req, diags
+}
+
+// setCrawlerAssets maps the assets block onto the request. AssetsValue stores
+// its sub-objects as plain basetypes.ObjectValue, so the attributes are read
+// directly. ObjectValue.As into a generated NetworkInterceptValue raises a
+// framework Value Conversion Error and must not be used here.
+func setCrawlerAssets(ctx context.Context, crawler *resource_crawler.CrawlerModel, req *quantadmingo.V2CrawlerRequest) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	if crawler.Assets.IsNull() || crawler.Assets.IsUnknown() {
+		return diags
+	}
+
+	assetsObj := quantadmingo.NewV2CrawlerAssets()
+	set := false
+
+	niObj, d := buildNetworkIntercept(ctx, crawler.Assets.NetworkIntercept)
+	diags.Append(d...)
+	if niObj != nil {
+		assetsObj.SetNetworkIntercept(*niObj)
+		set = true
+	}
+
+	parserObj, d := buildAssetsParser(ctx, crawler.Assets.Parser)
+	diags.Append(d...)
+	if parserObj != nil {
+		assetsObj.SetParser(*parserObj)
+		set = true
+	}
+
+	if set && !diags.HasError() {
+		req.SetAssets(*assetsObj)
+	}
+	return diags
+}
+
+// buildNetworkIntercept converts the network_intercept object. It returns nil
+// when the object is absent.
+func buildNetworkIntercept(ctx context.Context, obj basetypes.ObjectValue) (*quantadmingo.V2CrawlerAssetsNetworkIntercept, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil, diags
+	}
+
+	value, d := resource_crawler.NewNetworkInterceptValue(
+		resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx), obj.Attributes(),
+	)
+	diags.Append(d...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	out := quantadmingo.NewV2CrawlerAssetsNetworkIntercept()
+	if isKnown(value.Enabled) {
+		out.SetEnabled(value.Enabled.ValueBool())
+	}
+	if isKnown(value.ExecuteJs) {
+		out.SetExecuteJs(value.ExecuteJs.ValueBool())
+	}
+	if isKnown(value.Timeout) {
+		out.SetTimeout(int32(value.Timeout.ValueInt64()))
+	}
+	return out, diags
+}
+
+// buildAssetsParser converts the parser object. It returns nil when the object
+// is absent.
+func buildAssetsParser(ctx context.Context, obj basetypes.ObjectValue) (*quantadmingo.V2CrawlerAssetsParser, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if obj.IsNull() || obj.IsUnknown() {
+		return nil, diags
+	}
+
+	value, d := resource_crawler.NewParserValue(
+		resource_crawler.ParserValue{}.AttributeTypes(ctx), obj.Attributes(),
+	)
+	diags.Append(d...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	out := quantadmingo.NewV2CrawlerAssetsParser()
+	if isKnown(value.Enabled) {
+		out.SetEnabled(value.Enabled.ValueBool())
+	}
+	return out, diags
+}
+
+// isKnown reports whether an attribute carries a usable value.
+func isKnown(v attr.Value) bool {
+	return !v.IsNull() && !v.IsUnknown()
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +501,9 @@ type CrawlerConfig struct {
 				ExecuteJs bool `yaml:"execute_js"`
 				Timeout   int  `yaml:"timeout"`
 			} `yaml:"network_intercept"`
+			Parser struct {
+				Enabled bool `yaml:"enabled"`
+			} `yaml:"parser"`
 		} `yaml:"assets"`
 		Webhook struct {
 			Url        string `yaml:"url"`
@@ -547,32 +632,53 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 		crawler.Sitemap = types.ListNull(sitemapEntryType)
 	}
 
-	// Assets — network_intercept nested object.
-	niAttrTypes := resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)
-	parserAttrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
-	assetsAttrTypes := resource_crawler.AssetsValue{}.AttributeTypes(ctx)
-
-	if cfg.Assets.NetworkIntercept.Enabled || cfg.Assets.NetworkIntercept.Timeout > 0 {
-		networkInterceptObj, _ := types.ObjectValue(
-			niAttrTypes,
-			map[string]attr.Value{
-				"enabled":    types.BoolValue(cfg.Assets.NetworkIntercept.Enabled),
-				"execute_js": types.BoolValue(cfg.Assets.NetworkIntercept.ExecuteJs),
-				"timeout":    types.Int64Value(int64(cfg.Assets.NetworkIntercept.Timeout)),
-			},
-		)
-		crawler.Assets = resource_crawler.NewAssetsValueMust(
-			assetsAttrTypes,
-			map[string]attr.Value{
-				"network_intercept": networkInterceptObj,
-				"parser":            types.ObjectNull(parserAttrTypes),
-			},
-		)
-	} else if crawler.Assets.IsNull() || crawler.Assets.IsUnknown() {
-		crawler.Assets = resource_crawler.NewAssetsValueNull()
-	}
+	// Assets — network_intercept and parser nested objects.
+	crawler.Assets = crawlerAssetsFromConfig(ctx, &parsed, crawler.Assets)
 
 	return
+}
+
+// crawlerAssetsFromConfig rebuilds the assets value from the crawler config the
+// API returned. current is the planned value; it is kept when the config
+// reports no assets, so that a crawler without assets is left untouched.
+func crawlerAssetsFromConfig(ctx context.Context, cfg *CrawlerConfig, current resource_crawler.AssetsValue) resource_crawler.AssetsValue {
+	niAttrTypes := resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)
+	parserAttrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
+
+	hasNetworkIntercept := cfg.Config.Assets.NetworkIntercept.Enabled ||
+		cfg.Config.Assets.NetworkIntercept.Timeout > 0
+	hasParser := cfg.Config.Assets.Parser.Enabled
+
+	if !hasNetworkIntercept && !hasParser {
+		if current.IsNull() || current.IsUnknown() {
+			return resource_crawler.NewAssetsValueNull()
+		}
+		return current
+	}
+
+	networkIntercept := types.ObjectNull(niAttrTypes)
+	if hasNetworkIntercept {
+		networkIntercept = types.ObjectValueMust(niAttrTypes, map[string]attr.Value{
+			"enabled":    types.BoolValue(cfg.Config.Assets.NetworkIntercept.Enabled),
+			"execute_js": types.BoolValue(cfg.Config.Assets.NetworkIntercept.ExecuteJs),
+			"timeout":    types.Int64Value(int64(cfg.Config.Assets.NetworkIntercept.Timeout)),
+		})
+	}
+
+	parser := types.ObjectNull(parserAttrTypes)
+	if hasParser {
+		parser = types.ObjectValueMust(parserAttrTypes, map[string]attr.Value{
+			"enabled": types.BoolValue(true),
+		})
+	}
+
+	return resource_crawler.NewAssetsValueMust(
+		resource_crawler.AssetsValue{}.AttributeTypes(ctx),
+		map[string]attr.Value{
+			"network_intercept": networkIntercept,
+			"parser":            parser,
+		},
+	)
 }
 
 // ---------------------------------------------------------------------------

@@ -25,8 +25,18 @@ import (
 //
 // sdkReq must be a pointer so that setter methods with pointer receivers are
 // found by reflection.
-func ToSDK(ctx context.Context, tfModel any, sdkReq any) diag.Diagnostics {
+//
+// callerHandled names tfsdk tags that the caller maps itself. The mapper skips
+// those fields without a warning. Use it for fields the mapper cannot convert,
+// such as integer lists or nested object lists, so that the caller's own
+// mapping does not produce a misleading "field skipped" warning on every apply.
+func ToSDK(ctx context.Context, tfModel any, sdkReq any, callerHandled ...string) diag.Diagnostics {
 	var diags diag.Diagnostics
+
+	skip := make(map[string]struct{}, len(callerHandled))
+	for _, tag := range callerHandled {
+		skip[tag] = struct{}{}
+	}
 
 	modelVal := reflect.ValueOf(tfModel)
 	modelType := modelVal.Type()
@@ -55,6 +65,9 @@ func ToSDK(ctx context.Context, tfModel any, sdkReq any) diag.Diagnostics {
 		field := modelType.Field(i)
 		tag := field.Tag.Get("tfsdk")
 		if tag == "" || tag == "-" {
+			continue
+		}
+		if _, handled := skip[tag]; handled {
 			continue
 		}
 
@@ -131,7 +144,9 @@ func convertTFValue(ctx context.Context, fieldVal reflect.Value, targetType refl
 		if diags.HasError() {
 			return reflect.Value{}, true
 		}
-		return reflect.ValueOf(elems), false
+		// Guard the setter call: a string list must match the setter's
+		// parameter type, or the reflective call panics.
+		return convertToTarget(reflect.ValueOf(elems), targetType)
 
 	default:
 		// Unsupported type (nested objects, etc.) — skip silently.
