@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/client"
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/mapper"
@@ -478,23 +479,23 @@ type CrawlerConfig struct {
 				Enabled bool `yaml:"enabled"`
 			} `yaml:"tracking"`
 		} `yaml:"cloud"`
-		UserAgent      string                   `yaml:"user_agent"`
-		BrowserMode    bool                     `yaml:"browser_mode"`
-		Workers        int                      `yaml:"workers"`
-		Depth          int                      `yaml:"depth"`
-		MaxHits        int                      `yaml:"max_hits"`
-		MaxHtml        int                      `yaml:"max_html"`
-		MaxErrors      int                      `yaml:"max_errors"`
-		Cache          bool                     `yaml:"cache"`
-		Delay          float64                  `yaml:"delay"`
-		StatusOk       []int                    `yaml:"status_ok"`
-		Quant          map[string]interface{}   `yaml:"quant"`
-		StartUrl       []string                 `yaml:"start_url"`
-		Headers        map[string]string        `yaml:"headers"`
-		Exclude        []string                 `yaml:"exclude"`
-		Include        []string                 `yaml:"include"`
-		AllowedDomains []string                 `yaml:"allowed_domains"`
-		Sitemap        []map[string]interface{} `yaml:"sitemap"`
+		UserAgent      string                           `yaml:"user_agent"`
+		BrowserMode    bool                             `yaml:"browser_mode"`
+		Workers        int                              `yaml:"workers"`
+		Depth          int                              `yaml:"depth"`
+		MaxHits        int                              `yaml:"max_hits"`
+		MaxHtml        int                              `yaml:"max_html"`
+		MaxErrors      int                              `yaml:"max_errors"`
+		Cache          bool                             `yaml:"cache"`
+		Delay          float64                          `yaml:"delay"`
+		StatusOk       yamlList[int]                    `yaml:"status_ok"`
+		Quant          map[string]interface{}           `yaml:"quant"`
+		StartUrl       yamlList[string]                 `yaml:"start_url"`
+		Headers        map[string]string                `yaml:"headers"`
+		Exclude        yamlList[string]                 `yaml:"exclude"`
+		Include        yamlList[string]                 `yaml:"include"`
+		AllowedDomains yamlList[string]                 `yaml:"allowed_domains"`
+		Sitemap        yamlList[map[string]interface{}] `yaml:"sitemap"`
 		Assets         struct {
 			NetworkIntercept struct {
 				Enabled   bool `yaml:"enabled"`
@@ -515,14 +516,39 @@ type CrawlerConfig struct {
 	Headers map[string]string `yaml:"headers"`
 }
 
+// yamlList decodes a YAML sequence into a slice, and also accepts the empty
+// mapping the API writes for an empty list field. A PHP empty array serialises
+// as "{  }", which a plain slice field cannot decode.
+type yamlList[T any] []T
+
+func (l *yamlList[T]) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.MappingNode && len(node.Content) == 0 {
+		*l = nil
+		return nil
+	}
+	var out []T
+	if err := node.Decode(&out); err != nil {
+		return err
+	}
+	*l = out
+	return nil
+}
+
 // parseCrawlerConfig extracts fields from the YAML config blob that are not
 // present on the top-level API response object.
 func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resource_crawler.CrawlerModel, api *quantadmingo.V2Crawler) (diags diag.Diagnostics) {
 	var parsed CrawlerConfig
 	if err := yaml.Unmarshal([]byte(configYAML), &parsed); err != nil {
-		diags.AddWarning("Unable to parse crawler config",
-			fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()))
-		return
+		// A type error is per-field: yaml still decodes every other field, so
+		// the parse is kept. Any other error leaves the struct empty.
+		var typeErr *yaml.TypeError
+		if !errors.As(err, &typeErr) {
+			diags.AddWarning("Unable to parse crawler config",
+				fmt.Sprintf("Error parsing config YAML: %s. Some fields may not be set correctly.", err.Error()))
+			return
+		}
+		diags.AddWarning("Some crawler config fields could not be parsed",
+			fmt.Sprintf("%s. The remaining fields were read normally.", err.Error()))
 	}
 
 	cfg := parsed.Config
@@ -557,9 +583,9 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 	}
 
 	// String list fields — preserve plan values when API returns empty.
-	crawler.Exclude = stringListOrPreserve(cfg.Exclude, crawler.Exclude)
-	crawler.Include = stringListOrPreserve(cfg.Include, crawler.Include)
-	crawler.AllowedDomains = stringListOrPreserve(cfg.AllowedDomains, crawler.AllowedDomains)
+	crawler.Exclude = stringListOrPreserve([]string(cfg.Exclude), crawler.Exclude)
+	crawler.Include = stringListOrPreserve([]string(cfg.Include), crawler.Include)
+	crawler.AllowedDomains = stringListOrPreserve([]string(cfg.AllowedDomains), crawler.AllowedDomains)
 
 	// StatusOk — int list.
 	if len(cfg.StatusOk) > 0 {

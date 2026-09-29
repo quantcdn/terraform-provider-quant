@@ -7,6 +7,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
+
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/resource_crawler"
 )
 
@@ -248,5 +250,79 @@ func TestCrawlerAssetsFromConfig_NoAssets(t *testing.T) {
 
 	if !got.IsNull() {
 		t.Errorf("assets = %v, want null", got)
+	}
+}
+
+// crawlerConfigYAMLWithEmptyLists is the shape the API stores for a crawler
+// whose start_url, include and allowed_domains lists are empty. The backend
+// writes an empty mapping, not an empty sequence.
+const crawlerConfigYAMLWithEmptyLists = `config:
+    user_agent: 'test-agent'
+    browser_mode: true
+    workers: 3
+    depth: -1
+    delay: 4
+    status_ok: [200]
+    start_url: {  }
+    include: {  }
+    allowed_domains: {  }
+    exclude:
+        - /admin
+    sitemap:
+        - recursive: true
+          url: /sitemap.xml
+    headers: {  }
+domain: 'https://example.com'
+headers: {  }
+`
+
+// TestParseCrawlerConfig_EmptyListsAreMappings covers the config the API
+// actually stores. The empty mappings must not discard the rest of the parse:
+// every other field has to reach the model, and no warning may be raised.
+func TestParseCrawlerConfig_EmptyListsAreMappings(t *testing.T) {
+	ctx := context.Background()
+
+	crawler := &resource_crawler.CrawlerModel{Assets: resource_crawler.NewAssetsValueNull()}
+	api := &quantadmingo.V2Crawler{}
+
+	diags := parseCrawlerConfig(ctx, crawlerConfigYAMLWithEmptyLists, crawler, api)
+
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+	if len(diags.Warnings()) != 0 {
+		t.Errorf("unexpected warning diagnostics: %v", diags.Warnings())
+	}
+
+	// Fields that share the config blob with the empty lists.
+	if !crawler.BrowserMode.ValueBool() {
+		t.Error("browser_mode was not read back")
+	}
+	if got := crawler.Workers.ValueInt64(); got != 3 {
+		t.Errorf("workers = %d, want 3", got)
+	}
+	if got := crawler.UserAgent.ValueString(); got != "test-agent" {
+		t.Errorf("user_agent = %q, want %q", got, "test-agent")
+	}
+
+	// The control: a non-empty list already round-tripped before this fix.
+	if got := len(crawler.Exclude.Elements()); got != 1 {
+		t.Errorf("exclude length = %d, want 1", got)
+	}
+
+	// The values the empty mappings used to take down with them.
+	if got := len(crawler.StatusOk.Elements()); got != 1 {
+		t.Errorf("status_ok length = %d, want 1", got)
+	}
+	if got := len(crawler.Sitemap.Elements()); got != 1 {
+		t.Errorf("sitemap length = %d, want 1", got)
+	}
+
+	// The empty lists themselves must not look like configured values.
+	if !crawler.Include.IsNull() && len(crawler.Include.Elements()) != 0 {
+		t.Errorf("include = %v, want empty or null", crawler.Include)
+	}
+	if !crawler.AllowedDomains.IsNull() && len(crawler.AllowedDomains.Elements()) != 0 {
+		t.Errorf("allowed_domains = %v, want empty or null", crawler.AllowedDomains)
 	}
 }
