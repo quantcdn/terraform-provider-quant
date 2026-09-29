@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	quantadmingo "github.com/quantcdn/quant-admin-go/v4"
 
@@ -490,5 +491,89 @@ func TestParseCrawlerConfig_DocumentLevelTypeErrorIsNotApplied(t *testing.T) {
 	}
 	if len(crawler.StartUrls.Elements()) != 1 {
 		t.Errorf("start_urls = %v, was overwritten with a default", crawler.StartUrls)
+	}
+}
+
+// On import there is no prior plan or state, so every field of the model is a
+// Go zero value: a types.List{} with NO element type. A helper that returns
+// such a value verbatim puts an untyped list into state, and State.Set rejects
+// it with a Value Conversion Error. Each helper must produce a properly typed
+// value instead.
+func TestStringListOrPreserve_ZeroValueListGetsAType(t *testing.T) {
+	ctx := context.Background()
+
+	got := stringListOrPreserve(nil, types.List{})
+
+	if got.ElementType(ctx) == nil {
+		t.Fatalf("element type is missing: %v", got)
+	}
+	if got.ElementType(ctx) != types.StringType {
+		t.Errorf("element type = %v, want types.StringType", got.ElementType(ctx))
+	}
+}
+
+// The same guard must hold when the config does carry values.
+func TestStringListOrPreserve_ZeroValueListWithConfigValues(t *testing.T) {
+	ctx := context.Background()
+
+	got := stringListOrPreserve([]string{"/admin"}, types.List{})
+
+	if got.ElementType(ctx) != types.StringType {
+		t.Errorf("element type = %v, want types.StringType", got.ElementType(ctx))
+	}
+	if len(got.Elements()) != 1 {
+		t.Errorf("got %v, want one element", got)
+	}
+}
+
+func TestPlannedSubObject_ZeroValueObjectGetsAType(t *testing.T) {
+	ctx := context.Background()
+	attrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
+
+	// A known assets value carrying a zero-value sub-object.
+	assets := resource_crawler.NewAssetsValueMust(
+		resource_crawler.AssetsValue{}.AttributeTypes(ctx),
+		map[string]attr.Value{
+			"network_intercept": types.ObjectNull(resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)),
+			"parser":            types.ObjectNull(attrTypes),
+		},
+	)
+
+	got := plannedSubObject(assets, basetypes.ObjectValue{}, attrTypes)
+
+	if len(got.AttributeTypes(ctx)) != len(attrTypes) {
+		t.Errorf("attribute types = %v, want %v", got.AttributeTypes(ctx), attrTypes)
+	}
+}
+
+// The whole read path, driven the way import drives it: a model that is all
+// Go zero values. Every collection must come out with a usable type.
+func TestParseCrawlerConfig_ZeroValueModelIsFullyTyped(t *testing.T) {
+	ctx := context.Background()
+
+	crawler := &resource_crawler.CrawlerModel{}
+
+	diags := parseCrawlerConfig(ctx, crawlerConfigYAMLWithEmptyLists, crawler, &quantadmingo.V2Crawler{})
+	if diags.HasError() {
+		t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+	}
+
+	lists := map[string]types.List{
+		"exclude":         crawler.Exclude,
+		"include":         crawler.Include,
+		"allowed_domains": crawler.AllowedDomains,
+		"start_urls":      crawler.StartUrls,
+		"urls":            crawler.Urls,
+		"status_ok":       crawler.StatusOk,
+		"sitemap":         crawler.Sitemap,
+	}
+	for name, list := range lists {
+		if list.ElementType(ctx) == nil {
+			t.Errorf("%s has no element type: %v", name, list)
+		}
+	}
+
+	if crawler.Headers.ElementType(ctx) == nil {
+		t.Errorf("headers has no element type: %v", crawler.Headers)
 	}
 }

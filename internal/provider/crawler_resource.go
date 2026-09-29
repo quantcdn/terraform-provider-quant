@@ -518,7 +518,10 @@ type CrawlerConfig struct {
 // plannedSubObject returns the planned value of an assets sub-block, or a null
 // object when there is no usable planned value to keep.
 func plannedSubObject(assets resource_crawler.AssetsValue, sub basetypes.ObjectValue, attrTypes map[string]attr.Type) basetypes.ObjectValue {
-	if assets.IsNull() || assets.IsUnknown() || sub.IsUnknown() {
+	// A zero-value object carries no attribute types, which happens on import.
+	// Returning it verbatim would put an untyped object into state.
+	if assets.IsNull() || assets.IsUnknown() || sub.IsUnknown() ||
+		len(sub.AttributeTypes(context.Background())) == 0 {
 		return types.ObjectNull(attrTypes)
 	}
 	return sub
@@ -599,7 +602,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			vals[i] = types.Int64Value(int64(v))
 		}
 		crawler.StatusOk = types.ListValueMust(types.Int64Type, vals)
-	} else if crawler.StatusOk.IsUnknown() {
+	} else if crawler.StatusOk.IsUnknown() || crawler.StatusOk.ElementType(ctx) == nil {
 		crawler.StatusOk = types.ListValueMust(types.Int64Type, []attr.Value{})
 	}
 
@@ -610,7 +613,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			headersMap[k] = types.StringValue(v)
 		}
 		crawler.Headers = types.MapValueMust(types.StringType, headersMap)
-	} else if crawler.Headers.IsUnknown() {
+	} else if crawler.Headers.IsUnknown() || crawler.Headers.ElementType(ctx) == nil {
 		crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 	}
 	// else: preserve existing headers from plan/state
@@ -650,7 +653,8 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 			sitemapVals[i] = objVal
 		}
 		crawler.Sitemap, _ = types.ListValue(sitemapEntryType, sitemapVals)
-	} else if crawler.Sitemap.IsNull() || crawler.Sitemap.IsUnknown() {
+	} else if crawler.Sitemap.IsNull() || crawler.Sitemap.IsUnknown() ||
+		crawler.Sitemap.ElementType(ctx) == nil {
 		crawler.Sitemap = types.ListNull(sitemapEntryType)
 	}
 
@@ -870,9 +874,12 @@ func stringListOrPreserve(vals []string, existing types.List) types.List {
 		return types.ListValueMust(types.StringType, attrVals)
 	}
 	// An unknown value must resolve: the framework forbids leaving one unknown
-	// after apply. A planned null, or a planned value, is returned unchanged so
-	// that the read never invents a list the user did not ask for.
-	if existing.IsUnknown() {
+	// after apply. A zero-value list carries no element type, which happens on
+	// import, where there is no prior plan or state; returning it verbatim puts
+	// an untyped list into state and State.Set rejects it. Otherwise a planned
+	// null, or a planned value, is returned unchanged so that the read never
+	// invents a list the user did not ask for.
+	if existing.IsUnknown() || existing.ElementType(context.Background()) == nil {
 		return types.ListValueMust(types.StringType, []attr.Value{})
 	}
 	return existing
