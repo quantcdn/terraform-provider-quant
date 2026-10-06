@@ -92,6 +92,37 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Asset harvesting configuration",
 				MarkdownDescription: "Asset harvesting configuration",
 			},
+			"browser_config": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"capture_api_responses": schema.BoolAttribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Store XHR/fetch responses as files, so a static copy can serve a site whose navigation or content is rendered client-side from a JSON endpoint",
+						MarkdownDescription: "Store XHR/fetch responses as files, so a static copy can serve a site whose navigation or content is rendered client-side from a JSON endpoint",
+					},
+					"use_rendered_html": schema.BoolAttribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Store the JavaScript-modified DOM instead of the original HTML response",
+						MarkdownDescription: "Store the JavaScript-modified DOM instead of the original HTML response",
+					},
+					"wait_for_network_idle": schema.Int64Attribute{
+						Optional:            true,
+						Computed:            true,
+						Description:         "Wait for the network to settle before capture, in milliseconds. Useful for API-driven sites",
+						MarkdownDescription: "Wait for the network to settle before capture, in milliseconds. Useful for API-driven sites",
+					},
+				},
+				CustomType: BrowserConfigType{
+					ObjectType: types.ObjectType{
+						AttrTypes: BrowserConfigValue{}.AttributeTypes(ctx),
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Browser-mode behaviour. Only applies when browser_mode is true.",
+				MarkdownDescription: "Browser-mode behaviour. Only applies when browser_mode is true.",
+			},
 			"browser_mode": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -330,41 +361,42 @@ func CrawlerResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type CrawlerModel struct {
-	AllowedDomains    types.List    `tfsdk:"allowed_domains"`
-	Assets            AssetsValue   `tfsdk:"assets"`
-	BrowserMode       types.Bool    `tfsdk:"browser_mode"`
-	Config            types.String  `tfsdk:"config"`
-	Crawler           types.String  `tfsdk:"crawler"`
-	CreatedAt         types.String  `tfsdk:"created_at"`
-	Delay             types.Float64 `tfsdk:"delay"`
-	DeletedAt         types.String  `tfsdk:"deleted_at"`
-	Depth             types.Int64   `tfsdk:"depth"`
-	Domain            types.String  `tfsdk:"domain"`
-	DomainVerified    types.Int64   `tfsdk:"domain_verified"`
-	Exclude           types.List    `tfsdk:"exclude"`
-	Headers           types.Map     `tfsdk:"headers"`
-	Id                types.Int64   `tfsdk:"id"`
-	Include           types.List    `tfsdk:"include"`
-	MaxErrors         types.Int64   `tfsdk:"max_errors"`
-	MaxHits           types.Int64   `tfsdk:"max_hits"`
-	MaxHtml           types.Int64   `tfsdk:"max_html"`
-	Name              types.String  `tfsdk:"name"`
-	Organization      types.String  `tfsdk:"organization"`
-	Project           types.String  `tfsdk:"project"`
-	ProjectId         types.Int64   `tfsdk:"project_id"`
-	Sitemap           types.List    `tfsdk:"sitemap"`
-	StartUrls         types.List    `tfsdk:"start_urls"`
-	StatusOk          types.List    `tfsdk:"status_ok"`
-	Tracking          types.Bool    `tfsdk:"tracking"`
-	UpdatedAt         types.String  `tfsdk:"updated_at"`
-	Urls              types.List    `tfsdk:"urls"`
-	UrlsList          types.String  `tfsdk:"urls_list"`
-	UserAgent         types.String  `tfsdk:"user_agent"`
-	Uuid              types.String  `tfsdk:"uuid"`
-	WebhookAuthHeader types.String  `tfsdk:"webhook_auth_header"`
-	WebhookExtraVars  types.String  `tfsdk:"webhook_extra_vars"`
-	WebhookUrl        types.String  `tfsdk:"webhook_url"`
-	Workers           types.Int64   `tfsdk:"workers"`
+	AllowedDomains    types.List         `tfsdk:"allowed_domains"`
+	Assets            AssetsValue        `tfsdk:"assets"`
+	BrowserConfig     BrowserConfigValue `tfsdk:"browser_config"`
+	BrowserMode       types.Bool         `tfsdk:"browser_mode"`
+	Config            types.String       `tfsdk:"config"`
+	Crawler           types.String       `tfsdk:"crawler"`
+	CreatedAt         types.String       `tfsdk:"created_at"`
+	Delay             types.Float64      `tfsdk:"delay"`
+	DeletedAt         types.String       `tfsdk:"deleted_at"`
+	Depth             types.Int64        `tfsdk:"depth"`
+	Domain            types.String       `tfsdk:"domain"`
+	DomainVerified    types.Int64        `tfsdk:"domain_verified"`
+	Exclude           types.List         `tfsdk:"exclude"`
+	Headers           types.Map          `tfsdk:"headers"`
+	Id                types.Int64        `tfsdk:"id"`
+	Include           types.List         `tfsdk:"include"`
+	MaxErrors         types.Int64        `tfsdk:"max_errors"`
+	MaxHits           types.Int64        `tfsdk:"max_hits"`
+	MaxHtml           types.Int64        `tfsdk:"max_html"`
+	Name              types.String       `tfsdk:"name"`
+	Organization      types.String       `tfsdk:"organization"`
+	Project           types.String       `tfsdk:"project"`
+	ProjectId         types.Int64        `tfsdk:"project_id"`
+	Sitemap           types.List         `tfsdk:"sitemap"`
+	StartUrls         types.List         `tfsdk:"start_urls"`
+	StatusOk          types.List         `tfsdk:"status_ok"`
+	Tracking          types.Bool         `tfsdk:"tracking"`
+	UpdatedAt         types.String       `tfsdk:"updated_at"`
+	Urls              types.List         `tfsdk:"urls"`
+	UrlsList          types.String       `tfsdk:"urls_list"`
+	UserAgent         types.String       `tfsdk:"user_agent"`
+	Uuid              types.String       `tfsdk:"uuid"`
+	WebhookAuthHeader types.String       `tfsdk:"webhook_auth_header"`
+	WebhookExtraVars  types.String       `tfsdk:"webhook_extra_vars"`
+	WebhookUrl        types.String       `tfsdk:"webhook_url"`
+	Workers           types.Int64        `tfsdk:"workers"`
 }
 
 var _ basetypes.ObjectTypable = AssetsType{}
@@ -1555,6 +1587,440 @@ func (v ParserValue) Type(ctx context.Context) attr.Type {
 func (v ParserValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	return map[string]attr.Type{
 		"enabled": basetypes.BoolType{},
+	}
+}
+
+var _ basetypes.ObjectTypable = BrowserConfigType{}
+
+type BrowserConfigType struct {
+	basetypes.ObjectType
+}
+
+func (t BrowserConfigType) Equal(o attr.Type) bool {
+	other, ok := o.(BrowserConfigType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t BrowserConfigType) String() string {
+	return "BrowserConfigType"
+}
+
+func (t BrowserConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	captureApiResponsesAttribute, ok := attributes["capture_api_responses"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`capture_api_responses is missing from object`)
+
+		return nil, diags
+	}
+
+	captureApiResponsesVal, ok := captureApiResponsesAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`capture_api_responses expected to be basetypes.BoolValue, was: %T`, captureApiResponsesAttribute))
+	}
+
+	useRenderedHtmlAttribute, ok := attributes["use_rendered_html"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`use_rendered_html is missing from object`)
+
+		return nil, diags
+	}
+
+	useRenderedHtmlVal, ok := useRenderedHtmlAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`use_rendered_html expected to be basetypes.BoolValue, was: %T`, useRenderedHtmlAttribute))
+	}
+
+	waitForNetworkIdleAttribute, ok := attributes["wait_for_network_idle"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`wait_for_network_idle is missing from object`)
+
+		return nil, diags
+	}
+
+	waitForNetworkIdleVal, ok := waitForNetworkIdleAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`wait_for_network_idle expected to be basetypes.Int64Value, was: %T`, waitForNetworkIdleAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return BrowserConfigValue{
+		CaptureApiResponses: captureApiResponsesVal,
+		UseRenderedHtml:     useRenderedHtmlVal,
+		WaitForNetworkIdle:  waitForNetworkIdleVal,
+		state:               attr.ValueStateKnown,
+	}, diags
+}
+
+func NewBrowserConfigValueNull() BrowserConfigValue {
+	return BrowserConfigValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewBrowserConfigValueUnknown() BrowserConfigValue {
+	return BrowserConfigValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewBrowserConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (BrowserConfigValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing BrowserConfigValue Attribute Value",
+				"While creating a BrowserConfigValue value, a missing attribute value was detected. "+
+					"A BrowserConfigValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("BrowserConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid BrowserConfigValue Attribute Type",
+				"While creating a BrowserConfigValue value, an invalid attribute value was detected. "+
+					"A BrowserConfigValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("BrowserConfigValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("BrowserConfigValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra BrowserConfigValue Attribute Value",
+				"While creating a BrowserConfigValue value, an extra attribute value was detected. "+
+					"A BrowserConfigValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra BrowserConfigValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewBrowserConfigValueUnknown(), diags
+	}
+
+	captureApiResponsesAttribute, ok := attributes["capture_api_responses"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`capture_api_responses is missing from object`)
+
+		return NewBrowserConfigValueUnknown(), diags
+	}
+
+	captureApiResponsesVal, ok := captureApiResponsesAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`capture_api_responses expected to be basetypes.BoolValue, was: %T`, captureApiResponsesAttribute))
+	}
+
+	useRenderedHtmlAttribute, ok := attributes["use_rendered_html"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`use_rendered_html is missing from object`)
+
+		return NewBrowserConfigValueUnknown(), diags
+	}
+
+	useRenderedHtmlVal, ok := useRenderedHtmlAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`use_rendered_html expected to be basetypes.BoolValue, was: %T`, useRenderedHtmlAttribute))
+	}
+
+	waitForNetworkIdleAttribute, ok := attributes["wait_for_network_idle"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`wait_for_network_idle is missing from object`)
+
+		return NewBrowserConfigValueUnknown(), diags
+	}
+
+	waitForNetworkIdleVal, ok := waitForNetworkIdleAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`wait_for_network_idle expected to be basetypes.Int64Value, was: %T`, waitForNetworkIdleAttribute))
+	}
+
+	if diags.HasError() {
+		return NewBrowserConfigValueUnknown(), diags
+	}
+
+	return BrowserConfigValue{
+		CaptureApiResponses: captureApiResponsesVal,
+		UseRenderedHtml:     useRenderedHtmlVal,
+		WaitForNetworkIdle:  waitForNetworkIdleVal,
+		state:               attr.ValueStateKnown,
+	}, diags
+}
+
+func NewBrowserConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) BrowserConfigValue {
+	object, diags := NewBrowserConfigValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewBrowserConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t BrowserConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewBrowserConfigValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewBrowserConfigValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewBrowserConfigValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewBrowserConfigValueMust(BrowserConfigValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t BrowserConfigType) ValueType(ctx context.Context) attr.Value {
+	return BrowserConfigValue{}
+}
+
+var _ basetypes.ObjectValuable = BrowserConfigValue{}
+
+type BrowserConfigValue struct {
+	CaptureApiResponses basetypes.BoolValue  `tfsdk:"capture_api_responses"`
+	UseRenderedHtml     basetypes.BoolValue  `tfsdk:"use_rendered_html"`
+	WaitForNetworkIdle  basetypes.Int64Value `tfsdk:"wait_for_network_idle"`
+	state               attr.ValueState
+}
+
+func (v BrowserConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["capture_api_responses"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["use_rendered_html"] = basetypes.BoolType{}.TerraformType(ctx)
+	attrTypes["wait_for_network_idle"] = basetypes.Int64Type{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.CaptureApiResponses.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["capture_api_responses"] = val
+
+		val, err = v.UseRenderedHtml.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["use_rendered_html"] = val
+
+		val, err = v.WaitForNetworkIdle.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["wait_for_network_idle"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v BrowserConfigValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v BrowserConfigValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v BrowserConfigValue) String() string {
+	return "BrowserConfigValue"
+}
+
+func (v BrowserConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"capture_api_responses": basetypes.BoolType{},
+		"use_rendered_html":     basetypes.BoolType{},
+		"wait_for_network_idle": basetypes.Int64Type{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"capture_api_responses": v.CaptureApiResponses,
+			"use_rendered_html":     v.UseRenderedHtml,
+			"wait_for_network_idle": v.WaitForNetworkIdle,
+		})
+
+	return objVal, diags
+}
+
+func (v BrowserConfigValue) Equal(o attr.Value) bool {
+	other, ok := o.(BrowserConfigValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.CaptureApiResponses.Equal(other.CaptureApiResponses) {
+		return false
+	}
+
+	if !v.UseRenderedHtml.Equal(other.UseRenderedHtml) {
+		return false
+	}
+
+	if !v.WaitForNetworkIdle.Equal(other.WaitForNetworkIdle) {
+		return false
+	}
+
+	return true
+}
+
+func (v BrowserConfigValue) Type(ctx context.Context) attr.Type {
+	return BrowserConfigType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v BrowserConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"capture_api_responses": basetypes.BoolType{},
+		"use_rendered_html":     basetypes.BoolType{},
+		"wait_for_network_idle": basetypes.Int64Type{},
 	}
 }
 
