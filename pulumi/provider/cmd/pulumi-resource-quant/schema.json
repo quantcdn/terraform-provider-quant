@@ -1306,6 +1306,32 @@
                 }
             }
         },
+        "quant:index/CrawlerBrowserConfig:CrawlerBrowserConfig": {
+            "properties": {
+                "captureApiResponses": {
+                    "type": "boolean",
+                    "description": "Store XHR/fetch responses as files, so a static copy can serve a site whose navigation or content is rendered client-side from a JSON endpoint\n"
+                },
+                "useRenderedHtml": {
+                    "type": "boolean",
+                    "description": "Store the JavaScript-modified DOM instead of the original HTML response\n"
+                },
+                "waitForNetworkIdle": {
+                    "type": "integer",
+                    "description": "Wait for the network to settle before capture, in milliseconds. Useful for API-driven sites\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "captureApiResponses",
+                        "useRenderedHtml",
+                        "waitForNetworkIdle"
+                    ]
+                }
+            }
+        },
         "quant:index/CrawlerSitemap:CrawlerSitemap": {
             "properties": {
                 "recursive": {
@@ -4523,6 +4549,10 @@
                     "$ref": "#/types/quant:index/CrawlerAssets:CrawlerAssets",
                     "description": "Asset harvesting configuration"
                 },
+                "browserConfig": {
+                    "$ref": "#/types/quant:index/CrawlerBrowserConfig:CrawlerBrowserConfig",
+                    "description": "Browser-mode behaviour. Only applies when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis true."
+                },
                 "browserMode": {
                     "type": "boolean",
                     "description": "Enable browser mode"
@@ -4676,6 +4706,7 @@
             "required": [
                 "allowedDomains",
                 "assets",
+                "browserConfig",
                 "browserMode",
                 "config",
                 "crawler",
@@ -4720,6 +4751,10 @@
                 "assets": {
                     "$ref": "#/types/quant:index/CrawlerAssets:CrawlerAssets",
                     "description": "Asset harvesting configuration"
+                },
+                "browserConfig": {
+                    "$ref": "#/types/quant:index/CrawlerBrowserConfig:CrawlerBrowserConfig",
+                    "description": "Browser-mode behaviour. Only applies when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis true."
                 },
                 "browserMode": {
                     "type": "boolean",
@@ -4855,6 +4890,10 @@
                     "assets": {
                         "$ref": "#/types/quant:index/CrawlerAssets:CrawlerAssets",
                         "description": "Asset harvesting configuration"
+                    },
+                    "browserConfig": {
+                        "$ref": "#/types/quant:index/CrawlerBrowserConfig:CrawlerBrowserConfig",
+                        "description": "Browser-mode behaviour. Only applies when\u003cspan pulumi-lang-nodejs=\" browserMode \" pulumi-lang-dotnet=\" BrowserMode \" pulumi-lang-go=\" browserMode \" pulumi-lang-python=\" browser_mode \" pulumi-lang-yaml=\" browserMode \" pulumi-lang-java=\" browserMode \" pulumi-lang-hcl=\" browser_mode \"\u003e browserMode \u003c/span\u003eis true."
                     },
                     "browserMode": {
                         "type": "boolean",
