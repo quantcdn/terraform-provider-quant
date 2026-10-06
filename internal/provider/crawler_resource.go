@@ -155,6 +155,9 @@ func (r *crawlerResource) Update(ctx context.Context, req resource.UpdateRequest
 	if !plan.Assets.IsUnknown() {
 		data.Assets = plan.Assets
 	}
+	if !plan.BrowserConfig.IsUnknown() {
+		data.BrowserConfig = plan.BrowserConfig
+	}
 
 	resp.Diagnostics.Append(callCrawlerUpdateAPI(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -242,7 +245,53 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 	// Assets — nested object with network_intercept and parser sub-objects.
 	diags.Append(setCrawlerAssets(ctx, crawler, req)...)
 
+	// Browser config — only meaningful in browser mode.
+	diags.Append(setCrawlerBrowserConfig(ctx, crawler, req)...)
+
 	return req, diags
+}
+
+// setCrawlerBrowserConfig maps the browser_config block onto the request.
+//
+// These keys only take effect in browser mode: the crawler reads them on the
+// network-interception path, which is installed only when browser_mode is on.
+// capture_api_responses is the one that matters — it makes a crawl store
+// XHR/fetch responses as files, which is what lets a static copy serve a site
+// whose navigation or content is rendered client-side from a JSON endpoint.
+// Without it those endpoints 404 on the static copy and the page renders with
+// no navigation at all.
+//
+// Unlike AssetsValue, BrowserConfigValue exposes its attributes directly, so
+// no ObjectValue conversion is needed.
+func setCrawlerBrowserConfig(ctx context.Context, crawler *resource_crawler.CrawlerModel, req *quantadmingo.V2CrawlerRequest) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	bc := crawler.BrowserConfig
+	if bc.IsNull() || bc.IsUnknown() {
+		return diags
+	}
+
+	out := quantadmingo.NewV2CrawlerBrowserConfig()
+	set := false
+
+	if isKnown(bc.CaptureApiResponses) {
+		out.SetCaptureApiResponses(bc.CaptureApiResponses.ValueBool())
+		set = true
+	}
+	if isKnown(bc.UseRenderedHtml) {
+		out.SetUseRenderedHtml(bc.UseRenderedHtml.ValueBool())
+		set = true
+	}
+	if isKnown(bc.WaitForNetworkIdle) {
+		// The schema models this as int64; the API takes int32 milliseconds.
+		out.SetWaitForNetworkIdle(int32(bc.WaitForNetworkIdle.ValueInt64()))
+		set = true
+	}
+
+	if set {
+		req.SetBrowserConfig(*out)
+	}
+	return diags
 }
 
 // setCrawlerAssets maps the assets block onto the request. AssetsValue stores
@@ -495,7 +544,12 @@ type CrawlerConfig struct {
 		Include        yamlList[string]                 `yaml:"include"`
 		AllowedDomains yamlList[string]                 `yaml:"allowed_domains"`
 		Sitemap        yamlList[map[string]interface{}] `yaml:"sitemap"`
-		Assets         struct {
+		BrowserConfig  struct {
+			CaptureApiResponses bool  `yaml:"capture_api_responses"`
+			UseRenderedHtml     bool  `yaml:"use_rendered_html"`
+			WaitForNetworkIdle  int64 `yaml:"wait_for_network_idle"`
+		} `yaml:"browser_config"`
+		Assets struct {
 			NetworkIntercept struct {
 				Enabled   bool `yaml:"enabled"`
 				ExecuteJs bool `yaml:"execute_js"`
@@ -660,6 +714,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 
 	// Assets — network_intercept and parser nested objects.
 	crawler.Assets = crawlerAssetsFromConfig(ctx, &parsed, crawler.Assets)
+	crawler.BrowserConfig = crawlerBrowserConfigFromConfig(ctx, &parsed, crawler.BrowserConfig)
 
 	return
 }
@@ -667,6 +722,35 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 // crawlerAssetsFromConfig rebuilds the assets value from the crawler config the
 // API returned. current is the planned value; it is kept when the config
 // reports no assets, so that a crawler without assets is left untouched.
+// crawlerBrowserConfigFromConfig rebuilds browser_config from the config the
+// API returned. The attribute is Optional+Computed, so it must be KNOWN after
+// apply: leaving it unknown makes the framework reject the result with
+// "Provider returned invalid result object after apply", which is what every
+// crawler acceptance test hit when the generated schema landed without this.
+//
+// An absent block stays null rather than becoming a zero-valued object, so a
+// crawler that never sets it does not show a perpetual diff.
+func crawlerBrowserConfigFromConfig(ctx context.Context, cfg *CrawlerConfig, current resource_crawler.BrowserConfigValue) resource_crawler.BrowserConfigValue {
+	bc := cfg.Config.BrowserConfig
+	present := bc.CaptureApiResponses || bc.UseRenderedHtml || bc.WaitForNetworkIdle > 0
+
+	if !present {
+		if current.IsNull() || current.IsUnknown() {
+			return resource_crawler.NewBrowserConfigValueNull()
+		}
+		return current
+	}
+
+	return resource_crawler.NewBrowserConfigValueMust(
+		resource_crawler.BrowserConfigValue{}.AttributeTypes(ctx),
+		map[string]attr.Value{
+			"capture_api_responses": types.BoolValue(bc.CaptureApiResponses),
+			"use_rendered_html":     types.BoolValue(bc.UseRenderedHtml),
+			"wait_for_network_idle": types.Int64Value(bc.WaitForNetworkIdle),
+		},
+	)
+}
+
 func crawlerAssetsFromConfig(ctx context.Context, cfg *CrawlerConfig, current resource_crawler.AssetsValue) resource_crawler.AssetsValue {
 	niAttrTypes := resource_crawler.NetworkInterceptValue{}.AttributeTypes(ctx)
 	parserAttrTypes := resource_crawler.ParserValue{}.AttributeTypes(ctx)
@@ -797,6 +881,7 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	// modifier (its generated type rejects the conversion), so keep the prior
 	// value here; otherwise the Pulumi bridge reports a perpetual update.
 	plan.Assets = keepPriorAssetsIfUnknown(plan.Assets, state.Assets)
+	plan.BrowserConfig = keepPriorBrowserConfigIfUnknown(plan.BrowserConfig, state.BrowserConfig)
 
 	resp.Plan.Set(ctx, &plan)
 }
@@ -804,6 +889,16 @@ func (r *crawlerResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 // keepPriorAssetsIfUnknown returns the prior assets when the planned value is
 // unknown, mirroring UseStateForUnknown for the generated assets type.
 func keepPriorAssetsIfUnknown(planned, prior resource_crawler.AssetsValue) resource_crawler.AssetsValue {
+	if planned.IsUnknown() {
+		return prior
+	}
+	return planned
+}
+
+// keepPriorBrowserConfigIfUnknown returns the prior browser_config when the
+// planned value is unknown, mirroring keepPriorAssetsIfUnknown. The generated
+// BrowserConfigValue cannot take an attribute plan modifier either.
+func keepPriorBrowserConfigIfUnknown(planned, prior resource_crawler.BrowserConfigValue) resource_crawler.BrowserConfigValue {
 	if planned.IsUnknown() {
 		return prior
 	}
