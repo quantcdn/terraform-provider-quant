@@ -242,7 +242,53 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 	// Assets — nested object with network_intercept and parser sub-objects.
 	diags.Append(setCrawlerAssets(ctx, crawler, req)...)
 
+	// Browser config — only meaningful in browser mode.
+	diags.Append(setCrawlerBrowserConfig(ctx, crawler, req)...)
+
 	return req, diags
+}
+
+// setCrawlerBrowserConfig maps the browser_config block onto the request.
+//
+// These keys only take effect in browser mode: the crawler reads them on the
+// network-interception path, which is installed only when browser_mode is on.
+// capture_api_responses is the one that matters — it makes a crawl store
+// XHR/fetch responses as files, which is what lets a static copy serve a site
+// whose navigation or content is rendered client-side from a JSON endpoint.
+// Without it those endpoints 404 on the static copy and the page renders with
+// no navigation at all.
+//
+// Unlike AssetsValue, BrowserConfigValue exposes its attributes directly, so
+// no ObjectValue conversion is needed.
+func setCrawlerBrowserConfig(ctx context.Context, crawler *resource_crawler.CrawlerModel, req *quantadmingo.V2CrawlerRequest) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	bc := crawler.BrowserConfig
+	if bc.IsNull() || bc.IsUnknown() {
+		return diags
+	}
+
+	out := quantadmingo.NewV2CrawlerBrowserConfig()
+	set := false
+
+	if isKnown(bc.CaptureApiResponses) {
+		out.SetCaptureApiResponses(bc.CaptureApiResponses.ValueBool())
+		set = true
+	}
+	if isKnown(bc.UseRenderedHtml) {
+		out.SetUseRenderedHtml(bc.UseRenderedHtml.ValueBool())
+		set = true
+	}
+	if isKnown(bc.WaitForNetworkIdle) {
+		// The schema models this as int64; the API takes int32 milliseconds.
+		out.SetWaitForNetworkIdle(int32(bc.WaitForNetworkIdle.ValueInt64()))
+		set = true
+	}
+
+	if set {
+		req.SetBrowserConfig(*out)
+	}
+	return diags
 }
 
 // setCrawlerAssets maps the assets block onto the request. AssetsValue stores
