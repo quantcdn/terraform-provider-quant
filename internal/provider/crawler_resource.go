@@ -728,17 +728,26 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 // "Provider returned invalid result object after apply", which is what every
 // crawler acceptance test hit when the generated schema landed without this.
 //
-// An absent block stays null rather than becoming a zero-valued object, so a
-// crawler that never sets it does not show a perpetual diff.
+// An absent block reads back as NULL, including when prior state holds a
+// value. That is what makes drift visible.
+//
+// The first version returned the prior state when the API did not report the
+// block, copying how assets handles a backend that echoes one sub-block and
+// not the other. browser_config does not behave that way: the API echoes it
+// reliably once stored. Keeping the prior value therefore hid a real failure
+// — when the production API had not yet been deployed it accepted the field
+// and silently dropped it, and because the read-back reported the prior value
+// anyway, `pulumi preview --refresh` showed 1 change when 116 crawlers were
+// missing it. The field had to be set out of band to recover.
+//
+// An absent block still reads as null rather than a zero-valued object, so a
+// crawler that never sets it shows no diff.
 func crawlerBrowserConfigFromConfig(ctx context.Context, cfg *CrawlerConfig, current resource_crawler.BrowserConfigValue) resource_crawler.BrowserConfigValue {
 	bc := cfg.Config.BrowserConfig
 	present := bc.CaptureApiResponses || bc.UseRenderedHtml || bc.WaitForNetworkIdle > 0
 
 	if !present {
-		if current.IsNull() || current.IsUnknown() {
-			return resource_crawler.NewBrowserConfigValueNull()
-		}
-		return current
+		return resource_crawler.NewBrowserConfigValueNull()
 	}
 
 	return resource_crawler.NewBrowserConfigValueMust(
