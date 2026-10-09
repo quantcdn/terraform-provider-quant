@@ -82,3 +82,42 @@ func TestSetCrawlerBrowserConfigPartial(t *testing.T) {
 		t.Error("use_rendered_html should be absent when null")
 	}
 }
+
+// Drift must be visible. An earlier version returned the prior state when the
+// API did not report browser_config, which hid a real failure: the production
+// API accepted the field, silently dropped it, and `pulumi preview --refresh`
+// reported 1 change when 116 crawlers were actually missing it.
+func TestBrowserConfigReadBackReportsAbsenceAsNull(t *testing.T) {
+	ctx := context.Background()
+	var cfg CrawlerConfig // no browser_config echoed by the API
+
+	prior := browserConfig(map[string]attr.Value{
+		"capture_api_responses": basetypes.NewBoolValue(true),
+		"use_rendered_html":     basetypes.NewBoolNull(),
+		"wait_for_network_idle": basetypes.NewInt64Null(),
+	})
+
+	got := crawlerBrowserConfigFromConfig(ctx, &cfg, prior)
+	if !got.IsNull() {
+		t.Fatal("an absent browser_config must read back as null so drift is detectable")
+	}
+}
+
+// When the API does report it, state reflects what was stored.
+func TestBrowserConfigReadBackReflectsStoredValues(t *testing.T) {
+	ctx := context.Background()
+	var cfg CrawlerConfig
+	cfg.Config.BrowserConfig.CaptureApiResponses = true
+	cfg.Config.BrowserConfig.WaitForNetworkIdle = 5000
+
+	got := crawlerBrowserConfigFromConfig(ctx, &cfg, resource_crawler.NewBrowserConfigValueNull())
+	if got.IsNull() || got.IsUnknown() {
+		t.Fatal("a reported browser_config must read back as known")
+	}
+	if !got.CaptureApiResponses.ValueBool() {
+		t.Error("capture_api_responses should be true")
+	}
+	if got.WaitForNetworkIdle.ValueInt64() != 5000 {
+		t.Errorf("wait_for_network_idle = %d, want 5000", got.WaitForNetworkIdle.ValueInt64())
+	}
+}
