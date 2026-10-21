@@ -191,9 +191,10 @@ func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerM
 	// WebhookAuthHeader, WebhookExtraVars, Workers, Delay, Depth, MaxHits,
 	// MaxHtml, MaxErrors, UserAgent, Urls, StartUrls, Exclude, Include,
 	// AllowedDomains (all string/bool/int/float/string-list fields).
-	// sitemap and status_ok are named as caller-handled: the mapper only maps
-	// string lists, and this function sets both fields itself further down.
-	diags.Append(mapper.ToSDK(ctx, crawler, req, "sitemap", "status_ok")...)
+	// sitemap, status_ok, assets and browser_config are named as
+	// caller-handled: this function sets them itself further down, with rules
+	// the mapper does not apply (an object is only sent when a value is set).
+	diags.Append(mapper.ToSDK(ctx, crawler, req, "sitemap", "status_ok", "assets", "browser_config")...)
 	if diags.HasError() {
 		return nil, diags
 	}
@@ -466,8 +467,9 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	// mapper.FromSDK handles: Id, Name, Domain, DomainVerified, Uuid,
 	// ProjectId, BrowserMode, Workers, Delay, Depth, MaxHits, MaxHtml,
 	// MaxErrors, UserAgent, Config, UrlsList, WebhookUrl, WebhookAuthHeader,
-	// WebhookExtraVars.
-	diags.Append(mapper.FromSDK(ctx, api, crawler)...)
+	// WebhookExtraVars. sitemap, assets and browser_config are read from the
+	// YAML config below.
+	diags.Append(mapper.FromSDK(ctx, api, crawler, "sitemap", "assets", "browser_config")...)
 
 	// Restore saved values — YAML config parsing provides the canonical source.
 	crawler.Urls = savedUrls
