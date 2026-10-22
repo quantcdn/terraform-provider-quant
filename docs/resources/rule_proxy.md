@@ -199,11 +199,11 @@ This is particularly useful when updating existing infrastructure where you want
 * `proxy_alert_enabled` - (Optional) Enable proxy alerts for monitoring and notifications. Defaults to `false`.
 * `proxy_strip_headers` - (Optional) List of headers to strip from the response.
 * `proxy_strip_request_headers` - (Optional) List of headers to strip from the request.
-* `inject_headers` - (Optional) Map of headers to inject into the response.
+* `inject_headers` - (Optional) Map of headers to add to the request that Quant sends to the origin (for example a shared secret). They are not added to the response sent to visitors.
 * `auth_user` - (Optional) Basic authentication username for the origin server.
 * `auth_pass` - (Optional) Basic authentication password for the origin server.
-* `static_error_page` - (Optional) Custom HTML content to serve when origin errors occur (used with failover).
-* `static_error_page_status_codes` - (Optional) List of status codes that should serve the static error page.
+* `static_error_page` - (Optional) Turns on static error pages when set to a non-empty value (the dashboard option "Use static error pages"). The text of the value is not served. For each status in `static_error_page_status_codes`, Quant serves the page published at `/_quant<status>` (for example `/_quant502`); if that page does not exist, the origin's error response is passed through.
+* `static_error_page_status_codes` - (Optional) List of origin status codes (as strings, for example `["502", "503"]`) that get the static error page. Include `"502"` to replace Quant's own 502 "Proxy Error" page when the origin times out or cannot be reached.
 
 ### Application Proxy (Request-only computation fields)
 
