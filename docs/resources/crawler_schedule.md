@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_crawler_schedule"
+subcategory: "Crawlers"
+description: |-
+  Manages automated crawler schedules using cron expressions.
+---
+
 # Crawler Schedule Resource
 
 Manages automated crawler schedules using cron expressions.

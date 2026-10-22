@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_rule_custom_response"
+subcategory: "Rules"
+description: |-
+  The `quant_rule_custom_response` resource manages custom responses for rules in a Quant project.
+---
+
 # Rule Custom Response Resource
 
 The `quant_rule_custom_response` resource manages custom responses for rules in a Quant project.

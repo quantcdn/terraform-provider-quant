@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_rule_redirect"
+subcategory: "Rules"
+description: |-
+  Manages a Quant redirect rule.
+---
+
 # Rule Redirect Resource
 
 Manages a Quant redirect rule.

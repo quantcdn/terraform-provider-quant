@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_domain"
+subcategory: "Projects"
+description: |-
+  Manages domains within a Quant project.
+---
+
 # Domain Resource
 
 Manages domains within a Quant project.

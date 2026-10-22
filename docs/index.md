@@ -1,3 +1,9 @@
+---
+page_title: "Quant: quant"
+description: |-
+  The Quant provider allows you to manage resources in your Quant CDN environment with built-in API rate limiting and intelligent retry mechanisms.
+---
+
 # Quant Provider
 
 The Quant provider allows you to manage resources in your Quant CDN environment with built-in API rate limiting and intelligent retry mechanisms.

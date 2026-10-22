@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_crawler"
+subcategory: "Crawlers"
+description: |-
+  Manages web crawlers for content discovery and ingestion into Quant.
+---
+
 # Crawler Resource
 
 Manages web crawlers for content discovery and ingestion into Quant.

@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_kv_store"
+subcategory: "Key-Value Store"
+description: |-
+  Manages a Quant key-value store in a project. Format 2 stores support indexes, ledgers, conditional writes and transactions.
+---
+
 # KV Store Resource
 
 Manages a Quant KV store in a project.

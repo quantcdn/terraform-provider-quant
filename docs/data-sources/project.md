@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_project"
+subcategory: "Projects"
+description: |-
+  Fetches details for a specific Quant project, including write tokens for use in other providers.
+---
+
 # Project Data Source
 
 Fetches details for a specific Quant project, including write tokens for use in other providers.

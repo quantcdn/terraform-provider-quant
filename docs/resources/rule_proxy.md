@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_rule_proxy"
+subcategory: "Rules"
+description: |-
+  Manages a Quant proxy rule.
+---
+
 # Rule Proxy Resource
 
 Manages a Quant proxy rule.

@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_header"
+subcategory: "Rules"
+description: |-
+  Manages a Quant custom headers.
+---
+
 # Header Resource
 
 Manages a Quant custom headers.

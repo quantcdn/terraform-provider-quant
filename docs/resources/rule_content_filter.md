@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_rule_content_filter"
+subcategory: "Rules"
+description: |-
+  The `quant_rule_content_filter` resource manages content filter rules that apply custom functions to filter and transform content in a Quant project.
+---
+
 # Rule Content Filter Resource
 
 The `quant_rule_content_filter` resource manages content filter rules that apply custom functions to filter and transform content in a Quant project.
