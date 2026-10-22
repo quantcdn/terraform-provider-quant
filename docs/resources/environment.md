@@ -91,14 +91,14 @@ resource "quant_environment" "staging" {
       * `value_from` (String) - (Required) The key of the secret in the environment's 'app-secrets' store.
     * `user` (String) - (Optional) User to run the container process as.
     * `working_directory` (String) - (Optional) Working directory inside the container.
-  * `enable_cross_app_networking` (Boolean) - (Optional) Optional. Enable cross-application networking within the same organization. When false (default): Uses shared/app-specific security group based on enableCrossEnvNetworking. When true: Uses org-specific security group to enable container-to-container communication with ALL applications in the same organization via service discovery (microservices architecture). This setting takes priority over enableCrossEnvNetworking.
-  * `enable_cross_env_networking` (Boolean) - (Optional) Optional. Enable cross-environment networking within the same application. When false (default): Uses shared security group for complete isolation (most secure). When true: Uses app-specific security group to enable communication between environments of the same application (e.g., staging can connect to production database). Note: If enableCrossAppNetworking is true, this setting is overridden.
+  * `enable_cross_app_networking` (Boolean) - (Optional) Optional. Enable cross-application networking within the same organization. When false (default): Uses shared/app-specific network access group based on enableCrossEnvNetworking. When true: Uses org-specific network access group to enable container-to-container communication with ALL applications in the same organization via service discovery (microservices architecture). This setting takes priority over enableCrossEnvNetworking.
+  * `enable_cross_env_networking` (Boolean) - (Optional) Optional. Enable cross-environment networking within the same application. When false (default): Uses shared network access group for complete isolation (most secure). When true: Uses app-specific network access group to enable communication between environments of the same application (e.g., staging can connect to production database). Note: If enableCrossAppNetworking is true, this setting is overridden.
   * `max_capacity` (Number) - (Optional) Maximum number of instances.
   * `min_capacity` (Number) - (Optional) Minimum number of instances.
   * `single_task_only` (Boolean) - (Optional) Optional. Forces single-task mode for data-safe applications (max one running task). When true: capacity is locked to 1. When false: explicitly allows scaling. When omitted: the platform auto-detects stateful containers and enables single-task mode if found.
   * `spot_configuration` (Object) - (Optional) Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the platform. Available for non-production environments.
     * `strategy` (String) - (Optional) Spot instance strategy. 'off' = On-Demand only (highest reliability, no savings). 'spot-only' = 100% Spot instances (~70% savings, default for non-prod). 'mixed-safe' = 50% Spot instances (~35% savings, requires multiple instances). 'mixed-aggressive' = 80% Spot instances (~56% savings, requires multiple instances). Valid values: `off`, `spot-only`, `mixed-safe`, `mixed-aggressive`.
-  * `startup_grace_period_seconds` (Number) - (Optional) Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted. Range: 0 to 3600.
+  * `startup_grace_period_seconds` (Number) - (Optional) Optional. Seconds the routing layer waits after a task starts before an unhealthy health check can replace it (applied as the service's healthCheckGracePeriodSeconds when a routing layer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted. Range: 0 to 3600.
   * `task_cpu` (Number) - (Optional) Task-level CPU units (e.g., 256, 512, 1024).
   * `task_memory` (Number) - (Optional) Task-level memory in MB.
 * `environment` (List of Object) - (Optional) Environment variables to inject.
@@ -112,13 +112,13 @@ resource "quant_environment" "staging" {
 * `single_task_only` (Boolean) - (Optional) Optional. Forces single-task mode (max one running task). When omitted, the platform auto-detects stateful containers.
 * `spot_configuration` (Object) - (Optional) Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the platform. Available for non-production environments.
   * `strategy` (String) - (Optional) Spot instance strategy. 'off' = On-Demand only (highest reliability, no savings). 'spot-only' = 100% Spot instances (~70% savings, default for non-prod). 'mixed-safe' = 50% Spot instances (~35% savings, requires multiple instances). 'mixed-aggressive' = 80% Spot instances (~56% savings, requires multiple instances). Valid values: `off`, `spot-only`, `mixed-safe`, `mixed-aggressive`.
-* `startup_grace_period_seconds` (Number) - (Optional) Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it. If not set, the value from composeDefinition (or default 120) is used. Range: 0 to 3600.
+* `startup_grace_period_seconds` (Number) - (Optional) Optional. Seconds the routing layer waits after a task starts before an unhealthy health check can replace it. If not set, the value from composeDefinition (or default 120) is used. Range: 0 to 3600.
 
 ## Attribute Reference
 
 In addition to all arguments above, the following attributes are exported:
 
-* `alb_routing` (Object) - (Read-Only) Load balancer routing configuration.
+* `alb_routing` (Object) - (Read-Only) Routing layer routing configuration.
 * `container_names` (List of String) - (Read-Only) Container name list.
 * `created_at` (String) - (Read-Only) Creation timestamp.
 * `cron` (List of Object) - (Read-Only) Scheduled cron jobs.
@@ -126,17 +126,17 @@ In addition to all arguments above, the following attributes are exported:
 * `deployment_failure_type` (String) - (Read-Only) Why the most recent task stopped. SPOT_INTERRUPTION is informational: the platform reclaimed the task and container platform replaces it.
 * `deployment_status` (String) - (Read-Only) Current deployment status.
 * `desired_count` (Number) - (Read-Only) Desired number of tasks.
-* `load_balancer` (Object) - (Read-Only) Load balancer configuration.
+* `load_balancer` (Object) - (Read-Only) Routing configuration.
 * `public_ip_address` (String) - (Read-Only) Public IP address for SSH access.
 * `running_count` (Number) - (Read-Only) Number of running tasks.
-* `security_group` (Object) - (Read-Only) Security group configuration.
+* `security_group` (Object) - (Read-Only) Network access configuration.
 * `service` (Object) - (Read-Only) Service details.
 * `status` (String) - (Read-Only) Environment status.
-* `subnet` (Object) - (Read-Only) Subnet configuration.
+* `subnet` (Object) - (Read-Only) Network segment configuration.
 * `task_definition` (Object) - (Read-Only) Task definition details.
 * `updated_at` (String) - (Read-Only) Last update timestamp.
 * `volumes` (List of Object) - (Read-Only) Persistent storage volumes.
-* `vpc` (Object) - (Read-Only) VPC configuration.
+* `vpc` (Object) - (Read-Only) Network configuration.
 
 ## Import
 

@@ -51,6 +51,10 @@ In addition to all arguments above, the following attributes are exported:
 * `message` (String) - (Read-Only) Status message returned by the last API operation.
 * `success` (Boolean) - (Read-Only) Whether the last API operation succeeded.
 
+## Notes
+
+The `embedding_model` values are model identifiers. Use one of the values listed for the argument.
+
 ## Import
 
 Import a collection with the collection ID, or with `organisation/collection_id`.

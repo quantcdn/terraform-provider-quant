@@ -24,8 +24,8 @@ resource "quant_rule_redirect" "test" {
 
 ## Argument Reference
 
-- `name` - (Required) The name of the rule.
-- `project` - (Required) The machine name of the project.
+- `name` - (Optional) The name of the rule. Optional in the provider schema; the examples always set it.
+- `project` - (Optional) The machine name of the project. Optional in the provider schema; the examples always set it.
 - `domain` - (Required) The domain to apply the rule to.
 - `redirect_to` - (Required) The target URL to redirect requests to.
 - `redirect_code` - (Required) The status code to use for the redirect.

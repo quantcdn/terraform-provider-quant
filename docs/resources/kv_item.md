@@ -53,7 +53,7 @@ resource "quant_kv_item" "api_key" {
 
 * `organization` (String) - (Optional) Organization identifier.
 * `project` (String) - (Optional) Project identifier.
-* `secret` (Boolean) - (Optional) Store as secret with KMS encryption. Secrets cannot be retrieved via GET operations (returns [ENCRYPTED]). Ideal for API keys, passwords, and credentials. Defaults to `false`.
+* `secret` (Boolean) - (Optional) Store as an encrypted secret. Secrets cannot be retrieved via GET operations (returns [ENCRYPTED]). Ideal for API keys, passwords, and credentials. Defaults to `false`.
 * `store_id` (String) - (Optional) The ID of the key-value store.
 
 ## Attribute Reference

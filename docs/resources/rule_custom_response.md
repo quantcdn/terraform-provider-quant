@@ -31,8 +31,8 @@ resource "quant_rule_custom_response" "test" {
 
 The following arguments are supported:
 
-* `project` - (Required) The project ID this rule belongs to.
-* `name` - (Required) The name of the rule.
+* `project` - (Optional) The project ID this rule belongs to. Optional in the provider schema; the examples always set it.
+* `name` - (Optional) The name of the rule. Optional in the provider schema; the examples always set it.
 * `domain` - (Required) List of domains this rule applies to.
 * `url` - (Required) List of URLs this rule applies to.
 * `custom_response_status_code` - (Required) The HTTP status code for the custom response.
