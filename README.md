@@ -139,11 +139,11 @@ provider "quant" {
   max_delay_ms       = 300000  # 5 minutes
 }
 
-# Staging environment with custom base URL
+# AU Government platform
 provider "quant" {
-  alias        = "staging"
-  bearer       = var.staging_bearer_token
-  organization = var.staging_organization
+  alias        = "quantgov"
+  bearer       = var.quantgov_bearer_token
+  organization = var.quantgov_organization
   base_url     = "https://dash.quantgov.cloud"
 }
 
@@ -164,9 +164,9 @@ resource "quant_crawler" "critical" {
   domain   = "https://critical.example.com"
 }
 
-resource "quant_project" "staging_project" {
-  provider = quant.staging
-  name     = "Staging Project"
+resource "quant_project" "quantgov_project" {
+  provider = quant.quantgov
+  name     = "QuantGov Project"
 }
 ```
 

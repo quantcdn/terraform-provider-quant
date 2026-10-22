@@ -90,8 +90,6 @@ The following arguments are supported:
 
 ### Required Arguments
 
-* `name` - (Optional) The name of the content filter rule. Optional in the provider schema; the examples always set it.
-* `project` - (Optional) The project machine name this rule belongs to. Optional in the provider schema; the examples always set it.
 * `domain` - (Required) List of domains this rule applies to. Use `["any"]` to match all domains.
 * `url` - (Required) List of URL patterns this rule applies to. Supports wildcard patterns like `/api/*`.
 * `fn_uuid` - (Required) The UUID of the function to apply for content filtering.
@@ -99,6 +97,8 @@ The following arguments are supported:
 ### Optional Arguments
 
 * `disabled` - (Optional) Whether the content filter rule is disabled. Defaults to `false`.
+* `name` - (Optional) The name of the content filter rule. Optional in the provider schema; the examples always set it.
+* `project` - (Optional) The project machine name this rule belongs to. Optional in the provider schema; the examples always set it.
 
 ### Rule Selection Criteria
 
