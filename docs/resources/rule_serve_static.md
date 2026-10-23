@@ -55,9 +55,9 @@ resource "quant_rule_serve_static" "example" {
 * `method` (String) - (Optional) Method filter type (method_is, method_is_not, any).
 * `method_is` (List of String) - (Optional) Allowed HTTP methods.
 * `method_is_not` (List of String) - (Optional) Excluded HTTP methods.
-* `name` (String) - (Optional) Rule name.
+* `name` (String) - (Optional, Computed) Rule name. Computed from the API when omitted; always set it explicitly.
 * `organization` (String) - (Optional) Organization identifier.
-* `project` (String) - (Optional) Project identifier.
+* `project` (String) - (Optional, Computed) Project identifier. Computed from the API when omitted; always set it explicitly.
 * `weight` (Number) - (Optional) Rule weight. Defaults to `0`.
 
 ## Attribute Reference

@@ -97,8 +97,8 @@ The following arguments are supported:
 ### Optional Arguments
 
 * `disabled` - (Optional) Whether the content filter rule is disabled. Defaults to `false`.
-* `name` - (Optional) The name of the content filter rule. Optional in the provider schema; the examples always set it.
-* `project` - (Optional) The project machine name this rule belongs to. Optional in the provider schema; the examples always set it.
+* `name` - (Optional, Computed) The name of the content filter rule. Computed from the API when omitted; always set it explicitly.
+* `project` - (Optional, Computed) The project machine name this rule belongs to. Computed from the API when omitted; always set it explicitly.
 
 ### Rule Selection Criteria
 

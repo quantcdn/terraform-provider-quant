@@ -182,8 +182,8 @@ This is particularly useful when updating existing infrastructure where you want
 
 ## Argument Reference
 
-* `name` - (Optional) The name of the rule. Optional in the provider schema; the examples always set it.
-* `project` - (Optional) The machine name of the project. Optional in the provider schema; the examples always set it.
+* `name` - (Optional, Computed) The name of the rule. Computed from the API when omitted; always set it explicitly.
+* `project` - (Optional, Computed) The machine name of the project. Computed from the API when omitted; always set it explicitly.
 * `domain` - (Required) The domain to apply the rule to.
 * `url` - (Required) List of URL patterns to match.
 * `to` - (Conditionally Required) The target URL to proxy requests to. Required when `application_proxy` is not true. Must be omitted when `application_proxy` is true as it will be computed by the backend.

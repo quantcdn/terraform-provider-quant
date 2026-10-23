@@ -51,7 +51,7 @@ resource "quant_domain" "staging" {
 
 ### Optional Arguments
 
-- `project` - (Optional, Computed) The project machine name to create the domain in. If not specified, uses the provider's default project.
+- `project` - (Optional, Computed) The project machine name to create the domain in. There is no provider-level default project: always set it explicitly.
 - `organization` - (Optional, Computed) The organization identifier. Typically inherited from the provider configuration.
 
 ## Attributes Reference
