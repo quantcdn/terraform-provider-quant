@@ -49,7 +49,7 @@ resource "quant_ai_custom_tool" "lookup" {
 * `description` (String) - (Required) Human-readable description of what the tool does.
 * `edge_function_code` (String) - (Required) JavaScript source code for the edge function.
 * `input_schema` (String) - (Required) JSON-encoded JSON Schema object defining the tool's input parameters.
-* `name` (String) - (Required) Unique tool name (alphanumeric and underscores only).
+* `name` (String) - (Required) Unique tool name. Lowercase letters, digits and underscores only, starting with a letter or underscore (for example `lookup_order`); the API rejects hyphens and capital letters.
 
 ### Optional
 
