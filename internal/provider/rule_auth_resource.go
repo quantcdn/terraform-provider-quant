@@ -171,6 +171,7 @@ func callRuleAuthCreateAPI(ctx context.Context, r *ruleAuthResource, rule *resou
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, authExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}
@@ -221,6 +222,7 @@ func callRuleAuthCreateAPI(ctx context.Context, r *ruleAuthResource, rule *resou
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, res, authExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_auth.NewActionConfigValueNull()
 
@@ -273,6 +275,7 @@ func callRuleAuthReadAPI(ctx context.Context, r *ruleAuthResource, rule *resourc
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, api, authExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_auth.NewActionConfigValueNull()
 
@@ -307,6 +310,7 @@ func callRuleAuthUpdateAPI(ctx context.Context, r *ruleAuthResource, rule *resou
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, authExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}

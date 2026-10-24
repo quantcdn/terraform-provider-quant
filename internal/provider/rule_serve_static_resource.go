@@ -170,6 +170,7 @@ func callRuleServeStaticCreateAPI(ctx context.Context, r *ruleServeStaticResourc
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, serveStaticExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}
@@ -220,6 +221,7 @@ func callRuleServeStaticCreateAPI(ctx context.Context, r *ruleServeStaticResourc
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, res, serveStaticExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_serve_static.NewActionConfigValueNull()
 
@@ -271,6 +273,7 @@ func callRuleServeStaticReadAPI(ctx context.Context, r *ruleServeStaticResource,
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, api, serveStaticExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_serve_static.NewActionConfigValueNull()
 
@@ -304,6 +307,7 @@ func callRuleServeStaticUpdateAPI(ctx context.Context, r *ruleServeStaticResourc
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, serveStaticExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}

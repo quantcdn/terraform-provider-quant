@@ -181,11 +181,7 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
-	// ASN conditional list
-	diags.Append(buildConditionalList(ctx,
-		rule.Asn, rule.AsnIs, rule.AsnIsNot,
-		req.SetAsn, req.SetAsnIs, req.SetAsnIsNot,
-	)...)
+	diags.Append(buildRuleExtraConditions(ctx, customResponseExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}
@@ -243,11 +239,7 @@ func callRuleCustomResponseCreateAPI(ctx context.Context, r *ruleCustomResponseR
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
-	// ASN conditional list
-	diags.Append(setConditionalList(ctx,
-		res.Asn, res.AsnIs, res.AsnIsNot,
-		&rule.Asn, &rule.AsnIs, &rule.AsnIsNot,
-	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, res, customResponseExtraConditions(rule))...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
 	rule.ActionConfig = resource_rule_custom_response.NewActionConfigValueNull()
@@ -318,11 +310,7 @@ func callRuleCustomResponseReadAPI(ctx context.Context, r *ruleCustomResponseRes
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
-	// ASN conditional list
-	diags.Append(setConditionalList(ctx,
-		api.Asn, api.AsnIs, api.AsnIsNot,
-		&rule.Asn, &rule.AsnIs, &rule.AsnIsNot,
-	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, api, customResponseExtraConditions(rule))...)
 
 	// Set action_config to null since we expose its fields as top-level attributes
 	rule.ActionConfig = resource_rule_custom_response.NewActionConfigValueNull()
@@ -366,11 +354,7 @@ func callRuleCustomResponseUpdateAPI(ctx context.Context, r *ruleCustomResponseR
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
-	// ASN conditional list
-	diags.Append(buildConditionalList(ctx,
-		rule.Asn, rule.AsnIs, rule.AsnIsNot,
-		req.SetAsn, req.SetAsnIs, req.SetAsnIsNot,
-	)...)
+	diags.Append(buildRuleExtraConditions(ctx, customResponseExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}
