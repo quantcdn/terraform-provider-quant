@@ -29,43 +29,63 @@ func setKVStoreFormat(data *resource_kv_store.KvStoreModel, req *quantadmingo.V2
 	}
 }
 
-// ModifyPlan makes a format change on an existing store a plan-time error,
-// never a replacement: a replacement would delete the store and its data.
+// ModifyPlan makes a format change or a store_id change on an existing store
+// a plan-time error, never a replacement: a replacement would delete the
+// store and its data, and a store_id change would point the resource at
+// another store.
 func (r *kvStoreResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
-	var planned, prior types.Int64
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("format"), &planned)...)
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("format"), &prior)...)
+	var plan, state resource_kv_store.KvStoreModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(checkKVStoreFormatChange(plan.Format, state.Format)...)
+	resp.Diagnostics.Append(checkKVStoreIDChange(plan.StoreId, state.StoreId)...)
+}
+
+func checkKVStoreFormatChange(planned, prior types.Int64) diag.Diagnostics {
+	var diags diag.Diagnostics
 	// A state from a provider version before format has no value: Update
 	// compares the plan with the real format instead.
 	if !isKnown(planned) || !isKnown(prior) || planned.Equal(prior) {
-		return
+		return diags
 	}
-	resp.Diagnostics.AddAttributeError(path.Root("format"), "KV store format cannot change",
+	diags.AddAttributeError(path.Root("format"), "KV store format cannot change",
 		fmt.Sprintf("The store is format %d and the configuration asks for format %d. %s", prior.ValueInt64(), planned.ValueInt64(), kvStoreFormatUpgradeHint))
+	return diags
 }
 
-// Update is reached only by format (name, project and organization force a
-// replacement). It adopts a planned format that equals the real format, for
-// example a state written before the provider knew the format.
+func checkKVStoreIDChange(planned, prior types.String) diag.Diagnostics {
+	var diags diag.Diagnostics
+	if !isKnown(planned) || !isKnown(prior) || planned.Equal(prior) {
+		return diags
+	}
+	diags.AddAttributeError(path.Root("store_id"), "KV store store_id cannot change",
+		fmt.Sprintf("The resource manages store %q and the configuration asks for store %q. The API sets store_id; Terraform does not move a resource to another store. "+
+			"Remove store_id from the configuration, or import the other store into a new resource.", prior.ValueString(), planned.ValueString()))
+	return diags
+}
+
+// Update applies only the changes allowed in place: format, when it equals
+// the real format (for example a state written before the provider knew the
+// format). id, store_id, project and organization come from the prior state,
+// so nothing is unknown after apply, also with -refresh=false.
 func (r *kvStoreResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan resource_kv_store.KvStoreModel
+	var plan, state resource_kv_store.KvStoreModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	actual, diags := readKVStoreFormat(r, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
+	plan.Id, plan.StoreId, plan.Project, plan.Organization = state.Id, state.StoreId, state.Project, state.Organization
+	actual, httpResp, err := readKVStoreFormat(r, &plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read the KV store format", extractAPIErrorMessage(httpResp, err))
 		return
-	}
-	if actual == 0 {
-		actual = 1 // the upgrade endpoint does not know the store: format 1
 	}
 	if isKnown(plan.Format) && plan.Format.ValueInt64() != actual {
 		resp.Diagnostics.AddAttributeError(path.Root("format"), "KV store format cannot change",
@@ -77,37 +97,29 @@ func (r *kvStoreResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 // refreshKVStoreFormat sets format from the upgrade state of the store. The
-// store show response has no format. A store that the upgrade endpoint does
-// not know (404) keeps its prior format, or format 1 when there is none.
+// store show response has no format. When the upgrade endpoint fails (403,
+// 5xx), the store keeps its prior format and the read gives a warning.
 func refreshKVStoreFormat(r *kvStoreResource, data *resource_kv_store.KvStoreModel) diag.Diagnostics {
-	actual, diags := readKVStoreFormat(r, data)
-	if diags.HasError() {
-		return diags
-	}
-	if actual == 0 {
-		if !isKnown(data.Format) {
-			data.Format = types.Int64Value(1)
-		}
+	var diags diag.Diagnostics
+	actual, httpResp, err := readKVStoreFormat(r, data)
+	if err != nil {
+		diags.AddWarning("Unable to read the KV store format",
+			fmt.Sprintf("The provider keeps the format from state for store %s. %s", data.StoreId.ValueString(), extractAPIErrorMessage(httpResp, err)))
 		return diags
 	}
 	data.Format = types.Int64Value(actual)
 	return diags
 }
 
-// readKVStoreFormat is the real format of the store, or 0 when the upgrade
-// endpoint answers 404.
-func readKVStoreFormat(r *kvStoreResource, data *resource_kv_store.KvStoreModel) (int64, diag.Diagnostics) {
-	var diags diag.Diagnostics
+// readKVStoreFormat is the real format of the store. A store that the
+// upgrade endpoint does not know (404) is format 1.
+func readKVStoreFormat(r *kvStoreResource, data *resource_kv_store.KvStoreModel) (int64, *http.Response, error) {
 	state, httpResp, err := r.client.Instance.KVAPI.KVUpgradeShow(r.client.AuthContext, r.getOrg(data), data.Project.ValueString(), data.StoreId.ValueString()).Execute()
 	if kvAPIStatus(httpResp) == http.StatusNotFound {
-		return 0, diags
+		return 1, httpResp, nil
 	}
 	if err != nil {
-		diags.AddError("Unable to read the KV store format", extractAPIErrorMessage(httpResp, err))
-		return 0, diags
+		return 0, httpResp, err
 	}
-	if state.GetFormat() < 1 {
-		return 1, diags
-	}
-	return int64(state.GetFormat()), diags
+	return max(int64(state.GetFormat()), 1), httpResp, nil
 }

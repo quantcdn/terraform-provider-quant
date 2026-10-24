@@ -42,6 +42,8 @@ func (r *kvStoreResource) Schema(ctx context.Context, req resource.SchemaRequest
 	// only change by replacement. Without this, a rename plans an in-place
 	// update and the apply fails on "Update Not Supported".
 	addRequiresReplace(s.Attributes, "name", "project", "organization")
+	// The API sets id and store_id at create; they never change after.
+	addKeepState(s.Attributes, "id", "store_id")
 	resp.Schema = s
 }
 
