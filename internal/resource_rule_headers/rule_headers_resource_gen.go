@@ -5,10 +5,12 @@ package resource_rule_headers
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -44,22 +46,35 @@ func RuleHeadersResourceSchema(ctx context.Context) schema.Schema {
 			"asn": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "ASN filter type (asn_is, asn_is_not, any)",
-				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any)",
+				Description:         "ASN filter type (asn_is, asn_is_not, any). A PATCH that omits it keeps the current value. Invalid values return 422.",
+				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any). A PATCH that omits it keeps the current value. Invalid values return 422.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"any",
+						"asn_is",
+						"asn_is_not",
+					),
+				},
 			},
 			"asn_is": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Allowed AS numbers",
-				MarkdownDescription: "Allowed AS numbers",
+				Description:         "Allowed AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
+				MarkdownDescription: "Allowed AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
 			},
 			"asn_is_not": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Excluded AS numbers",
-				MarkdownDescription: "Excluded AS numbers",
+				Description:         "Excluded AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
+				MarkdownDescription: "Excluded AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
+			},
+			"cookie_name": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Write name of only_with_cookie: the rule applies only when this cookie is present. Empty string clears it.",
+				MarkdownDescription: "Write name of only_with_cookie: the rule applies only when this cookie is present. Empty string clears it.",
 			},
 			"country": schema.StringAttribute{
 				Optional:            true,
@@ -91,8 +106,8 @@ func RuleHeadersResourceSchema(ctx context.Context) schema.Schema {
 			"domain": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Required:            true,
-				Description:         "Domain patterns (default: any)",
-				MarkdownDescription: "Domain patterns (default: any)",
+				Description:         "Exact hostnames the rule matches, or 'any' (the default). Wildcards such as *.example.com are not supported.",
+				MarkdownDescription: "Exact hostnames the rule matches, or 'any' (the default). Wildcards such as *.example.com are not supported.",
 			},
 			"headers": schema.MapAttribute{
 				ElementType:         types.StringType,
@@ -174,6 +189,60 @@ func RuleHeadersResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Rule ID",
 				MarkdownDescription: "Rule ID",
 			},
+			"traffic_source": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Traffic source filter type (traffic_source_is, traffic_source_is_not, any). Invalid values return 422.",
+				MarkdownDescription: "Traffic source filter type (traffic_source_is, traffic_source_is_not, any). Invalid values return 422.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"any",
+						"traffic_source_is",
+						"traffic_source_is_not",
+					),
+				},
+			},
+			"traffic_source_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Traffic sources to match. A PATCH replaces the list.",
+				MarkdownDescription: "Traffic sources to match. A PATCH replaces the list.",
+			},
+			"traffic_source_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Traffic sources to exclude. A PATCH replaces the list.",
+				MarkdownDescription: "Traffic sources to exclude. A PATCH replaces the list.",
+			},
+			"ua": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "User agent filter type (ua_is, ua_is_not, any). Invalid values return 422.",
+				MarkdownDescription: "User agent filter type (ua_is, ua_is_not, any). Invalid values return 422.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"any",
+						"ua_is",
+						"ua_is_not",
+					),
+				},
+			},
+			"ua_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "User agent strings to match. Each item has at most 255 characters. A PATCH replaces the list.",
+				MarkdownDescription: "User agent strings to match. Each item has at most 255 characters. A PATCH replaces the list.",
+			},
+			"ua_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "User agent strings to exclude. Each item has at most 255 characters. A PATCH replaces the list.",
+				MarkdownDescription: "User agent strings to exclude. Each item has at most 255 characters. A PATCH replaces the list.",
+			},
 			"url": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Required:            true,
@@ -189,41 +258,50 @@ func RuleHeadersResourceSchema(ctx context.Context) schema.Schema {
 			"weight": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Rule weight",
-				MarkdownDescription: "Rule weight",
-				Default:             int64default.StaticInt64(0),
+				Description:         "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last.",
+				MarkdownDescription: "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last.",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
 			},
 		},
 	}
 }
 
 type RuleHeadersModel struct {
-	Action         types.String      `tfsdk:"action"`
-	ActionConfig   ActionConfigValue `tfsdk:"action_config"`
-	Asn            types.String      `tfsdk:"asn"`
-	AsnIs          types.List        `tfsdk:"asn_is"`
-	AsnIsNot       types.List        `tfsdk:"asn_is_not"`
-	Country        types.String      `tfsdk:"country"`
-	CountryIs      types.List        `tfsdk:"country_is"`
-	CountryIsNot   types.List        `tfsdk:"country_is_not"`
-	Disabled       types.Bool        `tfsdk:"disabled"`
-	Domain         types.List        `tfsdk:"domain"`
-	Headers        types.Map         `tfsdk:"headers"`
-	Ip             types.String      `tfsdk:"ip"`
-	IpIs           types.List        `tfsdk:"ip_is"`
-	IpIsNot        types.List        `tfsdk:"ip_is_not"`
-	Method         types.String      `tfsdk:"method"`
-	MethodIs       types.List        `tfsdk:"method_is"`
-	MethodIsNot    types.List        `tfsdk:"method_is_not"`
-	Name           types.String      `tfsdk:"name"`
-	OnlyWithCookie types.String      `tfsdk:"only_with_cookie"`
-	Organization   types.String      `tfsdk:"organization"`
-	Project        types.String      `tfsdk:"project"`
-	Rule           types.String      `tfsdk:"rule"`
-	RuleId         types.String      `tfsdk:"rule_id"`
-	Url            types.List        `tfsdk:"url"`
-	Uuid           types.String      `tfsdk:"uuid"`
-	Weight         types.Int64       `tfsdk:"weight"`
+	Action             types.String      `tfsdk:"action"`
+	ActionConfig       ActionConfigValue `tfsdk:"action_config"`
+	Asn                types.String      `tfsdk:"asn"`
+	AsnIs              types.List        `tfsdk:"asn_is"`
+	AsnIsNot           types.List        `tfsdk:"asn_is_not"`
+	CookieName         types.String      `tfsdk:"cookie_name"`
+	Country            types.String      `tfsdk:"country"`
+	CountryIs          types.List        `tfsdk:"country_is"`
+	CountryIsNot       types.List        `tfsdk:"country_is_not"`
+	Disabled           types.Bool        `tfsdk:"disabled"`
+	Domain             types.List        `tfsdk:"domain"`
+	Headers            types.Map         `tfsdk:"headers"`
+	Ip                 types.String      `tfsdk:"ip"`
+	IpIs               types.List        `tfsdk:"ip_is"`
+	IpIsNot            types.List        `tfsdk:"ip_is_not"`
+	Method             types.String      `tfsdk:"method"`
+	MethodIs           types.List        `tfsdk:"method_is"`
+	MethodIsNot        types.List        `tfsdk:"method_is_not"`
+	Name               types.String      `tfsdk:"name"`
+	OnlyWithCookie     types.String      `tfsdk:"only_with_cookie"`
+	Organization       types.String      `tfsdk:"organization"`
+	Project            types.String      `tfsdk:"project"`
+	Rule               types.String      `tfsdk:"rule"`
+	RuleId             types.String      `tfsdk:"rule_id"`
+	TrafficSource      types.String      `tfsdk:"traffic_source"`
+	TrafficSourceIs    types.List        `tfsdk:"traffic_source_is"`
+	TrafficSourceIsNot types.List        `tfsdk:"traffic_source_is_not"`
+	Ua                 types.String      `tfsdk:"ua"`
+	UaIs               types.List        `tfsdk:"ua_is"`
+	UaIsNot            types.List        `tfsdk:"ua_is_not"`
+	Url                types.List        `tfsdk:"url"`
+	Uuid               types.String      `tfsdk:"uuid"`
+	Weight             types.Int64       `tfsdk:"weight"`
 }
 
 var _ basetypes.ObjectTypable = ActionConfigType{}
