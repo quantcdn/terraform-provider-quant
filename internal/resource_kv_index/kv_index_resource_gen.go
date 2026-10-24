@@ -34,8 +34,8 @@ func KvIndexResourceSchema(ctx context.Context) schema.Schema {
 			"count": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Keeps a live count per value. Enables KV_index_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL).",
-				MarkdownDescription: "Keeps a live count per value. Enables KV_index_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL).",
+				Description:         "Keeps a live count per value. Enables KV_indexes_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL).",
+				MarkdownDescription: "Keeps a live count per value. Enables KV_indexes_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL).",
 				Default:             booldefault.StaticBool(false),
 			},
 			"created_at": schema.StringAttribute{
@@ -109,8 +109,8 @@ func KvIndexResourceSchema(ctx context.Context) schema.Schema {
 			"unique": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "One key per value. Enables KV_index_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND).",
-				MarkdownDescription: "One key per value. Enables KV_index_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND).",
+				Description:         "One key per value. Enables KV_indexes_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND).",
+				MarkdownDescription: "One key per value. Enables KV_indexes_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND).",
 				Default:             booldefault.StaticBool(false),
 			},
 		},

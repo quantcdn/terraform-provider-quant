@@ -160,8 +160,8 @@ func KvLedgerResourceSchema(ctx context.Context) schema.Schema {
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Top-level value fields that are encrypted per data subject, so a shred (KV_ledger_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED).",
-				MarkdownDescription: "Top-level value fields that are encrypted per data subject, so a shred (KV_ledger_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED).",
+				Description:         "Top-level value fields that are encrypted per data subject, so a shred (KV_ledgers_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED).",
+				MarkdownDescription: "Top-level value fields that are encrypted per data subject, so a shred (KV_ledgers_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED).",
 				Validators: []validator.List{
 					listvalidator.SizeAtMost(20),
 					listvalidator.UniqueValues(),
