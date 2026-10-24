@@ -21,6 +21,7 @@ var (
 	_ resource.Resource                = (*kvStoreResource)(nil)
 	_ resource.ResourceWithConfigure   = (*kvStoreResource)(nil)
 	_ resource.ResourceWithImportState = (*kvStoreResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*kvStoreResource)(nil)
 )
 
 func NewKVStoreResource() resource.Resource {
@@ -96,16 +97,12 @@ func (r *kvStoreResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(refreshKVStoreFormat(r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func (r *kvStoreResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// KV stores have no update API — name changes require destroy + create.
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"KV stores cannot be updated in-place. Changes require destroying and recreating the store.",
-	)
 }
 
 func (r *kvStoreResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -138,6 +135,10 @@ func (r *kvStoreResource) ImportState(ctx context.Context, req resource.ImportSt
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(refreshKVStoreFormat(r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -160,6 +161,7 @@ func callKVStoreCreateAPI(ctx context.Context, r *kvStoreResource, data *resourc
 	}
 
 	sdkReq := quantadmingo.NewV2StoreRequest(data.Name.ValueString())
+	setKVStoreFormat(data, sdkReq)
 
 	org := r.getOrg(data)
 	store, resp, err := r.client.Instance.KVAPI.KVCreate(r.client.AuthContext, org, data.Project.ValueString()).V2StoreRequest(*sdkReq).Execute()
