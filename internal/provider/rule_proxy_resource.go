@@ -187,7 +187,8 @@ func buildProxyRequest(ctx context.Context, data *resource_rule_proxy.RuleProxyM
 	// FailoverMode, FailoverOriginTtfb, FailoverOriginStatusCodes,
 	// FailoverLifetime, ProxyAlertEnabled, WafEnabled, OriginTimeout,
 	// StaticErrorPage, StaticErrorPageStatusCodes
-	diags.Append(mapper.ToSDK(ctx, data, req)...)
+	// waf_config is caller-handled: it is only sent when waf_enabled is true.
+	diags.Append(mapper.ToSDK(ctx, data, req, "waf_config")...)
 	if diags.HasError() {
 		return nil, diags
 	}

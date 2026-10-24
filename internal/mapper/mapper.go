@@ -1,6 +1,64 @@
 // Package mapper provides reflection-based conversion between Terraform Plugin
-// Framework model types and Go SDK request types, eliminating repetitive
-// null-check-then-set boilerplate in resource CRUD handlers.
+// Framework model types and Go SDK request/response types, eliminating
+// repetitive null-check-then-set boilerplate in resource CRUD handlers.
+//
+// ToSDK copies a model onto an SDK request through its Set{Name} methods, and
+// FromSDK copies an SDK response onto a model through its Get{Name} methods.
+// Field names come from the model's `tfsdk` tags: "allow_query_params" maps
+// to SetAllowQueryParams / GetAllowQueryParams.
+//
+// # Supported attributes
+//
+//   - Scalars: types.String, types.Bool, types.Int64 (to any signed integer
+//     setter), types.Float64.
+//   - String lists: types.List of strings ↔ []string.
+//   - Nested objects: a SingleNestedAttribute (a generated *Value type or a
+//     plain types.Object) ↔ an SDK struct or pointer to struct. The object's
+//     attributes are mapped recursively with the same rules, so nested objects,
+//     lists and JSON strings inside it work too.
+//   - Lists of nested objects: a ListNestedAttribute (types.List whose
+//     elements are objects) ↔ an SDK slice of structs or struct pointers.
+//   - JSON strings: see below.
+//
+// Other attribute types (maps, sets, numbers, integer lists) are skipped
+// without a warning; the caller maps them by hand.
+//
+// # JSON-string attributes
+//
+// A free-form SDK field (interface{}, map[string]interface{},
+// []interface{}, []map[string]interface{} and similar) has no fixed schema,
+// so the Terraform schema models it as a types.String holding a JSON document.
+// The mapper recognises such a field by the pairing of types, with no tag or
+// option: a types.String attribute whose SDK setter or getter uses a
+// free-form type is treated as JSON.
+//
+//   - ToSDK decodes the string with encoding/json into the setter's type.
+//     Invalid JSON is reported as an error diagnostic.
+//   - FromSDK encodes the getter's value in canonical form (object keys
+//     sorted, no insignificant whitespace). If the model already holds a JSON
+//     string that is semantically equal, that string is kept as is, so a
+//     configuration written with different key order or formatting shows no
+//     diff and does not trip Terraform's "inconsistent result after apply"
+//     check.
+//
+// # Null, unknown and absent values
+//
+// ToSDK never calls a setter for a null or unknown value, at any depth.
+//
+// For nested objects, lists of nested objects and JSON strings, FromSDK sets
+// the attribute to null when the SDK reports the field as absent: the getter
+// returns a nil pointer, map, slice or interface, or a Has{Name} method
+// returns false. Attributes of a nested object that have no SDK getter keep
+// the value they had in the model (null if the model had none), so FromSDK
+// should be given the plan or state model, as CRUD handlers already do. That
+// prior value also supplies the element type of a list of nested objects,
+// which a zero types.List does not carry.
+//
+// # Fields the caller maps itself
+//
+// Both functions accept callerHandled tfsdk tags. Those top-level fields are
+// skipped entirely, so the caller's own mapping is not overwritten and does
+// not produce a misleading "type mismatch" warning.
 package mapper
 
 import (
@@ -9,8 +67,10 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 // ToSDK maps fields from a Terraform model struct (tfModel) to an SDK request
@@ -19,17 +79,16 @@ import (
 // sdkReq. If the TF value is neither null nor unknown, the setter is called
 // with the Go-native value.
 //
-// Supported TF types: types.String, types.Bool, types.Int64, types.Float64,
-// types.List (string elements only). Nested objects are silently skipped
-// (handled per-resource).
+// See the package documentation for the supported attribute types, including
+// nested objects, lists of nested objects and JSON strings.
 //
 // sdkReq must be a pointer so that setter methods with pointer receivers are
 // found by reflection.
 //
 // callerHandled names tfsdk tags that the caller maps itself. The mapper skips
 // those fields without a warning. Use it for fields the mapper cannot convert,
-// such as integer lists or nested object lists, so that the caller's own
-// mapping does not produce a misleading "field skipped" warning on every apply.
+// such as integer lists, or that need custom logic, so that the caller's own
+// mapping is not overwritten or reported as a type mismatch on every apply.
 func ToSDK(ctx context.Context, tfModel any, sdkReq any, callerHandled ...string) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -71,36 +130,77 @@ func ToSDK(ctx context.Context, tfModel any, sdkReq any, callerHandled ...string
 			continue
 		}
 
-		fieldVal := modelVal.Field(i)
-		setterName := "Set" + snakeToPascal(tag)
-
-		setter := sdkVal.MethodByName(setterName)
-		if !setter.IsValid() {
-			// No matching setter — skip silently.
+		value, ok := modelVal.Field(i).Interface().(attr.Value)
+		if !ok {
+			// Not a Terraform value — skip silently.
 			continue
 		}
 
-		// Ensure the setter takes exactly one argument.
-		if setter.Type().NumIn() != 1 {
-			continue
-		}
-
-		args, skip := convertTFValue(ctx, fieldVal, setter.Type().In(0))
-		if skip {
-			if setter.IsValid() && !isNullOrUnknown(fieldVal) {
-				diags.AddWarning(
-					fmt.Sprintf("ToSDK: type mismatch for field %q", tag),
-					fmt.Sprintf("setter %s expects %s but TF value is %s — field skipped",
-						setterName, setter.Type().In(0), fieldVal.Type()),
-				)
-			}
-			continue
-		}
-
-		setter.Call([]reflect.Value{args})
+		diags.Append(setAttribute(ctx, sdkVal, tag, value, tag)...)
 	}
 
 	return diags
+}
+
+// setAttribute converts value and passes it to the Set{PascalCase(name)}
+// method of sdkPtr. A missing setter, or one that does not take exactly one
+// argument, skips the attribute silently. path names the attribute in
+// diagnostics.
+func setAttribute(ctx context.Context, sdkPtr reflect.Value, name string, value attr.Value, path string) diag.Diagnostics {
+	setter := sdkPtr.MethodByName("Set" + snakeToPascal(name))
+	if !setter.IsValid() || setter.Type().NumIn() != 1 {
+		return nil
+	}
+
+	arg, ok, diags := valueToSDK(ctx, value, setter.Type().In(0), path)
+	if ok {
+		setter.Call([]reflect.Value{arg})
+	}
+	return diags
+}
+
+// valueToSDK converts a Terraform value to target, the setter's parameter
+// type. ok is false when the setter must not be called: the value is null or
+// unknown or of an unsupported type (no diagnostic), does not fit target (a
+// warning), or is invalid JSON (an error).
+func valueToSDK(ctx context.Context, value attr.Value, target reflect.Type, path string) (reflect.Value, bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if value.IsNull() || value.IsUnknown() {
+		return reflect.Value{}, false, diags
+	}
+
+	switch v := value.(type) {
+	case types.String:
+		if isFreeForm(target) {
+			return jsonToSDK(v.ValueString(), target, path)
+		}
+	case types.List:
+		if elem, ok := sliceElem(target); ok && isStructTarget(elem) {
+			return objectListToSDK(ctx, v, target, path)
+		}
+	case types.Bool, types.Int64, types.Float64:
+	case basetypes.ObjectValuable:
+		return objectToSDK(ctx, v, target, path)
+	default:
+		// Unsupported type (maps, sets, numbers, ...) — skip silently.
+		return reflect.Value{}, false, diags
+	}
+
+	out, skip := convertTFValue(ctx, reflect.ValueOf(value), target)
+	if skip {
+		diags.Append(typeMismatch(path, target, value))
+		return reflect.Value{}, false, diags
+	}
+	return out, true, diags
+}
+
+// typeMismatch reports a known value that does not fit the SDK type.
+func typeMismatch(path string, target reflect.Type, value attr.Value) diag.Diagnostic {
+	return diag.NewWarningDiagnostic(
+		fmt.Sprintf("ToSDK: type mismatch for field %q", path),
+		fmt.Sprintf("the SDK expects %s but the Terraform value is %T; field skipped", target, value),
+	)
 }
 
 // convertTFValue extracts the Go-native value from a Terraform Plugin Framework
@@ -149,7 +249,8 @@ func convertTFValue(ctx context.Context, fieldVal reflect.Value, targetType refl
 		return convertToTarget(reflect.ValueOf(elems), targetType)
 
 	default:
-		// Unsupported type (nested objects, etc.) — skip silently.
+		// Unsupported type — skip silently. Nested objects are handled by
+		// valueToSDK before this function is reached.
 		return reflect.Value{}, true
 	}
 }
@@ -185,27 +286,6 @@ func convertToTarget(val reflect.Value, targetType reflect.Type) (reflect.Value,
 	return reflect.Value{}, true
 }
 
-// isNullOrUnknown reports whether a Terraform attribute value is null or unknown.
-// This is used to distinguish benign skips (null/unknown) from type mismatch skips.
-func isNullOrUnknown(fieldVal reflect.Value) bool {
-	iface := fieldVal.Interface()
-	switch v := iface.(type) {
-	case types.String:
-		return v.IsNull() || v.IsUnknown()
-	case types.Bool:
-		return v.IsNull() || v.IsUnknown()
-	case types.Int64:
-		return v.IsNull() || v.IsUnknown()
-	case types.Float64:
-		return v.IsNull() || v.IsUnknown()
-	case types.List:
-		return v.IsNull() || v.IsUnknown()
-	default:
-		// Unsupported types are always treated as "null-like" — no warning.
-		return true
-	}
-}
-
 // FromSDK maps fields from an SDK response object (sdkResp) back to a Terraform
 // model struct (tfModel) using reflection. For each exported field in tfModel
 // that has a `tfsdk` struct tag, it looks for a corresponding Get{PascalCase}()
@@ -213,12 +293,22 @@ func isNullOrUnknown(fieldVal reflect.Value) bool {
 // return value is converted to the appropriate Terraform Plugin Framework type
 // and set on the model field.
 //
-// Supported getter return types: string, bool, int32/int/int64, float32/float64.
-// Getters must take no arguments and return a single value.
+// Supported getter return types: string, bool, int32/int/int64, float32/float64,
+// []string, and the nested object, nested list and JSON forms described in the
+// package documentation. Getters must take no arguments and return a single
+// value.
 //
 // tfModel must be a pointer so that fields can be set via reflection.
-func FromSDK(ctx context.Context, sdkResp any, tfModel any) diag.Diagnostics {
+//
+// callerHandled names tfsdk tags that the caller maps itself. The mapper
+// leaves those fields untouched.
+func FromSDK(ctx context.Context, sdkResp any, tfModel any, callerHandled ...string) diag.Diagnostics {
 	var diags diag.Diagnostics
+
+	skip := make(map[string]struct{}, len(callerHandled))
+	for _, tag := range callerHandled {
+		skip[tag] = struct{}{}
+	}
 
 	modelVal := reflect.ValueOf(tfModel)
 	if modelVal.Kind() != reflect.Pointer {
@@ -245,25 +335,31 @@ func FromSDK(ctx context.Context, sdkResp any, tfModel any) diag.Diagnostics {
 			continue
 		}
 
-		getterName := "Get" + snakeToPascal(tag)
-		getter := sdkVal.MethodByName(getterName)
-		if !getter.IsValid() {
-			// No matching getter — skip silently.
+		if _, handled := skip[tag]; handled {
 			continue
 		}
 
-		// Ensure the getter takes no arguments and returns exactly one value.
-		if getter.Type().NumIn() != 0 || getter.Type().NumOut() != 1 {
-			continue
-		}
-
-		result := getter.Call(nil)[0]
-		tfVal, ok := convertToTFValue(ctx, result)
+		result, ok := callGetter(sdkVal, tag)
 		if !ok {
 			continue
 		}
 
 		fieldVal := modelVal.Field(i)
+
+		// Nested objects, lists of nested objects and JSON strings are
+		// converted using the field's current value for type information.
+		if prior, isAttr := fieldVal.Interface().(attr.Value); isAttr && isStructuredResult(prior, result.Type()) {
+			if v, ok := structuredFromSDK(ctx, sdkVal, tag, result, prior); ok {
+				setField(fieldVal, reflect.ValueOf(v))
+			}
+			continue
+		}
+
+		tfVal, ok := convertToTFValue(ctx, result)
+		if !ok {
+			continue
+		}
+
 		if fieldVal.CanSet() {
 			fieldVal.Set(tfVal)
 		}
