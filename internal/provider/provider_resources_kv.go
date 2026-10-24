@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
@@ -11,5 +12,15 @@ import (
 func handRegisteredResources() []func() resource.Resource {
 	return []func() resource.Resource{
 		NewKVIndexResource,
+		NewKVLedgerResource,
+	}
+}
+
+// kvDataSources are the hand-registered KV data sources. Their schemas are
+// generated (internal/datasource_kv_ledger*), the mapping is hand-written.
+func kvDataSources() []func() datasource.DataSource {
+	return []func() datasource.DataSource{
+		NewKVLedgerDataSource,
+		NewKVLedgerPublicKeyDataSource,
 	}
 }

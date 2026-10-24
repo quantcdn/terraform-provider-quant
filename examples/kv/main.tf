@@ -32,3 +32,49 @@ resource "quant_kv_index" "orders_by_customer" {
   fields     = ["customerId"]
   sort_by    = "createdAt"
 }
+
+# A ledger definition never changes, and the ledger cannot be dropped while
+# its archive retention runs. chains, retention_days and lock_mode can only go up.
+resource "quant_kv_ledger" "ai_use" {
+  project         = var.project
+  store_id        = quant_kv_store.orders.store_id
+  name            = "aiUse"
+  collection      = "ai-use:*"
+  chains          = 4
+  retention_days  = 2555
+  lock_mode       = "governance"
+  personal_fields = ["requesterName"]
+  subject_field   = "requesterId"
+  anchor          = { type = "rfc3161", tsa_url = "http://timestamp.digicert.com" }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# To stop managing the ledger without dropping it:
+# removed {
+#   from = quant_kv_ledger.ai_use
+#   lifecycle {
+#     destroy = false
+#   }
+# }
+
+data "quant_kv_ledger" "ai_use" {
+  project     = var.project
+  store_id    = quant_kv_store.orders.store_id
+  ledger_name = quant_kv_ledger.ai_use.name
+}
+
+data "quant_kv_ledger_public_key" "orders" {
+  project  = var.project
+  store_id = quant_kv_store.orders.store_id
+}
+
+output "ai_use_retained_until" {
+  value = data.quant_kv_ledger.ai_use.retain_until
+}
+
+output "ledger_public_key_pem" {
+  value = data.quant_kv_ledger_public_key.orders.public_key_pem
+}

@@ -161,7 +161,7 @@ func (r *kvIndexResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if kvAPIStatus(httpResp) == http.StatusNotFound {
 		return // already gone
 	}
-	if err != nil {
+	if err != nil && !kvAPIOK(httpResp) {
 		resp.Diagnostics.AddError("Unable to drop KV index", extractAPIErrorMessage(httpResp, err))
 		return
 	}

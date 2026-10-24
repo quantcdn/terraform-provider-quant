@@ -74,6 +74,13 @@ func kvAPIStatus(resp *http.Response) int {
 	return resp.StatusCode
 }
 
+// kvAPIOK is true for a 2xx answer. A drop or declare that the API accepted
+// succeeded even when the SDK cannot decode the answer body.
+func kvAPIOK(resp *http.Response) bool {
+	status := kvAPIStatus(resp)
+	return status >= 200 && status < 300
+}
+
 // kvAPIError is the KV error body (V2KvError) fields the provider reports.
 type kvAPIError struct {
 	Code        string `json:"code"`
