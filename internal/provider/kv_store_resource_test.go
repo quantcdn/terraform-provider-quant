@@ -58,7 +58,9 @@ func mockKVStoreServer(t *testing.T, org string, project string, storeId string)
 			if storeDeleted {
 				return httpmock.NewStringResponse(404, "Not Found"), nil
 			}
-			return httpmock.NewJsonResponse(200, createResponse())
+			show := createResponse()
+			show["status"] = "ready"
+			return httpmock.NewJsonResponse(200, show)
 		})
 
 	// GET KV store items: the store answers once its table is active.

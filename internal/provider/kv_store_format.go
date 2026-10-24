@@ -72,7 +72,7 @@ func checkKVStoreIDChange(planned, prior types.String) diag.Diagnostics {
 
 // Update applies only the changes allowed in place: format, when it equals
 // the real format (for example a state written before the provider knew the
-// format). id, store_id, project and organization come from the prior state,
+// format). id, store_id, project, organization and status come from the prior state,
 // so nothing is unknown after apply, also with -refresh=false.
 func (r *kvStoreResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state resource_kv_store.KvStoreModel
@@ -82,6 +82,7 @@ func (r *kvStoreResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 	plan.Id, plan.StoreId, plan.Project, plan.Organization = state.Id, state.StoreId, state.Project, state.Organization
+	plan.Status = state.Status
 	actual, httpResp, err := readKVStoreFormat(r, &plan)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read the KV store format", extractAPIErrorMessage(httpResp, err))

@@ -24,7 +24,8 @@ func fakeKVStore(t *testing.T, format *atomic.Int64) *kvFake {
 		}
 		return 200, store
 	})
-	f.json("GET /store-123", 200, store)
+	// KV_show reports the readiness status; KV_create may leave it out.
+	f.json("GET /store-123", 200, map[string]any{"id": "store-123", "name": "my-store", "status": "ready"})
 	f.json("GET /store-123/items", 200, map[string]any{"data": []any{}, "next_cursor": nil})
 	f.on("GET /store-123/upgrade", func(map[string]any) (int, any) {
 		if st := upgradeStatus.Load(); st != 0 {
