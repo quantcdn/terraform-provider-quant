@@ -35,7 +35,7 @@ The format is set when the store is created. Terraform never changes the format 
 
 ## Destroy
 
-Destroy deletes the store. While the store has a ledger that is `PENDING` or `ACTIVE`, or `DROPPED` but not yet finished by the archive job, the API refuses with `LEDGER_PRESENT` and the destroy fails. If the API answers `409 DIGEST_OWED`, the last digest of the store is not written yet: run the destroy again in a few minutes.
+Destroy deletes the store. While the store has a ledger that is `PENDING` or `ACTIVE`, or `DROPPED` but not yet finished by the archive job, the API refuses with `LEDGER_PRESENT` and the destroy fails. The provider shows the HTTP status only (for example `409 Conflict`). The error code (`DIGEST_OWED` or `LEDGER_PRESENT`) is in the body of the API answer. If the code is `DIGEST_OWED`, the last digest of the store is not written yet: run the destroy again in a few minutes.
 
 Destroy never deletes the ledger archive of the store. The archive objects, digests and anchors stay after the store is deleted, also after their retention ends. While they exist, a new store with the same name cannot be created (`409 STORE_NAME_RETAINED`). To delete a retained archive, use the archive purge in the dashboard or the KV API (`/api/v2/organizations/{organization}/kv/archives`, see [Deleting a retained archive](https://docs.quantcdn.io/compute/kv-ledgers/#deleting-a-retained-archive)). The provider has no resource or data source for it: a purge is a one-time action that cannot be undone, not state that Terraform manages.
 
