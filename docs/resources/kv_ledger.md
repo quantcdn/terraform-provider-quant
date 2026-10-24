@@ -84,7 +84,7 @@ The KV API allows 10 index and ledger changes (declare, raise, drop) per minute 
 
 ## Destroy
 
-Destroy drops the ledger. While the archive retention runs, the API refuses with `LEDGER_RETAINED`, and the destroy fails with the `retainUntil` date. To stop managing the ledger without a drop, use a `removed` block:
+Destroy drops the ledger. While the archive retention runs, the API refuses with `LEDGER_RETAINED`, and the destroy fails with the `retainUntil` date. A drop does not delete the ledger's archive objects. They stay until the store is deleted and its archive is purged (see the `quant_kv_store` destroy notes). To stop managing the ledger without a drop, use a `removed` block:
 
 ```hcl
 removed {

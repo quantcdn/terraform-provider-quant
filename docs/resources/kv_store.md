@@ -33,6 +33,12 @@ The format is set when the store is created. Terraform never changes the format 
 - Terraform reads the real format from `GET .../kv/{store_id}/upgrade` on every refresh, so an upgrade outside Terraform is visible in the plan. If that endpoint answers `404`, the store is format 1. If it fails (for example `403` or `5xx`), the refresh keeps the format from state and gives a warning.
 - The API sets `store_id`. A plan that sets `store_id` to another value fails with `KV store store_id cannot change`; it does not move the resource to another store.
 
+## Destroy
+
+Destroy deletes the store. While the store has a ledger that is `PENDING` or `ACTIVE`, or `DROPPED` but not yet finished by the archive job, the API refuses with `LEDGER_PRESENT` and the destroy fails. If the API answers `409 DIGEST_OWED`, the last digest of the store is not written yet: run the destroy again in a few minutes.
+
+Destroy never deletes the ledger archive of the store. The archive objects, digests and anchors stay after the store is deleted, also after their retention ends. While they exist, a new store with the same name cannot be created (`409 STORE_NAME_RETAINED`). To delete a retained archive, use the archive purge in the dashboard or the KV API (`/api/v2/organizations/{organization}/kv/archives`, see [Deleting a retained archive](https://docs.quantcdn.io/compute/kv-ledgers/#deleting-a-retained-archive)). The provider has no resource or data source for it: a purge is a one-time action that cannot be undone, not state that Terraform manages.
+
 ## Import
 
 ```bash
