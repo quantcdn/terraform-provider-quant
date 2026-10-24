@@ -78,12 +78,18 @@ func (r *kvLedgerResource) Create(ctx context.Context, req resource.CreateReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	_, httpResp, err := r.client.Instance.KVAPI.KVLedgersCreate(r.client.AuthContext, data.Organization.ValueString(), data.Project.ValueString(), data.StoreId.ValueString()).
-		V2KvLedgerAdminDeclareRequest(*body).Execute()
+	_, httpResp, err := kvRetry429(ctx, kvLedgerTimeout(), func() (*quantadmingo.V2KvLedger, *http.Response, error) {
+		return r.client.Instance.KVAPI.KVLedgersCreate(r.client.AuthContext, data.Organization.ValueString(), data.Project.ValueString(), data.StoreId.ValueString()).
+			V2KvLedgerAdminDeclareRequest(*body).Execute()
+	})
 	if err != nil && !kvAPIOK(httpResp) {
-		resp.Diagnostics.AddError("Unable to declare KV ledger", extractAPIErrorMessage(httpResp, err))
+		resp.Diagnostics.AddError("Unable to declare KV ledger", kvAPIErrorDetail(httpResp, err))
 		return
 	}
+	// A wait that ends before the ledger leaves PENDING returns an error
+	// before anything is saved. Saved state with an error is tainted, and the
+	// next apply would replace it: drop the declared ledger, which could then
+	// be retained or lose entries. Unsaved, the ledger is only imported.
 	final, diags := r.waitDeclared(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if final == nil {
@@ -126,10 +132,12 @@ func (r *kvLedgerResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 	if raise, changed := kvLedgerRaise(plan, state); changed {
-		_, httpResp, err := r.client.Instance.KVAPI.KVLedgersUpdate(r.client.AuthContext, r.org(&state), state.Project.ValueString(), state.StoreId.ValueString(), state.Name.ValueString()).
-			V2KvLedgerAdminRaiseRequest(raise).Execute()
+		_, httpResp, err := kvRetry429(ctx, kvLedgerTimeout(), func() (*quantadmingo.V2KvLedger, *http.Response, error) {
+			return r.client.Instance.KVAPI.KVLedgersUpdate(r.client.AuthContext, r.org(&state), state.Project.ValueString(), state.StoreId.ValueString(), state.Name.ValueString()).
+				V2KvLedgerAdminRaiseRequest(raise).Execute()
+		})
 		if err != nil {
-			resp.Diagnostics.AddError("Unable to raise KV ledger", extractAPIErrorMessage(httpResp, err))
+			resp.Diagnostics.AddError("Unable to raise KV ledger", kvAPIErrorDetail(httpResp, err))
 			return
 		}
 	}
@@ -150,11 +158,45 @@ func (r *kvLedgerResource) Delete(ctx context.Context, req resource.DeleteReques
 	if resp.Diagnostics.HasError() || data.State.ValueString() == kvLedgerDropped {
 		return
 	}
-	_, httpResp, err := r.client.Instance.KVAPI.KVLedgersDelete(r.client.AuthContext, r.org(&data), data.Project.ValueString(), data.StoreId.ValueString(), data.Name.ValueString()).Execute()
+	drop, diags := r.dropAllowed(&data)
+	resp.Diagnostics.Append(diags...)
+	if !drop {
+		return
+	}
+	_, httpResp, err := kvRetry429(ctx, kvLedgerTimeout(), func() (*quantadmingo.V2KvLedger, *http.Response, error) {
+		return r.client.Instance.KVAPI.KVLedgersDelete(r.client.AuthContext, r.org(&data), data.Project.ValueString(), data.StoreId.ValueString(), data.Name.ValueString()).Execute()
+	})
 	if err == nil || kvAPIOK(httpResp) || kvAPIStatus(httpResp) == http.StatusNotFound {
 		return
 	}
+	if kvAPIStatus(httpResp) == http.StatusTooManyRequests {
+		resp.Diagnostics.AddError("KV ledger cannot be dropped", kvAPIErrorDetail(httpResp, err))
+		return
+	}
 	resp.Diagnostics.AddError("KV ledger cannot be dropped", kvLedgerDropRefused(data.Name.ValueString(), err))
+}
+
+// dropAllowed reads the ledger again before the drop. It is false when the
+// ledger is gone, and false with an error when the prior state is FAILED
+// (the plan replaces it) but the server no longer shows FAILED: a drop would
+// destroy a ledger that works.
+func (r *kvLedgerResource) dropAllowed(d *resource_kv_ledger.KvLedgerModel) (bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	l, httpResp, err := r.show(d)
+	switch {
+	case kvAPIStatus(httpResp) == http.StatusNotFound:
+		return false, diags
+	case err != nil:
+		diags.AddError("Unable to read KV ledger before the drop", extractAPIErrorMessage(httpResp, err))
+		return false, diags
+	case l.GetState() == kvLedgerDropped:
+		return false, diags
+	case d.State.ValueString() == kvLedgerFailed && l.GetState() != kvLedgerFailed:
+		diags.AddError("KV ledger is not dropped", fmt.Sprintf("The plan replaces ledger %s because it was FAILED, but the server now shows it %s. "+
+			"The provider does not drop a ledger that is not FAILED. Run terraform plan again.", d.Name.ValueString(), l.GetState()))
+		return false, diags
+	}
+	return true, diags
 }
 
 func (r *kvLedgerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -186,7 +228,7 @@ func (r *kvLedgerResource) show(d *resource_kv_ledger.KvLedgerModel) (*quantadmi
 // waitDeclared polls the ledger until it leaves PENDING.
 func (r *kvLedgerResource) waitDeclared(ctx context.Context, d *resource_kv_ledger.KvLedgerModel) (*quantadmingo.V2KvLedgerDetail, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	timeout := waitTimeout("QUANTCDN_KV_LEDGER_TIMEOUT", KVLedgerWaitTimeout)
+	timeout := kvLedgerTimeout()
 	deadline := time.Now().Add(timeout)
 	for {
 		l, _, err := r.show(d)
@@ -194,14 +236,30 @@ func (r *kvLedgerResource) waitDeclared(ctx context.Context, d *resource_kv_ledg
 			return l, diags
 		}
 		if time.Now().After(deadline) {
-			diags.AddError("KV ledger wait timed out", fmt.Sprintf("Ledger %s is still PENDING after %s (set QUANTCDN_KV_LEDGER_TIMEOUT to wait longer). It exists: import it or apply again.", d.Name.ValueString(), timeout))
+			diags.AddError("KV ledger wait timed out", fmt.Sprintf("Ledger %s is still PENDING after %s (set QUANTCDN_KV_LEDGER_TIMEOUT to wait longer). %s", d.Name.ValueString(), timeout, r.importHint(d)))
 			return nil, diags
 		}
 		if serr := sleepCtx(ctx, KVLedgerWaitInterval); serr != nil {
-			diags.AddError("KV ledger wait cancelled", serr.Error())
+			diags.AddError("KV ledger wait cancelled", fmt.Sprintf("%s. %s", serr.Error(), r.importHint(d)))
 			return nil, diags
 		}
 	}
+}
+
+// importHint says that a declared ledger exists and how to import it.
+func (r *kvLedgerResource) importHint(d *resource_kv_ledger.KvLedgerModel) string {
+	id := fmt.Sprintf("%s/%s/%s", d.Project.ValueString(), d.StoreId.ValueString(), d.Name.ValueString())
+	if org := r.org(d); org != r.client.Organization {
+		id = org + "/" + id
+	}
+	return fmt.Sprintf("The provider did not save it in state, but the ledger exists on the server; import it with "+
+		"terraform import quant_kv_ledger.<name> %s (or an import block) before the next apply.", id)
+}
+
+// kvLedgerTimeout is the wait timeout of a ledger: for the declare, and for
+// 429 retries of the declare, the raise and the drop.
+func kvLedgerTimeout() time.Duration {
+	return waitTimeout("QUANTCDN_KV_LEDGER_TIMEOUT", KVLedgerWaitTimeout)
 }
 
 // kvLedgerDropRefused explains a refused drop and the ways to stop managing

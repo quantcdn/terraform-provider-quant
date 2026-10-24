@@ -20,6 +20,7 @@ var (
 	_ resource.Resource                = (*kvIndexResource)(nil)
 	_ resource.ResourceWithConfigure   = (*kvIndexResource)(nil)
 	_ resource.ResourceWithImportState = (*kvIndexResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*kvIndexResource)(nil)
 )
 
 // KVIndexWaitTimeout bounds the wait for ACTIVE after a create and for the
@@ -34,6 +35,7 @@ const (
 	kvIndexActive   = "ACTIVE"
 	kvIndexBuilding = "BUILDING"
 	kvIndexDropping = "DROPPING"
+	kvIndexFailed   = "FAILED"
 )
 
 // kvIndexCountAttr is the Terraform name of the API field count.
@@ -105,10 +107,12 @@ func (r *kvIndexResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	created, httpResp, err := r.client.Instance.KVAPI.KVIndexesCreate(r.client.AuthContext, data.Organization.ValueString(), data.Project.ValueString(), data.StoreId.ValueString()).
-		V2KvIndexRequest(body).Execute()
+	created, httpResp, err := kvRetry429(ctx, kvIndexTimeout(), func() (*quantadmingo.V2KvIndex, *http.Response, error) {
+		return r.client.Instance.KVAPI.KVIndexesCreate(r.client.AuthContext, data.Organization.ValueString(), data.Project.ValueString(), data.StoreId.ValueString()).
+			V2KvIndexRequest(body).Execute()
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Unable to declare KV index", extractAPIErrorMessage(httpResp, err))
+		resp.Diagnostics.AddError("Unable to declare KV index", kvAPIErrorDetail(httpResp, err))
 		return
 	}
 	// Save the BUILDING index first: when the wait fails, the index stays in
@@ -134,8 +138,11 @@ func (r *kvIndexResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	// A DROPPING index stays in state until it is gone: ModifyPlan then
+	// replaces it, and the replacement waits for the drop to end before it
+	// declares the name again.
 	idx, httpResp, err := r.show(&data)
-	if kvAPIStatus(httpResp) == http.StatusNotFound || (err == nil && idx.GetState() == kvIndexDropping) {
+	if kvAPIStatus(httpResp) == http.StatusNotFound {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -157,17 +164,55 @@ func (r *kvIndexResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	_, httpResp, err := r.client.Instance.KVAPI.KVIndexesDelete(r.client.AuthContext, r.org(&data), data.Project.ValueString(), data.StoreId.ValueString(), data.Name.ValueString()).Execute()
-	if kvAPIStatus(httpResp) == http.StatusNotFound {
-		return // already gone
-	}
-	if err != nil && !kvAPIOK(httpResp) {
-		resp.Diagnostics.AddError("Unable to drop KV index", extractAPIErrorMessage(httpResp, err))
-		return
+	// A DROPPING index is already on its way out: do not drop it again.
+	if data.State.ValueString() != kvIndexDropping {
+		_, httpResp, err := kvRetry429(ctx, kvIndexTimeout(), func() (*quantadmingo.V2KvIndex, *http.Response, error) {
+			return r.client.Instance.KVAPI.KVIndexesDelete(r.client.AuthContext, r.org(&data), data.Project.ValueString(), data.StoreId.ValueString(), data.Name.ValueString()).Execute()
+		})
+		if kvAPIStatus(httpResp) == http.StatusNotFound {
+			return // already gone
+		}
+		if err != nil && !kvAPIOK(httpResp) {
+			resp.Diagnostics.AddError("Unable to drop KV index", kvAPIErrorDetail(httpResp, err))
+			return
+		}
 	}
 	// Wait until the index is gone, so a replacement can declare the same name.
 	_, diags := r.waitFor(ctx, &data, indexGone)
 	resp.Diagnostics.Append(diags...)
+}
+
+// ModifyPlan replaces a FAILED index (also one just imported) and a
+// DROPPING index, with a warning. The replacement drops a FAILED index, or
+// waits until a DROPPING index is gone, then declares it again.
+func (r *kvIndexResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+	var state kvIndexModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	detail := kvIndexReplaceReason(&state)
+	if detail == "" {
+		return
+	}
+	resp.Diagnostics.AddWarning("KV index is replaced", detail)
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("state"), types.StringUnknown())...)
+	resp.RequiresReplace = append(resp.RequiresReplace, path.Root("state"))
+}
+
+// kvIndexReplaceReason explains why an index in this state is replaced, or
+// is empty when it is not.
+func kvIndexReplaceReason(d *kvIndexModel) string {
+	switch d.State.ValueString() {
+	case kvIndexFailed:
+		return fmt.Sprintf("Index %s is FAILED (%s %s). The apply drops it and declares it again.", d.Name.ValueString(), d.Error.ValueString(), d.Conflicts.String())
+	case kvIndexDropping:
+		return fmt.Sprintf("Index %s is DROPPING. The apply waits until the drop ends, then declares it again.", d.Name.ValueString())
+	}
+	return ""
 }
 
 func (r *kvIndexResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -195,6 +240,12 @@ func (r *kvIndexResource) show(d *kvIndexModel) (*quantadmingo.V2KvIndex, *http.
 	return r.client.Instance.KVAPI.KVIndexesShow(r.client.AuthContext, r.org(d), d.Project.ValueString(), d.StoreId.ValueString(), d.Name.ValueString()).Execute()
 }
 
+// kvIndexTimeout is the wait timeout of an index: for the build, for the
+// drop, and for 429 retries of the declare and the drop.
+func kvIndexTimeout() time.Duration {
+	return waitTimeout("QUANTCDN_KV_INDEX_TIMEOUT", KVIndexWaitTimeout)
+}
+
 // indexBuilt is true when the build has ended (ACTIVE or FAILED).
 func indexBuilt(i *quantadmingo.V2KvIndex, status int, err error) bool {
 	return err == nil && status == http.StatusOK && i.GetState() != kvIndexBuilding
@@ -207,7 +258,7 @@ func indexGone(_ *quantadmingo.V2KvIndex, status int, _ error) bool {
 // waitFor polls the index until done is true or the wait timeout passes.
 func (r *kvIndexResource) waitFor(ctx context.Context, d *kvIndexModel, done func(*quantadmingo.V2KvIndex, int, error) bool) (*quantadmingo.V2KvIndex, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	timeout := waitTimeout("QUANTCDN_KV_INDEX_TIMEOUT", KVIndexWaitTimeout)
+	timeout := kvIndexTimeout()
 	deadline := time.Now().Add(timeout)
 	for {
 		idx, httpResp, err := r.show(d)

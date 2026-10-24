@@ -60,7 +60,12 @@ Every argument forces a replacement.
 - Create declares the index (the API answers `202` with a `BUILDING` index) and waits until the build ends. The default wait is 10 minutes. Set the environment variable `QUANTCDN_KV_INDEX_TIMEOUT` (a Go duration, for example `30m`) to wait longer.
 - If the build ends `FAILED`, the apply fails with the error code and the conflicting keys. The index stays in state as tainted, and the next apply drops it and declares it again.
 - Delete drops the index and waits until it is gone. An index that is already gone (`404`) is not an error.
-- A refresh removes an index that is gone or `DROPPING` from state.
+- A refresh removes an index that is gone from state. An index that is `DROPPING` stays in state until it is gone. The next plan replaces it (with a warning): the apply waits until the drop ends, without a second drop, and then declares the index again.
+- An index in state that is `FAILED`, also one just imported, is replaced by the next plan (with a warning): the apply drops it and declares it again.
+
+## Rate limit
+
+The KV API allows 10 index and ledger changes (declare, raise, drop) per minute per project. Above that, it answers `429` with a `Retry-After` header. The provider then waits the full `Retry-After` and sends the declare or the drop again, until the wait timeout (`QUANTCDN_KV_INDEX_TIMEOUT`, default 10 minutes) ends. To declare many indexes in one apply, expect the apply to wait, or run `terraform apply -parallelism=` with a lower value.
 
 ## Import
 

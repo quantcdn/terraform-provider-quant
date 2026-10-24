@@ -1,6 +1,7 @@
 package provider_test
 
 import (
+	"fmt"
 	"regexp"
 	"sync/atomic"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/provider"
 )
@@ -33,40 +35,54 @@ func kvIndexBody(state string, fields any) map[string]any {
 }
 
 // fakeKVIndex answers the declare with 202 BUILDING, then BUILDING until
-// `polls` reads, then `final`. A drop answers 202 DROPPING; the index is then
-// 404. deleteStatus overrides the drop answer.
+// `polls` reads, then `final` (reset to the constructor value at each
+// declare). A drop answers 202 DROPPING; the index is then 404. While
+// droppingReads is above 0, a read answers DROPPING and counts down; at 0 the
+// index is gone. deleteStatus overrides the drop answer.
 type kvIndexFake struct {
 	*kvFake
-	reads, dropped atomic.Int64
-	deleteStatus   int
-	fields         atomic.Value
+	reads, dropped, droppingReads atomic.Int64
+	deleteStatus                  int
+	fields, final                 atomic.Value
 }
+
+var indexNotFound = map[string]any{"error": true, "code": "INDEX_NOT_FOUND", "message": "No index", "retryable": false}
 
 func fakeKVIndex(t *testing.T, polls int64, final string) *kvIndexFake {
 	f := &kvIndexFake{kvFake: newKVFake(t), deleteStatus: 202}
+	f.final.Store(final)
 	f.on("POST /store-123/indexes", func(body map[string]any) (int, any) {
 		f.dropped.Store(0)
 		f.reads.Store(0)
+		f.final.Store(final)
 		f.fields.Store(body["fields"])
 		return 202, kvIndexBody("BUILDING", f.fields.Load())
 	})
-	f.on("GET /store-123/indexes/byCustomer", func(map[string]any) (int, any) {
-		if f.dropped.Load() == 1 {
-			return 404, map[string]any{"error": true, "code": "INDEX_NOT_FOUND", "message": "No index", "retryable": false}
-		}
-		if f.reads.Add(1) < polls {
-			return 200, kvIndexBody("BUILDING", f.fields.Load())
-		}
-		return 200, kvIndexBody(final, f.fields.Load())
-	})
+	f.on("GET /store-123/indexes/byCustomer", func(map[string]any) (int, any) { return f.show(polls) })
 	f.on("DELETE /store-123/indexes/byCustomer", func(map[string]any) (int, any) {
 		f.dropped.Store(1)
 		if f.deleteStatus == 404 {
-			return 404, map[string]any{"error": true, "code": "INDEX_NOT_FOUND", "message": "No index", "retryable": false}
+			return 404, indexNotFound
 		}
 		return f.deleteStatus, kvIndexBody("DROPPING", f.fields.Load())
 	})
 	return f
+}
+
+func (f *kvIndexFake) show(polls int64) (int, any) {
+	if f.droppingReads.Load() > 0 {
+		if f.droppingReads.Add(-1) == 0 {
+			f.dropped.Store(1)
+		}
+		return 200, kvIndexBody("DROPPING", f.fields.Load())
+	}
+	if f.dropped.Load() == 1 {
+		return 404, indexNotFound
+	}
+	if f.reads.Add(1) < polls {
+		return 200, kvIndexBody("BUILDING", f.fields.Load())
+	}
+	return 200, kvIndexBody(f.final.Load().(string), f.fields.Load())
 }
 
 func kvIndexConfig(f *kvIndexFake, fields string) string {
@@ -157,6 +173,91 @@ func TestKVIndex_BadImportID(t *testing.T) {
 			{Config: kvIndexConfig(f, `"customerId"`)},
 			{ResourceName: "quant_kv_index.test", ImportState: true, ImportStateId: "store-123/byCustomer",
 				ExpectError: regexp.MustCompile(regexp.QuoteMeta("project/store_id/name"))},
+		},
+	})
+}
+
+// The KV API allows 10 index changes per minute per project. A 429 on the
+// declare and on the drop waits the full Retry-After and sends again.
+func TestKVIndex_RateLimitedDeclareAndDropRetry(t *testing.T) {
+	shortKVIndexWait(t)
+	provider.KVIndexWaitTimeout = 10 * time.Second
+	f := fakeKVIndex(t, 1, "ACTIVE")
+	f.on("POST /store-123/indexes", limitedTwice(f.routes["POST /store-123/indexes"]))
+	f.on("DELETE /store-123/indexes/byCustomer", limitedTwice(f.routes["DELETE /store-123/indexes/byCustomer"]))
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{Config: kvIndexConfig(f, `"customerId"`),
+			Check: resource.TestCheckResourceAttr("quant_kv_index.test", "state", "ACTIVE")}},
+	})
+	if n := f.count("POST /store-123/indexes"); n != 3 {
+		t.Errorf("declare sent %d times, want 3 (two 429)", n)
+	}
+	if n := f.count("DELETE /store-123/indexes/byCustomer"); n != 3 {
+		t.Errorf("drop sent %d times, want 3 (two 429)", n)
+	}
+}
+
+// An index that is DROPPING stays in state. The next apply waits until it is
+// gone (without a second drop) and then declares it again, so the declare
+// does not race the drop.
+func TestKVIndex_DroppingIndexStaysInStateUntilGone(t *testing.T) {
+	shortKVIndexWait(t)
+	f := fakeKVIndex(t, 1, "ACTIVE")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: kvIndexConfig(f, `"customerId"`)},
+			{PreConfig: func() { f.droppingReads.Store(1000) }, RefreshState: true, ExpectNonEmptyPlan: true,
+				Check: resource.TestCheckResourceAttr("quant_kv_index.test", "state", "DROPPING")},
+			{PreConfig: func() { f.droppingReads.Store(4) }, Config: kvIndexConfig(f, `"customerId"`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
+					plancheck.ExpectResourceAction("quant_kv_index.test", plancheck.ResourceActionDestroyBeforeCreate)}},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("quant_kv_index.test", "state", "ACTIVE"),
+					func(*terraform.State) error {
+						if n := f.count("DELETE /store-123/indexes/byCustomer"); n != 0 {
+							return fmt.Errorf("a DROPPING index was dropped again: %d DELETE", n)
+						}
+						return nil
+					})},
+		},
+	})
+}
+
+// A FAILED index, in state or imported, is replaced by the next apply.
+func TestKVIndex_FailedIndexIsReplaced(t *testing.T) {
+	shortKVIndexWait(t)
+	f := fakeKVIndex(t, 1, "ACTIVE")
+	replace := resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
+		plancheck.ExpectResourceAction("quant_kv_index.test", plancheck.ResourceActionDestroyBeforeCreate)}}
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: kvIndexConfig(f, `"customerId"`)},
+			{PreConfig: func() { f.final.Store("FAILED") }, Config: kvIndexConfig(f, `"customerId"`), ConfigPlanChecks: replace,
+				Check: resource.TestCheckResourceAttr("quant_kv_index.test", "state", "ACTIVE")},
+		},
+	})
+}
+
+func TestKVIndex_ImportedFailedIndexIsReplaced(t *testing.T) {
+	shortKVIndexWait(t)
+	f := fakeKVIndex(t, 1, "ACTIVE")
+	f.fields.Store([]any{"customerId"})
+	f.final.Store("FAILED")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: kvIndexConfig(f, `"customerId"`), ResourceName: "quant_kv_index.test", ImportState: true,
+				ImportStateId: "test-project/store-123/byCustomer", ImportStatePersist: true},
+			{Config: kvIndexConfig(f, `"customerId"`), ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
+				plancheck.ExpectResourceAction("quant_kv_index.test", plancheck.ResourceActionDestroyBeforeCreate)}},
+				Check: resource.TestCheckResourceAttr("quant_kv_index.test", "state", "ACTIVE")},
 		},
 	})
 }

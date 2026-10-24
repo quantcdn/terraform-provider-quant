@@ -64,11 +64,17 @@ Terraform never replaces a ledger: a retained ledger cannot be dropped, and a ne
 
 An increase of `chains` or `retention_days`, or `governance` to `compliance`, is an in-place update that sends only the changed fields.
 
-A ledger in state that is `FAILED` is declared again: the plan drops it (allowed for a `FAILED` ledger) and creates it.
+A ledger in state that is `FAILED` is declared again: the plan drops it (allowed for a `FAILED` ledger) and creates it. Before the drop, the apply reads the ledger again. If the server no longer shows it `FAILED` (for example it is `ACTIVE`), the apply refuses the drop. Run `terraform plan` again.
 
 ## Create
 
 Create declares the ledger (the API answers `202` with a `PENDING` ledger) and waits until it leaves `PENDING`. The default wait is 5 minutes. Set the environment variable `QUANTCDN_KV_LEDGER_TIMEOUT` (a Go duration) to wait longer. A `FAILED` ledger is an error, and the next apply declares it again.
+
+If the ledger is still `PENDING` when the wait ends, the apply fails and does not save the ledger in state. The ledger exists on the server. Import it (see [Import](#import)) before the next apply; otherwise the next apply declares it again and the API refuses. The provider does not save a `PENDING` ledger as tainted, because the next apply would then drop it.
+
+## Rate limit
+
+The KV API allows 10 index and ledger changes (declare, raise, drop) per minute per project. Above that, it answers `429` with a `Retry-After` header. The provider then waits the full `Retry-After` and sends the declare, the raise or the drop again, until the ledger wait timeout (`QUANTCDN_KV_LEDGER_TIMEOUT`, default 5 minutes) ends.
 
 ## Destroy
 

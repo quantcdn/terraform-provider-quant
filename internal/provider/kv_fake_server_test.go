@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -61,9 +62,34 @@ func (f *kvFake) serve(w http.ResponseWriter, req *http.Request) {
 	if ok {
 		status, out = h(body)
 	}
+	if h, ok := out.(kvWithHeaders); ok {
+		for k, v := range h.Header {
+			w.Header()[k] = v
+		}
+		out = h.Body
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(out)
+}
+
+// kvWithHeaders is a handler answer that also sets response headers.
+type kvWithHeaders struct {
+	Header http.Header
+	Body   any
+}
+
+// limitedTwice answers the first two requests to the wrapped route with 429
+// and Retry-After: 1, like the KV API above 10 changes per minute.
+func limitedTwice(h func(body map[string]any) (int, any)) func(body map[string]any) (int, any) {
+	var n atomic.Int64
+	return func(body map[string]any) (int, any) {
+		if n.Add(1) <= 2 {
+			return 429, kvWithHeaders{Header: http.Header{"Retry-After": []string{"1"}},
+				Body: map[string]any{"error": true, "code": "RATE_LIMITED", "message": "Too many changes", "retryable": true}}
+		}
+		return h(body)
+	}
 }
 
 // bodies are the request bodies sent to route, in order.

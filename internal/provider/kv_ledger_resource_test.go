@@ -304,3 +304,45 @@ resource "quant_kv_ledger" "test" {
 		}
 	}
 }
+
+// The KV API allows 10 ledger changes per minute per project. A 429 on the
+// declare, the raise and the drop waits the full Retry-After and sends again.
+func TestKVLedger_RateLimitedDeclareRaiseAndDropRetry(t *testing.T) {
+	f := fakeKVLedger(t)
+	provider.KVLedgerWaitTimeout = 10 * time.Second
+	for _, route := range []string{"POST /store-123/ledgers", "PATCH " + ledgerPath, "DELETE " + ledgerPath} {
+		f.on(route, limitedTwice(f.routes[route]))
+	}
+	raised := with(defaultLedger(), func(a *ledgerArgs) { a.retention = "3650" })
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: ledgerConfig(f, defaultLedger())},
+			{Config: ledgerConfig(f, raised), Check: resource.TestCheckResourceAttr("quant_kv_ledger.test", "retention_days", "3650")},
+		},
+	})
+	for _, route := range []string{"POST /store-123/ledgers", "PATCH " + ledgerPath, "DELETE " + ledgerPath} {
+		if n := f.count(route); n != 3 {
+			t.Errorf("%s sent %d times, want 3 (two 429)", route, n)
+		}
+	}
+}
+
+// A declare that is still PENDING at the wait timeout is an error that says
+// the ledger exists and how to import it. The resource is not saved, so it
+// is not tainted and no later apply drops it.
+func TestKVLedger_PendingAtTimeoutSaysImportAndIsNotSaved(t *testing.T) {
+	f := fakeKVLedger(t)
+	f.pending = 1 << 30
+	provider.KVLedgerWaitTimeout = 50 * time.Millisecond
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{Config: ledgerConfig(f, defaultLedger()),
+			ExpectError: regexp.MustCompile(`the\s+ledger\s+exists\s+on\s+the\s+server;\s+import\s+it\s+with\s+terraform\s+import\s+quant_kv_ledger.<name>\s+test-project/store-123/aiUse`)}},
+	})
+	if n := f.count("DELETE " + ledgerPath); n != 0 {
+		t.Fatalf("a PENDING ledger was dropped: %d DELETE", n)
+	}
+}
