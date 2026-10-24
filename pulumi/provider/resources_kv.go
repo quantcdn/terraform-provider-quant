@@ -1,7 +1,12 @@
 package provider
 
 import (
+	"context"
+	"fmt"
+	"strings"
+
 	"github.com/pulumi/pulumi-terraform-bridge/v3/pkg/tfbridge"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 )
 
 // handRegisteredResources maps the resources that generator_config.yml lists
@@ -13,9 +18,27 @@ import (
 // index or ledger name allows no "-", and the name is part of the definition.
 func handRegisteredResources() map[string]*tfbridge.ResourceInfo {
 	keepName := map[string]*tfbridge.SchemaInfo{"name": {Name: "name"}}
+	importID := compositeComputeID("project", "storeId", "name")
 	return map[string]*tfbridge.ResourceInfo{
-		"quant_kv_index":  {Tok: "quant:index:KvIndex", ComputeID: fieldComputeID("name"), Fields: keepName},
-		"quant_kv_ledger": {Tok: "quant:index:KvLedger", ComputeID: fieldComputeID("name"), Fields: keepName},
+		"quant_kv_index":  {Tok: "quant:index:KvIndex", ComputeID: importID, Fields: keepName},
+		"quant_kv_ledger": {Tok: "quant:index:KvLedger", ComputeID: importID, Fields: keepName},
+	}
+}
+
+// compositeComputeID joins the named string properties with "/". For a KV
+// index or ledger it is the import ID, project/store_id/name: a name alone
+// is unique only within one store.
+func compositeComputeID(keys ...string) tfbridge.ComputeID {
+	return func(_ context.Context, state resource.PropertyMap) (resource.ID, error) {
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			prop, ok := state[resource.PropertyKey(k)]
+			if !ok || !prop.IsString() || prop.StringValue() == "" {
+				return "", fmt.Errorf("missing %s property in state", k)
+			}
+			parts = append(parts, prop.StringValue())
+		}
+		return resource.ID(strings.Join(parts, "/")), nil
 	}
 }
 
