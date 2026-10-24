@@ -145,7 +145,7 @@ func (d *kvLedgerPublicKeyDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 	m.Organization = types.StringValue(orgOr(m.Organization, d.client.Organization))
-	k, httpResp, err := d.client.Instance.KVAPI.KVLedgerPublicKey(d.client.AuthContext, m.Organization.ValueString(), m.Project.ValueString(), m.StoreId.ValueString()).Execute()
+	k, httpResp, err := d.client.Instance.KVAPI.KVLedgersPublicKey(d.client.AuthContext, m.Organization.ValueString(), m.Project.ValueString(), m.StoreId.ValueString()).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read the KV ledger public key", extractAPIErrorMessage(httpResp, err))
 		return
