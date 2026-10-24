@@ -83,9 +83,11 @@ func (d *kvLedgerDataSource) Read(ctx context.Context, req datasource.ReadReques
 }
 
 func fillKVLedgerDataSource(ctx context.Context, m *datasource_kv_ledger.KvLedgerModel, l *quantadmingo.V2KvLedgerDetail) diag.Diagnostics {
-	diags := mapper.FromSDK(ctx, l, m, "organization", "project", "store_id", "ledger_name", "subject_field", "error",
+	diags := mapper.FromSDK(ctx, l, m, "organization", "project", "store_id", "ledger_name", "subject_field", "subject_mode", "subject_case", "error",
 		"created_at", "active_after", "updated_at", "dropped_at", "retain_until", "last_digest_at")
 	m.SubjectField = optionalString(l.SubjectField)
+	m.SubjectMode = optionalString(l.SubjectMode)
+	m.SubjectCase = optionalString(l.SubjectCase)
 	m.Error = optionalString(l.Error)
 	m.CreatedAt = timeString(l.GetCreatedAt())
 	m.ActiveAfter = timeString(l.GetActiveAfter())

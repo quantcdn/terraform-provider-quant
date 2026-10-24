@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -33,6 +35,17 @@ func addReplaceKeepingState(attrs map[string]schema.Attribute, names ...string) 
 func addKeepState(attrs map[string]schema.Attribute, names ...string) {
 	for _, name := range names {
 		attrs[name] = withPlanModifiers(attrs[name], false)
+	}
+}
+
+// requireSubjectField makes each string attribute need subject_field in the
+// same configuration (a plan-time error instead of an API 400).
+func requireSubjectField(attrs map[string]schema.Attribute, names ...string) {
+	for _, name := range names {
+		if t, ok := attrs[name].(schema.StringAttribute); ok {
+			t.Validators = append(t.Validators, stringvalidator.AlsoRequires(path.MatchRoot("subject_field")))
+			attrs[name] = t
+		}
 	}
 }
 

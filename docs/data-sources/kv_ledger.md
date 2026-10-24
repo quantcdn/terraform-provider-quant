@@ -29,7 +29,7 @@ output "ai_use_last_verify_ok" {
 
 ## Attribute Reference
 
-- `name`, `collection`, `chains`, `retention_days`, `lock_mode`, `personal_fields`, `subject_field`, `anchor`, `writer_policy` - The ledger definition.
+- `name`, `collection`, `chains`, `retention_days`, `lock_mode`, `personal_fields`, `subject_field`, `subject_mode`, `subject_case`, `anchor`, `writer_policy` - The ledger definition.
 - `state` - `PENDING`, `ACTIVE`, `FAILED` or `DROPPED`.
 - `definition_hash` - Hex SHA-256 of the canonical definition.
 - `retain_until` - The archive retention end.

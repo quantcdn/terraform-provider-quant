@@ -20,6 +20,7 @@ func TestKVLedgerDataSources(t *testing.T) {
 	f.json("GET /store-123/ledgers/aiUse", 200, map[string]any{
 		"name": "aiUse", "collection": "ai-use:*", "chains": 4, "retentionDays": 2555, "lockMode": "governance",
 		"personalFields": []string{"requesterName"}, "subjectField": "requesterId",
+		"subjectMode": "clear", "subjectCase": "fold",
 		"anchor": map[string]any{"type": "rfc3161", "tsaUrl": "http://timestamp.digicert.com"},
 		"state":  "ACTIVE", "createdAt": "2026-10-16T00:00:00.000Z", "activeAfter": "2026-10-16T00:01:15.000Z",
 		"definitionHash": "c4a5", "retainUntil": "2033-10-14T00:00:00.000Z", "lastDigestAt": "2026-10-23T00:05:00.000Z",
@@ -58,6 +59,8 @@ data "quant_kv_ledger" "l" {
 				resource.TestCheckResourceAttr("data.quant_kv_ledger.l", "last_verify.at", "2026-10-23T01:00:00Z"),
 				resource.TestCheckResourceAttr("data.quant_kv_ledger.l", "last_verify.scope.collection", "ai-use:a"),
 				resource.TestCheckResourceAttr("data.quant_kv_ledger.l", "last_digest_at", "2026-10-23T00:05:00Z"),
+				resource.TestCheckResourceAttr("data.quant_kv_ledger.l", "subject_mode", "clear"),
+				resource.TestCheckResourceAttr("data.quant_kv_ledger.l", "subject_case", "fold"),
 			),
 		}},
 	})

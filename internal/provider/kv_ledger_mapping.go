@@ -16,7 +16,7 @@ import (
 // not convert time.Time), optional strings that read back as null, and the
 // anchor, whose empty strings must not be sent.
 var kvLedgerCallerHandled = []string{
-	"organization", "project", "store_id", "ledger_name", "anchor", "subject_field", "error",
+	"organization", "project", "store_id", "ledger_name", "anchor", "subject_field", "subject_mode", "subject_case", "error",
 	"created_at", "active_after", "updated_at", "dropped_at", "retain_until",
 }
 
@@ -29,6 +29,12 @@ func kvLedgerDeclareRequest(ctx context.Context, d *resource_kv_ledger.KvLedgerM
 	diags := mapper.ToSDK(ctx, d, req, kvLedgerCallerHandled...)
 	if isKnown(d.SubjectField) && d.SubjectField.ValueString() != "" {
 		req.SetSubjectField(d.SubjectField.ValueString())
+	}
+	if s, ok := knownNonEmpty(d.SubjectMode); ok {
+		req.SetSubjectMode(s)
+	}
+	if s, ok := knownNonEmpty(d.SubjectCase); ok {
+		req.SetSubjectCase(s)
 	}
 	if isKnown(d.Anchor) {
 		req.SetAnchor(kvLedgerAnchor(d.Anchor))
@@ -90,6 +96,8 @@ func setKVLedgerState(ctx context.Context, d *resource_kv_ledger.KvLedgerModel, 
 	}
 	d.LedgerName = d.Name
 	d.SubjectField = optionalString(l.SubjectField)
+	d.SubjectMode = optionalString(l.SubjectMode)
+	d.SubjectCase = optionalString(l.SubjectCase)
 	d.Error = optionalString(l.Error)
 	d.CreatedAt = timeString(l.GetCreatedAt())
 	d.ActiveAfter = timeString(l.GetActiveAfter())

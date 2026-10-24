@@ -28,6 +28,7 @@ func ledgerImmutable(m *resource_kv_ledger.KvLedgerModel) map[string]attr.Value 
 		"organization": m.Organization, "project": m.Project, "store_id": m.StoreId,
 		"name": m.Name, "ledger_name": m.LedgerName, "collection": m.Collection,
 		"personal_fields": m.PersonalFields, "subject_field": m.SubjectField,
+		"subject_mode": m.SubjectMode, "subject_case": m.SubjectCase,
 		"anchor": m.Anchor, "writer_policy": m.WriterPolicy,
 	}
 }

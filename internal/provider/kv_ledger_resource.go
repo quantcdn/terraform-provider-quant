@@ -47,9 +47,10 @@ func (r *kvLedgerResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *kvLedgerResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	s := resource_kv_ledger.KvLedgerResourceSchema(ctx)
-	s.Description = "A tamper-evident ledger on a collection of a format 2 KV store. The definition (name, collection, personal fields, subject field, anchor, writer policy) never changes; chains, retention_days and lock_mode can only go up. A ledger cannot be dropped before its archive retention ends."
+	s.Description = "A tamper-evident ledger on a collection of a format 2 KV store. The definition (name, collection, personal fields, subject field, subject mode, subject case, anchor, writer policy) never changes; chains, retention_days and lock_mode can only go up. A ledger cannot be dropped before its archive retention ends."
 	s.MarkdownDescription = s.Description
-	addKeepState(s.Attributes, "organization", "project", "store_id", "ledger_name", "personal_fields", "subject_field", "created_at")
+	addKeepState(s.Attributes, "organization", "project", "store_id", "ledger_name", "personal_fields", "subject_field", "subject_mode", "subject_case", "created_at")
+	requireSubjectField(s.Attributes, "subject_mode", "subject_case")
 	resp.Schema = s
 }
 

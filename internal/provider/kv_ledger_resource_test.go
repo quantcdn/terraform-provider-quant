@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 
 	"github.com/quantcdn/terraform-provider-quant/v5/internal/provider"
 )
@@ -48,8 +50,14 @@ func fakeKVLedger(t *testing.T) *kvLedgerFake {
 func (f *kvLedgerFake) declare(body map[string]any) (int, any) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if _, ok := body["subjectField"]; !ok && (body["subjectMode"] != nil || body["subjectCase"] != nil) {
+		return 400, map[string]any{"error": true, "code": "VALIDATION", "message": "subjectMode and subjectCase need subjectField", "retryable": false}
+	}
 	f.ledger = map[string]any{"state": "PENDING", "createdAt": "2026-10-16T00:00:00.000Z", "activeAfter": "2026-10-16T00:01:15.000Z",
 		"definitionHash": "c4a5", "retainUntil": "2033-10-14T00:00:00.000Z", "personalFields": []any{}, "anchor": map[string]any{"type": "none"}}
+	if _, ok := body["subjectField"]; ok {
+		f.ledger["subjectMode"], f.ledger["subjectCase"] = "pseudonym", "exact" // the API defaults
+	}
 	for k, v := range body {
 		f.ledger[k] = v
 	}
@@ -103,10 +111,23 @@ func (f *kvLedgerFake) set(fn func(f *kvLedgerFake)) {
 
 type ledgerArgs struct {
 	collection, chains, retention, lock, personal string
+	subject, mode, caseMode                       string
 }
 
 func defaultLedger() ledgerArgs {
-	return ledgerArgs{collection: "ai-use:*", chains: "4", retention: "2555", lock: "governance", personal: `"requesterName"`}
+	return ledgerArgs{collection: "ai-use:*", chains: "4", retention: "2555", lock: "governance", personal: `"requesterName"`, subject: "requesterId"}
+}
+
+// ledgerSubjectLines is the subject_field, subject_mode and subject_case
+// lines for the attributes that are set.
+func ledgerSubjectLines(a ledgerArgs) string {
+	out := ""
+	for _, kv := range [][2]string{{"subject_field", a.subject}, {"subject_mode", a.mode}, {"subject_case", a.caseMode}} {
+		if kv[1] != "" {
+			out += "  " + kv[0] + " = \"" + kv[1] + "\"\n"
+		}
+	}
+	return out
 }
 
 func ledgerConfig(f *kvLedgerFake, a ledgerArgs) string {
@@ -120,8 +141,7 @@ resource "quant_kv_ledger" "test" {
   retention_days  = ` + a.retention + `
   lock_mode       = "` + a.lock + `"
   personal_fields = [` + a.personal + `]
-  subject_field   = "requesterId"
-  anchor          = { type = "none" }
+` + ledgerSubjectLines(a) + `  anchor          = { type = "none" }
 }
 `
 }
@@ -293,12 +313,14 @@ resource "quant_kv_ledger" "test" {
 			{Config: cfg, Check: resource.ComposeTestCheckFunc(
 				resource.TestCheckResourceAttr("quant_kv_ledger.test", "anchor.type", "none"),
 				resource.TestCheckResourceAttr("quant_kv_ledger.test", "personal_fields.#", "0"),
-				resource.TestCheckNoResourceAttr("quant_kv_ledger.test", "subject_field"))},
+				resource.TestCheckNoResourceAttr("quant_kv_ledger.test", "subject_field"),
+				resource.TestCheckNoResourceAttr("quant_kv_ledger.test", "subject_mode"),
+				resource.TestCheckNoResourceAttr("quant_kv_ledger.test", "subject_case"))},
 			{Config: cfg, PlanOnly: true},
 		},
 	})
 	body := f.bodies("POST /store-123/ledgers")[0]
-	for _, k := range []string{"anchor", "personalFields", "subjectField", "writerPolicy"} {
+	for _, k := range []string{"anchor", "personalFields", "subjectField", "subjectMode", "subjectCase", "writerPolicy"} {
 		if _, ok := body[k]; ok {
 			t.Errorf("declare body sent %s for an omitted attribute: %v", k, body)
 		}
@@ -344,5 +366,105 @@ func TestKVLedger_PendingAtTimeoutSaysImportAndIsNotSaved(t *testing.T) {
 	})
 	if n := f.count("DELETE " + ledgerPath); n != 0 {
 		t.Fatalf("a PENDING ledger was dropped: %d DELETE", n)
+	}
+}
+
+func TestKVLedger_SubjectModeAndCaseDefaultWhenOmitted(t *testing.T) {
+	f := fakeKVLedger(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: ledgerConfig(f, defaultLedger()), Check: resource.ComposeTestCheckFunc(
+				resource.TestCheckResourceAttr("quant_kv_ledger.test", "subject_mode", "pseudonym"),
+				resource.TestCheckResourceAttr("quant_kv_ledger.test", "subject_case", "exact"))},
+			{Config: ledgerConfig(f, defaultLedger()), PlanOnly: true},
+		},
+	})
+	body := f.bodies("POST /store-123/ledgers")[0]
+	for _, k := range []string{"subjectMode", "subjectCase"} {
+		if _, ok := body[k]; ok {
+			t.Errorf("declare body sent %s for an omitted attribute: %v", k, body)
+		}
+	}
+}
+
+func TestKVLedger_SubjectModeAndCaseSentOnDeclare(t *testing.T) {
+	f := fakeKVLedger(t)
+	cfg := ledgerConfig(f, with(defaultLedger(), func(a *ledgerArgs) { a.mode, a.caseMode = "clear", "fold" }))
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: cfg, Check: resource.ComposeTestCheckFunc(
+				resource.TestCheckResourceAttr("quant_kv_ledger.test", "subject_mode", "clear"),
+				resource.TestCheckResourceAttr("quant_kv_ledger.test", "subject_case", "fold"))},
+			{Config: cfg, PlanOnly: true},
+			{ResourceName: "quant_kv_ledger.test", ImportState: true, ImportStateId: "test-project/store-123/aiUse",
+				ImportStateVerify: true, ImportStateVerifyIdentifierAttribute: "name"},
+		},
+	})
+	body := f.bodies("POST /store-123/ledgers")[0]
+	if body["subjectMode"] != "clear" || body["subjectCase"] != "fold" {
+		t.Errorf("declare body subjectMode=%v subjectCase=%v, want clear and fold (body %v)", body["subjectMode"], body["subjectCase"], body)
+	}
+}
+
+func TestKVLedger_SubjectModeOrCaseChangeFailsAtPlan(t *testing.T) {
+	f := fakeKVLedger(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: ledgerConfig(f, defaultLedger())},
+			{Config: ledgerConfig(f, with(defaultLedger(), func(a *ledgerArgs) { a.caseMode = "fold" })), PlanOnly: true,
+				ExpectError: regexp.MustCompile(`KV ledger subject_case cannot change`)},
+			{Config: ledgerConfig(f, with(defaultLedger(), func(a *ledgerArgs) { a.mode = "clear" })), PlanOnly: true,
+				ExpectError: regexp.MustCompile(`KV ledger subject_mode cannot change`)},
+		},
+	})
+	if n := f.count("PATCH " + ledgerPath); n != 0 {
+		t.Fatalf("a refused change reached the API: %d PATCH", n)
+	}
+}
+
+func TestKVLedger_SubjectModeNeedsSubjectField(t *testing.T) {
+	f := fakeKVLedger(t)
+	cfg := ledgerConfig(f, with(defaultLedger(), func(a *ledgerArgs) { a.subject, a.mode, a.personal = "", "clear", "" }))
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: cfg, ExpectError: regexp.MustCompile(`subject_field" must be specified when "subject_mode"`)}},
+	})
+	if n := f.count("POST /store-123/ledgers"); n != 0 {
+		t.Fatalf("a refused declare reached the API: %d POST", n)
+	}
+}
+
+func TestKVLedger_SubjectModeRejectsUnknownValue(t *testing.T) {
+	f := fakeKVLedger(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{Config: ledgerConfig(f, with(defaultLedger(), func(a *ledgerArgs) { a.mode = "hashed" })),
+			ExpectError: regexp.MustCompile(`value must be one of`)}},
+	})
+}
+
+func TestKVLedger_RaiseKeepsSubjectModeKnown(t *testing.T) {
+	f := fakeKVLedger(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: ledgerConfig(f, defaultLedger())},
+			{Config: ledgerConfig(f, with(defaultLedger(), func(a *ledgerArgs) { a.retention = "3650" })), ConfigPlanChecks: resource.ConfigPlanChecks{
+				PreApply: []plancheck.PlanCheck{plancheck.ExpectKnownValue("quant_kv_ledger.test",
+					tfjsonpath.New("subject_mode"), knownvalue.StringExact("pseudonym"))}}},
+		},
+	})
+	patches := f.bodies("PATCH " + ledgerPath)
+	if len(patches) != 1 || len(patches[0]) != 1 || patches[0]["retentionDays"] != float64(3650) {
+		t.Fatalf("want one PATCH with only retentionDays, got %v", patches)
 	}
 }
