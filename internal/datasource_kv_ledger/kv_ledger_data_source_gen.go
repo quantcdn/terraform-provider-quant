@@ -219,8 +219,18 @@ func KvLedgerDataSourceSchema(ctx context.Context) schema.Schema {
 				Description:         "KV store id, as returned by KV_list",
 				MarkdownDescription: "KV store id, as returned by KV_list",
 			},
+			"subject_case": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Present when subjectField is set.",
+				MarkdownDescription: "Present when subjectField is set.",
+			},
 			"subject_field": schema.StringAttribute{
 				Computed: true,
+			},
+			"subject_mode": schema.StringAttribute{
+				Computed:            true,
+				Description:         "Present when subjectField is set.",
+				MarkdownDescription: "Present when subjectField is set.",
 			},
 			"updated_at": schema.StringAttribute{
 				Computed: true,
@@ -268,7 +278,9 @@ type KvLedgerModel struct {
 	RetentionDays  types.Int64       `tfsdk:"retention_days"`
 	State          types.String      `tfsdk:"state"`
 	StoreId        types.String      `tfsdk:"store_id"`
+	SubjectCase    types.String      `tfsdk:"subject_case"`
 	SubjectField   types.String      `tfsdk:"subject_field"`
+	SubjectMode    types.String      `tfsdk:"subject_mode"`
 	UpdatedAt      types.String      `tfsdk:"updated_at"`
 	WriterPolicy   WriterPolicyValue `tfsdk:"writer_policy"`
 }
