@@ -50,6 +50,11 @@ func KvStoreResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Project identifier",
 				MarkdownDescription: "Project identifier",
 			},
+			"status": schema.StringAttribute{
+				Computed:            true,
+				Description:         "KV_create and KV_show only. ready: the store accepts data requests. provisioning: the table is still being created; data requests are 503 UNAVAILABLE retryable until it is ready.",
+				MarkdownDescription: "KV_create and KV_show only. ready: the store accepts data requests. provisioning: the table is still being created; data requests are 503 UNAVAILABLE retryable until it is ready.",
+			},
 			"store_id": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -64,5 +69,6 @@ type KvStoreModel struct {
 	Name         types.String `tfsdk:"name"`
 	Organization types.String `tfsdk:"organization"`
 	Project      types.String `tfsdk:"project"`
+	Status       types.String `tfsdk:"status"`
 	StoreId      types.String `tfsdk:"store_id"`
 }

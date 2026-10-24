@@ -126,8 +126,8 @@ func KvLedgerDataSourceSchema(ctx context.Context) schema.Schema {
 					},
 					"id": schema.StringAttribute{
 						Computed:            true,
-						Description:         "The verification record; KV_ledgers_verification_report returns it signed.",
-						MarkdownDescription: "The verification record; KV_ledgers_verification_report returns it signed.",
+						Description:         "The verification record; KV_ledgers_verifications_report returns it signed.",
+						MarkdownDescription: "The verification record; KV_ledgers_verifications_report returns it signed.",
 					},
 					"ok": schema.BoolAttribute{
 						Computed: true,
