@@ -1981,6 +1981,106 @@
                 "platformPrincipals"
             ]
         },
+        "quant:index/ProjectSearchConfig:ProjectSearchConfig": {
+            "properties": {
+                "algolia": {
+                    "$ref": "#/types/quant:index/ProjectSearchConfigAlgolia:ProjectSearchConfigAlgolia",
+                    "description": "Index settings. Named \u003cspan pulumi-lang-nodejs=\"`algolia`\" pulumi-lang-dotnet=\"`Algolia`\" pulumi-lang-go=\"`algolia`\" pulumi-lang-python=\"`algolia`\" pulumi-lang-yaml=\"`algolia`\" pulumi-lang-java=\"`algolia`\" pulumi-lang-hcl=\"`algolia`\"\u003e`algolia`\u003c/span\u003e for historical reasons; they are applied to whichever backend the project's\u003cspan pulumi-lang-nodejs=\" platformMode \" pulumi-lang-dotnet=\" PlatformMode \" pulumi-lang-go=\" platformMode \" pulumi-lang-python=\" platform_mode \" pulumi-lang-yaml=\" platformMode \" pulumi-lang-java=\" platformMode \" pulumi-lang-hcl=\" platform_mode \"\u003e platformMode \u003c/span\u003eselects, including Typesense.\n"
+                },
+                "extractors": {
+                    "$ref": "#/types/quant:index/ProjectSearchConfigExtractors:ProjectSearchConfigExtractors",
+                    "description": "XPath expressions that decide what each indexed page contributes to a search record. The defaults take the page body from the meta description, which indexes one sentence per page and matches nothing on body text, so a real deployment should set \u003cspan pulumi-lang-nodejs=\"`content`\" pulumi-lang-dotnet=\"`Content`\" pulumi-lang-go=\"`content`\" pulumi-lang-python=\"`content`\" pulumi-lang-yaml=\"`content`\" pulumi-lang-java=\"`content`\" pulumi-lang-hcl=\"`content`\"\u003e`content`\u003c/span\u003e to the page's main content region.\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "algolia",
+                        "extractors"
+                    ]
+                }
+            }
+        },
+        "quant:index/ProjectSearchConfigAlgolia:ProjectSearchConfigAlgolia": {
+            "properties": {
+                "customRankings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Ranking rules, e.g. asc(title)\n"
+                },
+                "facets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Fields offered as facets\n"
+                },
+                "searchableAttributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Fields a query matches against\n"
+                },
+                "sortableAttributes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Fields results may be sorted by\n"
+                },
+                "synonyms": {
+                    "type": "string",
+                    "description": "Newline-separated synonym groups, each a comma-separated list of terms\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "customRankings",
+                        "facets",
+                        "searchableAttributes",
+                        "sortableAttributes",
+                        "synonyms"
+                    ]
+                }
+            }
+        },
+        "quant:index/ProjectSearchConfigExtractors:ProjectSearchConfigExtractors": {
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "XPath for the record body\n"
+                },
+                "image": {
+                    "type": "string",
+                    "description": "XPath for the record image\n"
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "XPath for the record summary\n"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "XPath for the record title\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "content",
+                        "image",
+                        "summary",
+                        "title"
+                    ]
+                }
+            }
+        },
         "quant:index/RuleAuthActionConfig:RuleAuthActionConfig": {
             "properties": {
                 "authPass": {
@@ -3018,7 +3118,7 @@
                 },
                 "id": {
                     "type": "string",
-                    "description": "The verification record; KV_ledger_verification_report returns it signed.\n"
+                    "description": "The verification record; KV_ledgers_verification_report returns it signed.\n"
                 },
                 "ok": {
                     "type": "boolean"
@@ -6182,7 +6282,7 @@
                 },
                 "liveCount": {
                     "type": "boolean",
-                    "description": "Keeps a live count per value. Enables KV_index_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL)."
+                    "description": "Keeps a live count per value. Enables KV_indexes_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL)."
                 },
                 "name": {
                     "type": "string",
@@ -6213,7 +6313,7 @@
                 },
                 "unique": {
                     "type": "boolean",
-                    "description": "One key per value. Enables KV_index_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND)."
+                    "description": "One key per value. Enables KV_indexes_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND)."
                 }
             },
             "required": [
@@ -6250,7 +6350,7 @@
                 },
                 "liveCount": {
                     "type": "boolean",
-                    "description": "Keeps a live count per value. Enables KV_index_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL)."
+                    "description": "Keeps a live count per value. Enables KV_indexes_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL)."
                 },
                 "name": {
                     "type": "string",
@@ -6274,7 +6374,7 @@
                 },
                 "unique": {
                     "type": "boolean",
-                    "description": "One key per value. Enables KV_index_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND)."
+                    "description": "One key per value. Enables KV_indexes_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND)."
                 }
             },
             "requiredInputs": [
@@ -6314,7 +6414,7 @@
                     },
                     "liveCount": {
                         "type": "boolean",
-                        "description": "Keeps a live count per value. Enables KV_index_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL)."
+                        "description": "Keeps a live count per value. Enables KV_indexes_count. Not allowed on a ledger collection (LEDGER_INDEX_KIND) or on items with a ttl (COUNT_WITH_TTL)."
                     },
                     "name": {
                         "type": "string",
@@ -6345,7 +6445,7 @@
                     },
                     "unique": {
                         "type": "boolean",
-                        "description": "One key per value. Enables KV_index_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND)."
+                        "description": "One key per value. Enables KV_indexes_lookup. Not allowed on a ledger collection (LEDGER_INDEX_KIND)."
                     }
                 },
                 "type": "object"
@@ -6503,7 +6603,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Top-level value fields that are encrypted per data subject, so a shred (KV_ledger_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED)."
+                    "description": "Top-level value fields that are encrypted per data subject, so a shred (KV_ledgers_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED)."
                 },
                 "project": {
                     "type": "string",
@@ -6593,7 +6693,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Top-level value fields that are encrypted per data subject, so a shred (KV_ledger_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED)."
+                    "description": "Top-level value fields that are encrypted per data subject, so a shred (KV_ledgers_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED)."
                 },
                 "project": {
                     "type": "string",
@@ -6676,7 +6776,7 @@
                         "items": {
                             "type": "string"
                         },
-                        "description": "Top-level value fields that are encrypted per data subject, so a shred (KV_ledger_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED)."
+                        "description": "Top-level value fields that are encrypted per data subject, so a shred (KV_ledgers_shred) can erase them. Needs subjectField (else 400 LEDGER_SUBJECT_REQUIRED). Any field name except at. An index cannot use a personal field (400 INDEX_FIELD_ENCRYPTED)."
                     },
                     "project": {
                         "type": "string",
@@ -6831,6 +6931,14 @@
                     "type": "string",
                     "description": "Project region"
                 },
+                "searchConfig": {
+                    "$ref": "#/types/quant:index/ProjectSearchConfig:ProjectSearchConfig",
+                    "description": "How the project builds and serves its search index. A PATCH merges one section at a time, so sending only \u003cspan pulumi-lang-nodejs=\"`extractors`\" pulumi-lang-dotnet=\"`Extractors`\" pulumi-lang-go=\"`extractors`\" pulumi-lang-python=\"`extractors`\" pulumi-lang-yaml=\"`extractors`\" pulumi-lang-java=\"`extractors`\" pulumi-lang-hcl=\"`extractors`\"\u003e`extractors`\u003c/span\u003e leaves \u003cspan pulumi-lang-nodejs=\"`algolia`\" pulumi-lang-dotnet=\"`Algolia`\" pulumi-lang-go=\"`algolia`\" pulumi-lang-python=\"`algolia`\" pulumi-lang-yaml=\"`algolia`\" pulumi-lang-java=\"`algolia`\" pulumi-lang-hcl=\"`algolia`\"\u003e`algolia`\u003c/span\u003e untouched; within a section a list replaces wholesale."
+                },
+                "searchEnabled": {
+                    "type": "boolean",
+                    "description": "Enable the project's search index. Rejected when the organisation has no search subscription."
+                },
                 "uuid": {
                     "type": "string",
                     "description": "Project UUID"
@@ -6854,6 +6962,8 @@
                 "organization",
                 "project",
                 "region",
+                "searchConfig",
+                "searchEnabled",
                 "uuid",
                 "withToken",
                 "writeToken"
@@ -6898,6 +7008,14 @@
                 "region": {
                     "type": "string",
                     "description": "Project region"
+                },
+                "searchConfig": {
+                    "$ref": "#/types/quant:index/ProjectSearchConfig:ProjectSearchConfig",
+                    "description": "How the project builds and serves its search index. A PATCH merges one section at a time, so sending only \u003cspan pulumi-lang-nodejs=\"`extractors`\" pulumi-lang-dotnet=\"`Extractors`\" pulumi-lang-go=\"`extractors`\" pulumi-lang-python=\"`extractors`\" pulumi-lang-yaml=\"`extractors`\" pulumi-lang-java=\"`extractors`\" pulumi-lang-hcl=\"`extractors`\"\u003e`extractors`\u003c/span\u003e leaves \u003cspan pulumi-lang-nodejs=\"`algolia`\" pulumi-lang-dotnet=\"`Algolia`\" pulumi-lang-go=\"`algolia`\" pulumi-lang-python=\"`algolia`\" pulumi-lang-yaml=\"`algolia`\" pulumi-lang-java=\"`algolia`\" pulumi-lang-hcl=\"`algolia`\"\u003e`algolia`\u003c/span\u003e untouched; within a section a list replaces wholesale."
+                },
+                "searchEnabled": {
+                    "type": "boolean",
+                    "description": "Enable the project's search index. Rejected when the organisation has no search subscription."
                 },
                 "withToken": {
                     "type": "boolean"
@@ -6945,6 +7063,14 @@
                     "region": {
                         "type": "string",
                         "description": "Project region"
+                    },
+                    "searchConfig": {
+                        "$ref": "#/types/quant:index/ProjectSearchConfig:ProjectSearchConfig",
+                        "description": "How the project builds and serves its search index. A PATCH merges one section at a time, so sending only \u003cspan pulumi-lang-nodejs=\"`extractors`\" pulumi-lang-dotnet=\"`Extractors`\" pulumi-lang-go=\"`extractors`\" pulumi-lang-python=\"`extractors`\" pulumi-lang-yaml=\"`extractors`\" pulumi-lang-java=\"`extractors`\" pulumi-lang-hcl=\"`extractors`\"\u003e`extractors`\u003c/span\u003e leaves \u003cspan pulumi-lang-nodejs=\"`algolia`\" pulumi-lang-dotnet=\"`Algolia`\" pulumi-lang-go=\"`algolia`\" pulumi-lang-python=\"`algolia`\" pulumi-lang-yaml=\"`algolia`\" pulumi-lang-java=\"`algolia`\" pulumi-lang-hcl=\"`algolia`\"\u003e`algolia`\u003c/span\u003e untouched; within a section a list replaces wholesale."
+                    },
+                    "searchEnabled": {
+                        "type": "boolean",
+                        "description": "Enable the project's search index. Rejected when the organisation has no search subscription."
                     },
                     "uuid": {
                         "type": "string",

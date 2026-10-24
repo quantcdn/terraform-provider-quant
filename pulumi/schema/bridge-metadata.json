@@ -363,7 +363,29 @@
                 "current": "quant:index:KvStore"
             },
             "quant_project": {
-                "current": "quant:index:Project"
+                "current": "quant:index:Project",
+                "fields": {
+                    "search_config": {
+                        "fields": {
+                            "algolia": {
+                                "fields": {
+                                    "custom_ranking": {
+                                        "maxItemsOne": false
+                                    },
+                                    "facets": {
+                                        "maxItemsOne": false
+                                    },
+                                    "searchable_attributes": {
+                                        "maxItemsOne": false
+                                    },
+                                    "sortable_attributes": {
+                                        "maxItemsOne": false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             },
             "quant_rule_auth": {
                 "current": "quant:index:RuleAuth",
