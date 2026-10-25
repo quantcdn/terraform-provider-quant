@@ -21,6 +21,8 @@ resource "quant_kv_ledger" "ai_use" {
   lock_mode       = "governance"
   personal_fields = ["requesterName"]
   subject_field   = "requesterId"
+  subject_mode    = "pseudonym"
+  subject_case    = "fold"
   anchor          = { type = "rfc3161", tsa_url = "http://timestamp.digicert.com" }
 
   lifecycle {
@@ -40,6 +42,8 @@ resource "quant_kv_ledger" "ai_use" {
 - `lock_mode` - (Required) `governance` or `compliance`. `governance` can become `compliance`, never back.
 - `personal_fields` - (Optional) Top-level value fields that are encrypted per data subject, so a shred can erase them. Needs `subject_field`.
 - `subject_field` - (Optional) The top-level value field that names the data subject.
+- `subject_mode` - (Optional) `pseudonym` or `clear`. Needs `subject_field`; `pseudonym` when left out. `pseudonym`: each entry stores a random subject token in the subject field and keeps the value as appended sealed, so after a shred no entry names the person. `clear`: each entry stores the value as appended, so after a shred the id and its activity stay readable. Cannot change.
+- `subject_case` - (Optional) `exact` or `fold`. Needs `subject_field`; `exact` when left out. `exact`: `Alice@Example.com` and `alice@example.com` are two subjects, so a shred of one leaves the other. `fold`: ids that differ only in case are one subject. Use `fold` for emails and usernames. Cannot change.
 - `anchor` - (Optional) External witness of the daily digests. `type` is `none` (default), `customer-bucket` (needs `bucket_arn` and `account_id`, optional `prefix`) or `rfc3161` (needs `tsa_url`).
 - `writer_policy` - (Optional) `platform_principals`: the platform service principals that may append (1 to 16).
 - `organization` - (Optional) The organization. Defaults to the provider organization.
@@ -52,12 +56,14 @@ resource "quant_kv_ledger" "ai_use" {
 - `created_at`, `active_after`, `updated_at`, `dropped_at` - Timestamps.
 - `error` - `FAILED` only: why the ledger failed.
 - `ledger_name` - The same value as `name`.
+- `subject_mode`, `subject_case` - The values the API stored (`pseudonym` and `exact` when left out). Both are null when `subject_field` is not set.
 
 ## Plan-time checks
 
 Terraform never replaces a ledger: a retained ledger cannot be dropped, and a new ledger needs an empty collection. So the plan fails, before anything reaches the API, when:
 
-- `name`, `collection`, `personal_fields`, `subject_field`, `anchor`, `writer_policy`, `store_id`, `project` or `organization` changes (`KV ledger <attribute> cannot change`). Declare a new ledger with a new name on an empty collection instead.
+- `name`, `collection`, `personal_fields`, `subject_field`, `subject_mode`, `subject_case`, `anchor`, `writer_policy`, `store_id`, `project` or `organization` changes (`KV ledger <attribute> cannot change`). Declare a new ledger with a new name on an empty collection instead.
+- `subject_mode` or `subject_case` without `subject_field`.
 - `chains` or `retention_days` goes down (`<attribute> can only go up`).
 - `lock_mode` goes from `compliance` to `governance`.
 - The ledger in state is `DROPPED` and is still in the configuration. A dropped name cannot be used again.

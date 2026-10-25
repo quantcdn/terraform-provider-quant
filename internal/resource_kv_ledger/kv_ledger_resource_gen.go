@@ -197,13 +197,37 @@ func KvLedgerResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "KV store id, as returned by KV_list",
 				MarkdownDescription: "KV store id, as returned by KV_list",
 			},
+			"subject_case": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "exact (the default): ids that differ in case are different subjects. fold: case is ignored; use it for email addresses and usernames. Needs subjectField. Cannot change.",
+				MarkdownDescription: "exact (the default): ids that differ in case are different subjects. fold: case is ignored; use it for email addresses and usernames. Needs subjectField. Cannot change.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"exact",
+						"fold",
+					),
+				},
+			},
 			"subject_field": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "The top-level value field that names the data subject. It is not a personal field.",
-				MarkdownDescription: "The top-level value field that names the data subject. It is not a personal field.",
+				Description:         "The top-level value field that names the data subject. It is not a personal field. May be set without personal fields; such a ledger is pseudonymised and can be shredded. $subject and $subjectTag are reserved value field names.",
+				MarkdownDescription: "The top-level value field that names the data subject. It is not a personal field. May be set without personal fields; such a ledger is pseudonymised and can be shredded. $subject and $subjectTag are reserved value field names.",
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile("^[A-Za-z_][A-Za-z0-9_]{0,63}$"), ""),
+				},
+			},
+			"subject_mode": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "How the subject field is stored. pseudonym (the default): a random token, and after a shred nobody can link the remaining entries to the person. clear: the value as written; after a shred the id and the activity stay. Needs subjectField. Cannot change.",
+				MarkdownDescription: "How the subject field is stored. pseudonym (the default): a random token, and after a shred nobody can link the remaining entries to the person. clear: the value as written; after a shred the id and the activity stay. Needs subjectField. Cannot change.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"pseudonym",
+						"clear",
+					),
 				},
 			},
 			"updated_at": schema.StringAttribute{
@@ -255,7 +279,9 @@ type KvLedgerModel struct {
 	RetentionDays  types.Int64       `tfsdk:"retention_days"`
 	State          types.String      `tfsdk:"state"`
 	StoreId        types.String      `tfsdk:"store_id"`
+	SubjectCase    types.String      `tfsdk:"subject_case"`
 	SubjectField   types.String      `tfsdk:"subject_field"`
+	SubjectMode    types.String      `tfsdk:"subject_mode"`
 	UpdatedAt      types.String      `tfsdk:"updated_at"`
 	WriterPolicy   WriterPolicyValue `tfsdk:"writer_policy"`
 }

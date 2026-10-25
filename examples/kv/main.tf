@@ -45,6 +45,8 @@ resource "quant_kv_ledger" "ai_use" {
   lock_mode       = "governance"
   personal_fields = ["requesterName"]
   subject_field   = "requesterId"
+  subject_mode    = "pseudonym"
+  subject_case    = "fold"
   anchor          = { type = "rfc3161", tsa_url = "http://timestamp.digicert.com" }
 
   lifecycle {

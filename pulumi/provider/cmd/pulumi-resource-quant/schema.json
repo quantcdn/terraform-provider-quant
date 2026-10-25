@@ -6625,9 +6625,17 @@
                     "type": "string",
                     "description": "KV store id, as returned by KV_list"
                 },
+                "subjectCase": {
+                    "type": "string",
+                    "description": "exact (the default): ids that differ in case are different subjects. fold: case is ignored; use it for email addresses and usernames. Needs subjectField. Cannot change."
+                },
                 "subjectField": {
                     "type": "string",
-                    "description": "The top-level value field that names the data subject. It is not a personal field."
+                    "description": "The top-level value field that names the data subject. It is not a personal field. May be set without personal fields; such a ledger is pseudonymised and can be shredded. $subject and $subjectTag are reserved value field names."
+                },
+                "subjectMode": {
+                    "type": "string",
+                    "description": "How the subject field is stored. pseudonym (the default): a random token, and after a shred nobody can link the remaining entries to the person. clear: the value as written; after a shred the id and the activity stay. Needs subjectField. Cannot change."
                 },
                 "updatedAt": {
                     "type": "string"
@@ -6656,7 +6664,9 @@
                 "retentionDays",
                 "state",
                 "storeId",
+                "subjectCase",
                 "subjectField",
+                "subjectMode",
                 "updatedAt",
                 "writerPolicy"
             ],
@@ -6707,9 +6717,17 @@
                     "type": "string",
                     "description": "KV store id, as returned by KV_list"
                 },
+                "subjectCase": {
+                    "type": "string",
+                    "description": "exact (the default): ids that differ in case are different subjects. fold: case is ignored; use it for email addresses and usernames. Needs subjectField. Cannot change."
+                },
                 "subjectField": {
                     "type": "string",
-                    "description": "The top-level value field that names the data subject. It is not a personal field."
+                    "description": "The top-level value field that names the data subject. It is not a personal field. May be set without personal fields; such a ledger is pseudonymised and can be shredded. $subject and $subjectTag are reserved value field names."
+                },
+                "subjectMode": {
+                    "type": "string",
+                    "description": "How the subject field is stored. pseudonym (the default): a random token, and after a shred nobody can link the remaining entries to the person. clear: the value as written; after a shred the id and the activity stay. Needs subjectField. Cannot change."
                 },
                 "writerPolicy": {
                     "$ref": "#/types/quant:index/KvLedgerWriterPolicy:KvLedgerWriterPolicy",
@@ -6798,9 +6816,17 @@
                         "type": "string",
                         "description": "KV store id, as returned by KV_list"
                     },
+                    "subjectCase": {
+                        "type": "string",
+                        "description": "exact (the default): ids that differ in case are different subjects. fold: case is ignored; use it for email addresses and usernames. Needs subjectField. Cannot change."
+                    },
                     "subjectField": {
                         "type": "string",
-                        "description": "The top-level value field that names the data subject. It is not a personal field."
+                        "description": "The top-level value field that names the data subject. It is not a personal field. May be set without personal fields; such a ledger is pseudonymised and can be shredded. $subject and $subjectTag are reserved value field names."
+                    },
+                    "subjectMode": {
+                        "type": "string",
+                        "description": "How the subject field is stored. pseudonym (the default): a random token, and after a shred nobody can link the remaining entries to the person. clear: the value as written; after a shred the id and the activity stay. Needs subjectField. Cannot change."
                     },
                     "updatedAt": {
                         "type": "string"
@@ -13223,7 +13249,13 @@
                     "storeId": {
                         "type": "string"
                     },
+                    "subjectCase": {
+                        "type": "string"
+                    },
                     "subjectField": {
+                        "type": "string"
+                    },
+                    "subjectMode": {
                         "type": "string"
                     },
                     "updatedAt": {
@@ -13254,7 +13286,9 @@
                     "retentionDays",
                     "state",
                     "storeId",
+                    "subjectCase",
                     "subjectField",
+                    "subjectMode",
                     "updatedAt",
                     "writerPolicy"
                 ],
