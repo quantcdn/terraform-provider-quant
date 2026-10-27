@@ -569,7 +569,43 @@ func callEnvironmentDeleteAPI(ctx context.Context, r *environmentResource, data 
 			return // Already deleted
 		}
 		diags.AddError("Unable to delete environment", fmt.Sprintf("Error: %s", err.Error()))
+		return
 	}
 
+	// The platform removes the environment asynchronously. Wait until it is
+	// gone, or deleting the application next is refused ("Non-production
+	// environments exist and must be deleted first").
+	diags.Append(waitForEnvironmentDeleted(ctx, r, org, data.Application.ValueString(), data.EnvName.ValueString())...)
+
+	return
+}
+
+// waitForEnvironmentDeleted polls the environment until the API answers 404.
+func waitForEnvironmentDeleted(ctx context.Context, r *environmentResource, org, app, env string) (diags diag.Diagnostics) {
+	deleteStateConf := retry.StateChangeConf{
+		Pending: []string{"exists"},
+		Target:  []string{"deleted"},
+		Refresh: func() (interface{}, string, error) {
+			_, resp, err := r.client.Instance.EnvironmentsAPI.GetEnvironment(r.client.AuthContext, org, app, env).Execute()
+			if err != nil {
+				if resp != nil && resp.StatusCode == http.StatusNotFound {
+					return struct{}{}, "deleted", nil
+				}
+				return nil, "", fmt.Errorf("error checking environment status: %v", err)
+			}
+			return struct{}{}, "exists", nil
+		},
+		Timeout:      15 * time.Minute,
+		Delay:        2 * time.Second,
+		MinTimeout:   2 * time.Second,
+		PollInterval: 5 * time.Second,
+	}
+
+	if _, err := deleteStateConf.WaitForStateContext(ctx); err != nil {
+		diags.AddError(
+			"Environment deletion timeout",
+			fmt.Sprintf("The delete was accepted but environment '%s' still exists. Error: %s", env, err.Error()),
+		)
+	}
 	return
 }
