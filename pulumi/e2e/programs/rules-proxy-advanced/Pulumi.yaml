@@ -21,7 +21,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/api/*"
       to: "https://httpbin.org"
@@ -52,7 +52,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/waf-protected/*"
       to: "https://httpbin.org"
@@ -79,7 +79,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/protected-proxy/*"
       to: "https://httpbin.org"
@@ -95,7 +95,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/fallback/*"
       to: "https://httpbin.org"
@@ -114,7 +114,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/non-embargoed/*"
       to: "https://httpbin.org"
@@ -130,7 +130,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/api/webhook"
       to: "https://httpbin.org/post"

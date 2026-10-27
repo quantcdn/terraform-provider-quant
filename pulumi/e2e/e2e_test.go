@@ -949,7 +949,7 @@ func TestE2E_DriftDetection_Rule(t *testing.T) {
 
 	// Update the redirect rule destination via API
 	redirectReq := quantadmingo.NewV2RuleRedirectRequest(
-		[]string{"*.example.com"},
+		[]string{"www.example.com"},
 		[]string{"/old-path"},
 		"https://drifted.example.com/path",
 	)
