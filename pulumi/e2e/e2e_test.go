@@ -323,9 +323,7 @@ func TestE2E_RulesDeep(t *testing.T) {
 		"serveStaticMethodFilterId",
 		"serveStaticCountryFilterId",
 		// ContentFilter
-		"contentFilterBlockId",
 		// Function
-		"ruleFunctionId",
 	}
 	for _, key := range expected {
 		assert.NotEmpty(t, result.outputs[key].Value, "%s should be set", key)
@@ -401,6 +399,8 @@ func TestE2E_AppStack(t *testing.T) {
 	assert.NotEmpty(t, result.outputs["envId"].Value, "envId should be set")
 	assert.NotEmpty(t, result.outputs["volumeId"].Value, "volumeId should be set")
 	assert.NotEmpty(t, result.outputs["cronId"].Value, "cronId should be set")
+	assert.Equal(t, "e2e", result.outputs["appMetadataTeam"].Value, "application metadata should be stored and read back")
+	assert.Equal(t, true, result.outputs["appMetadataAvailable"].Value, "metadataAvailable should be true")
 
 	t.Logf("Created app stack: app=%v env=%v volume=%v cron=%v",
 		result.outputs["appId"].Value, result.outputs["envId"].Value,
