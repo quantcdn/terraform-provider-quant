@@ -4,8 +4,15 @@ package resource_project
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
@@ -79,6 +86,113 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Project region",
 				MarkdownDescription: "Project region",
 			},
+			"search_config": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"algolia": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{
+							"custom_ranking": schema.ListAttribute{
+								ElementType:         types.StringType,
+								Optional:            true,
+								Computed:            true,
+								Description:         "Ranking rules, e.g. asc(title)",
+								MarkdownDescription: "Ranking rules, e.g. asc(title)",
+							},
+							"facets": schema.ListAttribute{
+								ElementType:         types.StringType,
+								Optional:            true,
+								Computed:            true,
+								Description:         "Fields offered as facets",
+								MarkdownDescription: "Fields offered as facets",
+							},
+							"searchable_attributes": schema.ListAttribute{
+								ElementType:         types.StringType,
+								Optional:            true,
+								Computed:            true,
+								Description:         "Fields a query matches against",
+								MarkdownDescription: "Fields a query matches against",
+							},
+							"sortable_attributes": schema.ListAttribute{
+								ElementType:         types.StringType,
+								Optional:            true,
+								Computed:            true,
+								Description:         "Fields results may be sorted by",
+								MarkdownDescription: "Fields results may be sorted by",
+							},
+							"synonyms": schema.StringAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "Newline-separated synonym groups, each a comma-separated list of terms",
+								MarkdownDescription: "Newline-separated synonym groups, each a comma-separated list of terms",
+							},
+						},
+						CustomType: AlgoliaType{
+							ObjectType: types.ObjectType{
+								AttrTypes: AlgoliaValue{}.AttributeTypes(ctx),
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "Index settings. Named `algolia` for historical reasons; they are applied to whichever backend the project's platform_mode selects, including Typesense.",
+						MarkdownDescription: "Index settings. Named `algolia` for historical reasons; they are applied to whichever backend the project's platform_mode selects, including Typesense.",
+					},
+					"extractors": schema.SingleNestedAttribute{
+						Attributes: map[string]schema.Attribute{
+							"content": schema.StringAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "XPath for the record body",
+								MarkdownDescription: "XPath for the record body",
+								Default:             stringdefault.StaticString("//meta[@name='description'][1]/@content"),
+							},
+							"image": schema.StringAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "XPath for the record image",
+								MarkdownDescription: "XPath for the record image",
+								Default:             stringdefault.StaticString("//meta[@property='og:image'][1]/@content"),
+							},
+							"summary": schema.StringAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "XPath for the record summary",
+								MarkdownDescription: "XPath for the record summary",
+								Default:             stringdefault.StaticString("//meta[@name='description'][1]/@content"),
+							},
+							"title": schema.StringAttribute{
+								Optional:            true,
+								Computed:            true,
+								Description:         "XPath for the record title",
+								MarkdownDescription: "XPath for the record title",
+								Default:             stringdefault.StaticString("//h1[1]"),
+							},
+						},
+						CustomType: ExtractorsType{
+							ObjectType: types.ObjectType{
+								AttrTypes: ExtractorsValue{}.AttributeTypes(ctx),
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "XPath expressions that decide what each indexed page contributes to a search record. The defaults take the page body from the meta description, which indexes one sentence per page and matches nothing on body text, so a real deployment should set `content` to the page's main content region.",
+						MarkdownDescription: "XPath expressions that decide what each indexed page contributes to a search record. The defaults take the page body from the meta description, which indexes one sentence per page and matches nothing on body text, so a real deployment should set `content` to the page's main content region.",
+					},
+				},
+				CustomType: SearchConfigType{
+					ObjectType: types.ObjectType{
+						AttrTypes: SearchConfigValue{}.AttributeTypes(ctx),
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "How the project builds and serves its search index. A PATCH merges one section at a time, so sending only `extractors` leaves `algolia` untouched; within a section a list replaces wholesale.",
+				MarkdownDescription: "How the project builds and serves its search index. A PATCH merges one section at a time, so sending only `extractors` leaves `algolia` untouched; within a section a list replaces wholesale.",
+			},
+			"search_enabled": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Enable the project's search index. Rejected when the organisation has no search subscription.",
+				MarkdownDescription: "Enable the project's search index. Rejected when the organisation has no search subscription.",
+			},
 			"uuid": schema.StringAttribute{
 				Computed:            true,
 				Description:         "Project UUID",
@@ -99,18 +213,1630 @@ func ProjectResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type ProjectModel struct {
-	AllowQueryParams     types.Bool   `tfsdk:"allow_query_params"`
-	BasicAuthPassword    types.String `tfsdk:"basic_auth_password"`
-	BasicAuthPreviewOnly types.Bool   `tfsdk:"basic_auth_preview_only"`
-	BasicAuthUsername    types.String `tfsdk:"basic_auth_username"`
-	DisableRevisions     types.Bool   `tfsdk:"disable_revisions"`
-	Id                   types.Int64  `tfsdk:"id"`
-	MachineName          types.String `tfsdk:"machine_name"`
-	Name                 types.String `tfsdk:"name"`
-	Organization         types.String `tfsdk:"organization"`
-	Project              types.String `tfsdk:"project"`
-	Region               types.String `tfsdk:"region"`
-	Uuid                 types.String `tfsdk:"uuid"`
-	WithToken            types.Bool   `tfsdk:"with_token"`
-	WriteToken           types.String `tfsdk:"write_token"`
+	AllowQueryParams     types.Bool        `tfsdk:"allow_query_params"`
+	BasicAuthPassword    types.String      `tfsdk:"basic_auth_password"`
+	BasicAuthPreviewOnly types.Bool        `tfsdk:"basic_auth_preview_only"`
+	BasicAuthUsername    types.String      `tfsdk:"basic_auth_username"`
+	DisableRevisions     types.Bool        `tfsdk:"disable_revisions"`
+	Id                   types.Int64       `tfsdk:"id"`
+	MachineName          types.String      `tfsdk:"machine_name"`
+	Name                 types.String      `tfsdk:"name"`
+	Organization         types.String      `tfsdk:"organization"`
+	Project              types.String      `tfsdk:"project"`
+	Region               types.String      `tfsdk:"region"`
+	SearchConfig         SearchConfigValue `tfsdk:"search_config"`
+	SearchEnabled        types.Bool        `tfsdk:"search_enabled"`
+	Uuid                 types.String      `tfsdk:"uuid"`
+	WithToken            types.Bool        `tfsdk:"with_token"`
+	WriteToken           types.String      `tfsdk:"write_token"`
+}
+
+var _ basetypes.ObjectTypable = SearchConfigType{}
+
+type SearchConfigType struct {
+	basetypes.ObjectType
+}
+
+func (t SearchConfigType) Equal(o attr.Type) bool {
+	other, ok := o.(SearchConfigType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t SearchConfigType) String() string {
+	return "SearchConfigType"
+}
+
+func (t SearchConfigType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	algoliaAttribute, ok := attributes["algolia"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`algolia is missing from object`)
+
+		return nil, diags
+	}
+
+	algoliaVal, ok := algoliaAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`algolia expected to be basetypes.ObjectValue, was: %T`, algoliaAttribute))
+	}
+
+	extractorsAttribute, ok := attributes["extractors"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`extractors is missing from object`)
+
+		return nil, diags
+	}
+
+	extractorsVal, ok := extractorsAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`extractors expected to be basetypes.ObjectValue, was: %T`, extractorsAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return SearchConfigValue{
+		Algolia:    algoliaVal,
+		Extractors: extractorsVal,
+		state:      attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSearchConfigValueNull() SearchConfigValue {
+	return SearchConfigValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewSearchConfigValueUnknown() SearchConfigValue {
+	return SearchConfigValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewSearchConfigValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (SearchConfigValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing SearchConfigValue Attribute Value",
+				"While creating a SearchConfigValue value, a missing attribute value was detected. "+
+					"A SearchConfigValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SearchConfigValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid SearchConfigValue Attribute Type",
+				"While creating a SearchConfigValue value, an invalid attribute value was detected. "+
+					"A SearchConfigValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("SearchConfigValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("SearchConfigValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra SearchConfigValue Attribute Value",
+				"While creating a SearchConfigValue value, an extra attribute value was detected. "+
+					"A SearchConfigValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra SearchConfigValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewSearchConfigValueUnknown(), diags
+	}
+
+	algoliaAttribute, ok := attributes["algolia"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`algolia is missing from object`)
+
+		return NewSearchConfigValueUnknown(), diags
+	}
+
+	algoliaVal, ok := algoliaAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`algolia expected to be basetypes.ObjectValue, was: %T`, algoliaAttribute))
+	}
+
+	extractorsAttribute, ok := attributes["extractors"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`extractors is missing from object`)
+
+		return NewSearchConfigValueUnknown(), diags
+	}
+
+	extractorsVal, ok := extractorsAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`extractors expected to be basetypes.ObjectValue, was: %T`, extractorsAttribute))
+	}
+
+	if diags.HasError() {
+		return NewSearchConfigValueUnknown(), diags
+	}
+
+	return SearchConfigValue{
+		Algolia:    algoliaVal,
+		Extractors: extractorsVal,
+		state:      attr.ValueStateKnown,
+	}, diags
+}
+
+func NewSearchConfigValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) SearchConfigValue {
+	object, diags := NewSearchConfigValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewSearchConfigValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t SearchConfigType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewSearchConfigValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewSearchConfigValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewSearchConfigValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewSearchConfigValueMust(SearchConfigValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t SearchConfigType) ValueType(ctx context.Context) attr.Value {
+	return SearchConfigValue{}
+}
+
+var _ basetypes.ObjectValuable = SearchConfigValue{}
+
+type SearchConfigValue struct {
+	Algolia    basetypes.ObjectValue `tfsdk:"algolia"`
+	Extractors basetypes.ObjectValue `tfsdk:"extractors"`
+	state      attr.ValueState
+}
+
+func (v SearchConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["algolia"] = basetypes.ObjectType{
+		AttrTypes: AlgoliaValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
+	attrTypes["extractors"] = basetypes.ObjectType{
+		AttrTypes: ExtractorsValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.Algolia.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["algolia"] = val
+
+		val, err = v.Extractors.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["extractors"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v SearchConfigValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v SearchConfigValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v SearchConfigValue) String() string {
+	return "SearchConfigValue"
+}
+
+func (v SearchConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var algolia basetypes.ObjectValue
+
+	if v.Algolia.IsNull() {
+		algolia = types.ObjectNull(
+			AlgoliaValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.Algolia.IsUnknown() {
+		algolia = types.ObjectUnknown(
+			AlgoliaValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.Algolia.IsNull() && !v.Algolia.IsUnknown() {
+		algolia = types.ObjectValueMust(
+			AlgoliaValue{}.AttributeTypes(ctx),
+			v.Algolia.Attributes(),
+		)
+	}
+
+	var extractors basetypes.ObjectValue
+
+	if v.Extractors.IsNull() {
+		extractors = types.ObjectNull(
+			ExtractorsValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.Extractors.IsUnknown() {
+		extractors = types.ObjectUnknown(
+			ExtractorsValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.Extractors.IsNull() && !v.Extractors.IsUnknown() {
+		extractors = types.ObjectValueMust(
+			ExtractorsValue{}.AttributeTypes(ctx),
+			v.Extractors.Attributes(),
+		)
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"algolia": basetypes.ObjectType{
+			AttrTypes: AlgoliaValue{}.AttributeTypes(ctx),
+		},
+		"extractors": basetypes.ObjectType{
+			AttrTypes: ExtractorsValue{}.AttributeTypes(ctx),
+		},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"algolia":    algolia,
+			"extractors": extractors,
+		})
+
+	return objVal, diags
+}
+
+func (v SearchConfigValue) Equal(o attr.Value) bool {
+	other, ok := o.(SearchConfigValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Algolia.Equal(other.Algolia) {
+		return false
+	}
+
+	if !v.Extractors.Equal(other.Extractors) {
+		return false
+	}
+
+	return true
+}
+
+func (v SearchConfigValue) Type(ctx context.Context) attr.Type {
+	return SearchConfigType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v SearchConfigValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"algolia": basetypes.ObjectType{
+			AttrTypes: AlgoliaValue{}.AttributeTypes(ctx),
+		},
+		"extractors": basetypes.ObjectType{
+			AttrTypes: ExtractorsValue{}.AttributeTypes(ctx),
+		},
+	}
+}
+
+var _ basetypes.ObjectTypable = AlgoliaType{}
+
+type AlgoliaType struct {
+	basetypes.ObjectType
+}
+
+func (t AlgoliaType) Equal(o attr.Type) bool {
+	other, ok := o.(AlgoliaType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t AlgoliaType) String() string {
+	return "AlgoliaType"
+}
+
+func (t AlgoliaType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	customRankingAttribute, ok := attributes["custom_ranking"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`custom_ranking is missing from object`)
+
+		return nil, diags
+	}
+
+	customRankingVal, ok := customRankingAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`custom_ranking expected to be basetypes.ListValue, was: %T`, customRankingAttribute))
+	}
+
+	facetsAttribute, ok := attributes["facets"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`facets is missing from object`)
+
+		return nil, diags
+	}
+
+	facetsVal, ok := facetsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`facets expected to be basetypes.ListValue, was: %T`, facetsAttribute))
+	}
+
+	searchableAttributesAttribute, ok := attributes["searchable_attributes"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`searchable_attributes is missing from object`)
+
+		return nil, diags
+	}
+
+	searchableAttributesVal, ok := searchableAttributesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`searchable_attributes expected to be basetypes.ListValue, was: %T`, searchableAttributesAttribute))
+	}
+
+	sortableAttributesAttribute, ok := attributes["sortable_attributes"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`sortable_attributes is missing from object`)
+
+		return nil, diags
+	}
+
+	sortableAttributesVal, ok := sortableAttributesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`sortable_attributes expected to be basetypes.ListValue, was: %T`, sortableAttributesAttribute))
+	}
+
+	synonymsAttribute, ok := attributes["synonyms"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`synonyms is missing from object`)
+
+		return nil, diags
+	}
+
+	synonymsVal, ok := synonymsAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`synonyms expected to be basetypes.StringValue, was: %T`, synonymsAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return AlgoliaValue{
+		CustomRanking:        customRankingVal,
+		Facets:               facetsVal,
+		SearchableAttributes: searchableAttributesVal,
+		SortableAttributes:   sortableAttributesVal,
+		Synonyms:             synonymsVal,
+		state:                attr.ValueStateKnown,
+	}, diags
+}
+
+func NewAlgoliaValueNull() AlgoliaValue {
+	return AlgoliaValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewAlgoliaValueUnknown() AlgoliaValue {
+	return AlgoliaValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewAlgoliaValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (AlgoliaValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing AlgoliaValue Attribute Value",
+				"While creating a AlgoliaValue value, a missing attribute value was detected. "+
+					"A AlgoliaValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("AlgoliaValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid AlgoliaValue Attribute Type",
+				"While creating a AlgoliaValue value, an invalid attribute value was detected. "+
+					"A AlgoliaValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("AlgoliaValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("AlgoliaValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra AlgoliaValue Attribute Value",
+				"While creating a AlgoliaValue value, an extra attribute value was detected. "+
+					"A AlgoliaValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra AlgoliaValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewAlgoliaValueUnknown(), diags
+	}
+
+	customRankingAttribute, ok := attributes["custom_ranking"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`custom_ranking is missing from object`)
+
+		return NewAlgoliaValueUnknown(), diags
+	}
+
+	customRankingVal, ok := customRankingAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`custom_ranking expected to be basetypes.ListValue, was: %T`, customRankingAttribute))
+	}
+
+	facetsAttribute, ok := attributes["facets"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`facets is missing from object`)
+
+		return NewAlgoliaValueUnknown(), diags
+	}
+
+	facetsVal, ok := facetsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`facets expected to be basetypes.ListValue, was: %T`, facetsAttribute))
+	}
+
+	searchableAttributesAttribute, ok := attributes["searchable_attributes"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`searchable_attributes is missing from object`)
+
+		return NewAlgoliaValueUnknown(), diags
+	}
+
+	searchableAttributesVal, ok := searchableAttributesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`searchable_attributes expected to be basetypes.ListValue, was: %T`, searchableAttributesAttribute))
+	}
+
+	sortableAttributesAttribute, ok := attributes["sortable_attributes"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`sortable_attributes is missing from object`)
+
+		return NewAlgoliaValueUnknown(), diags
+	}
+
+	sortableAttributesVal, ok := sortableAttributesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`sortable_attributes expected to be basetypes.ListValue, was: %T`, sortableAttributesAttribute))
+	}
+
+	synonymsAttribute, ok := attributes["synonyms"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`synonyms is missing from object`)
+
+		return NewAlgoliaValueUnknown(), diags
+	}
+
+	synonymsVal, ok := synonymsAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`synonyms expected to be basetypes.StringValue, was: %T`, synonymsAttribute))
+	}
+
+	if diags.HasError() {
+		return NewAlgoliaValueUnknown(), diags
+	}
+
+	return AlgoliaValue{
+		CustomRanking:        customRankingVal,
+		Facets:               facetsVal,
+		SearchableAttributes: searchableAttributesVal,
+		SortableAttributes:   sortableAttributesVal,
+		Synonyms:             synonymsVal,
+		state:                attr.ValueStateKnown,
+	}, diags
+}
+
+func NewAlgoliaValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) AlgoliaValue {
+	object, diags := NewAlgoliaValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewAlgoliaValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t AlgoliaType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewAlgoliaValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewAlgoliaValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewAlgoliaValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewAlgoliaValueMust(AlgoliaValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t AlgoliaType) ValueType(ctx context.Context) attr.Value {
+	return AlgoliaValue{}
+}
+
+var _ basetypes.ObjectValuable = AlgoliaValue{}
+
+type AlgoliaValue struct {
+	CustomRanking        basetypes.ListValue   `tfsdk:"custom_ranking"`
+	Facets               basetypes.ListValue   `tfsdk:"facets"`
+	SearchableAttributes basetypes.ListValue   `tfsdk:"searchable_attributes"`
+	SortableAttributes   basetypes.ListValue   `tfsdk:"sortable_attributes"`
+	Synonyms             basetypes.StringValue `tfsdk:"synonyms"`
+	state                attr.ValueState
+}
+
+func (v AlgoliaValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 5)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["custom_ranking"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["facets"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["searchable_attributes"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["sortable_attributes"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["synonyms"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 5)
+
+		val, err = v.CustomRanking.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["custom_ranking"] = val
+
+		val, err = v.Facets.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["facets"] = val
+
+		val, err = v.SearchableAttributes.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["searchable_attributes"] = val
+
+		val, err = v.SortableAttributes.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["sortable_attributes"] = val
+
+		val, err = v.Synonyms.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["synonyms"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v AlgoliaValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v AlgoliaValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v AlgoliaValue) String() string {
+	return "AlgoliaValue"
+}
+
+func (v AlgoliaValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var customRankingVal basetypes.ListValue
+	switch {
+	case v.CustomRanking.IsUnknown():
+		customRankingVal = types.ListUnknown(types.StringType)
+	case v.CustomRanking.IsNull():
+		customRankingVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		customRankingVal, d = types.ListValue(types.StringType, v.CustomRanking.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"custom_ranking": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"facets": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"searchable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"sortable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"synonyms": basetypes.StringType{},
+		}), diags
+	}
+
+	var facetsVal basetypes.ListValue
+	switch {
+	case v.Facets.IsUnknown():
+		facetsVal = types.ListUnknown(types.StringType)
+	case v.Facets.IsNull():
+		facetsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		facetsVal, d = types.ListValue(types.StringType, v.Facets.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"custom_ranking": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"facets": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"searchable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"sortable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"synonyms": basetypes.StringType{},
+		}), diags
+	}
+
+	var searchableAttributesVal basetypes.ListValue
+	switch {
+	case v.SearchableAttributes.IsUnknown():
+		searchableAttributesVal = types.ListUnknown(types.StringType)
+	case v.SearchableAttributes.IsNull():
+		searchableAttributesVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		searchableAttributesVal, d = types.ListValue(types.StringType, v.SearchableAttributes.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"custom_ranking": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"facets": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"searchable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"sortable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"synonyms": basetypes.StringType{},
+		}), diags
+	}
+
+	var sortableAttributesVal basetypes.ListValue
+	switch {
+	case v.SortableAttributes.IsUnknown():
+		sortableAttributesVal = types.ListUnknown(types.StringType)
+	case v.SortableAttributes.IsNull():
+		sortableAttributesVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		sortableAttributesVal, d = types.ListValue(types.StringType, v.SortableAttributes.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"custom_ranking": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"facets": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"searchable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"sortable_attributes": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"synonyms": basetypes.StringType{},
+		}), diags
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"custom_ranking": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"facets": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"searchable_attributes": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"sortable_attributes": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"synonyms": basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"custom_ranking":        customRankingVal,
+			"facets":                facetsVal,
+			"searchable_attributes": searchableAttributesVal,
+			"sortable_attributes":   sortableAttributesVal,
+			"synonyms":              v.Synonyms,
+		})
+
+	return objVal, diags
+}
+
+func (v AlgoliaValue) Equal(o attr.Value) bool {
+	other, ok := o.(AlgoliaValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.CustomRanking.Equal(other.CustomRanking) {
+		return false
+	}
+
+	if !v.Facets.Equal(other.Facets) {
+		return false
+	}
+
+	if !v.SearchableAttributes.Equal(other.SearchableAttributes) {
+		return false
+	}
+
+	if !v.SortableAttributes.Equal(other.SortableAttributes) {
+		return false
+	}
+
+	if !v.Synonyms.Equal(other.Synonyms) {
+		return false
+	}
+
+	return true
+}
+
+func (v AlgoliaValue) Type(ctx context.Context) attr.Type {
+	return AlgoliaType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v AlgoliaValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"custom_ranking": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"facets": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"searchable_attributes": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"sortable_attributes": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"synonyms": basetypes.StringType{},
+	}
+}
+
+var _ basetypes.ObjectTypable = ExtractorsType{}
+
+type ExtractorsType struct {
+	basetypes.ObjectType
+}
+
+func (t ExtractorsType) Equal(o attr.Type) bool {
+	other, ok := o.(ExtractorsType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t ExtractorsType) String() string {
+	return "ExtractorsType"
+}
+
+func (t ExtractorsType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	contentAttribute, ok := attributes["content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`content is missing from object`)
+
+		return nil, diags
+	}
+
+	contentVal, ok := contentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`content expected to be basetypes.StringValue, was: %T`, contentAttribute))
+	}
+
+	imageAttribute, ok := attributes["image"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`image is missing from object`)
+
+		return nil, diags
+	}
+
+	imageVal, ok := imageAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`image expected to be basetypes.StringValue, was: %T`, imageAttribute))
+	}
+
+	summaryAttribute, ok := attributes["summary"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`summary is missing from object`)
+
+		return nil, diags
+	}
+
+	summaryVal, ok := summaryAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`summary expected to be basetypes.StringValue, was: %T`, summaryAttribute))
+	}
+
+	titleAttribute, ok := attributes["title"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`title is missing from object`)
+
+		return nil, diags
+	}
+
+	titleVal, ok := titleAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`title expected to be basetypes.StringValue, was: %T`, titleAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return ExtractorsValue{
+		Content: contentVal,
+		Image:   imageVal,
+		Summary: summaryVal,
+		Title:   titleVal,
+		state:   attr.ValueStateKnown,
+	}, diags
+}
+
+func NewExtractorsValueNull() ExtractorsValue {
+	return ExtractorsValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewExtractorsValueUnknown() ExtractorsValue {
+	return ExtractorsValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewExtractorsValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ExtractorsValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing ExtractorsValue Attribute Value",
+				"While creating a ExtractorsValue value, a missing attribute value was detected. "+
+					"A ExtractorsValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ExtractorsValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid ExtractorsValue Attribute Type",
+				"While creating a ExtractorsValue value, an invalid attribute value was detected. "+
+					"A ExtractorsValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ExtractorsValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("ExtractorsValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra ExtractorsValue Attribute Value",
+				"While creating a ExtractorsValue value, an extra attribute value was detected. "+
+					"A ExtractorsValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra ExtractorsValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewExtractorsValueUnknown(), diags
+	}
+
+	contentAttribute, ok := attributes["content"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`content is missing from object`)
+
+		return NewExtractorsValueUnknown(), diags
+	}
+
+	contentVal, ok := contentAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`content expected to be basetypes.StringValue, was: %T`, contentAttribute))
+	}
+
+	imageAttribute, ok := attributes["image"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`image is missing from object`)
+
+		return NewExtractorsValueUnknown(), diags
+	}
+
+	imageVal, ok := imageAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`image expected to be basetypes.StringValue, was: %T`, imageAttribute))
+	}
+
+	summaryAttribute, ok := attributes["summary"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`summary is missing from object`)
+
+		return NewExtractorsValueUnknown(), diags
+	}
+
+	summaryVal, ok := summaryAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`summary expected to be basetypes.StringValue, was: %T`, summaryAttribute))
+	}
+
+	titleAttribute, ok := attributes["title"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`title is missing from object`)
+
+		return NewExtractorsValueUnknown(), diags
+	}
+
+	titleVal, ok := titleAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`title expected to be basetypes.StringValue, was: %T`, titleAttribute))
+	}
+
+	if diags.HasError() {
+		return NewExtractorsValueUnknown(), diags
+	}
+
+	return ExtractorsValue{
+		Content: contentVal,
+		Image:   imageVal,
+		Summary: summaryVal,
+		Title:   titleVal,
+		state:   attr.ValueStateKnown,
+	}, diags
+}
+
+func NewExtractorsValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ExtractorsValue {
+	object, diags := NewExtractorsValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewExtractorsValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t ExtractorsType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewExtractorsValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewExtractorsValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewExtractorsValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewExtractorsValueMust(ExtractorsValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t ExtractorsType) ValueType(ctx context.Context) attr.Value {
+	return ExtractorsValue{}
+}
+
+var _ basetypes.ObjectValuable = ExtractorsValue{}
+
+type ExtractorsValue struct {
+	Content basetypes.StringValue `tfsdk:"content"`
+	Image   basetypes.StringValue `tfsdk:"image"`
+	Summary basetypes.StringValue `tfsdk:"summary"`
+	Title   basetypes.StringValue `tfsdk:"title"`
+	state   attr.ValueState
+}
+
+func (v ExtractorsValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 4)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["content"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["image"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["summary"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["title"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 4)
+
+		val, err = v.Content.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["content"] = val
+
+		val, err = v.Image.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["image"] = val
+
+		val, err = v.Summary.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["summary"] = val
+
+		val, err = v.Title.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["title"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v ExtractorsValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v ExtractorsValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v ExtractorsValue) String() string {
+	return "ExtractorsValue"
+}
+
+func (v ExtractorsValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"content": basetypes.StringType{},
+		"image":   basetypes.StringType{},
+		"summary": basetypes.StringType{},
+		"title":   basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"content": v.Content,
+			"image":   v.Image,
+			"summary": v.Summary,
+			"title":   v.Title,
+		})
+
+	return objVal, diags
+}
+
+func (v ExtractorsValue) Equal(o attr.Value) bool {
+	other, ok := o.(ExtractorsValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Content.Equal(other.Content) {
+		return false
+	}
+
+	if !v.Image.Equal(other.Image) {
+		return false
+	}
+
+	if !v.Summary.Equal(other.Summary) {
+		return false
+	}
+
+	if !v.Title.Equal(other.Title) {
+		return false
+	}
+
+	return true
+}
+
+func (v ExtractorsValue) Type(ctx context.Context) attr.Type {
+	return ExtractorsType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v ExtractorsValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"content": basetypes.StringType{},
+		"image":   basetypes.StringType{},
+		"summary": basetypes.StringType{},
+		"title":   basetypes.StringType{},
+	}
 }

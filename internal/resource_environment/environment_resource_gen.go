@@ -33,8 +33,8 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 					},
 				},
 				Computed:            true,
-				Description:         "ALB routing configuration",
-				MarkdownDescription: "ALB routing configuration",
+				Description:         "Load balancer routing configuration",
+				MarkdownDescription: "Load balancer routing configuration",
 			},
 			"application": schema.StringAttribute{
 				Optional:            true,
@@ -214,8 +214,8 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 										},
 										"type": schema.StringAttribute{
 											Required:            true,
-											Description:         "Specifies whether the image is internal (ECR) or external (e.g., Docker Hub)",
-											MarkdownDescription: "Specifies whether the image is internal (ECR) or external (e.g., Docker Hub)",
+											Description:         "Specifies whether the image is internal (Quant container registry) or external (e.g., Docker Hub)",
+											MarkdownDescription: "Specifies whether the image is internal (Quant container registry) or external (e.g., Docker Hub)",
 											Validators: []validator.String{
 												stringvalidator.OneOf(
 													"internal",
@@ -424,14 +424,14 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 						},
 						Optional:            true,
 						Computed:            true,
-						Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
-						MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
+						Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the cloud provider. Available for non-production environments.",
+						MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the cloud provider. Available for non-production environments.",
 					},
 					"startup_grace_period_seconds": schema.Int64Attribute{
 						Optional:            true,
 						Computed:            true,
-						Description:         "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
-						MarkdownDescription: "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						Description:         "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the container service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						MarkdownDescription: "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the container service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
 						Validators: []validator.Int64{
 							int64validator.Between(0, 3600),
 						},
@@ -509,8 +509,8 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"deployment_failure_type": schema.StringAttribute{
 				Computed:            true,
-				Description:         "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it.",
-				MarkdownDescription: "Why the most recent task stopped. SPOT_INTERRUPTION is informational: AWS reclaimed the task and ECS replaces it.",
+				Description:         "Why the most recent task stopped. SPOT_INTERRUPTION is informational: the cloud provider reclaimed the task and the platform replaces it.",
+				MarkdownDescription: "Why the most recent task stopped. SPOT_INTERRUPTION is informational: the cloud provider reclaimed the task and the platform replaces it.",
 			},
 			"deployment_status": schema.StringAttribute{
 				Computed:            true,
@@ -627,8 +627,8 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 					},
 				},
 				Computed:            true,
-				Description:         "ECS service details",
-				MarkdownDescription: "ECS service details",
+				Description:         "Container service details",
+				MarkdownDescription: "Container service details",
 			},
 			"single_task_only": schema.BoolAttribute{
 				Optional:            true,
@@ -661,8 +661,8 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 				},
 				Optional:            true,
 				Computed:            true,
-				Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
-				MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
+				Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the cloud provider. Available for non-production environments.",
+				MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the cloud provider. Available for non-production environments.",
 			},
 			"startup_grace_period_seconds": schema.Int64Attribute{
 				Optional:            true,
@@ -698,8 +698,8 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 					},
 				},
 				Computed:            true,
-				Description:         "ECS task definition details",
-				MarkdownDescription: "ECS task definition details",
+				Description:         "Task definition details",
+				MarkdownDescription: "Task definition details",
 			},
 			"updated_at": schema.StringAttribute{
 				Computed:            true,

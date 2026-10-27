@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -229,8 +230,8 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 										},
 										"type": schema.StringAttribute{
 											Required:            true,
-											Description:         "Specifies whether the image is internal (ECR) or external (e.g., Docker Hub)",
-											MarkdownDescription: "Specifies whether the image is internal (ECR) or external (e.g., Docker Hub)",
+											Description:         "Specifies whether the image is internal (Quant container registry) or external (e.g., Docker Hub)",
+											MarkdownDescription: "Specifies whether the image is internal (Quant container registry) or external (e.g., Docker Hub)",
 											Validators: []validator.String{
 												stringvalidator.OneOf(
 													"internal",
@@ -439,14 +440,14 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 						},
 						Optional:            true,
 						Computed:            true,
-						Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
-						MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by AWS. Available for non-production environments.",
+						Description:         "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the cloud provider. Available for non-production environments.",
+						MarkdownDescription: "Spot instance strategy configuration for controlling cost vs reliability. Spot instances provide significant cost savings (~70%) but may be interrupted by the cloud provider. Available for non-production environments.",
 					},
 					"startup_grace_period_seconds": schema.Int64Attribute{
 						Optional:            true,
 						Computed:            true,
-						Description:         "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
-						MarkdownDescription: "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the ECS service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						Description:         "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the container service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
+						MarkdownDescription: "Optional. Seconds the load balancer waits after a task starts before an unhealthy health check can replace it (applied as the container service's healthCheckGracePeriodSeconds when a load balancer is attached). Raise for apps that are slow to boot, e.g. run migrations on startup. Tasks that become healthy sooner still enter service immediately. Defaults to 120 when omitted.",
 						Validators: []validator.Int64{
 							int64validator.Between(0, 3600),
 						},
@@ -496,8 +497,8 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 					"instance_class": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						Description:         "RDS instance class",
-						MarkdownDescription: "RDS instance class",
+						Description:         "Database instance class",
+						MarkdownDescription: "Database instance class",
 						Default:             stringdefault.StaticString("db.t4g.micro"),
 					},
 					"multi_az": schema.BoolAttribute{
@@ -509,8 +510,8 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 					},
 					"rds_instance_endpoint": schema.StringAttribute{
 						Computed:            true,
-						Description:         "RDS instance endpoint address",
-						MarkdownDescription: "RDS instance endpoint address",
+						Description:         "Database instance endpoint address",
+						MarkdownDescription: "Database instance endpoint address",
 					},
 					"rds_instance_engine": schema.StringAttribute{
 						Computed:            true,
@@ -519,13 +520,13 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 					},
 					"rds_instance_identifier": schema.StringAttribute{
 						Computed:            true,
-						Description:         "RDS instance identifier",
-						MarkdownDescription: "RDS instance identifier",
+						Description:         "Database instance identifier",
+						MarkdownDescription: "Database instance identifier",
 					},
 					"rds_instance_status": schema.StringAttribute{
 						Computed:            true,
-						Description:         "RDS instance status",
-						MarkdownDescription: "RDS instance status",
+						Description:         "Database instance status",
+						MarkdownDescription: "Database instance status",
 					},
 					"storage_gb": schema.Int64Attribute{
 						Optional:            true,
@@ -626,8 +627,8 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 				Attributes: map[string]schema.Attribute{
 					"filesystem_id": schema.StringAttribute{
 						Computed:            true,
-						Description:         "EFS filesystem ID",
-						MarkdownDescription: "EFS filesystem ID",
+						Description:         "Shared filesystem ID",
+						MarkdownDescription: "Shared filesystem ID",
 					},
 					"mount_path": schema.StringAttribute{
 						Optional:            true,
@@ -683,6 +684,21 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 				MarkdownDescription: "Maximum task count for auto-scaling",
 				Default:             int64default.StaticInt64(1),
 			},
+			"metadata": schema.MapAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Free-form key/value metadata. Maximum 50 pairs. Keys are 1-128 characters, values 0-256 characters. Letters, digits, space and + - = . _ : / @ only. Keys starting with 'quant:' are reserved.",
+				MarkdownDescription: "Free-form key/value metadata. Maximum 50 pairs. Keys are 1-128 characters, values 0-256 characters. Letters, digits, space and + - = . _ : / @ only. Keys starting with 'quant:' are reserved.",
+				Validators: []validator.Map{
+					mapvalidator.SizeAtMost(50),
+				},
+			},
+			"metadata_available": schema.BoolAttribute{
+				Computed:            true,
+				Description:         "Present on the detail response; false when metadata could not be read",
+				MarkdownDescription: "Present on the detail response; false when metadata could not be read",
+			},
 			"min_capacity": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
@@ -723,6 +739,8 @@ type ApplicationModel struct {
 	Filesystem            FilesystemValue        `tfsdk:"filesystem"`
 	ImageReference        ImageReferenceValue    `tfsdk:"image_reference"`
 	MaxCapacity           types.Int64            `tfsdk:"max_capacity"`
+	Metadata              types.Map              `tfsdk:"metadata"`
+	MetadataAvailable     types.Bool             `tfsdk:"metadata_available"`
 	MinCapacity           types.Int64            `tfsdk:"min_capacity"`
 	Organisation          types.String           `tfsdk:"organisation"`
 	RunningCount          types.Int64            `tfsdk:"running_count"`
