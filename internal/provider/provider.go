@@ -225,12 +225,12 @@ func (p *quantProvider) Metadata(ctx context.Context, req provider.MetadataReque
 }
 
 func (p *quantProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
+	return append([]func() datasource.DataSource{
 		NewProjectsDataSource,
 		NewProjectDataSource,
-	}
+	}, kvDataSources()...)
 }
 
 func (p *quantProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return GeneratedResources()
+	return append(GeneratedResources(), handRegisteredResources()...)
 }

@@ -7,7 +7,7 @@ terraform {
 }
 
 provider "quant" {
-  bearer = "fxj1eivEXhKdIEVGuKkfrcfv4WeEQ8uqqNqEeIEy4zEb6hlz8Tj1SdRxdc9x"
+  bearer = "<your-api-token>"
   organization = "quant"
 }
 

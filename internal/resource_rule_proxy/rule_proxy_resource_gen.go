@@ -110,8 +110,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					"inject_headers": schema.MapAttribute{
 						ElementType:         types.StringType,
 						Computed:            true,
-						Description:         "Headers to inject",
-						MarkdownDescription: "Headers to inject",
+						Description:         "Headers added to (or replacing headers on) the request sent to the origin. They are not added to the response sent to the visitor.",
+						MarkdownDescription: "Headers added to (or replacing headers on) the request sent to the origin. They are not added to the response sent to the visitor.",
 					},
 					"notify": schema.StringAttribute{
 						Computed:            true,
@@ -144,8 +144,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					},
 					"origin_timeout": schema.StringAttribute{
 						Computed:            true,
-						Description:         "Origin timeout",
-						MarkdownDescription: "Origin timeout",
+						Description:         "Origin timeout in milliseconds. Defaults to 30000 when omitted on create.",
+						MarkdownDescription: "Origin timeout in milliseconds. Defaults to 30000 when omitted on create.",
 					},
 					"proxy_alert_enabled": schema.BoolAttribute{
 						Computed:            true,
@@ -204,14 +204,14 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					},
 					"static_error_page": schema.StringAttribute{
 						Computed:            true,
-						Description:         "Static error page content (HTML) to serve on origin errors",
-						MarkdownDescription: "Static error page content (HTML) to serve on origin errors",
+						Description:         "On/off switch, not page content. Send a string: any non-empty string (for example the text true) turns it on; an empty string or null turns it off. Write the text true to enable and an empty string to disable; do not send the text false, because any non-empty string counts as on. A JSON boolean is rejected on write. A boolean stored by the dashboard reads back as the string true, or an empty string when off. When on, an origin response whose status is in static_error_page_status_codes is replaced by the project's published /_quant<status> page (for example /_quant503).",
+						MarkdownDescription: "On/off switch, not page content. Send a string: any non-empty string (for example the text true) turns it on; an empty string or null turns it off. Write the text true to enable and an empty string to disable; do not send the text false, because any non-empty string counts as on. A JSON boolean is rejected on write. A boolean stored by the dashboard reads back as the string true, or an empty string when off. When on, an origin response whose status is in static_error_page_status_codes is replaced by the project's published /_quant<status> page (for example /_quant503).",
 					},
 					"static_error_page_status_codes": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Computed:            true,
-						Description:         "Origin status codes that trigger static error page",
-						MarkdownDescription: "Origin status codes that trigger static error page",
+						Description:         "Origin status codes that serve the published /_quant<status> page when static_error_page is on",
+						MarkdownDescription: "Origin status codes that serve the published /_quant<status> page when static_error_page is on",
 					},
 					"to": schema.StringAttribute{
 						Computed:            true,
@@ -326,8 +326,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 									},
 									"httpbl_key": schema.StringAttribute{
 										Computed:            true,
-										Description:         "HTTP:BL API key",
-										MarkdownDescription: "HTTP:BL API key",
+										Description:         "HTTP:BL API key. The deprecated write alias api_key is still accepted.",
+										MarkdownDescription: "HTTP:BL API key. The deprecated write alias api_key is still accepted.",
 									},
 								},
 								CustomType: HttpblType{
@@ -353,13 +353,13 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 							},
 							"notify_slack": schema.StringAttribute{
 								Computed:            true,
-								Description:         "Slack webhook URL for notifications",
-								MarkdownDescription: "Slack webhook URL for notifications",
+								Description:         "Slack webhook URL for notifications. The deprecated write alias notify_slack_webhook is still accepted",
+								MarkdownDescription: "Slack webhook URL for notifications. The deprecated write alias notify_slack_webhook is still accepted",
 							},
 							"notify_slack_hits_rpm": schema.Int64Attribute{
 								Computed:            true,
-								Description:         "Minimum hits per minute to trigger Slack notification",
-								MarkdownDescription: "Minimum hits per minute to trigger Slack notification",
+								Description:         "Minimum hits per minute to trigger Slack notification. Send a positive integer. 0, null or an empty string turns it off (reads back null). Other values return 400. The deprecated write alias notify_slack_rpm is still accepted",
+								MarkdownDescription: "Minimum hits per minute to trigger Slack notification. Send a positive integer. 0, null or an empty string turns it off (reads back null). Other values return 400. The deprecated write alias notify_slack_rpm is still accepted",
 							},
 							"paranoia_level": schema.Int64Attribute{
 								Computed:            true,
@@ -419,8 +419,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 									},
 								},
 								Computed:            true,
-								Description:         "Rate limiting thresholds",
-								MarkdownDescription: "Rate limiting thresholds",
+								Description:         "Rate limiting thresholds. Entries are merged by type on update: only the listed types change. A request without thresholds keeps the stored ones. To turn a limit off, send its type with mode disabled. rps, hits and minutes are integers of 1 or more; cooldown is 0 or more. Invalid values return 400. An empty list changes nothing. A request that sets notify_slack copies that webhook into every threshold that the same request does not give its own notify_slack. Deprecated write aliases, still accepted: ip_ratelimit_rps, ip_ratelimit_cooldown, ip_ratelimit_mode, header_ratelimit_rps, header_ratelimit_cooldown, header_ratelimit_value, header_ratelimit_mode, hit_ratelimit_hits, hit_ratelimit_minutes, hit_ratelimit_cooldown, hit_ratelimit_mode. When thresholds and an alias set the same value, thresholds wins.",
+								MarkdownDescription: "Rate limiting thresholds. Entries are merged by type on update: only the listed types change. A request without thresholds keeps the stored ones. To turn a limit off, send its type with mode disabled. rps, hits and minutes are integers of 1 or more; cooldown is 0 or more. Invalid values return 400. An empty list changes nothing. A request that sets notify_slack copies that webhook into every threshold that the same request does not give its own notify_slack. Deprecated write aliases, still accepted: ip_ratelimit_rps, ip_ratelimit_cooldown, ip_ratelimit_mode, header_ratelimit_rps, header_ratelimit_cooldown, header_ratelimit_value, header_ratelimit_mode, hit_ratelimit_hits, hit_ratelimit_minutes, hit_ratelimit_cooldown, hit_ratelimit_mode. When thresholds and an alias set the same value, thresholds wins.",
 							},
 						},
 						CustomType: WafConfigType{
@@ -480,22 +480,29 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"asn": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "ASN filter type (asn_is, asn_is_not, any)",
-				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any)",
+				Description:         "ASN filter type (asn_is, asn_is_not, any). A PATCH that omits it keeps the current value. Invalid values return 422.",
+				MarkdownDescription: "ASN filter type (asn_is, asn_is_not, any). A PATCH that omits it keeps the current value. Invalid values return 422.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"any",
+						"asn_is",
+						"asn_is_not",
+					),
+				},
 			},
 			"asn_is": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Allowed AS numbers",
-				MarkdownDescription: "Allowed AS numbers",
+				Description:         "Allowed AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
+				MarkdownDescription: "Allowed AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
 			},
 			"asn_is_not": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Excluded AS numbers",
-				MarkdownDescription: "Excluded AS numbers",
+				Description:         "Excluded AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
+				MarkdownDescription: "Excluded AS numbers. Positive integers up to 4294967295, stored as strings. A PATCH replaces the list.",
 			},
 			"auth_pass": schema.StringAttribute{
 				Optional:            true,
@@ -516,6 +523,12 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Computed:            true,
 				Description:         "Cache lifetime",
 				MarkdownDescription: "Cache lifetime",
+			},
+			"cookie_name": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Write name of only_with_cookie: the rule applies only when this cookie is present. Empty string clears it.",
+				MarkdownDescription: "Write name of only_with_cookie: the rule applies only when this cookie is present. Empty string clears it.",
 			},
 			"country": schema.StringAttribute{
 				Optional:            true,
@@ -554,8 +567,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"domain": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Required:            true,
-				Description:         "Domain patterns (default: any)",
-				MarkdownDescription: "Domain patterns (default: any)",
+				Description:         "Exact hostnames the rule matches, or 'any' (the default). Wildcards such as *.example.com are not supported.",
+				MarkdownDescription: "Exact hostnames the rule matches, or 'any' (the default). Wildcards such as *.example.com are not supported.",
 			},
 			"failover_lifetime": schema.StringAttribute{
 				Optional:            true,
@@ -595,8 +608,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Headers to inject",
-				MarkdownDescription: "Headers to inject",
+				Description:         "Headers added to (or replacing headers on) the request sent to the origin. They are not added to the response sent to the visitor.",
+				MarkdownDescription: "Headers added to (or replacing headers on) the request sent to the origin. They are not added to the response sent to the visitor.",
 			},
 			"ip": schema.StringAttribute{
 				Optional:            true,
@@ -663,8 +676,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"origin_timeout": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Origin timeout",
-				MarkdownDescription: "Origin timeout",
+				Description:         "Origin timeout in milliseconds. Defaults to 30000 when omitted on create.",
+				MarkdownDescription: "Origin timeout in milliseconds. Defaults to 30000 when omitted on create.",
 			},
 			"project": schema.StringAttribute{
 				Optional: true,
@@ -703,20 +716,74 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"static_error_page": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Static error page content (HTML) to serve on origin errors",
-				MarkdownDescription: "Static error page content (HTML) to serve on origin errors",
+				Description:         "On/off switch, not page content. Send a string: any non-empty string (for example the text true) turns it on; an empty string or null turns it off. Write the text true to enable and an empty string to disable; do not send the text false, because any non-empty string counts as on. A JSON boolean is rejected on write. A boolean stored by the dashboard reads back as the string true, or an empty string when off. When on, an origin response whose status is in static_error_page_status_codes is replaced by the project's published /_quant<status> page (for example /_quant503).",
+				MarkdownDescription: "On/off switch, not page content. Send a string: any non-empty string (for example the text true) turns it on; an empty string or null turns it off. Write the text true to enable and an empty string to disable; do not send the text false, because any non-empty string counts as on. A JSON boolean is rejected on write. A boolean stored by the dashboard reads back as the string true, or an empty string when off. When on, an origin response whose status is in static_error_page_status_codes is replaced by the project's published /_quant<status> page (for example /_quant503).",
 			},
 			"static_error_page_status_codes": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Origin status codes that trigger static error page",
-				MarkdownDescription: "Origin status codes that trigger static error page",
+				Description:         "Origin status codes that serve the published /_quant<status> page when static_error_page is on",
+				MarkdownDescription: "Origin status codes that serve the published /_quant<status> page when static_error_page is on",
 			},
 			"to": schema.StringAttribute{
 				Required:            true,
 				Description:         "Target URL to proxy to",
 				MarkdownDescription: "Target URL to proxy to",
+			},
+			"traffic_source": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Traffic source filter type (traffic_source_is, traffic_source_is_not, any). Invalid values return 422.",
+				MarkdownDescription: "Traffic source filter type (traffic_source_is, traffic_source_is_not, any). Invalid values return 422.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"any",
+						"traffic_source_is",
+						"traffic_source_is_not",
+					),
+				},
+			},
+			"traffic_source_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Traffic sources to match. A PATCH replaces the list.",
+				MarkdownDescription: "Traffic sources to match. A PATCH replaces the list.",
+			},
+			"traffic_source_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Traffic sources to exclude. A PATCH replaces the list.",
+				MarkdownDescription: "Traffic sources to exclude. A PATCH replaces the list.",
+			},
+			"ua": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "User agent filter type (ua_is, ua_is_not, any). Invalid values return 422.",
+				MarkdownDescription: "User agent filter type (ua_is, ua_is_not, any). Invalid values return 422.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"any",
+						"ua_is",
+						"ua_is_not",
+					),
+				},
+			},
+			"ua_is": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "User agent strings to match. Each item has at most 255 characters. A PATCH replaces the list.",
+				MarkdownDescription: "User agent strings to match. Each item has at most 255 characters. A PATCH replaces the list.",
+			},
+			"ua_is_not": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "User agent strings to exclude. Each item has at most 255 characters. A PATCH replaces the list.",
+				MarkdownDescription: "User agent strings to exclude. Each item has at most 255 characters. A PATCH replaces the list.",
 			},
 			"url": schema.ListAttribute{
 				ElementType:         types.StringType,
@@ -855,8 +922,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 							"httpbl_key": schema.StringAttribute{
 								Optional:            true,
 								Computed:            true,
-								Description:         "HTTP:BL API key",
-								MarkdownDescription: "HTTP:BL API key",
+								Description:         "HTTP:BL API key. The deprecated write alias api_key is still accepted.",
+								MarkdownDescription: "HTTP:BL API key. The deprecated write alias api_key is still accepted.",
 							},
 						},
 						CustomType: HttpblType{
@@ -892,14 +959,14 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					"notify_slack": schema.StringAttribute{
 						Optional:            true,
 						Computed:            true,
-						Description:         "Slack webhook URL for notifications",
-						MarkdownDescription: "Slack webhook URL for notifications",
+						Description:         "Slack webhook URL for notifications. The deprecated write alias notify_slack_webhook is still accepted",
+						MarkdownDescription: "Slack webhook URL for notifications. The deprecated write alias notify_slack_webhook is still accepted",
 					},
 					"notify_slack_hits_rpm": schema.Int64Attribute{
 						Optional:            true,
 						Computed:            true,
-						Description:         "Minimum hits per minute to trigger Slack notification",
-						MarkdownDescription: "Minimum hits per minute to trigger Slack notification",
+						Description:         "Minimum hits per minute to trigger Slack notification. Send a positive integer. 0, null or an empty string turns it off (reads back null). Other values return 400. The deprecated write alias notify_slack_rpm is still accepted",
+						MarkdownDescription: "Minimum hits per minute to trigger Slack notification. Send a positive integer. 0, null or an empty string turns it off (reads back null). Other values return 400. The deprecated write alias notify_slack_rpm is still accepted",
 					},
 					"paranoia_level": schema.Int64Attribute{
 						Optional:            true,
@@ -919,18 +986,27 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 									Computed:            true,
 									Description:         "Cooldown period in seconds",
 									MarkdownDescription: "Cooldown period in seconds",
+									Validators: []validator.Int64{
+										int64validator.AtLeast(0),
+									},
 								},
 								"hits": schema.Int64Attribute{
 									Optional:            true,
 									Computed:            true,
 									Description:         "Hit count limit (for waf_hit_by_ip)",
 									MarkdownDescription: "Hit count limit (for waf_hit_by_ip)",
+									Validators: []validator.Int64{
+										int64validator.AtLeast(1),
+									},
 								},
 								"minutes": schema.Int64Attribute{
 									Optional:            true,
 									Computed:            true,
 									Description:         "Time window in minutes (for waf_hit_by_ip)",
 									MarkdownDescription: "Time window in minutes (for waf_hit_by_ip)",
+									Validators: []validator.Int64{
+										int64validator.AtLeast(1),
+									},
 								},
 								"mode": schema.StringAttribute{
 									Optional:            true,
@@ -942,6 +1018,7 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 											"disabled",
 											"report",
 											"block",
+											"bot_challenge",
 										),
 									},
 									Default: stringdefault.StaticString("disabled"),
@@ -957,6 +1034,9 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 									Computed:            true,
 									Description:         "Requests per second limit (for ip/header)",
 									MarkdownDescription: "Requests per second limit (for ip/header)",
+									Validators: []validator.Int64{
+										int64validator.AtLeast(1),
+									},
 								},
 								"type": schema.StringAttribute{
 									Optional:            true,
@@ -986,8 +1066,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						},
 						Optional:            true,
 						Computed:            true,
-						Description:         "Rate limiting thresholds",
-						MarkdownDescription: "Rate limiting thresholds",
+						Description:         "Rate limiting thresholds. Entries are merged by type on update: only the listed types change. A request without thresholds keeps the stored ones. To turn a limit off, send its type with mode disabled. rps, hits and minutes are integers of 1 or more; cooldown is 0 or more. Invalid values return 400. An empty list changes nothing. A request that sets notify_slack copies that webhook into every threshold that the same request does not give its own notify_slack. Deprecated write aliases, still accepted: ip_ratelimit_rps, ip_ratelimit_cooldown, ip_ratelimit_mode, header_ratelimit_rps, header_ratelimit_cooldown, header_ratelimit_value, header_ratelimit_mode, hit_ratelimit_hits, hit_ratelimit_minutes, hit_ratelimit_cooldown, hit_ratelimit_mode. When thresholds and an alias set the same value, thresholds wins.",
+						MarkdownDescription: "Rate limiting thresholds. Entries are merged by type on update: only the listed types change. A request without thresholds keeps the stored ones. To turn a limit off, send its type with mode disabled. rps, hits and minutes are integers of 1 or more; cooldown is 0 or more. Invalid values return 400. An empty list changes nothing. A request that sets notify_slack copies that webhook into every threshold that the same request does not give its own notify_slack. Deprecated write aliases, still accepted: ip_ratelimit_rps, ip_ratelimit_cooldown, ip_ratelimit_mode, header_ratelimit_rps, header_ratelimit_cooldown, header_ratelimit_value, header_ratelimit_mode, hit_ratelimit_hits, hit_ratelimit_minutes, hit_ratelimit_cooldown, hit_ratelimit_mode. When thresholds and an alias set the same value, thresholds wins.",
 					},
 				},
 				CustomType: WafConfigType{
@@ -1010,9 +1090,11 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 			"weight": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Rule weight",
-				MarkdownDescription: "Rule weight",
-				Default:             int64default.StaticInt64(0),
+				Description:         "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last.",
+				MarkdownDescription: "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last.",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
 			},
 		},
 	}
@@ -1032,6 +1114,7 @@ type RuleProxyModel struct {
 	AuthPass                   types.String      `tfsdk:"auth_pass"`
 	AuthUser                   types.String      `tfsdk:"auth_user"`
 	CacheLifetime              types.String      `tfsdk:"cache_lifetime"`
+	CookieName                 types.String      `tfsdk:"cookie_name"`
 	Country                    types.String      `tfsdk:"country"`
 	CountryIs                  types.List        `tfsdk:"country_is"`
 	CountryIsNot               types.List        `tfsdk:"country_is_not"`
@@ -1064,6 +1147,12 @@ type RuleProxyModel struct {
 	StaticErrorPage            types.String      `tfsdk:"static_error_page"`
 	StaticErrorPageStatusCodes types.List        `tfsdk:"static_error_page_status_codes"`
 	To                         types.String      `tfsdk:"to"`
+	TrafficSource              types.String      `tfsdk:"traffic_source"`
+	TrafficSourceIs            types.List        `tfsdk:"traffic_source_is"`
+	TrafficSourceIsNot         types.List        `tfsdk:"traffic_source_is_not"`
+	Ua                         types.String      `tfsdk:"ua"`
+	UaIs                       types.List        `tfsdk:"ua_is"`
+	UaIsNot                    types.List        `tfsdk:"ua_is_not"`
 	Url                        types.List        `tfsdk:"url"`
 	Uuid                       types.String      `tfsdk:"uuid"`
 	WafConfig                  WafConfigValue    `tfsdk:"waf_config"`

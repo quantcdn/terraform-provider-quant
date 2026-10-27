@@ -196,6 +196,7 @@ func callRuleHeadersCreateAPI(ctx context.Context, r *ruleHeadersResource, rule 
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, headersExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}
@@ -246,6 +247,7 @@ func callRuleHeadersCreateAPI(ctx context.Context, r *ruleHeadersResource, rule 
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, res, headersExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_headers.NewActionConfigValueNull()
 
@@ -303,6 +305,7 @@ func callRuleHeadersReadAPI(ctx context.Context, r *ruleHeadersResource, rule *r
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, api, headersExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_headers.NewActionConfigValueNull()
 
@@ -341,6 +344,7 @@ func callRuleHeadersUpdateAPI(ctx context.Context, r *ruleHeadersResource, rule 
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, headersExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}

@@ -4,6 +4,9 @@ package resource_kv_store
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -12,6 +15,19 @@ import (
 func KvStoreResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"format": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Store format. Format 1 is a plain key-value store. Format 2 enables indexes, ledgers, conditional writes, transactions and the cursor key list. The format is chosen when the store is created and cannot be changed by this request; omit the field for format 1.",
+				MarkdownDescription: "Store format. Format 1 is a plain key-value store. Format 2 enables indexes, ledgers, conditional writes, transactions and the cursor key list. The format is chosen when the store is created and cannot be changed by this request; omit the field for format 1.",
+				Validators: []validator.Int64{
+					int64validator.OneOf(
+						1,
+						2,
+					),
+				},
+				Default: int64default.StaticInt64(1),
+			},
 			"id": schema.StringAttribute{
 				Computed:            true,
 				Description:         "Store ID",
@@ -34,6 +50,11 @@ func KvStoreResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Project identifier",
 				MarkdownDescription: "Project identifier",
 			},
+			"status": schema.StringAttribute{
+				Computed:            true,
+				Description:         "KV_create and KV_show only. ready: the store accepts data requests. provisioning: the table is still being created; data requests are 503 UNAVAILABLE retryable until it is ready.",
+				MarkdownDescription: "KV_create and KV_show only. ready: the store accepts data requests. provisioning: the table is still being created; data requests are 503 UNAVAILABLE retryable until it is ready.",
+			},
 			"store_id": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -43,9 +64,11 @@ func KvStoreResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type KvStoreModel struct {
+	Format       types.Int64  `tfsdk:"format"`
 	Id           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
 	Organization types.String `tfsdk:"organization"`
 	Project      types.String `tfsdk:"project"`
+	Status       types.String `tfsdk:"status"`
 	StoreId      types.String `tfsdk:"store_id"`
 }

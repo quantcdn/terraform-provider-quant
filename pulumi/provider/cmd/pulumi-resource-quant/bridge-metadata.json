@@ -330,14 +330,62 @@
             "quant_header": {
                 "current": "quant:index:Header"
             },
+            "quant_kv_index": {
+                "current": "quant:index:KvIndex",
+                "fields": {
+                    "conflicts": {
+                        "maxItemsOne": false
+                    },
+                    "fields": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
             "quant_kv_item": {
                 "current": "quant:index:KvItem"
+            },
+            "quant_kv_ledger": {
+                "current": "quant:index:KvLedger",
+                "fields": {
+                    "personal_fields": {
+                        "maxItemsOne": false
+                    },
+                    "writer_policy": {
+                        "fields": {
+                            "platform_principals": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    }
+                }
             },
             "quant_kv_store": {
                 "current": "quant:index:KvStore"
             },
             "quant_project": {
-                "current": "quant:index:Project"
+                "current": "quant:index:Project",
+                "fields": {
+                    "search_config": {
+                        "fields": {
+                            "algolia": {
+                                "fields": {
+                                    "custom_ranking": {
+                                        "maxItemsOne": false
+                                    },
+                                    "facets": {
+                                        "maxItemsOne": false
+                                    },
+                                    "searchable_attributes": {
+                                        "maxItemsOne": false
+                                    },
+                                    "sortable_attributes": {
+                                        "maxItemsOne": false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             },
             "quant_rule_auth": {
                 "current": "quant:index:RuleAuth",
@@ -367,6 +415,18 @@
                         "maxItemsOne": false
                     },
                     "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
                         "maxItemsOne": false
                     },
                     "url": {
@@ -404,6 +464,18 @@
                     "method_is_not": {
                         "maxItemsOne": false
                     },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
+                        "maxItemsOne": false
+                    },
                     "url": {
                         "maxItemsOne": false
                     }
@@ -437,6 +509,18 @@
                         "maxItemsOne": false
                     },
                     "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
                         "maxItemsOne": false
                     },
                     "url": {
@@ -474,6 +558,18 @@
                     "method_is_not": {
                         "maxItemsOne": false
                     },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
+                        "maxItemsOne": false
+                    },
                     "url": {
                         "maxItemsOne": false
                     }
@@ -509,6 +605,18 @@
                     "method_is_not": {
                         "maxItemsOne": false
                     },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
+                        "maxItemsOne": false
+                    },
                     "url": {
                         "maxItemsOne": false
                     }
@@ -542,6 +650,18 @@
                         "maxItemsOne": false
                     },
                     "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
                         "maxItemsOne": false
                     },
                     "url": {
@@ -635,6 +755,18 @@
                     "static_error_page_status_codes": {
                         "maxItemsOne": false
                     },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
+                        "maxItemsOne": false
+                    },
                     "url": {
                         "maxItemsOne": false
                     },
@@ -698,6 +830,18 @@
                     "method_is_not": {
                         "maxItemsOne": false
                     },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
+                        "maxItemsOne": false
+                    },
                     "url": {
                         "maxItemsOne": false
                     }
@@ -731,6 +875,18 @@
                         "maxItemsOne": false
                     },
                     "method_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is": {
+                        "maxItemsOne": false
+                    },
+                    "traffic_source_is_not": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is": {
+                        "maxItemsOne": false
+                    },
+                    "ua_is_not": {
                         "maxItemsOne": false
                     },
                     "url": {
@@ -806,6 +962,29 @@
             }
         },
         "datasources": {
+            "quant_kv_ledger": {
+                "current": "quant:index:getKvLedger",
+                "fields": {
+                    "personal_fields": {
+                        "maxItemsOne": false
+                    },
+                    "writer_policy": {
+                        "fields": {
+                            "platform_principals": {
+                                "maxItemsOne": false
+                            }
+                        }
+                    }
+                }
+            },
+            "quant_kv_ledger_public_key": {
+                "current": "quant:index:getKvLedgerPublicKey",
+                "fields": {
+                    "keys": {
+                        "maxItemsOne": false
+                    }
+                }
+            },
             "quant_project": {
                 "current": "quant:index:getProject"
             },

@@ -21,6 +21,7 @@ var (
 	_ resource.Resource                = (*kvStoreResource)(nil)
 	_ resource.ResourceWithConfigure   = (*kvStoreResource)(nil)
 	_ resource.ResourceWithImportState = (*kvStoreResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*kvStoreResource)(nil)
 )
 
 func NewKVStoreResource() resource.Resource {
@@ -41,6 +42,8 @@ func (r *kvStoreResource) Schema(ctx context.Context, req resource.SchemaRequest
 	// only change by replacement. Without this, a rename plans an in-place
 	// update and the apply fails on "Update Not Supported".
 	addRequiresReplace(s.Attributes, "name", "project", "organization")
+	// The API sets id and store_id at create; they never change after.
+	addKeepState(s.Attributes, "id", "store_id", "status")
 	resp.Schema = s
 }
 
@@ -81,7 +84,17 @@ func (r *kvStoreResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// A create that answers status ready needs no wait. A create that
+	// answers provisioning, or no status (an older API), waits for the store.
+	if data.Status.ValueString() == kvStoreStatusReady {
+		return
+	}
 	resp.Diagnostics.Append(waitForKVStoreReady(ctx, r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	data.Status = types.StringValue(kvStoreStatusReady)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *kvStoreResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -96,16 +109,12 @@ func (r *kvStoreResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(refreshKVStoreFormat(r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func (r *kvStoreResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// KV stores have no update API — name changes require destroy + create.
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"KV stores cannot be updated in-place. Changes require destroying and recreating the store.",
-	)
 }
 
 func (r *kvStoreResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -138,6 +147,10 @@ func (r *kvStoreResource) ImportState(ctx context.Context, req resource.ImportSt
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(refreshKVStoreFormat(r, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -160,6 +173,7 @@ func callKVStoreCreateAPI(ctx context.Context, r *kvStoreResource, data *resourc
 	}
 
 	sdkReq := quantadmingo.NewV2StoreRequest(data.Name.ValueString())
+	setKVStoreFormat(data, sdkReq)
 
 	org := r.getOrg(data)
 	store, resp, err := r.client.Instance.KVAPI.KVCreate(r.client.AuthContext, org, data.Project.ValueString()).V2StoreRequest(*sdkReq).Execute()
@@ -187,6 +201,7 @@ func callKVStoreCreateAPI(ctx context.Context, r *kvStoreResource, data *resourc
 	data.Id = types.StringValue(storeId)
 	data.Name = types.StringValue(store.GetName())
 	data.Organization = types.StringValue(org)
+	data.Status = types.StringPointerValue(store.Status)
 	// Project is user-provided (Required); preserve the plan value.
 	// No need to set it here — it's already populated from the plan.
 
@@ -207,17 +222,7 @@ func callKVStoreReadAPI(ctx context.Context, r *kvStoreResource, data *resource_
 			diags.AddError("KV Store Not Found", fmt.Sprintf("KV store '%s' not found.", data.StoreId.ValueString()))
 			return
 		}
-		var errMsg string
-		if resp != nil && resp.Body != nil {
-			body, readErr := io.ReadAll(resp.Body)
-			if readErr == nil {
-				errMsg = string(body)
-			}
-		}
-		if errMsg == "" {
-			errMsg = err.Error()
-		}
-		diags.AddError("Unable to read KV store", fmt.Sprintf("Error: %s", errMsg))
+		diags.AddError("Unable to read KV store", fmt.Sprintf("Error: %s", kvStoreReadErrorMessage(resp, err)))
 		return
 	}
 
@@ -226,6 +231,7 @@ func callKVStoreReadAPI(ctx context.Context, r *kvStoreResource, data *resource_
 	data.Id = types.StringValue(storeId)
 	data.Name = types.StringValue(store.GetName())
 	data.Organization = types.StringValue(r.getOrg(data))
+	data.Status = types.StringPointerValue(store.Status)
 
 	// Resolve any remaining unknown Computed fields
 	if data.Project.IsUnknown() {
@@ -233,6 +239,19 @@ func callKVStoreReadAPI(ctx context.Context, r *kvStoreResource, data *resource_
 	}
 
 	return
+}
+
+// kvStoreReadErrorMessage is the response body of a failed read, or the
+// error text when the body is empty or cannot be read.
+func kvStoreReadErrorMessage(resp *http.Response, err error) string {
+	if resp == nil || resp.Body == nil {
+		return err.Error()
+	}
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil || len(body) == 0 {
+		return err.Error()
+	}
+	return string(body)
 }
 
 func callKVStoreDeleteAPI(ctx context.Context, r *kvStoreResource, data *resource_kv_store.KvStoreModel) (diags diag.Diagnostics) {
@@ -253,6 +272,11 @@ func callKVStoreDeleteAPI(ctx context.Context, r *kvStoreResource, data *resourc
 
 	return
 }
+
+// kvStoreStatusReady is the store status when it accepts data requests. The
+// SDK treats any 2xx as success, so a create that answers 202 provisioning
+// or 200 ready both reach the status check in Create.
+const kvStoreStatusReady = "ready"
 
 // KVStoreReadyTimeout and KVStoreReadyInterval bound the wait after a create.
 // The API accepts a create before the DynamoDB table is active, and item

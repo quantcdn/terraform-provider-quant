@@ -38,11 +38,13 @@ func Provider() tfbridge.ProviderInfo {
 
 		Config: map[string]*tfbridge.SchemaInfo{},
 
-		Resources: GeneratedResourceMap(),
+		Resources: resourceMap(),
 
 		DataSources: map[string]*tfbridge.DataSourceInfo{
-			"quant_project":  {Tok: "quant:index:getProject"},
-			"quant_projects": {Tok: "quant:index:getProjects"},
+			"quant_project":              {Tok: "quant:index:getProject"},
+			"quant_projects":             {Tok: "quant:index:getProjects"},
+			"quant_kv_ledger":            {Tok: "quant:index:getKvLedger"},
+			"quant_kv_ledger_public_key": {Tok: "quant:index:getKvLedgerPublicKey"},
 		},
 
 		JavaScript: &tfbridge.JavaScriptInfo{

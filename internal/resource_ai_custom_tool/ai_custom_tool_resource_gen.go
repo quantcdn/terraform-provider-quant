@@ -49,8 +49,8 @@ func AiCustomToolResourceSchema(ctx context.Context) schema.Schema {
 			},
 			"input_schema": schema.StringAttribute{
 				Required:            true,
-				Description:         "JSON-encoded JSON Schema object defining the tool's input parameters",
-				MarkdownDescription: "JSON-encoded JSON Schema object defining the tool's input parameters",
+				Description:         "JSON Schema defining the tool's input parameters. The API accepts a JSON object here and rejects a JSON-encoded string with a 422; the declared type string is a known inaccuracy kept to avoid changing generated clients.",
+				MarkdownDescription: "JSON Schema defining the tool's input parameters. The API accepts a JSON object here and rejects a JSON-encoded string with a 422; the declared type string is a known inaccuracy kept to avoid changing generated clients.",
 			},
 			"is_async": schema.BoolAttribute{
 				Optional:            true,
@@ -81,8 +81,8 @@ func AiCustomToolResourceSchema(ctx context.Context) schema.Schema {
 			"output_schema": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "JSON-encoded JSON Schema object defining the tool's output structure",
-				MarkdownDescription: "JSON-encoded JSON Schema object defining the tool's output structure",
+				Description:         "JSON Schema defining the tool's output structure. The API accepts a JSON object here and rejects a JSON-encoded string with a 422; the declared type string is a known inaccuracy kept to avoid changing generated clients.",
+				MarkdownDescription: "JSON Schema defining the tool's output structure. The API accepts a JSON object here and rejects a JSON-encoded string with a 422; the declared type string is a known inaccuracy kept to avoid changing generated clients.",
 			},
 			"output_schema_description": schema.StringAttribute{
 				Optional:            true,

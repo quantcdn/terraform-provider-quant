@@ -151,6 +151,16 @@ func (r *ruleBotChallengeResource) ImportState(ctx context.Context, req resource
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// setBotChallengeTtls sends the known challenge and verification TTLs.
+func setBotChallengeTtls(rule *resource_rule_bot_challenge.RuleBotChallengeModel, req *quantadmingo.V2RuleBotChallengeRequest) {
+	if isKnown(rule.RobotChallengeVerificationTtl) {
+		req.SetRobotChallengeVerificationTtl(int32(rule.RobotChallengeVerificationTtl.ValueInt64()))
+	}
+	if isKnown(rule.RobotChallengeChallengeTtl) {
+		req.SetRobotChallengeChallengeTtl(int32(rule.RobotChallengeChallengeTtl.ValueInt64()))
+	}
+}
+
 func callRuleBotChallengeCreateAPI(ctx context.Context, r *ruleBotChallengeResource, rule *resource_rule_bot_challenge.RuleBotChallengeModel) (diags diag.Diagnostics) {
 	req := quantadmingo.NewV2RuleBotChallengeRequestWithDefaults()
 
@@ -161,12 +171,7 @@ func callRuleBotChallengeCreateAPI(ctx context.Context, r *ruleBotChallengeResou
 
 	// Bot challenge specific fields
 	req.SetRobotChallengeType(rule.RobotChallengeType.ValueString())
-	if !rule.RobotChallengeVerificationTtl.IsNull() && !rule.RobotChallengeVerificationTtl.IsUnknown() {
-		req.SetRobotChallengeVerificationTtl(int32(rule.RobotChallengeVerificationTtl.ValueInt64()))
-	}
-	if !rule.RobotChallengeChallengeTtl.IsNull() && !rule.RobotChallengeChallengeTtl.IsUnknown() {
-		req.SetRobotChallengeChallengeTtl(int32(rule.RobotChallengeChallengeTtl.ValueInt64()))
-	}
+	setBotChallengeTtls(rule, req)
 
 	diags.Append(buildConditionalListsForRequest(ctx,
 		rule.Country, rule.CountryIs, rule.CountryIsNot,
@@ -176,6 +181,7 @@ func callRuleBotChallengeCreateAPI(ctx context.Context, r *ruleBotChallengeResou
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, botChallengeExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}
@@ -226,6 +232,7 @@ func callRuleBotChallengeCreateAPI(ctx context.Context, r *ruleBotChallengeResou
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, res, botChallengeExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_bot_challenge.NewActionConfigValueNull()
 
@@ -279,6 +286,7 @@ func callRuleBotChallengeReadAPI(ctx context.Context, r *ruleBotChallengeResourc
 		&rule.Ip, &rule.IpIs, &rule.IpIsNot,
 		&rule.Method, &rule.MethodIs, &rule.MethodIsNot,
 	)...)
+	diags.Append(setRuleExtraConditionsFromAPI(ctx, api, botChallengeExtraConditions(rule))...)
 
 	rule.ActionConfig = resource_rule_bot_challenge.NewActionConfigValueNull()
 
@@ -303,12 +311,7 @@ func callRuleBotChallengeUpdateAPI(ctx context.Context, r *ruleBotChallengeResou
 	}
 
 	req.SetRobotChallengeType(rule.RobotChallengeType.ValueString())
-	if !rule.RobotChallengeVerificationTtl.IsNull() && !rule.RobotChallengeVerificationTtl.IsUnknown() {
-		req.SetRobotChallengeVerificationTtl(int32(rule.RobotChallengeVerificationTtl.ValueInt64()))
-	}
-	if !rule.RobotChallengeChallengeTtl.IsNull() && !rule.RobotChallengeChallengeTtl.IsUnknown() {
-		req.SetRobotChallengeChallengeTtl(int32(rule.RobotChallengeChallengeTtl.ValueInt64()))
-	}
+	setBotChallengeTtls(rule, req)
 
 	diags.Append(buildConditionalListsForRequest(ctx,
 		rule.Country, rule.CountryIs, rule.CountryIsNot,
@@ -318,6 +321,7 @@ func callRuleBotChallengeUpdateAPI(ctx context.Context, r *ruleBotChallengeResou
 		req.SetIp, req.SetIpIs, req.SetIpIsNot,
 		req.SetMethod, req.SetMethodIs, req.SetMethodIsNot,
 	)...)
+	diags.Append(buildRuleExtraConditions(ctx, botChallengeExtraConditions(rule), req)...)
 	if diags.HasError() {
 		return
 	}

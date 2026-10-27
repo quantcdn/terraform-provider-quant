@@ -82,6 +82,8 @@ func TestUnitProviderResources(t *testing.T) {
 		"_cron_job":         false,
 		"_kv_store":         false,
 		"_kv_item":          false,
+		"_kv_index":         false,
+		"_kv_ledger":        false,
 	}
 
 	for _, rf := range resources {
@@ -105,13 +107,15 @@ func TestUnitProviderDataSources(t *testing.T) {
 	p := &quantProvider{}
 	dataSources := p.DataSources(context.Background())
 
-	if len(dataSources) != 2 {
-		t.Fatalf("expected 2 data sources, got %d", len(dataSources))
+	if len(dataSources) != 4 {
+		t.Fatalf("expected 4 data sources, got %d", len(dataSources))
 	}
 
 	expectedTypeNames := map[string]bool{
-		"quant_projects": false,
-		"quant_project":  false,
+		"quant_projects":             false,
+		"quant_project":              false,
+		"quant_kv_ledger":            false,
+		"quant_kv_ledger_public_key": false,
 	}
 
 	for _, dsf := range dataSources {

@@ -504,20 +504,42 @@ func TestDataSource_GetProjectsToken(t *testing.T) {
 	assert.Equal(t, "quant:index:getProjects", string(ds.Tok))
 }
 
+func TestDataSource_GetKvLedgerTokens(t *testing.T) {
+	info := Provider()
+	for tf, tok := range map[string]string{
+		"quant_kv_ledger":            "quant:index:getKvLedger",
+		"quant_kv_ledger_public_key": "quant:index:getKvLedgerPublicKey",
+	} {
+		ds, ok := info.DataSources[tf]
+		require.True(t, ok, "%s data source not found", tf)
+		assert.Equal(t, tok, string(ds.Tok))
+	}
+}
+
+func TestProviderInfo_HandRegisteredKVResources(t *testing.T) {
+	info := Provider()
+	for tf, tok := range map[string]string{"quant_kv_index": "quant:index:KvIndex", "quant_kv_ledger": "quant:index:KvLedger"} {
+		res, ok := info.Resources[tf]
+		require.True(t, ok, "%s not mapped", tf)
+		assert.Equal(t, tok, string(res.Tok))
+		assert.NotNil(t, res.ComputeID, "%s has no id attribute and needs ComputeID", tf)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Provider info unit tests (no Pulumi CLI needed)
 // ---------------------------------------------------------------------------
 
 func TestProviderInfo_ResourceCount(t *testing.T) {
 	info := Provider()
-	// Both Resources() and bridge mappings are generated from generator_config.yml.
-	// If this count changes, update it — but it should match the registrations section.
-	assert.Equal(t, 28, len(info.Resources), "resource count must match generator_config.yml registrations")
+	// Both Resources() and bridge mappings are generated from generator_config.yml,
+	// plus the hand-registered KV resources (resources_kv.go, `skip: true` there).
+	assert.Equal(t, 28+len(handRegisteredResources()), len(info.Resources), "resource count must match generator_config.yml registrations plus the hand-registered resources")
 }
 
 func TestProviderInfo_DataSourceCount(t *testing.T) {
 	info := Provider()
-	assert.Equal(t, 2, len(info.DataSources), "expected 2 data source mappings")
+	assert.Equal(t, 4, len(info.DataSources), "expected 4 data source mappings")
 }
 
 func TestProviderInfo_ResourceTokenFormat(t *testing.T) {
