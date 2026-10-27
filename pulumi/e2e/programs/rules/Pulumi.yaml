@@ -28,7 +28,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/proxy/*"
       to: ${proxyTo}
@@ -37,7 +37,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/old-path"
       redirectTo: ${redirectTo}
@@ -46,7 +46,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/maintenance"
       customResponseBody: ${customResponseBody}
@@ -55,7 +55,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/admin/*"
       authUser: e2euser
@@ -65,7 +65,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/protected/*"
       robotChallengeType: invisible
@@ -74,7 +74,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/*"
       headers:
@@ -84,7 +84,7 @@ resources:
     properties:
       project: ${testProject.machineName}
       domains:
-        - "*.example.com"
+        - "www.example.com"
       urls:
         - "/static/*"
       staticFilePath: "/index.html"

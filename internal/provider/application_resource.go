@@ -106,9 +106,15 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 func (r *applicationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// The V3 Applications API does not have an Update endpoint.
 	// If only computed fields changed (drift in server-computed values),
-	// refresh state from the API instead of erroring.
+	// refresh state from the API instead of erroring. Metadata has its own
+	// endpoint and is replaced as a whole.
 	var data resource_application.ApplicationModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(putApplicationMetadata(ctx, r, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -244,6 +250,12 @@ func buildCreateApplicationRequest(ctx context.Context, data *resource_applicati
 		if len(envVars) > 0 {
 			sdkReq.SetEnvironment(envVars)
 		}
+	}
+
+	md, mdDiags := applicationMetadataFromPlan(ctx, data.Metadata)
+	diags.Append(mdDiags...)
+	if md != nil {
+		sdkReq.SetMetadata(md)
 	}
 
 	return sdkReq, diags
@@ -522,6 +534,8 @@ func callApplicationReadAPI(ctx context.Context, r *applicationResource, data *r
 	if data.Application.IsUnknown() {
 		data.Application = types.StringNull()
 	}
+
+	diags.Append(setApplicationMetadataState(ctx, app, data)...)
 
 	return
 }

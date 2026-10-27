@@ -24,6 +24,8 @@ resources:
         taskCpu: 256
         taskMemory: 512
         architecture: X86_64
+      metadata:
+        team: e2e
   testEnv:
     type: quant:index:Environment
     properties:
@@ -49,6 +51,8 @@ resources:
 outputs:
   appId: ${testApp.id}
   appName: ${testApp.appName}
+  appMetadataTeam: ${testApp.metadata["team"]}
+  appMetadataAvailable: ${testApp.metadataAvailable}
   envId: ${testEnv.id}
   envName: ${testEnv.envName}
   volumeId: ${testVolume.id}
