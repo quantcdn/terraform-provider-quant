@@ -67,15 +67,26 @@ This project and everyone participating in it is governed by our Code of Conduct
    go build -o terraform-provider-quant
    ```
 
-4. Set up development overrides in your Terraform configuration:
+4. Set up development overrides in your Terraform configuration (`~/.terraformrc`):
    ```hcl
    provider_installation {
      dev_overrides {
-       "registry.terraform.io/quantcdn/quant" = "/path/to/terraform-provider-quant"
+       "registry.terraform.io/quantcdn/quant" = "/path/to/go/bin"
      }
      direct {}
    }
    ```
+
+5. Keep that build current (optional). With dev overrides, Terraform runs the
+   local binary, not the registry release, so a stale build tests old code:
+   ```bash
+   scripts/install-local-hooks.sh        # rebuild after commit, merge, checkout, rebase
+   scripts/install-local-hooks.sh --uninstall
+   ```
+   The hooks run `go install .` in the background for this clone and all its
+   worktrees; the log is `$(git rev-parse --git-common-dir)/local-install.log`.
+   To check a registry release instead, run Terraform with
+   `TF_CLI_CONFIG_FILE` pointing at a file without `dev_overrides`.
 
 ## Testing
 
