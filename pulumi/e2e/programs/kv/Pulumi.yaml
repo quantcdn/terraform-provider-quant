@@ -1,6 +1,6 @@
 name: e2e-kv
 runtime: yaml
-description: E2E test for KvStore and KvItem resources
+description: E2E test for KvStore (format 1 and 2), KvItem and KvIndex resources
 config:
   projectName:
     type: string
@@ -29,6 +29,24 @@ resources:
       storeId: ${testStore.id}
       key: e2e-test-key
       value: ${itemValue}
+  v2Store:
+    type: quant:index:KvStore
+    properties:
+      project: ${testProject.machineName}
+      name: e2e-test-store-v2
+      format: 2
+  v2Index:
+    type: quant:index:KvIndex
+    properties:
+      project: ${testProject.machineName}
+      storeId: ${v2Store.id}
+      name: byemail
+      collection: users
+      fields:
+        - email
+      unique: true
 outputs:
   storeId: ${testStore.id}
+  v2StoreFormat: ${v2Store.format}
+  v2IndexState: ${v2Index.state}
   itemId: ${testItem.id}

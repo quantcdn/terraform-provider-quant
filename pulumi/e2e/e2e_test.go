@@ -427,6 +427,8 @@ func TestE2E_KV(t *testing.T) {
 
 	assert.NotEmpty(t, result.outputs["storeId"].Value, "storeId should be set")
 	assert.NotEmpty(t, result.outputs["itemId"].Value, "itemId should be set")
+	assert.EqualValues(t, 2, result.outputs["v2StoreFormat"].Value, "v2 store should be format 2")
+	assert.Equal(t, "ACTIVE", result.outputs["v2IndexState"].Value, "index should be ACTIVE after create")
 
 	t.Logf("Created KV: store=%v item=%v", result.outputs["storeId"].Value, result.outputs["itemId"].Value)
 
