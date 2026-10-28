@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_kv_ledger"
+subcategory: "Key-Value Store"
+description: |-
+  Reads a KV ledger: its definition, state, archive retention end and last verification.
+---
+
 # KV Ledger Data Source
 
 Reads a KV ledger: its definition, its state, its archive retention end and the last verification.

@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_project"
+subcategory: "Projects"
+description: |-
+  Manages a Quant project.
+---
+
 # Project Resource
 
 Manages a Quant project.

@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_rule_redirect"
+subcategory: "Rules"
+description: |-
+  Manages a Quant redirect rule.
+---
+
 # Rule Redirect Resource
 
 Manages a Quant redirect rule.
@@ -17,8 +24,8 @@ resource "quant_rule_redirect" "test" {
 
 ## Argument Reference
 
-- `name` - (Required) The name of the rule.
-- `project` - (Required) The machine name of the project.
+- `name` - (Optional, Computed) The name of the rule. Computed from the API when omitted; always set it explicitly.
+- `project` - (Optional, Computed) The machine name of the project. Computed from the API when omitted; always set it explicitly.
 - `domain` - (Required) The domain to apply the rule to.
 - `redirect_to` - (Required) The target URL to redirect requests to.
 - `redirect_code` - (Required) The status code to use for the redirect.

@@ -1,6 +1,13 @@
+---
+page_title: "Quant: quant_kv_ledger"
+subcategory: "Key-Value Store"
+description: |-
+  Manages a tamper-evident ledger on a collection of a format 2 KV store.
+---
+
 # KV Ledger Resource
 
-Manages a tamper-evident ledger on a collection of a format 2 KV store (`quant_kv_store` with `format = 2`). The archive of a ledger is kept with S3 Object Lock, and the ledger cannot be dropped before its retention ends.
+Manages a tamper-evident ledger on a collection of a format 2 KV store (`quant_kv_store` with `format = 2`). The archive of a ledger is kept in write-once storage, and the ledger cannot be dropped before its retention ends.
 
 ## Example Usage
 
@@ -38,7 +45,7 @@ resource "quant_kv_ledger" "ai_use" {
 - `name` - (Required) The ledger name, unique in the store.
 - `collection` - (Required) A collection, or a pattern where `*` as a whole segment matches exactly one segment. It must not overlap another ledger, and it must be empty when the ledger is declared.
 - `chains` - (Required) Parallel hash chains (shards) per collection. Can only go up.
-- `retention_days` - (Required) S3 Object Lock retention of the archive, in days. Can only go up.
+- `retention_days` - (Required) How long each archive object is locked, in days. Can only go up.
 - `lock_mode` - (Required) `governance` or `compliance`. `governance` can become `compliance`, never back.
 - `personal_fields` - (Optional) Top-level value fields that are encrypted per data subject, so a shred can erase them. Needs `subject_field`.
 - `subject_field` - (Optional) The top-level value field that names the data subject.

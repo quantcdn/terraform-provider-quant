@@ -59,7 +59,7 @@ Configuration can also be set via environment variables:
 ```bash
 export QUANTCDN_API_TOKEN="your-token"
 export QUANTCDN_ORGANIZATION="your-org"
-export QUANTCDN_BASE_URL="https://custom-api.example.com/api/v2"  # Optional custom base URL
+export QUANTCDN_BASE_URL="https://dashboard.example.com"  # Optional custom base URL
 export QUANTCDN_REQUESTS_PER_SECOND="15.0"
 export QUANTCDN_MAX_RETRIES="5"
 export QUANTCDN_BASE_DELAY_MS="1000"
@@ -139,12 +139,12 @@ provider "quant" {
   max_delay_ms       = 300000  # 5 minutes
 }
 
-# Staging environment with custom base URL
+# AU Government platform
 provider "quant" {
-  alias        = "staging"
-  bearer       = var.staging_bearer_token
-  organization = var.staging_organization
-  base_url     = "https://staging-dashboard.quantcdn.io/api/v2"
+  alias        = "quantgov"
+  bearer       = var.quantgov_bearer_token
+  organization = var.quantgov_organization
+  base_url     = "https://dash.quantgov.cloud"
 }
 
 # Use different providers for different resources
@@ -164,9 +164,9 @@ resource "quant_crawler" "critical" {
   domain   = "https://critical.example.com"
 }
 
-resource "quant_project" "staging_project" {
-  provider = quant.staging
-  name     = "Staging Project"
+resource "quant_project" "quantgov_project" {
+  provider = quant.quantgov
+  name     = "QuantGov Project"
 }
 ```
 
@@ -203,7 +203,7 @@ resource "quant_project" "staging_project" {
 provider "quant" {
   bearer              = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   organization        = "quant"
-  base_url            = "https://custom-api.example.com/api/v2"  # Optional custom base URL
+  base_url            = "https://dashboard.example.com"  # Optional custom base URL
   
   # Rate limiting configuration
   requests_per_second = 15.0    # Allow 15 requests per second

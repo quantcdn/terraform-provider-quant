@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_projects"
+subcategory: "Projects"
+description: |-
+  Lists all projects in the Quant organization.
+---
+
 # Projects Data Source
 
 Lists all projects in the Quant organization.

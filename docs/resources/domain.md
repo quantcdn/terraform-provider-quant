@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_domain"
+subcategory: "Projects"
+description: |-
+  Manages domains within a Quant project.
+---
+
 # Domain Resource
 
 Manages domains within a Quant project.
@@ -44,7 +51,7 @@ resource "quant_domain" "staging" {
 
 ### Optional Arguments
 
-- `project` - (Optional, Computed) The project machine name to create the domain in. If not specified, uses the provider's default project.
+- `project` - (Optional, Computed) The project machine name to create the domain in. There is no provider-level default project: always set it explicitly.
 - `organization` - (Optional, Computed) The organization identifier. Typically inherited from the provider configuration.
 
 ## Attributes Reference

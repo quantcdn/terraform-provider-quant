@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_crawler"
+subcategory: "Crawlers"
+description: |-
+  Manages web crawlers for content discovery and ingestion into Quant.
+---
+
 # Crawler Resource
 
 Manages web crawlers for content discovery and ingestion into Quant.
@@ -178,10 +185,10 @@ In addition to all arguments above, the following attributes are exported:
 
 ## Import
 
-Crawlers can be imported using the format `organization/project/uuid`:
+Crawlers can be imported using the format `project:crawler_uuid`. A bare `crawler_uuid` uses the project `default`:
 
 ```shell
-terraform import quant_crawler.example my-org/my-project/550e8400-e29b-41d4-a716-446655440000
+terraform import quant_crawler.example my-project:550e8400-e29b-41d4-a716-446655440000
 ```
 
 ## Notes

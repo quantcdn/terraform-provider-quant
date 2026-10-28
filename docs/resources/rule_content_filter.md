@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_rule_content_filter"
+subcategory: "Rules"
+description: |-
+  The `quant_rule_content_filter` resource manages content filter rules that apply custom functions to filter and transform content in a Quant project.
+---
+
 # Rule Content Filter Resource
 
 The `quant_rule_content_filter` resource manages content filter rules that apply custom functions to filter and transform content in a Quant project.
@@ -83,8 +90,6 @@ The following arguments are supported:
 
 ### Required Arguments
 
-* `name` - (Required) The name of the content filter rule.
-* `project` - (Required) The project machine name this rule belongs to.
 * `domain` - (Required) List of domains this rule applies to. Use `["any"]` to match all domains.
 * `url` - (Required) List of URL patterns this rule applies to. Supports wildcard patterns like `/api/*`.
 * `fn_uuid` - (Required) The UUID of the function to apply for content filtering.
@@ -92,6 +97,8 @@ The following arguments are supported:
 ### Optional Arguments
 
 * `disabled` - (Optional) Whether the content filter rule is disabled. Defaults to `false`.
+* `name` - (Optional, Computed) The name of the content filter rule. Computed from the API when omitted; always set it explicitly.
+* `project` - (Optional, Computed) The project machine name this rule belongs to. Computed from the API when omitted; always set it explicitly.
 
 ### Rule Selection Criteria
 

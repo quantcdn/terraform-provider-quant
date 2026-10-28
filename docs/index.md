@@ -1,3 +1,9 @@
+---
+page_title: "Quant: quant"
+description: |-
+  The Quant provider allows you to manage resources in your Quant CDN environment with built-in API rate limiting and intelligent retry mechanisms.
+---
+
 # Quant Provider
 
 The Quant provider allows you to manage resources in your Quant CDN environment with built-in API rate limiting and intelligent retry mechanisms.
@@ -19,7 +25,7 @@ provider "quant" {
 provider "quant" {
   bearer              = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   organization        = "quant"
-  base_url            = "https://custom-api.example.com/api/v2"  # Optional custom base URL
+  base_url            = "https://dashboard.example.com"  # Optional: bare host only, no path. AU Government: "https://dash.quantgov.cloud"
   
   # Timeout configuration for deadlock resilience
   timeout_seconds     = 120     # Total timeout per request (default: 120 seconds)
@@ -91,7 +97,7 @@ provider "quant" {
 
 ### Optional Arguments
 
-- `base_url` (String) - The base URL for the QuantCDN API. Useful for pointing to staging, development, or custom API endpoints. Can also be set via QUANTCDN_BASE_URL environment variable.
+- `base_url` (String) - The base URL (bare host, with no path) of the Quant dashboard. Default: `https://dashboard.quantcdn.io`. AU Government customers use `https://dash.quantgov.cloud`. Can also be set via QUANTCDN_BASE_URL environment variable.
 - `timeout_seconds` (Number) - HTTP client timeout in seconds for API requests. Controls how long to wait for API responses before timing out. Particularly useful for handling slow operations and API deadlocks. Default: `120` seconds. Can also be set via QUANTCDN_TIMEOUT_SECONDS environment variable.
 - `requests_per_second` (Number) - Maximum number of requests per second to send to the API. Controls the rate limiting behaviour. Default: `10.0`
 - `max_retries` (Number) - Maximum number of retry attempts for failed requests. The provider will retry requests that fail due to rate limiting (429), server errors (5xx), network errors, or timeout errors. Default: `3`
@@ -105,7 +111,7 @@ All configuration options can be set via environment variables as an alternative
 
 - `QUANTCDN_API_TOKEN` - Bearer token (alternative to `bearer`)
 - `QUANTCDN_ORGANIZATION` - Organization name (alternative to `organization`)
-- `QUANTCDN_BASE_URL` - Base URL for the API (alternative to `base_url`)
+- `QUANTCDN_BASE_URL` - Base URL for the API, bare host (alternative to `base_url`)
 - `QUANTCDN_TIMEOUT_SECONDS` - HTTP client timeout in seconds (alternative to `timeout_seconds`)
 - `QUANTCDN_REQUESTS_PER_SECOND` - Requests per second limit
 - `QUANTCDN_MAX_RETRIES` - Maximum retry attempts

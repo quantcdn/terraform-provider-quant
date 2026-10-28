@@ -1,115 +1,91 @@
-# Example: Using custom base URL for different environments
+# Example: Using a custom base URL
+# Set base_url to the bare host of the dashboard. Do not add a path such as /api/v2.
 
-# Production environment (default)
+# Public platform (default)
 provider "quant" {
-  alias = "prod"
-  
-  bearer       = var.prod_api_token
-  organization = var.prod_organization
-  # Uses default base URL: https://dashboard.quantcdn.io/api/v2
+  alias = "public"
+
+  bearer       = var.public_api_token
+  organization = var.public_organization
+  # Uses the default base URL: https://dashboard.quantcdn.io
 }
 
-# Staging environment
+# AU Government platform
 provider "quant" {
-  alias = "staging"
-  
-  bearer       = var.staging_api_token
-  organization = var.staging_organization
-  base_url     = "https://staging-dashboard.quantcdn.io/api/v2"
+  alias = "gov"
+
+  bearer       = var.gov_api_token
+  organization = var.gov_organization
+  base_url     = "https://dash.quantgov.cloud"
 }
 
-# Development environment
-provider "quant" {
-  alias = "dev"
-  
-  bearer       = var.dev_api_token
-  organization = var.dev_organization
-  base_url     = "https://dev-dashboard.quantcdn.io/api/v2"
-}
-
-# Custom API endpoint
+# Custom host
 provider "quant" {
   alias = "custom"
-  
+
   bearer       = var.custom_api_token
   organization = var.custom_organization
-  base_url     = "https://my-custom-api.example.com/api/v2"
+  base_url     = "https://dashboard.example.com"
 }
 
 # Using environment variables
 provider "quant" {
   alias = "env"
-  
+
   # These will use environment variables:
   # - QUANTCDN_API_TOKEN
-  # - QUANTCDN_ORGANIZATION  
+  # - QUANTCDN_ORGANIZATION
   # - QUANTCDN_BASE_URL
 }
 
 # Example resources using different providers
-resource "quant_project" "prod_project" {
-  provider = quant.prod
-  name     = "Production Project"
+resource "quant_project" "public_project" {
+  provider = quant.public
+  name     = "Public Project"
 }
 
-resource "quant_project" "staging_project" {
-  provider = quant.staging
-  name     = "Staging Project"
+resource "quant_project" "gov_project" {
+  provider = quant.gov
+  name     = "Gov Project"
 }
 
-resource "quant_project" "dev_project" {
-  provider = quant.dev
-  name     = "Development Project"
-}
-
-# Data source using custom base URL
+# Data source using a custom base URL
 data "quant_project" "custom_project" {
   provider     = quant.custom
-  machine_name = "my-project"
+  machine_name = "example-project"
   with_token   = true
 }
 
 # Variables
-variable "prod_api_token" {
-  description = "Production API token"
+variable "public_api_token" {
+  description = "Public platform API token"
   type        = string
   sensitive   = true
 }
 
-variable "prod_organization" {
-  description = "Production organization"
+variable "public_organization" {
+  description = "Public platform organization"
   type        = string
 }
 
-variable "staging_api_token" {
-  description = "Staging API token"
-  type        = string
-  sensitive   = true
-}
-
-variable "staging_organization" {
-  description = "Staging organization"
-  type        = string
-}
-
-variable "dev_api_token" {
-  description = "Development API token"
+variable "gov_api_token" {
+  description = "AU Government platform API token"
   type        = string
   sensitive   = true
 }
 
-variable "dev_organization" {
-  description = "Development organization"
+variable "gov_organization" {
+  description = "AU Government platform organization"
   type        = string
 }
 
 variable "custom_api_token" {
-  description = "Custom API token"
+  description = "Custom host API token"
   type        = string
   sensitive   = true
 }
 
 variable "custom_organization" {
-  description = "Custom organization"
+  description = "Custom host organization"
   type        = string
-} 
+}

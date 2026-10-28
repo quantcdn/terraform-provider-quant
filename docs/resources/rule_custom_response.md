@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_rule_custom_response"
+subcategory: "Rules"
+description: |-
+  The `quant_rule_custom_response` resource manages custom responses for rules in a Quant project.
+---
+
 # Rule Custom Response Resource
 
 The `quant_rule_custom_response` resource manages custom responses for rules in a Quant project.
@@ -24,8 +31,8 @@ resource "quant_rule_custom_response" "test" {
 
 The following arguments are supported:
 
-* `project` - (Required) The project ID this rule belongs to.
-* `name` - (Required) The name of the rule.
+* `project` - (Optional, Computed) The project ID this rule belongs to. Computed from the API when omitted; always set it explicitly.
+* `name` - (Optional, Computed) The name of the rule. Computed from the API when omitted; always set it explicitly.
 * `domain` - (Required) List of domains this rule applies to.
 * `url` - (Required) List of URLs this rule applies to.
 * `custom_response_status_code` - (Required) The HTTP status code for the custom response.
