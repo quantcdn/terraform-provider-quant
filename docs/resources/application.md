@@ -131,6 +131,7 @@ resource "quant_application" "example" {
   * `mount_path` (String) - (Optional) Mount path inside containers. Defaults to `/mnt/data`.
   * `required` (Boolean) - (Optional) Whether to create a shared filesystem. Defaults to `true`.
 * `max_capacity` (Number) - (Optional) Maximum task count for auto-scaling. Defaults to `1`.
+* `metadata` (Map of String) - (Optional) Key/value labels for people and filters, for example `{ team = "web" }`. They change nothing at runtime. At most 50 pairs; keys 1 to 128 characters, values 0 to 256; letters, digits, space and `+ - = . _ : / @` only; keys that start with `quant:` are reserved. An update replaces the whole set. When not set, Terraform does not manage the labels.
 * `min_capacity` (Number) - (Optional) Minimum task count for auto-scaling. Defaults to `1`.
 
 ## Attribute Reference
@@ -143,6 +144,7 @@ In addition to all arguments above, the following attributes are exported:
 * `desired_count` (Number) - (Read-Only) Desired task count.
 * `environment_names` (List of String) - (Read-Only) List of environment names (read-only).
 * `image_reference` (Object) - (Read-Only) Image reference information.
+* `metadata_available` (Boolean) - (Read-Only) `false` when the platform could not read the labels; `metadata` then keeps its configured value.
 * `organisation` (String) - (Read-Only) Organisation machine name.
 * `running_count` (Number) - (Read-Only) Currently running task count.
 * `status` (String) - (Read-Only) Application status.

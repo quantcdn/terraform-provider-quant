@@ -1,3 +1,10 @@
+---
+page_title: "Quant: quant_kv_index"
+subcategory: "Key-Value Store"
+description: |-
+  Manages a secondary index of a format 2 KV store.
+---
+
 # KV Index Resource
 
 Manages a secondary index of a format 2 KV store (`quant_kv_store` with `format = 2`).
