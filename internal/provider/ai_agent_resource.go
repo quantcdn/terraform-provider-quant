@@ -203,6 +203,9 @@ func callAiAgentCreateAPI(ctx context.Context, r *aiAgentResource, data *resourc
 	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
 		sdkReq.SetLongContext(data.LongContext.ValueBool())
 	}
+	if !data.ReasoningEffort.IsNull() && !data.ReasoningEffort.IsUnknown() {
+		sdkReq.SetReasoningEffort(data.ReasoningEffort.ValueString())
+	}
 	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
 		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
 	}
@@ -330,6 +333,9 @@ func callAiAgentUpdateAPI(ctx context.Context, r *aiAgentResource, data *resourc
 	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
 		sdkReq.SetLongContext(data.LongContext.ValueBool())
 	}
+	if !data.ReasoningEffort.IsNull() && !data.ReasoningEffort.IsUnknown() {
+		sdkReq.SetReasoningEffort(data.ReasoningEffort.ValueString())
+	}
 	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
 		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
 	}
@@ -425,6 +431,9 @@ func mapAiAgentFromMap(ctx context.Context, m map[string]interface{}, org string
 	if v, ok := m["longContext"].(bool); ok {
 		agent.LongContext = &v
 	}
+	if v, ok := m["reasoningEffort"].(string); ok {
+		agent.SetReasoningEffort(v)
+	}
 	if v, ok := m["isGlobal"].(bool); ok {
 		agent.IsGlobal = &v
 	}
@@ -498,6 +507,8 @@ func mapAiAgentResponse(ctx context.Context, agent *quantadmingo.GetAIAgent200Re
 	} else {
 		data.LongContext = types.BoolNull()
 	}
+	effort, _ := agent.GetReasoningEffortOk()
+	data.ReasoningEffort = optionalStringPtrValue(effort)
 
 	data.AllowedTools = stringListFromSlice(ctx, agent.AllowedTools)
 	data.AllowedCollections = stringListFromSlice(ctx, agent.AllowedCollections)
@@ -524,6 +535,7 @@ func mapAiAgentResponse(ctx context.Context, agent *quantadmingo.GetAIAgent200Re
 		"allowed_collections": data.AllowedCollections,
 		"assigned_skills":     data.AssignedSkills,
 		"long_context":        data.LongContext,
+		"reasoning_effort":    data.ReasoningEffort,
 		"guardrail_preset":    data.GuardrailPreset,
 		"created_by":          data.CreatedBy,
 		"is_global":           boolPtrToValue(agent.IsGlobal),
