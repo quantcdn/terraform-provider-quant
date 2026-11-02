@@ -229,12 +229,14 @@ type volumeRead struct {
 
 // cronRead maps SDK Cron → TF CronValue.
 type cronRead struct {
-	Command             types.List `tfsdk:"command"`
-	Description         *string    `tfsdk:"description"`
-	IsEnabled           *bool      `tfsdk:"is_enabled"`
-	Name                *string    `tfsdk:"name"`
-	ScheduleExpression  *string    `tfsdk:"schedule_expression"`
-	TargetContainerName *string    `tfsdk:"target_container_name"`
+	Command             types.List   `tfsdk:"command"`
+	Description         *string      `tfsdk:"description"`
+	IsEnabled           *bool        `tfsdk:"is_enabled"`
+	Name                *string      `tfsdk:"name"`
+	ScheduleExpression  *string      `tfsdk:"schedule_expression"`
+	TargetContainerName *string      `tfsdk:"target_container_name"`
+	ConsecutiveFailures types.Int64  `tfsdk:"consecutive_failures"`
+	LastRun             types.Object `tfsdk:"last_run"`
 }
 
 // ---------------------------------------------------------------------------
@@ -830,6 +832,9 @@ func buildEnvCronListFromSDK(ctx context.Context, crons []quantadmingo.Cron) (ba
 			diags.Append(d...)
 		}
 
+		lastRun, d := cronLastRunObject(resource_environment.LastRunValue{}.AttributeTypes(ctx), &c)
+		diags.Append(d...)
+
 		v, d := autoMap(ctx, attrTypes,
 			cronRead{
 				Command:             cmdList,
@@ -838,6 +843,8 @@ func buildEnvCronListFromSDK(ctx context.Context, crons []quantadmingo.Cron) (ba
 				Name:                ptrStr(c.GetNameOk()),
 				ScheduleExpression:  ptrStr(c.GetScheduleExpressionOk()),
 				TargetContainerName: ptrStr(c.GetTargetContainerNameOk()),
+				ConsecutiveFailures: cronConsecutiveFailures(&c),
+				LastRun:             lastRun,
 			},
 			resource_environment.NewCronValue,
 		)

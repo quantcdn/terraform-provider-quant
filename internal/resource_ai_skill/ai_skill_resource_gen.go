@@ -5,11 +5,14 @@ package resource_ai_skill
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -57,6 +60,9 @@ func AiSkillResourceSchema(ctx context.Context) schema.Schema {
 			"namespace": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$"), ""),
+				},
 			},
 			"organisation": schema.StringAttribute{
 				Optional:            true,

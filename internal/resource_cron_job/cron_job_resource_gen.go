@@ -4,8 +4,14 @@ package resource_cron_job
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
@@ -22,6 +28,11 @@ func CronJobResourceSchema(ctx context.Context) schema.Schema {
 			"command": schema.ListAttribute{
 				ElementType: types.StringType,
 				Required:    true,
+			},
+			"consecutive_failures": schema.Int64Attribute{
+				Computed:            true,
+				Description:         "Failed runs (FAILED or FAILED_TO_START) from the newest run back to the first run that did not fail, counted over the latest 10 runs. 0 when the newest run did not fail. Sent by the cron list.",
+				MarkdownDescription: "Failed runs (FAILED or FAILED_TO_START) from the newest run back to the first run that did not fail, counted over the latest 10 runs. 0 when the newest run did not fail. Sent by the cron list.",
 			},
 			"cron": schema.StringAttribute{
 				Optional:            true,
@@ -43,6 +54,37 @@ func CronJobResourceSchema(ctx context.Context) schema.Schema {
 				Optional: true,
 				Computed: true,
 				Default:  booldefault.StaticBool(true),
+			},
+			"last_run": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"created_at": schema.StringAttribute{
+						Computed: true,
+					},
+					"error_message": schema.StringAttribute{
+						Computed:            true,
+						Description:         "Why the run failed, in plain text. Set when the status is FAILED_TO_START.",
+						MarkdownDescription: "Why the run failed, in plain text. Set when the status is FAILED_TO_START.",
+					},
+					"exit_code": schema.Int64Attribute{
+						Computed: true,
+					},
+					"run_id": schema.StringAttribute{
+						Computed: true,
+					},
+					"status": schema.StringAttribute{
+						Computed:            true,
+						Description:         "FAILED_TO_START: the task could not be launched, so the command never ran (for example, the job targets a container that no longer exists).",
+						MarkdownDescription: "FAILED_TO_START: the task could not be launched, so the command never ran (for example, the job targets a container that no longer exists).",
+					},
+				},
+				CustomType: LastRunType{
+					ObjectType: types.ObjectType{
+						AttrTypes: LastRunValue{}.AttributeTypes(ctx),
+					},
+				},
+				Computed:            true,
+				Description:         "Summary of the newest run of a cron job.",
+				MarkdownDescription: "Summary of the newest run of a cron job.",
 			},
 			"name": schema.StringAttribute{
 				Required: true,
@@ -67,12 +109,558 @@ func CronJobResourceSchema(ctx context.Context) schema.Schema {
 type CronJobModel struct {
 	Application         types.String `tfsdk:"application"`
 	Command             types.List   `tfsdk:"command"`
+	ConsecutiveFailures types.Int64  `tfsdk:"consecutive_failures"`
 	Cron                types.String `tfsdk:"cron"`
 	Description         types.String `tfsdk:"description"`
 	Environment         types.String `tfsdk:"environment"`
 	IsEnabled           types.Bool   `tfsdk:"is_enabled"`
+	LastRun             LastRunValue `tfsdk:"last_run"`
 	Name                types.String `tfsdk:"name"`
 	Organisation        types.String `tfsdk:"organisation"`
 	ScheduleExpression  types.String `tfsdk:"schedule_expression"`
 	TargetContainerName types.String `tfsdk:"target_container_name"`
+}
+
+var _ basetypes.ObjectTypable = LastRunType{}
+
+type LastRunType struct {
+	basetypes.ObjectType
+}
+
+func (t LastRunType) Equal(o attr.Type) bool {
+	other, ok := o.(LastRunType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t LastRunType) String() string {
+	return "LastRunType"
+}
+
+func (t LastRunType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	createdAtAttribute, ok := attributes["created_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`created_at is missing from object`)
+
+		return nil, diags
+	}
+
+	createdAtVal, ok := createdAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`created_at expected to be basetypes.StringValue, was: %T`, createdAtAttribute))
+	}
+
+	errorMessageAttribute, ok := attributes["error_message"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`error_message is missing from object`)
+
+		return nil, diags
+	}
+
+	errorMessageVal, ok := errorMessageAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`error_message expected to be basetypes.StringValue, was: %T`, errorMessageAttribute))
+	}
+
+	exitCodeAttribute, ok := attributes["exit_code"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`exit_code is missing from object`)
+
+		return nil, diags
+	}
+
+	exitCodeVal, ok := exitCodeAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`exit_code expected to be basetypes.Int64Value, was: %T`, exitCodeAttribute))
+	}
+
+	runIdAttribute, ok := attributes["run_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`run_id is missing from object`)
+
+		return nil, diags
+	}
+
+	runIdVal, ok := runIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`run_id expected to be basetypes.StringValue, was: %T`, runIdAttribute))
+	}
+
+	statusAttribute, ok := attributes["status"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`status is missing from object`)
+
+		return nil, diags
+	}
+
+	statusVal, ok := statusAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`status expected to be basetypes.StringValue, was: %T`, statusAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return LastRunValue{
+		CreatedAt:    createdAtVal,
+		ErrorMessage: errorMessageVal,
+		ExitCode:     exitCodeVal,
+		RunId:        runIdVal,
+		Status:       statusVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewLastRunValueNull() LastRunValue {
+	return LastRunValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewLastRunValueUnknown() LastRunValue {
+	return LastRunValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewLastRunValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (LastRunValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing LastRunValue Attribute Value",
+				"While creating a LastRunValue value, a missing attribute value was detected. "+
+					"A LastRunValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("LastRunValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid LastRunValue Attribute Type",
+				"While creating a LastRunValue value, an invalid attribute value was detected. "+
+					"A LastRunValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("LastRunValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("LastRunValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra LastRunValue Attribute Value",
+				"While creating a LastRunValue value, an extra attribute value was detected. "+
+					"A LastRunValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra LastRunValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewLastRunValueUnknown(), diags
+	}
+
+	createdAtAttribute, ok := attributes["created_at"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`created_at is missing from object`)
+
+		return NewLastRunValueUnknown(), diags
+	}
+
+	createdAtVal, ok := createdAtAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`created_at expected to be basetypes.StringValue, was: %T`, createdAtAttribute))
+	}
+
+	errorMessageAttribute, ok := attributes["error_message"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`error_message is missing from object`)
+
+		return NewLastRunValueUnknown(), diags
+	}
+
+	errorMessageVal, ok := errorMessageAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`error_message expected to be basetypes.StringValue, was: %T`, errorMessageAttribute))
+	}
+
+	exitCodeAttribute, ok := attributes["exit_code"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`exit_code is missing from object`)
+
+		return NewLastRunValueUnknown(), diags
+	}
+
+	exitCodeVal, ok := exitCodeAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`exit_code expected to be basetypes.Int64Value, was: %T`, exitCodeAttribute))
+	}
+
+	runIdAttribute, ok := attributes["run_id"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`run_id is missing from object`)
+
+		return NewLastRunValueUnknown(), diags
+	}
+
+	runIdVal, ok := runIdAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`run_id expected to be basetypes.StringValue, was: %T`, runIdAttribute))
+	}
+
+	statusAttribute, ok := attributes["status"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`status is missing from object`)
+
+		return NewLastRunValueUnknown(), diags
+	}
+
+	statusVal, ok := statusAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`status expected to be basetypes.StringValue, was: %T`, statusAttribute))
+	}
+
+	if diags.HasError() {
+		return NewLastRunValueUnknown(), diags
+	}
+
+	return LastRunValue{
+		CreatedAt:    createdAtVal,
+		ErrorMessage: errorMessageVal,
+		ExitCode:     exitCodeVal,
+		RunId:        runIdVal,
+		Status:       statusVal,
+		state:        attr.ValueStateKnown,
+	}, diags
+}
+
+func NewLastRunValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) LastRunValue {
+	object, diags := NewLastRunValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewLastRunValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t LastRunType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewLastRunValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewLastRunValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewLastRunValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewLastRunValueMust(LastRunValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t LastRunType) ValueType(ctx context.Context) attr.Value {
+	return LastRunValue{}
+}
+
+var _ basetypes.ObjectValuable = LastRunValue{}
+
+type LastRunValue struct {
+	CreatedAt    basetypes.StringValue `tfsdk:"created_at"`
+	ErrorMessage basetypes.StringValue `tfsdk:"error_message"`
+	ExitCode     basetypes.Int64Value  `tfsdk:"exit_code"`
+	RunId        basetypes.StringValue `tfsdk:"run_id"`
+	Status       basetypes.StringValue `tfsdk:"status"`
+	state        attr.ValueState
+}
+
+func (v LastRunValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 5)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["created_at"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["error_message"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["exit_code"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["run_id"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["status"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 5)
+
+		val, err = v.CreatedAt.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["created_at"] = val
+
+		val, err = v.ErrorMessage.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["error_message"] = val
+
+		val, err = v.ExitCode.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["exit_code"] = val
+
+		val, err = v.RunId.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["run_id"] = val
+
+		val, err = v.Status.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["status"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v LastRunValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v LastRunValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v LastRunValue) String() string {
+	return "LastRunValue"
+}
+
+func (v LastRunValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"created_at":    basetypes.StringType{},
+		"error_message": basetypes.StringType{},
+		"exit_code":     basetypes.Int64Type{},
+		"run_id":        basetypes.StringType{},
+		"status":        basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"created_at":    v.CreatedAt,
+			"error_message": v.ErrorMessage,
+			"exit_code":     v.ExitCode,
+			"run_id":        v.RunId,
+			"status":        v.Status,
+		})
+
+	return objVal, diags
+}
+
+func (v LastRunValue) Equal(o attr.Value) bool {
+	other, ok := o.(LastRunValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.CreatedAt.Equal(other.CreatedAt) {
+		return false
+	}
+
+	if !v.ErrorMessage.Equal(other.ErrorMessage) {
+		return false
+	}
+
+	if !v.ExitCode.Equal(other.ExitCode) {
+		return false
+	}
+
+	if !v.RunId.Equal(other.RunId) {
+		return false
+	}
+
+	if !v.Status.Equal(other.Status) {
+		return false
+	}
+
+	return true
+}
+
+func (v LastRunValue) Type(ctx context.Context) attr.Type {
+	return LastRunType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v LastRunValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"created_at":    basetypes.StringType{},
+		"error_message": basetypes.StringType{},
+		"exit_code":     basetypes.Int64Type{},
+		"run_id":        basetypes.StringType{},
+		"status":        basetypes.StringType{},
+	}
 }

@@ -225,3 +225,73 @@ func TestAccCronJobResource_CreateError500(t *testing.T) {
 		},
 	})
 }
+
+// mockCronJobRunStateServer answers with a lastRun that changes on every
+// read, as it does when the job runs between two plans.
+func mockCronJobRunStateServer(t *testing.T, org, app, env, cronName string) {
+	httpmock.Activate()
+	base := fmt.Sprintf("https://dashboard.quantcdn.io/api/v3/organizations/%s/applications/%s/environments/%s/cron", org, app, env)
+	reads := 0
+	deleted := false
+	answer := func() map[string]interface{} {
+		reads++
+		return map[string]interface{}{
+			"name":                cronName,
+			"scheduleExpression":  "0 * * * *",
+			"command":             []string{"echo", "hello"},
+			"consecutiveFailures": reads,
+			"lastRun": map[string]interface{}{
+				"runId":        fmt.Sprintf("run-%d", reads),
+				"status":       "FAILED",
+				"createdAt":    "2026-11-02T01:00:00Z",
+				"exitCode":     1,
+				"errorMessage": nil,
+			},
+		}
+	}
+
+	httpmock.RegisterNoResponder(func(req *http.Request) (*http.Response, error) {
+		t.Logf("Unhandled Request: %s %s", req.Method, req.URL)
+		return httpmock.NewStringResponse(404, "Not Found"), nil
+	})
+	httpmock.RegisterResponder("POST", base, func(req *http.Request) (*http.Response, error) {
+		deleted = false
+		return httpmock.NewJsonResponse(200, answer())
+	})
+	httpmock.RegisterResponder("GET", base+"/"+cronName, func(req *http.Request) (*http.Response, error) {
+		if deleted {
+			return httpmock.NewStringResponse(404, "Not Found"), nil
+		}
+		return httpmock.NewJsonResponse(200, answer())
+	})
+	httpmock.RegisterResponder("DELETE", base+"/"+cronName, func(req *http.Request) (*http.Response, error) {
+		deleted = true
+		return httpmock.NewStringResponse(200, ""), nil
+	})
+}
+
+// Run state is read from the API and changes between runs without a plan diff.
+func TestAccCronJobResource_RunState(t *testing.T) {
+	mockCronJobRunStateServer(t, "test-org", "test-app", "production", "backup")
+	defer httpmock.DeactivateAndReset()
+
+	cfg := testAccCronJobResourceConfig("test-org", "test-app", "production", "backup", "0 * * * *", `["echo", "hello"]`)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestMatchResourceAttr("quant_cron_job.test", "last_run.run_id", regexp.MustCompile(`^run-\d+$`)),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "last_run.status", "FAILED"),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "last_run.exit_code", "1"),
+					resource.TestCheckResourceAttr("quant_cron_job.test", "last_run.created_at", "2026-11-02T01:00:00Z"),
+					resource.TestCheckNoResourceAttr("quant_cron_job.test", "last_run.error_message"),
+					resource.TestMatchResourceAttr("quant_cron_job.test", "consecutive_failures", regexp.MustCompile(`^\d+$`)),
+				),
+			},
+			// A new run between plans changes the refreshed state, not the plan.
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}
