@@ -1353,6 +1353,39 @@
                 }
             }
         },
+        "quant:index/CronJobLastRun:CronJobLastRun": {
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "errorMessage": {
+                    "type": "string",
+                    "description": "Why the run failed, in plain text. Set when the status is FAILED_TO_START.\n"
+                },
+                "exitCode": {
+                    "type": "integer"
+                },
+                "runId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "description": "FAILED_TO_START: the task could not be launched, so the command never ran (for example, the job targets a container that no longer exists).\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "createdAt",
+                        "errorMessage",
+                        "exitCode",
+                        "runId",
+                        "status"
+                    ]
+                }
+            }
+        },
         "quant:index/DomainDnsGoLiveRecord:DomainDnsGoLiveRecord": {
             "properties": {
                 "description": {
@@ -1800,11 +1833,19 @@
                         "type": "string"
                     }
                 },
+                "consecutiveFailures": {
+                    "type": "integer",
+                    "description": "Failed runs (FAILED or FAILED_TO_START) from the newest run back to the first run that did not fail, counted over the latest 10 runs. 0 when the newest run did not fail. Sent by the cron list.\n"
+                },
                 "description": {
                     "type": "string"
                 },
                 "isEnabled": {
                     "type": "boolean"
+                },
+                "lastRun": {
+                    "$ref": "#/types/quant:index/EnvironmentCronLastRun:EnvironmentCronLastRun",
+                    "description": "Summary of the newest run of a cron job.\n"
                 },
                 "name": {
                     "type": "string"
@@ -1821,11 +1862,46 @@
                 "nodejs": {
                     "requiredOutputs": [
                         "commands",
+                        "consecutiveFailures",
                         "description",
                         "isEnabled",
+                        "lastRun",
                         "name",
                         "scheduleExpression",
                         "targetContainerName"
+                    ]
+                }
+            }
+        },
+        "quant:index/EnvironmentCronLastRun:EnvironmentCronLastRun": {
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "errorMessage": {
+                    "type": "string",
+                    "description": "Why the run failed, in plain text. Set when the status is FAILED_TO_START.\n"
+                },
+                "exitCode": {
+                    "type": "integer"
+                },
+                "runId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "description": "FAILED_TO_START: the task could not be launched, so the command never ran (for example, the job targets a container that no longer exists).\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "createdAt",
+                        "errorMessage",
+                        "exitCode",
+                        "runId",
+                        "status"
                     ]
                 }
             }
@@ -5587,6 +5663,10 @@
                         "type": "string"
                     }
                 },
+                "consecutiveFailures": {
+                    "type": "integer",
+                    "description": "Failed runs (FAILED or FAILED_TO_START) from the newest run back to the first run that did not fail, counted over the latest 10 runs. 0 when the newest run did not fail. Sent by the cron list."
+                },
                 "cron": {
                     "type": "string",
                     "description": "The cron job ID"
@@ -5600,6 +5680,10 @@
                 },
                 "isEnabled": {
                     "type": "boolean"
+                },
+                "lastRun": {
+                    "$ref": "#/types/quant:index/CronJobLastRun:CronJobLastRun",
+                    "description": "Summary of the newest run of a cron job."
                 },
                 "name": {
                     "type": "string"
@@ -5618,10 +5702,12 @@
             "required": [
                 "application",
                 "commands",
+                "consecutiveFailures",
                 "cron",
                 "description",
                 "environment",
                 "isEnabled",
+                "lastRun",
                 "name",
                 "organisation",
                 "scheduleExpression",
@@ -5683,6 +5769,10 @@
                             "type": "string"
                         }
                     },
+                    "consecutiveFailures": {
+                        "type": "integer",
+                        "description": "Failed runs (FAILED or FAILED_TO_START) from the newest run back to the first run that did not fail, counted over the latest 10 runs. 0 when the newest run did not fail. Sent by the cron list."
+                    },
                     "cron": {
                         "type": "string",
                         "description": "The cron job ID"
@@ -5696,6 +5786,10 @@
                     },
                     "isEnabled": {
                         "type": "boolean"
+                    },
+                    "lastRun": {
+                        "$ref": "#/types/quant:index/CronJobLastRun:CronJobLastRun",
+                        "description": "Summary of the newest run of a cron job."
                     },
                     "name": {
                         "type": "string"
@@ -7299,7 +7393,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -7499,7 +7593,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -7686,7 +7780,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -7873,7 +7967,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -8078,7 +8172,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -8268,7 +8362,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -8447,7 +8541,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -8642,7 +8736,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -8824,7 +8918,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -9015,7 +9109,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -9225,7 +9319,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -9419,7 +9513,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -9598,7 +9692,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -9793,7 +9887,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -9975,7 +10069,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -10157,7 +10251,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -10355,7 +10449,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -10540,7 +10634,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -10827,7 +10921,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -11154,7 +11248,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -11444,7 +11538,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -11624,7 +11718,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -11821,7 +11915,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -12004,7 +12098,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
@@ -12183,7 +12277,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "required": [
@@ -12378,7 +12472,7 @@
                 },
                 "weight": {
                     "type": "integer",
-                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                    "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                 }
             },
             "requiredInputs": [
@@ -12560,7 +12654,7 @@
                     },
                     "weight": {
                         "type": "integer",
-                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last."
+                        "description": "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if \u003cspan pulumi-lang-nodejs=\"`weight`\" pulumi-lang-dotnet=\"`Weight`\" pulumi-lang-go=\"`weight`\" pulumi-lang-python=\"`weight`\" pulumi-lang-yaml=\"`weight`\" pulumi-lang-java=\"`weight`\" pulumi-lang-hcl=\"`weight`\"\u003e`weight`\u003c/span\u003e is set in configuration, the next plan shows the difference and apply restores the configured order."
                     }
                 },
                 "type": "object"
