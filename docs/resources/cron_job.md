@@ -56,6 +56,16 @@ resource "quant_cron_job" "nightly" {
 
 In addition to all arguments above, the following attributes are exported:
 
+* `consecutive_failures` (Number) - (Read-Only) Failed runs (FAILED or FAILED_TO_START) from the newest run back to the first run that did not fail, counted over the latest 10 runs. `0` when the newest run did not fail. Null when the API does not return it.
+* `last_run` (Object) - (Read-Only) Summary of the newest run of the cron job. Null when the job has not run.
+  * `run_id` (String) - (Read-Only) Run ID.
+  * `status` (String) - (Read-Only) Run status. `FAILED_TO_START` means the task could not be launched, so the command never ran.
+  * `created_at` (String) - (Read-Only) Start time of the run (RFC 3339).
+  * `exit_code` (Number) - (Read-Only) Exit code of the command.
+  * `error_message` (String) - (Read-Only) Why the run failed. Set when the status is `FAILED_TO_START`.
+
+`last_run` and `consecutive_failures` change each time the job runs. Terraform refreshes them on every read; they never cause a plan difference.
+
 ## Import
 
 Import a cron job with the ID `application/environment/cron_name`.

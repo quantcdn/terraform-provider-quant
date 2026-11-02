@@ -206,7 +206,7 @@ func callCronJobCreateAPI(ctx context.Context, r *cronJobResource, data *resourc
 		return
 	}
 
-	mapCronResponse(cron, data)
+	diags.Append(mapCronResponse(cron, data)...)
 	data.Organisation = types.StringValue(org)
 
 	return
@@ -240,7 +240,7 @@ func callCronJobReadAPI(ctx context.Context, r *cronJobResource, data *resource_
 		return
 	}
 
-	mapCronResponse(cron, data)
+	diags.Append(mapCronResponse(cron, data)...)
 	data.Organisation = types.StringValue(org)
 
 	return
@@ -309,7 +309,7 @@ func callCronJobDeleteAPI(ctx context.Context, r *cronJobResource, data *resourc
 	return
 }
 
-func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobModel) {
+func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobModel) diag.Diagnostics {
 	ctx := context.Background()
 	if cron.Name != nil {
 		data.Name = types.StringValue(*cron.Name)
@@ -360,4 +360,6 @@ func mapCronResponse(cron *quantadmingo.Cron, data *resource_cron_job.CronJobMod
 	if data.Organisation.IsUnknown() {
 		data.Organisation = types.StringNull()
 	}
+
+	return setCronJobRunState(ctx, cron, data)
 }
