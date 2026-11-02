@@ -256,8 +256,8 @@ func RuleFunctionResourceSchema(ctx context.Context) schema.Schema {
 			"weight": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
-				Description:         "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last.",
-				MarkdownDescription: "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last.",
+				Description:         "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if `weight` is set in configuration, the next plan shows the difference and apply restores the configured order.",
+				MarkdownDescription: "Rule order. Must be 0 or greater; lower weights are processed first. If omitted on create, the rule is placed last. A reorder in the Quant dashboard changes this rule's weight; if `weight` is set in configuration, the next plan shows the difference and apply restores the configured order.",
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
