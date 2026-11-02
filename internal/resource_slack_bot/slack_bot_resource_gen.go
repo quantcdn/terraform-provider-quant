@@ -161,6 +161,11 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 					"name": schema.StringAttribute{
 						Computed: true,
 					},
+					"reasoning_effort": schema.StringAttribute{
+						Computed:            true,
+						Description:         "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+						MarkdownDescription: "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+					},
 					"session_ttl_days": schema.Int64Attribute{
 						Computed: true,
 					},
@@ -263,6 +268,21 @@ func SlackBotResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "The organisation ID",
 				MarkdownDescription: "The organisation ID",
 			},
+			"reasoning_effort": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+				MarkdownDescription: "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"low",
+						"medium",
+						"high",
+						"xhigh",
+						"max",
+					),
+				},
+			},
 			"session_ttl_days": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
@@ -320,6 +340,7 @@ type SlackBotModel struct {
 	ModelId            types.String            `tfsdk:"model_id"`
 	Name               types.String            `tfsdk:"name"`
 	Organisation       types.String            `tfsdk:"organisation"`
+	ReasoningEffort    types.String            `tfsdk:"reasoning_effort"`
 	SessionTtlDays     types.Int64             `tfsdk:"session_ttl_days"`
 	SetupType          types.String            `tfsdk:"setup_type"`
 	SystemPrompt       types.String            `tfsdk:"system_prompt"`
@@ -989,6 +1010,24 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
 	}
 
+	reasoningEffortAttribute, ok := attributes["reasoning_effort"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`reasoning_effort is missing from object`)
+
+		return nil, diags
+	}
+
+	reasoningEffortVal, ok := reasoningEffortAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`reasoning_effort expected to be basetypes.StringValue, was: %T`, reasoningEffortAttribute))
+	}
+
 	sessionTtlDaysAttribute, ok := attributes["session_ttl_days"]
 
 	if !ok {
@@ -1123,6 +1162,7 @@ func (t BotType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) 
 		MaxTokens:          maxTokensVal,
 		ModelId:            modelIdVal,
 		Name:               nameVal,
+		ReasoningEffort:    reasoningEffortVal,
 		SessionTtlDays:     sessionTtlDaysVal,
 		SetupType:          setupTypeVal,
 		Status:             statusVal,
@@ -1574,6 +1614,24 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
 	}
 
+	reasoningEffortAttribute, ok := attributes["reasoning_effort"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`reasoning_effort is missing from object`)
+
+		return NewBotValueUnknown(), diags
+	}
+
+	reasoningEffortVal, ok := reasoningEffortAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`reasoning_effort expected to be basetypes.StringValue, was: %T`, reasoningEffortAttribute))
+	}
+
 	sessionTtlDaysAttribute, ok := attributes["session_ttl_days"]
 
 	if !ok {
@@ -1708,6 +1766,7 @@ func NewBotValue(attributeTypes map[string]attr.Type, attributes map[string]attr
 		MaxTokens:          maxTokensVal,
 		ModelId:            modelIdVal,
 		Name:               nameVal,
+		ReasoningEffort:    reasoningEffortVal,
 		SessionTtlDays:     sessionTtlDaysVal,
 		SetupType:          setupTypeVal,
 		Status:             statusVal,
@@ -1807,6 +1866,7 @@ type BotValue struct {
 	MaxTokens          basetypes.Int64Value  `tfsdk:"max_tokens"`
 	ModelId            basetypes.StringValue `tfsdk:"model_id"`
 	Name               basetypes.StringValue `tfsdk:"name"`
+	ReasoningEffort    basetypes.StringValue `tfsdk:"reasoning_effort"`
 	SessionTtlDays     basetypes.Int64Value  `tfsdk:"session_ttl_days"`
 	SetupType          basetypes.StringValue `tfsdk:"setup_type"`
 	Status             basetypes.StringValue `tfsdk:"status"`
@@ -1817,7 +1877,7 @@ type BotValue struct {
 }
 
 func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 27)
+	attrTypes := make(map[string]tftypes.Type, 28)
 
 	var val tftypes.Value
 	var err error
@@ -1863,6 +1923,7 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 	attrTypes["max_tokens"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["model_id"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["reasoning_effort"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["session_ttl_days"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["setup_type"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["status"] = basetypes.StringType{}.TerraformType(ctx)
@@ -1874,7 +1935,7 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 27)
+		vals := make(map[string]tftypes.Value, 28)
 
 		val, err = v.AgentAccessControl.ToTerraformValue(ctx)
 
@@ -2044,6 +2105,14 @@ func (v BotValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
 
 		vals["name"] = val
 
+		val, err = v.ReasoningEffort.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["reasoning_effort"] = val
+
 		val, err = v.SessionTtlDays.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -2197,6 +2266,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2261,6 +2331,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2325,6 +2396,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2389,6 +2461,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2453,6 +2526,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2517,6 +2591,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2581,6 +2656,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2645,6 +2721,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2709,6 +2786,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"session_ttl_days": basetypes.Int64Type{},
 			"setup_type":       basetypes.StringType{},
 			"status":           basetypes.StringType{},
@@ -2760,6 +2838,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 		"max_tokens":       basetypes.Int64Type{},
 		"model_id":         basetypes.StringType{},
 		"name":             basetypes.StringType{},
+		"reasoning_effort": basetypes.StringType{},
 		"session_ttl_days": basetypes.Int64Type{},
 		"setup_type":       basetypes.StringType{},
 		"status":           basetypes.StringType{},
@@ -2800,6 +2879,7 @@ func (v BotValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, dia
 			"max_tokens":           v.MaxTokens,
 			"model_id":             v.ModelId,
 			"name":                 v.Name,
+			"reasoning_effort":     v.ReasoningEffort,
 			"session_ttl_days":     v.SessionTtlDays,
 			"setup_type":           v.SetupType,
 			"status":               v.Status,
@@ -2910,6 +2990,10 @@ func (v BotValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.ReasoningEffort.Equal(other.ReasoningEffort) {
+		return false
+	}
+
 	if !v.SessionTtlDays.Equal(other.SessionTtlDays) {
 		return false
 	}
@@ -2988,6 +3072,7 @@ func (v BotValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 		"max_tokens":       basetypes.Int64Type{},
 		"model_id":         basetypes.StringType{},
 		"name":             basetypes.StringType{},
+		"reasoning_effort": basetypes.StringType{},
 		"session_ttl_days": basetypes.Int64Type{},
 		"setup_type":       basetypes.StringType{},
 		"status":           basetypes.StringType{},
