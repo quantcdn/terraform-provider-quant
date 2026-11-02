@@ -211,6 +211,11 @@ func (r *aiAgentOverlayResource) upsert(ctx context.Context, data *resource_ai_a
 		sdkReq.SetModelId(data.ModelId.ValueString())
 	}
 
+	// reasoning_effort
+	if !data.ReasoningEffort.IsNull() && !data.ReasoningEffort.IsUnknown() {
+		sdkReq.SetReasoningEffort(data.ReasoningEffort.ValueString())
+	}
+
 	// temperature — types.Number -> *float32
 	if !data.Temperature.IsNull() && !data.Temperature.IsUnknown() {
 		bf := data.Temperature.ValueBigFloat()
@@ -396,6 +401,7 @@ func populateOverlay(ctx context.Context, overlay *quantadmingo.GetAgentOverlay2
 		data.SystemPromptAppend = types.StringNull()
 		data.AllowedCollections = types.ListNull(types.StringType)
 		data.GuardrailPreset = types.StringNull()
+		data.ReasoningEffort = types.StringNull()
 		data.Version = types.Int64Null()
 		data.Overlay = resource_ai_agent_overlay.NewOverlayValueNull()
 		return
@@ -444,6 +450,10 @@ func populateOverlay(ctx context.Context, overlay *quantadmingo.GetAgentOverlay2
 		data.GuardrailPreset = types.StringNull()
 	}
 
+	// reasoning_effort
+	effort, _ := overlay.GetReasoningEffortOk()
+	data.ReasoningEffort = optionalStringPtrValue(effort)
+
 	// version
 	if overlay.Version != nil {
 		data.Version = types.Int64Value(int64(*overlay.Version))
@@ -463,6 +473,7 @@ func populateOverlay(ctx context.Context, overlay *quantadmingo.GetAgentOverlay2
 		"disabled_skills":      data.DisabledSkills,
 		"disabled_tools":       data.DisabledTools,
 		"guardrail_preset":     data.GuardrailPreset,
+		"reasoning_effort":     data.ReasoningEffort,
 		"max_tokens":           data.MaxTokens,
 		"model_id":             data.ModelId,
 		"system_prompt_append": data.SystemPromptAppend,

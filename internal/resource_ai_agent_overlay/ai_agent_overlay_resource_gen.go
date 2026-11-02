@@ -156,6 +156,11 @@ func AiAgentOverlayResourceSchema(ctx context.Context) schema.Schema {
 					"model_id": schema.StringAttribute{
 						Computed: true,
 					},
+					"reasoning_effort": schema.StringAttribute{
+						Computed:            true,
+						Description:         "Reasoning effort for this organisation. Overrides the global agent value.",
+						MarkdownDescription: "Reasoning effort for this organisation. Overrides the global agent value.",
+					},
 					"system_prompt_append": schema.StringAttribute{
 						Computed: true,
 					},
@@ -172,6 +177,21 @@ func AiAgentOverlayResourceSchema(ctx context.Context) schema.Schema {
 					},
 				},
 				Computed: true,
+			},
+			"reasoning_effort": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Override the reasoning effort. Must be one of the levels the effective model lists in capabilities.effortLevels. Omit or null to use the global agent value.",
+				MarkdownDescription: "Override the reasoning effort. Must be one of the levels the effective model lists in capabilities.effortLevels. Omit or null to use the global agent value.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"low",
+						"medium",
+						"high",
+						"xhigh",
+						"max",
+					),
+				},
 			},
 			"system_prompt_append": schema.StringAttribute{
 				Optional:            true,
@@ -208,6 +228,7 @@ type AiAgentOverlayModel struct {
 	ModelId            types.String `tfsdk:"model_id"`
 	Organisation       types.String `tfsdk:"organisation"`
 	Overlay            OverlayValue `tfsdk:"overlay"`
+	ReasoningEffort    types.String `tfsdk:"reasoning_effort"`
 	SystemPromptAppend types.String `tfsdk:"system_prompt_append"`
 	Temperature        types.Number `tfsdk:"temperature"`
 	Version            types.Int64  `tfsdk:"version"`
@@ -990,6 +1011,24 @@ func (t OverlayType) ValueFromObject(ctx context.Context, in basetypes.ObjectVal
 			fmt.Sprintf(`model_id expected to be basetypes.StringValue, was: %T`, modelIdAttribute))
 	}
 
+	reasoningEffortAttribute, ok := attributes["reasoning_effort"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`reasoning_effort is missing from object`)
+
+		return nil, diags
+	}
+
+	reasoningEffortVal, ok := reasoningEffortAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`reasoning_effort expected to be basetypes.StringValue, was: %T`, reasoningEffortAttribute))
+	}
+
 	systemPromptAppendAttribute, ok := attributes["system_prompt_append"]
 
 	if !ok {
@@ -1057,6 +1096,7 @@ func (t OverlayType) ValueFromObject(ctx context.Context, in basetypes.ObjectVal
 		GuardrailPreset:    guardrailPresetVal,
 		MaxTokens:          maxTokensVal,
 		ModelId:            modelIdVal,
+		ReasoningEffort:    reasoningEffortVal,
 		SystemPromptAppend: systemPromptAppendVal,
 		Temperature:        temperatureVal,
 		Version:            versionVal,
@@ -1271,6 +1311,24 @@ func NewOverlayValue(attributeTypes map[string]attr.Type, attributes map[string]
 			fmt.Sprintf(`model_id expected to be basetypes.StringValue, was: %T`, modelIdAttribute))
 	}
 
+	reasoningEffortAttribute, ok := attributes["reasoning_effort"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`reasoning_effort is missing from object`)
+
+		return NewOverlayValueUnknown(), diags
+	}
+
+	reasoningEffortVal, ok := reasoningEffortAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`reasoning_effort expected to be basetypes.StringValue, was: %T`, reasoningEffortAttribute))
+	}
+
 	systemPromptAppendAttribute, ok := attributes["system_prompt_append"]
 
 	if !ok {
@@ -1338,6 +1396,7 @@ func NewOverlayValue(attributeTypes map[string]attr.Type, attributes map[string]
 		GuardrailPreset:    guardrailPresetVal,
 		MaxTokens:          maxTokensVal,
 		ModelId:            modelIdVal,
+		ReasoningEffort:    reasoningEffortVal,
 		SystemPromptAppend: systemPromptAppendVal,
 		Temperature:        temperatureVal,
 		Version:            versionVal,
@@ -1421,6 +1480,7 @@ type OverlayValue struct {
 	GuardrailPreset    basetypes.StringValue `tfsdk:"guardrail_preset"`
 	MaxTokens          basetypes.Int64Value  `tfsdk:"max_tokens"`
 	ModelId            basetypes.StringValue `tfsdk:"model_id"`
+	ReasoningEffort    basetypes.StringValue `tfsdk:"reasoning_effort"`
 	SystemPromptAppend basetypes.StringValue `tfsdk:"system_prompt_append"`
 	Temperature        basetypes.NumberValue `tfsdk:"temperature"`
 	Version            basetypes.Int64Value  `tfsdk:"version"`
@@ -1428,7 +1488,7 @@ type OverlayValue struct {
 }
 
 func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 11)
+	attrTypes := make(map[string]tftypes.Type, 12)
 
 	var val tftypes.Value
 	var err error
@@ -1451,6 +1511,7 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 	attrTypes["guardrail_preset"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["max_tokens"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["model_id"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["reasoning_effort"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["system_prompt_append"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["temperature"] = basetypes.NumberType{}.TerraformType(ctx)
 	attrTypes["version"] = basetypes.Int64Type{}.TerraformType(ctx)
@@ -1459,7 +1520,7 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 11)
+		vals := make(map[string]tftypes.Value, 12)
 
 		val, err = v.AdditionalSkills.ToTerraformValue(ctx)
 
@@ -1524,6 +1585,14 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 		}
 
 		vals["model_id"] = val
+
+		val, err = v.ReasoningEffort.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["reasoning_effort"] = val
 
 		val, err = v.SystemPromptAppend.ToTerraformValue(ctx)
 
@@ -1610,6 +1679,7 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"guardrail_preset":     basetypes.StringType{},
 			"max_tokens":           basetypes.Int64Type{},
 			"model_id":             basetypes.StringType{},
+			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
 			"temperature":          basetypes.NumberType{},
 			"version":              basetypes.Int64Type{},
@@ -1648,6 +1718,7 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"guardrail_preset":     basetypes.StringType{},
 			"max_tokens":           basetypes.Int64Type{},
 			"model_id":             basetypes.StringType{},
+			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
 			"temperature":          basetypes.NumberType{},
 			"version":              basetypes.Int64Type{},
@@ -1686,6 +1757,7 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"guardrail_preset":     basetypes.StringType{},
 			"max_tokens":           basetypes.Int64Type{},
 			"model_id":             basetypes.StringType{},
+			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
 			"temperature":          basetypes.NumberType{},
 			"version":              basetypes.Int64Type{},
@@ -1724,6 +1796,7 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"guardrail_preset":     basetypes.StringType{},
 			"max_tokens":           basetypes.Int64Type{},
 			"model_id":             basetypes.StringType{},
+			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
 			"temperature":          basetypes.NumberType{},
 			"version":              basetypes.Int64Type{},
@@ -1762,6 +1835,7 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"guardrail_preset":     basetypes.StringType{},
 			"max_tokens":           basetypes.Int64Type{},
 			"model_id":             basetypes.StringType{},
+			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
 			"temperature":          basetypes.NumberType{},
 			"version":              basetypes.Int64Type{},
@@ -1787,6 +1861,7 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 		"guardrail_preset":     basetypes.StringType{},
 		"max_tokens":           basetypes.Int64Type{},
 		"model_id":             basetypes.StringType{},
+		"reasoning_effort":     basetypes.StringType{},
 		"system_prompt_append": basetypes.StringType{},
 		"temperature":          basetypes.NumberType{},
 		"version":              basetypes.Int64Type{},
@@ -1811,6 +1886,7 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"guardrail_preset":     v.GuardrailPreset,
 			"max_tokens":           v.MaxTokens,
 			"model_id":             v.ModelId,
+			"reasoning_effort":     v.ReasoningEffort,
 			"system_prompt_append": v.SystemPromptAppend,
 			"temperature":          v.Temperature,
 			"version":              v.Version,
@@ -1866,6 +1942,10 @@ func (v OverlayValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.ReasoningEffort.Equal(other.ReasoningEffort) {
+		return false
+	}
+
 	if !v.SystemPromptAppend.Equal(other.SystemPromptAppend) {
 		return false
 	}
@@ -1909,6 +1989,7 @@ func (v OverlayValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 		"guardrail_preset":     basetypes.StringType{},
 		"max_tokens":           basetypes.Int64Type{},
 		"model_id":             basetypes.StringType{},
+		"reasoning_effort":     basetypes.StringType{},
 		"system_prompt_append": basetypes.StringType{},
 		"temperature":          basetypes.NumberType{},
 		"version":              basetypes.Int64Type{},

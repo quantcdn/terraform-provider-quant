@@ -242,6 +242,9 @@ func callSlackBotCreateAPI(ctx context.Context, r *slackBotResource, data *resou
 	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
 		sdkReq.SetLongContext(data.LongContext.ValueBool())
 	}
+	if !data.ReasoningEffort.IsNull() && !data.ReasoningEffort.IsUnknown() {
+		sdkReq.SetReasoningEffort(data.ReasoningEffort.ValueString())
+	}
 	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
 		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
 	}
@@ -348,6 +351,9 @@ func callSlackBotUpdateAPI(ctx context.Context, r *slackBotResource, data *resou
 	if !data.LongContext.IsNull() && !data.LongContext.IsUnknown() {
 		sdkReq.SetLongContext(data.LongContext.ValueBool())
 	}
+	if !data.ReasoningEffort.IsNull() && !data.ReasoningEffort.IsUnknown() {
+		sdkReq.SetReasoningEffort(data.ReasoningEffort.ValueString())
+	}
 	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
 		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
 	}
@@ -426,6 +432,7 @@ func mapSlackBotFromMap(ctx context.Context, m map[string]interface{}, org strin
 	data.SystemPrompt = mapStringFromAny(m, "systemPrompt")
 	data.ModelId = mapStringFromAny(m, "modelId")
 	data.GuardrailPreset = mapStringFromAny(m, "guardrailPreset")
+	data.ReasoningEffort = mapStringFromAny(m, "reasoningEffort")
 	data.HomeTabContent = mapStringFromAny(m, "homeTabContent")
 
 	data.SessionTtlDays = mapInt64FromAny(m, "sessionTtlDays")
@@ -538,6 +545,7 @@ func buildBotObject(ctx context.Context, m map[string]interface{}, data *resourc
 		"keywords_enabled":    data.KeywordsEnabled,
 		"allow_guests":        data.AllowGuests,
 		"long_context":        data.LongContext,
+		"reasoning_effort":    data.ReasoningEffort,
 		"temperature":         data.Temperature,
 		"allowed_channels":    data.AllowedChannels,
 		"keywords":            data.Keywords,

@@ -165,6 +165,10 @@
                 "name": {
                     "type": "string"
                 },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.\n"
+                },
                 "systemPrompt": {
                     "type": "string"
                 },
@@ -194,6 +198,7 @@
                         "maxTokens",
                         "modelId",
                         "name",
+                        "reasoningEffort",
                         "systemPrompt",
                         "temperature",
                         "updatedAt"
@@ -279,6 +284,10 @@
                 "modelId": {
                     "type": "string"
                 },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Reasoning effort for this organisation. Overrides the global agent value.\n"
+                },
                 "systemPromptAppend": {
                     "type": "string"
                 },
@@ -301,6 +310,7 @@
                         "guardrailPreset",
                         "maxTokens",
                         "modelId",
+                        "reasoningEffort",
                         "systemPromptAppend",
                         "temperature",
                         "version"
@@ -3082,6 +3092,10 @@
                 "name": {
                     "type": "string"
                 },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.\n"
+                },
                 "sessionTtlDays": {
                     "type": "integer"
                 },
@@ -3126,6 +3140,7 @@
                         "maxTokens",
                         "modelId",
                         "name",
+                        "reasoningEffort",
                         "sessionTtlDays",
                         "setupType",
                         "status",
@@ -3508,6 +3523,10 @@
                     "type": "string",
                     "description": "The organisation ID"
                 },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default."
+                },
                 "success": {
                     "type": "boolean"
                 },
@@ -3535,6 +3554,7 @@
                 "modelId",
                 "name",
                 "organisation",
+                "reasoningEffort",
                 "success",
                 "systemPrompt",
                 "temperature"
@@ -3600,6 +3620,10 @@
                 "organisation": {
                     "type": "string",
                     "description": "The organisation ID"
+                },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default."
                 },
                 "systemPrompt": {
                     "type": "string"
@@ -3683,6 +3707,10 @@
                         "type": "string",
                         "description": "The organisation ID"
                     },
+                    "reasoningEffort": {
+                        "type": "string",
+                        "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default."
+                    },
                     "success": {
                         "type": "boolean"
                     },
@@ -3760,6 +3788,10 @@
                 "overlay": {
                     "$ref": "#/types/quant:index/AiAgentOverlayOverlay:AiAgentOverlayOverlay"
                 },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Override the reasoning effort. Must be one of the levels the effective model lists in capabilities.effortLevels. Omit or null to use the global agent value."
+                },
                 "systemPromptAppend": {
                     "type": "string",
                     "description": "Text appended to base system prompt"
@@ -3786,6 +3818,7 @@
                 "modelId",
                 "organisation",
                 "overlay",
+                "reasoningEffort",
                 "systemPromptAppend",
                 "temperature",
                 "version"
@@ -3845,6 +3878,10 @@
                 "organisation": {
                     "type": "string",
                     "description": "The organisation ID"
+                },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Override the reasoning effort. Must be one of the levels the effective model lists in capabilities.effortLevels. Omit or null to use the global agent value."
                 },
                 "systemPromptAppend": {
                     "type": "string",
@@ -3923,6 +3960,10 @@
                     },
                     "overlay": {
                         "$ref": "#/types/quant:index/AiAgentOverlayOverlay:AiAgentOverlayOverlay"
+                    },
+                    "reasoningEffort": {
+                        "type": "string",
+                        "description": "Override the reasoning effort. Must be one of the levels the effective model lists in capabilities.effortLevels. Omit or null to use the global agent value."
                     },
                     "systemPromptAppend": {
                         "type": "string",
@@ -12772,6 +12813,10 @@
                     "type": "string",
                     "description": "The organisation ID"
                 },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default."
+                },
                 "sessionTtlDays": {
                     "type": "integer",
                     "description": "Session TTL in days"
@@ -12811,6 +12856,7 @@
                 "modelId",
                 "name",
                 "organisation",
+                "reasoningEffort",
                 "sessionTtlDays",
                 "setupType",
                 "systemPrompt",
@@ -12923,6 +12969,10 @@
                 "organisation": {
                     "type": "string",
                     "description": "The organisation ID"
+                },
+                "reasoningEffort": {
+                    "type": "string",
+                    "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default."
                 },
                 "sessionTtlDays": {
                     "type": "integer",
@@ -13058,6 +13108,10 @@
                     "organisation": {
                         "type": "string",
                         "description": "The organisation ID"
+                    },
+                    "reasoningEffort": {
+                        "type": "string",
+                        "description": "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default."
                     },
                     "sessionTtlDays": {
                         "type": "integer",

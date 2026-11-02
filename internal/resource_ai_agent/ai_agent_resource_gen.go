@@ -79,6 +79,11 @@ func AiAgentResourceSchema(ctx context.Context) schema.Schema {
 					"name": schema.StringAttribute{
 						Computed: true,
 					},
+					"reasoning_effort": schema.StringAttribute{
+						Computed:            true,
+						Description:         "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+						MarkdownDescription: "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+					},
 					"system_prompt": schema.StringAttribute{
 						Computed: true,
 					},
@@ -180,6 +185,21 @@ func AiAgentResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "The organisation ID",
 				MarkdownDescription: "The organisation ID",
 			},
+			"reasoning_effort": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+				MarkdownDescription: "Reasoning effort (Anthropic effort). Must be one of the levels the model lists in capabilities.effortLevels. Unset uses the caller or model default.",
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"low",
+						"medium",
+						"high",
+						"xhigh",
+						"max",
+					),
+				},
+			},
 			"success": schema.BoolAttribute{
 				Computed: true,
 			},
@@ -211,6 +231,7 @@ type AiAgentModel struct {
 	ModelId            types.String `tfsdk:"model_id"`
 	Name               types.String `tfsdk:"name"`
 	Organisation       types.String `tfsdk:"organisation"`
+	ReasoningEffort    types.String `tfsdk:"reasoning_effort"`
 	Success            types.Bool   `tfsdk:"success"`
 	SystemPrompt       types.String `tfsdk:"system_prompt"`
 	Temperature        types.Number `tfsdk:"temperature"`
@@ -511,6 +532,24 @@ func (t AgentType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue
 			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
 	}
 
+	reasoningEffortAttribute, ok := attributes["reasoning_effort"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`reasoning_effort is missing from object`)
+
+		return nil, diags
+	}
+
+	reasoningEffortVal, ok := reasoningEffortAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`reasoning_effort expected to be basetypes.StringValue, was: %T`, reasoningEffortAttribute))
+	}
+
 	systemPromptAttribute, ok := attributes["system_prompt"]
 
 	if !ok {
@@ -585,6 +624,7 @@ func (t AgentType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue
 		MaxTokens:          maxTokensVal,
 		ModelId:            modelIdVal,
 		Name:               nameVal,
+		ReasoningEffort:    reasoningEffortVal,
 		SystemPrompt:       systemPromptVal,
 		Temperature:        temperatureVal,
 		UpdatedAt:          updatedAtVal,
@@ -925,6 +965,24 @@ func NewAgentValue(attributeTypes map[string]attr.Type, attributes map[string]at
 			fmt.Sprintf(`name expected to be basetypes.StringValue, was: %T`, nameAttribute))
 	}
 
+	reasoningEffortAttribute, ok := attributes["reasoning_effort"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`reasoning_effort is missing from object`)
+
+		return NewAgentValueUnknown(), diags
+	}
+
+	reasoningEffortVal, ok := reasoningEffortAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`reasoning_effort expected to be basetypes.StringValue, was: %T`, reasoningEffortAttribute))
+	}
+
 	systemPromptAttribute, ok := attributes["system_prompt"]
 
 	if !ok {
@@ -999,6 +1057,7 @@ func NewAgentValue(attributeTypes map[string]attr.Type, attributes map[string]at
 		MaxTokens:          maxTokensVal,
 		ModelId:            modelIdVal,
 		Name:               nameVal,
+		ReasoningEffort:    reasoningEffortVal,
 		SystemPrompt:       systemPromptVal,
 		Temperature:        temperatureVal,
 		UpdatedAt:          updatedAtVal,
@@ -1089,6 +1148,7 @@ type AgentValue struct {
 	MaxTokens          basetypes.Int64Value  `tfsdk:"max_tokens"`
 	ModelId            basetypes.StringValue `tfsdk:"model_id"`
 	Name               basetypes.StringValue `tfsdk:"name"`
+	ReasoningEffort    basetypes.StringValue `tfsdk:"reasoning_effort"`
 	SystemPrompt       basetypes.StringValue `tfsdk:"system_prompt"`
 	Temperature        basetypes.NumberValue `tfsdk:"temperature"`
 	UpdatedAt          basetypes.StringValue `tfsdk:"updated_at"`
@@ -1096,7 +1156,7 @@ type AgentValue struct {
 }
 
 func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 18)
+	attrTypes := make(map[string]tftypes.Type, 19)
 
 	var val tftypes.Value
 	var err error
@@ -1122,6 +1182,7 @@ func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error)
 	attrTypes["max_tokens"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["model_id"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["reasoning_effort"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["system_prompt"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["temperature"] = basetypes.NumberType{}.TerraformType(ctx)
 	attrTypes["updated_at"] = basetypes.StringType{}.TerraformType(ctx)
@@ -1130,7 +1191,7 @@ func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error)
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 18)
+		vals := make(map[string]tftypes.Value, 19)
 
 		val, err = v.AgentId.ToTerraformValue(ctx)
 
@@ -1252,6 +1313,14 @@ func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error)
 
 		vals["name"] = val
 
+		val, err = v.ReasoningEffort.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["reasoning_effort"] = val
+
 		val, err = v.SystemPrompt.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -1340,6 +1409,7 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"system_prompt":    basetypes.StringType{},
 			"temperature":      basetypes.NumberType{},
 			"updated_at":       basetypes.StringType{},
@@ -1381,6 +1451,7 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"system_prompt":    basetypes.StringType{},
 			"temperature":      basetypes.NumberType{},
 			"updated_at":       basetypes.StringType{},
@@ -1422,6 +1493,7 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"max_tokens":       basetypes.Int64Type{},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
 			"system_prompt":    basetypes.StringType{},
 			"temperature":      basetypes.NumberType{},
 			"updated_at":       basetypes.StringType{},
@@ -1450,6 +1522,7 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 		"max_tokens":       basetypes.Int64Type{},
 		"model_id":         basetypes.StringType{},
 		"name":             basetypes.StringType{},
+		"reasoning_effort": basetypes.StringType{},
 		"system_prompt":    basetypes.StringType{},
 		"temperature":      basetypes.NumberType{},
 		"updated_at":       basetypes.StringType{},
@@ -1481,6 +1554,7 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"max_tokens":          v.MaxTokens,
 			"model_id":            v.ModelId,
 			"name":                v.Name,
+			"reasoning_effort":    v.ReasoningEffort,
 			"system_prompt":       v.SystemPrompt,
 			"temperature":         v.Temperature,
 			"updated_at":          v.UpdatedAt,
@@ -1564,6 +1638,10 @@ func (v AgentValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.ReasoningEffort.Equal(other.ReasoningEffort) {
+		return false
+	}
+
 	if !v.SystemPrompt.Equal(other.SystemPrompt) {
 		return false
 	}
@@ -1610,6 +1688,7 @@ func (v AgentValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 		"max_tokens":       basetypes.Int64Type{},
 		"model_id":         basetypes.StringType{},
 		"name":             basetypes.StringType{},
+		"reasoning_effort": basetypes.StringType{},
 		"system_prompt":    basetypes.StringType{},
 		"temperature":      basetypes.NumberType{},
 		"updated_at":       basetypes.StringType{},
