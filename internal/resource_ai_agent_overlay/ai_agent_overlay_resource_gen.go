@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -91,6 +92,13 @@ func AiAgentOverlayResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Tool names to remove",
 				MarkdownDescription: "Tool names to remove",
 			},
+			"filter_policies": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Description:         "Filter policy IDs applied to this agent's requests for this organisation, with any organisation-wide mandatory policies",
+				MarkdownDescription: "Filter policy IDs applied to this agent's requests for this organisation, with any organisation-wide mandatory policies",
+			},
 			"guardrail_preset": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -104,6 +112,12 @@ func AiAgentOverlayResourceSchema(ctx context.Context) schema.Schema {
 					),
 				},
 			},
+			"long_context": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Force the 1M context window on (true) or off (false) for this organisation. Omit or null to use the platform default.",
+				MarkdownDescription: "Force the 1M context window on (true) or off (false) for this organisation. Omit or null to use the platform default.",
+			},
 			"max_tokens": schema.Int64Attribute{
 				Optional:            true,
 				Computed:            true,
@@ -112,6 +126,36 @@ func AiAgentOverlayResourceSchema(ctx context.Context) schema.Schema {
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
+			},
+			"mcp_servers": schema.ListNestedAttribute{
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"server": schema.StringAttribute{
+							Required:            true,
+							Description:         "The registered server name",
+							MarkdownDescription: "The registered server name",
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,62}$"), ""),
+							},
+						},
+						"tools": schema.ListAttribute{
+							ElementType:         types.StringType,
+							Optional:            true,
+							Computed:            true,
+							Description:         "Optional. Only these tools of the server. Omit for every tool the server allows; an empty array allows none.",
+							MarkdownDescription: "Optional. Only these tools of the server. Omit for every tool the server allows; an empty array allows none.",
+						},
+					},
+					CustomType: McpServersType{
+						ObjectType: types.ObjectType{
+							AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+						},
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. The overlay PUT replaces the whole overlay: omit the field or send an empty array to remove every attachment.",
+				MarkdownDescription: "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. The overlay PUT replaces the whole overlay: omit the field or send an empty array to remove every attachment.",
 			},
 			"model_id": schema.StringAttribute{
 				Optional:            true,
@@ -147,10 +191,36 @@ func AiAgentOverlayResourceSchema(ctx context.Context) schema.Schema {
 						ElementType: types.StringType,
 						Computed:    true,
 					},
+					"filter_policies": schema.ListAttribute{
+						ElementType: types.StringType,
+						Computed:    true,
+					},
 					"guardrail_preset": schema.StringAttribute{
 						Computed: true,
 					},
+					"long_context": schema.BoolAttribute{
+						Computed: true,
+					},
 					"max_tokens": schema.Int64Attribute{
+						Computed: true,
+					},
+					"mcp_servers": schema.ListNestedAttribute{
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"server": schema.StringAttribute{
+									Computed: true,
+								},
+								"tools": schema.ListAttribute{
+									ElementType: types.StringType,
+									Computed:    true,
+								},
+							},
+							CustomType: McpServersType{
+								ObjectType: types.ObjectType{
+									AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+								},
+							},
+						},
 						Computed: true,
 					},
 					"model_id": schema.StringAttribute{
@@ -223,8 +293,11 @@ type AiAgentOverlayModel struct {
 	Base               BaseValue    `tfsdk:"base"`
 	DisabledSkills     types.List   `tfsdk:"disabled_skills"`
 	DisabledTools      types.List   `tfsdk:"disabled_tools"`
+	FilterPolicies     types.List   `tfsdk:"filter_policies"`
 	GuardrailPreset    types.String `tfsdk:"guardrail_preset"`
+	LongContext        types.Bool   `tfsdk:"long_context"`
 	MaxTokens          types.Int64  `tfsdk:"max_tokens"`
+	McpServers         types.List   `tfsdk:"mcp_servers"`
 	ModelId            types.String `tfsdk:"model_id"`
 	Organisation       types.String `tfsdk:"organisation"`
 	Overlay            OverlayValue `tfsdk:"overlay"`
@@ -842,6 +915,412 @@ func (v BaseValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 	}
 }
 
+var _ basetypes.ObjectTypable = McpServersType{}
+
+type McpServersType struct {
+	basetypes.ObjectType
+}
+
+func (t McpServersType) Equal(o attr.Type) bool {
+	other, ok := o.(McpServersType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t McpServersType) String() string {
+	return "McpServersType"
+}
+
+func (t McpServersType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	serverAttribute, ok := attributes["server"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`server is missing from object`)
+
+		return nil, diags
+	}
+
+	serverVal, ok := serverAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`server expected to be basetypes.StringValue, was: %T`, serverAttribute))
+	}
+
+	toolsAttribute, ok := attributes["tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tools is missing from object`)
+
+		return nil, diags
+	}
+
+	toolsVal, ok := toolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tools expected to be basetypes.ListValue, was: %T`, toolsAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return McpServersValue{
+		Server: serverVal,
+		Tools:  toolsVal,
+		state:  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewMcpServersValueNull() McpServersValue {
+	return McpServersValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewMcpServersValueUnknown() McpServersValue {
+	return McpServersValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewMcpServersValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (McpServersValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing McpServersValue Attribute Value",
+				"While creating a McpServersValue value, a missing attribute value was detected. "+
+					"A McpServersValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("McpServersValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid McpServersValue Attribute Type",
+				"While creating a McpServersValue value, an invalid attribute value was detected. "+
+					"A McpServersValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("McpServersValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("McpServersValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra McpServersValue Attribute Value",
+				"While creating a McpServersValue value, an extra attribute value was detected. "+
+					"A McpServersValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra McpServersValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	serverAttribute, ok := attributes["server"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`server is missing from object`)
+
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	serverVal, ok := serverAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`server expected to be basetypes.StringValue, was: %T`, serverAttribute))
+	}
+
+	toolsAttribute, ok := attributes["tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tools is missing from object`)
+
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	toolsVal, ok := toolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tools expected to be basetypes.ListValue, was: %T`, toolsAttribute))
+	}
+
+	if diags.HasError() {
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	return McpServersValue{
+		Server: serverVal,
+		Tools:  toolsVal,
+		state:  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewMcpServersValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) McpServersValue {
+	object, diags := NewMcpServersValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewMcpServersValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t McpServersType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewMcpServersValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewMcpServersValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewMcpServersValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewMcpServersValueMust(McpServersValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t McpServersType) ValueType(ctx context.Context) attr.Value {
+	return McpServersValue{}
+}
+
+var _ basetypes.ObjectValuable = McpServersValue{}
+
+type McpServersValue struct {
+	Server basetypes.StringValue `tfsdk:"server"`
+	Tools  basetypes.ListValue   `tfsdk:"tools"`
+	state  attr.ValueState
+}
+
+func (v McpServersValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["server"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["tools"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.Server.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["server"] = val
+
+		val, err = v.Tools.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["tools"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v McpServersValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v McpServersValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v McpServersValue) String() string {
+	return "McpServersValue"
+}
+
+func (v McpServersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var toolsVal basetypes.ListValue
+	switch {
+	case v.Tools.IsUnknown():
+		toolsVal = types.ListUnknown(types.StringType)
+	case v.Tools.IsNull():
+		toolsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		toolsVal, d = types.ListValue(types.StringType, v.Tools.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"server": basetypes.StringType{},
+			"tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+		}), diags
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"server": basetypes.StringType{},
+		"tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"server": v.Server,
+			"tools":  toolsVal,
+		})
+
+	return objVal, diags
+}
+
+func (v McpServersValue) Equal(o attr.Value) bool {
+	other, ok := o.(McpServersValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Server.Equal(other.Server) {
+		return false
+	}
+
+	if !v.Tools.Equal(other.Tools) {
+		return false
+	}
+
+	return true
+}
+
+func (v McpServersValue) Type(ctx context.Context) attr.Type {
+	return McpServersType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v McpServersValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"server": basetypes.StringType{},
+		"tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+	}
+}
+
 var _ basetypes.ObjectTypable = OverlayType{}
 
 type OverlayType struct {
@@ -957,6 +1436,24 @@ func (t OverlayType) ValueFromObject(ctx context.Context, in basetypes.ObjectVal
 			fmt.Sprintf(`disabled_tools expected to be basetypes.ListValue, was: %T`, disabledToolsAttribute))
 	}
 
+	filterPoliciesAttribute, ok := attributes["filter_policies"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`filter_policies is missing from object`)
+
+		return nil, diags
+	}
+
+	filterPoliciesVal, ok := filterPoliciesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`filter_policies expected to be basetypes.ListValue, was: %T`, filterPoliciesAttribute))
+	}
+
 	guardrailPresetAttribute, ok := attributes["guardrail_preset"]
 
 	if !ok {
@@ -975,6 +1472,24 @@ func (t OverlayType) ValueFromObject(ctx context.Context, in basetypes.ObjectVal
 			fmt.Sprintf(`guardrail_preset expected to be basetypes.StringValue, was: %T`, guardrailPresetAttribute))
 	}
 
+	longContextAttribute, ok := attributes["long_context"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`long_context is missing from object`)
+
+		return nil, diags
+	}
+
+	longContextVal, ok := longContextAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`long_context expected to be basetypes.BoolValue, was: %T`, longContextAttribute))
+	}
+
 	maxTokensAttribute, ok := attributes["max_tokens"]
 
 	if !ok {
@@ -991,6 +1506,24 @@ func (t OverlayType) ValueFromObject(ctx context.Context, in basetypes.ObjectVal
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`max_tokens expected to be basetypes.Int64Value, was: %T`, maxTokensAttribute))
+	}
+
+	mcpServersAttribute, ok := attributes["mcp_servers"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`mcp_servers is missing from object`)
+
+		return nil, diags
+	}
+
+	mcpServersVal, ok := mcpServersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`mcp_servers expected to be basetypes.ListValue, was: %T`, mcpServersAttribute))
 	}
 
 	modelIdAttribute, ok := attributes["model_id"]
@@ -1093,8 +1626,11 @@ func (t OverlayType) ValueFromObject(ctx context.Context, in basetypes.ObjectVal
 		AllowedCollections: allowedCollectionsVal,
 		DisabledSkills:     disabledSkillsVal,
 		DisabledTools:      disabledToolsVal,
+		FilterPolicies:     filterPoliciesVal,
 		GuardrailPreset:    guardrailPresetVal,
+		LongContext:        longContextVal,
 		MaxTokens:          maxTokensVal,
+		McpServers:         mcpServersVal,
 		ModelId:            modelIdVal,
 		ReasoningEffort:    reasoningEffortVal,
 		SystemPromptAppend: systemPromptAppendVal,
@@ -1257,6 +1793,24 @@ func NewOverlayValue(attributeTypes map[string]attr.Type, attributes map[string]
 			fmt.Sprintf(`disabled_tools expected to be basetypes.ListValue, was: %T`, disabledToolsAttribute))
 	}
 
+	filterPoliciesAttribute, ok := attributes["filter_policies"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`filter_policies is missing from object`)
+
+		return NewOverlayValueUnknown(), diags
+	}
+
+	filterPoliciesVal, ok := filterPoliciesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`filter_policies expected to be basetypes.ListValue, was: %T`, filterPoliciesAttribute))
+	}
+
 	guardrailPresetAttribute, ok := attributes["guardrail_preset"]
 
 	if !ok {
@@ -1275,6 +1829,24 @@ func NewOverlayValue(attributeTypes map[string]attr.Type, attributes map[string]
 			fmt.Sprintf(`guardrail_preset expected to be basetypes.StringValue, was: %T`, guardrailPresetAttribute))
 	}
 
+	longContextAttribute, ok := attributes["long_context"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`long_context is missing from object`)
+
+		return NewOverlayValueUnknown(), diags
+	}
+
+	longContextVal, ok := longContextAttribute.(basetypes.BoolValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`long_context expected to be basetypes.BoolValue, was: %T`, longContextAttribute))
+	}
+
 	maxTokensAttribute, ok := attributes["max_tokens"]
 
 	if !ok {
@@ -1291,6 +1863,24 @@ func NewOverlayValue(attributeTypes map[string]attr.Type, attributes map[string]
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`max_tokens expected to be basetypes.Int64Value, was: %T`, maxTokensAttribute))
+	}
+
+	mcpServersAttribute, ok := attributes["mcp_servers"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`mcp_servers is missing from object`)
+
+		return NewOverlayValueUnknown(), diags
+	}
+
+	mcpServersVal, ok := mcpServersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`mcp_servers expected to be basetypes.ListValue, was: %T`, mcpServersAttribute))
 	}
 
 	modelIdAttribute, ok := attributes["model_id"]
@@ -1393,8 +1983,11 @@ func NewOverlayValue(attributeTypes map[string]attr.Type, attributes map[string]
 		AllowedCollections: allowedCollectionsVal,
 		DisabledSkills:     disabledSkillsVal,
 		DisabledTools:      disabledToolsVal,
+		FilterPolicies:     filterPoliciesVal,
 		GuardrailPreset:    guardrailPresetVal,
+		LongContext:        longContextVal,
 		MaxTokens:          maxTokensVal,
+		McpServers:         mcpServersVal,
 		ModelId:            modelIdVal,
 		ReasoningEffort:    reasoningEffortVal,
 		SystemPromptAppend: systemPromptAppendVal,
@@ -1477,8 +2070,11 @@ type OverlayValue struct {
 	AllowedCollections basetypes.ListValue   `tfsdk:"allowed_collections"`
 	DisabledSkills     basetypes.ListValue   `tfsdk:"disabled_skills"`
 	DisabledTools      basetypes.ListValue   `tfsdk:"disabled_tools"`
+	FilterPolicies     basetypes.ListValue   `tfsdk:"filter_policies"`
 	GuardrailPreset    basetypes.StringValue `tfsdk:"guardrail_preset"`
+	LongContext        basetypes.BoolValue   `tfsdk:"long_context"`
 	MaxTokens          basetypes.Int64Value  `tfsdk:"max_tokens"`
+	McpServers         basetypes.ListValue   `tfsdk:"mcp_servers"`
 	ModelId            basetypes.StringValue `tfsdk:"model_id"`
 	ReasoningEffort    basetypes.StringValue `tfsdk:"reasoning_effort"`
 	SystemPromptAppend basetypes.StringValue `tfsdk:"system_prompt_append"`
@@ -1488,7 +2084,7 @@ type OverlayValue struct {
 }
 
 func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 12)
+	attrTypes := make(map[string]tftypes.Type, 15)
 
 	var val tftypes.Value
 	var err error
@@ -1508,8 +2104,15 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 	attrTypes["disabled_tools"] = basetypes.ListType{
 		ElemType: types.StringType,
 	}.TerraformType(ctx)
+	attrTypes["filter_policies"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
 	attrTypes["guardrail_preset"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["long_context"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["max_tokens"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["mcp_servers"] = basetypes.ListType{
+		ElemType: McpServersValue{}.Type(ctx),
+	}.TerraformType(ctx)
 	attrTypes["model_id"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["reasoning_effort"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["system_prompt_append"] = basetypes.StringType{}.TerraformType(ctx)
@@ -1520,7 +2123,7 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 12)
+		vals := make(map[string]tftypes.Value, 15)
 
 		val, err = v.AdditionalSkills.ToTerraformValue(ctx)
 
@@ -1562,6 +2165,14 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 
 		vals["disabled_tools"] = val
 
+		val, err = v.FilterPolicies.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["filter_policies"] = val
+
 		val, err = v.GuardrailPreset.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -1570,6 +2181,14 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 
 		vals["guardrail_preset"] = val
 
+		val, err = v.LongContext.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["long_context"] = val
+
 		val, err = v.MaxTokens.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -1577,6 +2196,14 @@ func (v OverlayValue) ToTerraformValue(ctx context.Context) (tftypes.Value, erro
 		}
 
 		vals["max_tokens"] = val
+
+		val, err = v.McpServers.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["mcp_servers"] = val
 
 		val, err = v.ModelId.ToTerraformValue(ctx)
 
@@ -1647,6 +2274,35 @@ func (v OverlayValue) String() string {
 func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
+	mcpServers := types.ListValueMust(
+		McpServersType{
+			basetypes.ObjectType{
+				AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+			},
+		},
+		v.McpServers.Elements(),
+	)
+
+	if v.McpServers.IsNull() {
+		mcpServers = types.ListNull(
+			McpServersType{
+				basetypes.ObjectType{
+					AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	if v.McpServers.IsUnknown() {
+		mcpServers = types.ListUnknown(
+			McpServersType{
+				basetypes.ObjectType{
+					AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
 	var additionalSkillsVal basetypes.ListValue
 	switch {
 	case v.AdditionalSkills.IsUnknown():
@@ -1676,8 +2332,15 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"disabled_tools": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"guardrail_preset":     basetypes.StringType{},
-			"max_tokens":           basetypes.Int64Type{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":             basetypes.StringType{},
 			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
@@ -1715,8 +2378,15 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"disabled_tools": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"guardrail_preset":     basetypes.StringType{},
-			"max_tokens":           basetypes.Int64Type{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":             basetypes.StringType{},
 			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
@@ -1754,8 +2424,15 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"disabled_tools": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"guardrail_preset":     basetypes.StringType{},
-			"max_tokens":           basetypes.Int64Type{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":             basetypes.StringType{},
 			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
@@ -1793,8 +2470,15 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"disabled_tools": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"guardrail_preset":     basetypes.StringType{},
-			"max_tokens":           basetypes.Int64Type{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":             basetypes.StringType{},
 			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
@@ -1832,8 +2516,61 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"disabled_tools": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"guardrail_preset":     basetypes.StringType{},
-			"max_tokens":           basetypes.Int64Type{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
+			"model_id":             basetypes.StringType{},
+			"reasoning_effort":     basetypes.StringType{},
+			"system_prompt_append": basetypes.StringType{},
+			"temperature":          basetypes.NumberType{},
+			"version":              basetypes.Int64Type{},
+		}), diags
+	}
+
+	var filterPoliciesVal basetypes.ListValue
+	switch {
+	case v.FilterPolicies.IsUnknown():
+		filterPoliciesVal = types.ListUnknown(types.StringType)
+	case v.FilterPolicies.IsNull():
+		filterPoliciesVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		filterPoliciesVal, d = types.ListValue(types.StringType, v.FilterPolicies.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"additional_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"additional_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"disabled_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"disabled_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"guardrail_preset": basetypes.StringType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":             basetypes.StringType{},
 			"reasoning_effort":     basetypes.StringType{},
 			"system_prompt_append": basetypes.StringType{},
@@ -1858,8 +2595,15 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 		"disabled_tools": basetypes.ListType{
 			ElemType: types.StringType,
 		},
-		"guardrail_preset":     basetypes.StringType{},
-		"max_tokens":           basetypes.Int64Type{},
+		"filter_policies": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"guardrail_preset": basetypes.StringType{},
+		"long_context":     basetypes.BoolType{},
+		"max_tokens":       basetypes.Int64Type{},
+		"mcp_servers": basetypes.ListType{
+			ElemType: McpServersValue{}.Type(ctx),
+		},
 		"model_id":             basetypes.StringType{},
 		"reasoning_effort":     basetypes.StringType{},
 		"system_prompt_append": basetypes.StringType{},
@@ -1883,8 +2627,11 @@ func (v OverlayValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue,
 			"allowed_collections":  allowedCollectionsVal,
 			"disabled_skills":      disabledSkillsVal,
 			"disabled_tools":       disabledToolsVal,
+			"filter_policies":      filterPoliciesVal,
 			"guardrail_preset":     v.GuardrailPreset,
+			"long_context":         v.LongContext,
 			"max_tokens":           v.MaxTokens,
+			"mcp_servers":          mcpServers,
 			"model_id":             v.ModelId,
 			"reasoning_effort":     v.ReasoningEffort,
 			"system_prompt_append": v.SystemPromptAppend,
@@ -1930,11 +2677,23 @@ func (v OverlayValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.FilterPolicies.Equal(other.FilterPolicies) {
+		return false
+	}
+
 	if !v.GuardrailPreset.Equal(other.GuardrailPreset) {
 		return false
 	}
 
+	if !v.LongContext.Equal(other.LongContext) {
+		return false
+	}
+
 	if !v.MaxTokens.Equal(other.MaxTokens) {
+		return false
+	}
+
+	if !v.McpServers.Equal(other.McpServers) {
 		return false
 	}
 
@@ -1986,8 +2745,15 @@ func (v OverlayValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 		"disabled_tools": basetypes.ListType{
 			ElemType: types.StringType,
 		},
-		"guardrail_preset":     basetypes.StringType{},
-		"max_tokens":           basetypes.Int64Type{},
+		"filter_policies": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"guardrail_preset": basetypes.StringType{},
+		"long_context":     basetypes.BoolType{},
+		"max_tokens":       basetypes.Int64Type{},
+		"mcp_servers": basetypes.ListType{
+			ElemType: McpServersValue{}.Type(ctx),
+		},
 		"model_id":             basetypes.StringType{},
 		"reasoning_effort":     basetypes.StringType{},
 		"system_prompt_append": basetypes.StringType{},
@@ -1995,3 +2761,26 @@ func (v OverlayValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 		"version":              basetypes.Int64Type{},
 	}
 }
+
+var _ basetypes.ObjectTypable = McpServersType{}
+
+
+
+
+
+
+
+
+
+
+
+var _ basetypes.ObjectValuable = McpServersValue{}
+
+
+
+
+
+
+
+
+
