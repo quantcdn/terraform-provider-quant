@@ -137,6 +137,13 @@
                 "description": {
                     "type": "string"
                 },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Filter policy IDs applied to this agent's requests (organisation agents)\n"
+                },
                 "group": {
                     "type": "string"
                 },
@@ -158,6 +165,13 @@
                 },
                 "maxTokens": {
                     "type": "integer"
+                },
+                "mcpServers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiAgentAgentMcpServer:AiAgentAgentMcpServer"
+                    },
+                    "description": "Attached MCP servers. A platform agent shows its organisation overlay's attachments.\n"
                 },
                 "modelId": {
                     "type": "string"
@@ -190,18 +204,43 @@
                         "createdAt",
                         "createdBy",
                         "description",
+                        "filterPolicies",
                         "group",
                         "guardrailPreset",
                         "hasOverlay",
                         "isGlobal",
                         "longContext",
                         "maxTokens",
+                        "mcpServers",
                         "modelId",
                         "name",
                         "reasoningEffort",
                         "systemPrompt",
                         "temperature",
                         "updatedAt"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiAgentAgentMcpServer:AiAgentAgentMcpServer": {
+            "properties": {
+                "server": {
+                    "type": "string"
+                },
+                "tools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Absent: every tool the server allows. Empty: none.\n"
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "server",
+                        "tools"
                     ]
                 }
             }

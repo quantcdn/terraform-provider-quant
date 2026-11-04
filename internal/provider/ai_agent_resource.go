@@ -451,7 +451,24 @@ func mapAiAgentFromMap(ctx context.Context, m map[string]interface{}, org string
 			agent.UpdatedAt = &t
 		}
 	}
+	agentListsFromMap(m, agent)
 	return mapAiAgentResponse(ctx, agent, org, data)
+}
+
+// agentListsFromMap reads filterPolicies and mcpServers from a create or update
+// response. An absent key stays nil, so the read keeps the planned value.
+func agentListsFromMap(m map[string]interface{}, agent *quantadmingo.GetAIAgent200ResponseAgent) {
+	if v, ok := m["filterPolicies"].([]interface{}); ok {
+		agent.FilterPolicies = stringSliceFromInterface(v)
+	}
+	raw, ok := m["mcpServers"].([]interface{})
+	if !ok {
+		return
+	}
+	agent.McpServers = make([]quantadmingo.ListAIAgents200ResponseAgentsInnerMcpServersInner, 0, len(raw))
+	for _, item := range raw {
+		agent.McpServers = append(agent.McpServers, storedAttachment(item))
+	}
 }
 
 func stringSliceFromInterface(s []interface{}) []string {
@@ -505,12 +522,8 @@ func mapAiAgentResponse(ctx context.Context, agent *quantadmingo.GetAIAgent200Re
 	data.AllowedTools = stringListFromSlice(ctx, agent.AllowedTools)
 	data.AllowedCollections = stringListFromSlice(ctx, agent.AllowedCollections)
 	data.AssignedSkills = stringListFromSlice(ctx, agent.AssignedSkills)
-	// FilterPolicies is not on the response model — always set to a typed null
-	// so the list has a concrete element type (bridge rejects dynamic type).
-	if data.FilterPolicies.IsUnknown() || data.FilterPolicies.IsNull() || data.FilterPolicies.ElementType(ctx) == nil {
-		data.FilterPolicies = types.ListNull(types.StringType)
-	}
-	mcp, d := agentMcpServersValue(ctx, agent.AdditionalProperties, data.McpServers)
+	data.FilterPolicies = agentFilterPoliciesValue(ctx, agent.FilterPolicies, data.FilterPolicies)
+	mcp, d := agentMcpServersValue(ctx, agent.McpServers, data.McpServers)
 	diags.Append(d...)
 	data.McpServers = mcp
 
@@ -529,6 +542,8 @@ func mapAiAgentResponse(ctx context.Context, agent *quantadmingo.GetAIAgent200Re
 		"allowed_tools":       data.AllowedTools,
 		"allowed_collections": data.AllowedCollections,
 		"assigned_skills":     data.AssignedSkills,
+		"filter_policies":     data.FilterPolicies,
+		"mcp_servers":         data.McpServers,
 		"long_context":        data.LongContext,
 		"reasoning_effort":    data.ReasoningEffort,
 		"guardrail_preset":    data.GuardrailPreset,
@@ -594,26 +609,34 @@ func agentMcpAttachments(ctx context.Context, list types.List) ([]quantadmingo.C
 	return out, diags
 }
 
-// agentMcpServersValue reads mcp_servers from the agent response. The SDK's
-// agent model has no mcpServers field, so the value comes from the response's
-// additional properties. When the response has none (the API stores no empty
-// list on create), the planned value stays, else null.
-func agentMcpServersValue(ctx context.Context, props map[string]interface{}, planned types.List) (types.List, diag.Diagnostics) {
+// agentFilterPoliciesValue reads filter_policies from the agent response. When
+// the response has none, the planned value stays, else null.
+func agentFilterPoliciesValue(ctx context.Context, policies []string, planned types.List) types.List {
+	if policies == nil && known(planned) {
+		return planned
+	}
+	return stringListFromSlice(ctx, policies)
+}
+
+// agentMcpServersValue reads mcp_servers from the agent response. When the
+// response has none (the API stores no empty list on create), the planned
+// value stays, else null.
+func agentMcpServersValue(ctx context.Context, servers []quantadmingo.ListAIAgents200ResponseAgentsInnerMcpServersInner, planned types.List) (types.List, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	elemType := resource_ai_agent.McpServersType{
 		ObjectType: types.ObjectType{AttrTypes: resource_ai_agent.McpServersValue{}.AttributeTypes(ctx)},
 	}
-	raw, ok := props["mcpServers"].([]interface{})
-	if !ok {
+	if servers == nil {
 		if known(planned) {
 			return planned, diags
 		}
 		return types.ListNull(elemType), diags
 	}
 	attrTypes := resource_ai_agent.McpServersValue{}.AttributeTypes(ctx)
-	elems := make([]attr.Value, 0, len(raw))
-	for _, item := range raw {
-		v, d := resource_ai_agent.NewMcpServersValue(attrTypes, mcpServerAttrs(ctx, storedAttachment(item)))
+	elems := make([]attr.Value, 0, len(servers))
+	for _, s := range servers {
+		stored := quantadmingo.GetAgentOverlay200ResponseOverlayMcpServersInner{Server: s.Server, Tools: s.Tools}
+		v, d := resource_ai_agent.NewMcpServersValue(attrTypes, mcpServerAttrs(ctx, stored))
 		diags.Append(d...)
 		elems = append(elems, v)
 	}
@@ -623,8 +646,8 @@ func agentMcpServersValue(ctx context.Context, props map[string]interface{}, pla
 }
 
 // storedAttachment reads one {server, tools?} object from a decoded JSON value.
-func storedAttachment(item interface{}) quantadmingo.GetAgentOverlay200ResponseOverlayMcpServersInner {
-	out := quantadmingo.GetAgentOverlay200ResponseOverlayMcpServersInner{}
+func storedAttachment(item interface{}) quantadmingo.ListAIAgents200ResponseAgentsInnerMcpServersInner {
+	out := quantadmingo.ListAIAgents200ResponseAgentsInnerMcpServersInner{}
 	m, ok := item.(map[string]interface{})
 	if !ok {
 		return out

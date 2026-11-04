@@ -14,6 +14,19 @@
                             },
                             "assigned_skills": {
                                 "maxItemsOne": false
+                            },
+                            "filter_policies": {
+                                "maxItemsOne": false
+                            },
+                            "mcp_servers": {
+                                "maxItemsOne": false,
+                                "elem": {
+                                    "fields": {
+                                        "tools": {
+                                            "maxItemsOne": false
+                                        }
+                                    }
+                                }
                             }
                         }
                     },
