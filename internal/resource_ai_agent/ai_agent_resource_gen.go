@@ -48,6 +48,12 @@ func AiAgentResourceSchema(ctx context.Context) schema.Schema {
 					"description": schema.StringAttribute{
 						Computed: true,
 					},
+					"filter_policies": schema.ListAttribute{
+						ElementType:         types.StringType,
+						Computed:            true,
+						Description:         "Filter policy IDs applied to this agent's requests (organisation agents)",
+						MarkdownDescription: "Filter policy IDs applied to this agent's requests (organisation agents)",
+					},
 					"group": schema.StringAttribute{
 						Computed: true,
 					},
@@ -73,6 +79,29 @@ func AiAgentResourceSchema(ctx context.Context) schema.Schema {
 					},
 					"max_tokens": schema.Int64Attribute{
 						Computed: true,
+					},
+					"mcp_servers": schema.ListNestedAttribute{
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"server": schema.StringAttribute{
+									Computed: true,
+								},
+								"tools": schema.ListAttribute{
+									ElementType:         types.StringType,
+									Computed:            true,
+									Description:         "Absent: every tool the server allows. Empty: none.",
+									MarkdownDescription: "Absent: every tool the server allows. Empty: none.",
+								},
+							},
+							CustomType: McpServersType{
+								ObjectType: types.ObjectType{
+									AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+								},
+							},
+						},
+						Computed:            true,
+						Description:         "Attached MCP servers. A platform agent shows its organisation overlay's attachments.",
+						MarkdownDescription: "Attached MCP servers. A platform agent shows its organisation overlay's attachments.",
 					},
 					"model_id": schema.StringAttribute{
 						Computed: true,
@@ -420,6 +449,24 @@ func (t AgentType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue
 			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
 	}
 
+	filterPoliciesAttribute, ok := attributes["filter_policies"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`filter_policies is missing from object`)
+
+		return nil, diags
+	}
+
+	filterPoliciesVal, ok := filterPoliciesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`filter_policies expected to be basetypes.ListValue, was: %T`, filterPoliciesAttribute))
+	}
+
 	groupAttribute, ok := attributes["group"]
 
 	if !ok {
@@ -526,6 +573,24 @@ func (t AgentType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`max_tokens expected to be basetypes.Int64Value, was: %T`, maxTokensAttribute))
+	}
+
+	mcpServersAttribute, ok := attributes["mcp_servers"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`mcp_servers is missing from object`)
+
+		return nil, diags
+	}
+
+	mcpServersVal, ok := mcpServersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`mcp_servers expected to be basetypes.ListValue, was: %T`, mcpServersAttribute))
 	}
 
 	modelIdAttribute, ok := attributes["model_id"]
@@ -648,12 +713,14 @@ func (t AgentType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue
 		CreatedAt:          createdAtVal,
 		CreatedBy:          createdByVal,
 		Description:        descriptionVal,
+		FilterPolicies:     filterPoliciesVal,
 		Group:              groupVal,
 		GuardrailPreset:    guardrailPresetVal,
 		HasOverlay:         hasOverlayVal,
 		IsGlobal:           isGlobalVal,
 		LongContext:        longContextVal,
 		MaxTokens:          maxTokensVal,
+		McpServers:         mcpServersVal,
 		ModelId:            modelIdVal,
 		Name:               nameVal,
 		ReasoningEffort:    reasoningEffortVal,
@@ -853,6 +920,24 @@ func NewAgentValue(attributeTypes map[string]attr.Type, attributes map[string]at
 			fmt.Sprintf(`description expected to be basetypes.StringValue, was: %T`, descriptionAttribute))
 	}
 
+	filterPoliciesAttribute, ok := attributes["filter_policies"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`filter_policies is missing from object`)
+
+		return NewAgentValueUnknown(), diags
+	}
+
+	filterPoliciesVal, ok := filterPoliciesAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`filter_policies expected to be basetypes.ListValue, was: %T`, filterPoliciesAttribute))
+	}
+
 	groupAttribute, ok := attributes["group"]
 
 	if !ok {
@@ -959,6 +1044,24 @@ func NewAgentValue(attributeTypes map[string]attr.Type, attributes map[string]at
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`max_tokens expected to be basetypes.Int64Value, was: %T`, maxTokensAttribute))
+	}
+
+	mcpServersAttribute, ok := attributes["mcp_servers"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`mcp_servers is missing from object`)
+
+		return NewAgentValueUnknown(), diags
+	}
+
+	mcpServersVal, ok := mcpServersAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`mcp_servers expected to be basetypes.ListValue, was: %T`, mcpServersAttribute))
 	}
 
 	modelIdAttribute, ok := attributes["model_id"]
@@ -1081,12 +1184,14 @@ func NewAgentValue(attributeTypes map[string]attr.Type, attributes map[string]at
 		CreatedAt:          createdAtVal,
 		CreatedBy:          createdByVal,
 		Description:        descriptionVal,
+		FilterPolicies:     filterPoliciesVal,
 		Group:              groupVal,
 		GuardrailPreset:    guardrailPresetVal,
 		HasOverlay:         hasOverlayVal,
 		IsGlobal:           isGlobalVal,
 		LongContext:        longContextVal,
 		MaxTokens:          maxTokensVal,
+		McpServers:         mcpServersVal,
 		ModelId:            modelIdVal,
 		Name:               nameVal,
 		ReasoningEffort:    reasoningEffortVal,
@@ -1172,12 +1277,14 @@ type AgentValue struct {
 	CreatedAt          basetypes.StringValue `tfsdk:"created_at"`
 	CreatedBy          basetypes.StringValue `tfsdk:"created_by"`
 	Description        basetypes.StringValue `tfsdk:"description"`
+	FilterPolicies     basetypes.ListValue   `tfsdk:"filter_policies"`
 	Group              basetypes.StringValue `tfsdk:"group"`
 	GuardrailPreset    basetypes.StringValue `tfsdk:"guardrail_preset"`
 	HasOverlay         basetypes.BoolValue   `tfsdk:"has_overlay"`
 	IsGlobal           basetypes.BoolValue   `tfsdk:"is_global"`
 	LongContext        basetypes.BoolValue   `tfsdk:"long_context"`
 	MaxTokens          basetypes.Int64Value  `tfsdk:"max_tokens"`
+	McpServers         basetypes.ListValue   `tfsdk:"mcp_servers"`
 	ModelId            basetypes.StringValue `tfsdk:"model_id"`
 	Name               basetypes.StringValue `tfsdk:"name"`
 	ReasoningEffort    basetypes.StringValue `tfsdk:"reasoning_effort"`
@@ -1188,7 +1295,7 @@ type AgentValue struct {
 }
 
 func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 19)
+	attrTypes := make(map[string]tftypes.Type, 21)
 
 	var val tftypes.Value
 	var err error
@@ -1206,12 +1313,18 @@ func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error)
 	attrTypes["created_at"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["created_by"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["description"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["filter_policies"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
 	attrTypes["group"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["guardrail_preset"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["has_overlay"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["is_global"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["long_context"] = basetypes.BoolType{}.TerraformType(ctx)
 	attrTypes["max_tokens"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["mcp_servers"] = basetypes.ListType{
+		ElemType: McpServersValue{}.Type(ctx),
+	}.TerraformType(ctx)
 	attrTypes["model_id"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["name"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["reasoning_effort"] = basetypes.StringType{}.TerraformType(ctx)
@@ -1223,7 +1336,7 @@ func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error)
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 19)
+		vals := make(map[string]tftypes.Value, 21)
 
 		val, err = v.AgentId.ToTerraformValue(ctx)
 
@@ -1281,6 +1394,14 @@ func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error)
 
 		vals["description"] = val
 
+		val, err = v.FilterPolicies.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["filter_policies"] = val
+
 		val, err = v.Group.ToTerraformValue(ctx)
 
 		if err != nil {
@@ -1328,6 +1449,14 @@ func (v AgentValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error)
 		}
 
 		vals["max_tokens"] = val
+
+		val, err = v.McpServers.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["mcp_servers"] = val
 
 		val, err = v.ModelId.ToTerraformValue(ctx)
 
@@ -1406,6 +1535,35 @@ func (v AgentValue) String() string {
 func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
+	mcpServers := types.ListValueMust(
+		McpServersType{
+			basetypes.ObjectType{
+				AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+			},
+		},
+		v.McpServers.Elements(),
+	)
+
+	if v.McpServers.IsNull() {
+		mcpServers = types.ListNull(
+			McpServersType{
+				basetypes.ObjectType{
+					AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	if v.McpServers.IsUnknown() {
+		mcpServers = types.ListUnknown(
+			McpServersType{
+				basetypes.ObjectType{
+					AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
 	var allowedCollectionsVal basetypes.ListValue
 	switch {
 	case v.AllowedCollections.IsUnknown():
@@ -1430,15 +1588,21 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"assigned_skills": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"created_at":       basetypes.StringType{},
-			"created_by":       basetypes.StringType{},
-			"description":      basetypes.StringType{},
+			"created_at":  basetypes.StringType{},
+			"created_by":  basetypes.StringType{},
+			"description": basetypes.StringType{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
 			"group":            basetypes.StringType{},
 			"guardrail_preset": basetypes.StringType{},
 			"has_overlay":      basetypes.BoolType{},
 			"is_global":        basetypes.BoolType{},
 			"long_context":     basetypes.BoolType{},
 			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
 			"reasoning_effort": basetypes.StringType{},
@@ -1472,15 +1636,21 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"assigned_skills": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"created_at":       basetypes.StringType{},
-			"created_by":       basetypes.StringType{},
-			"description":      basetypes.StringType{},
+			"created_at":  basetypes.StringType{},
+			"created_by":  basetypes.StringType{},
+			"description": basetypes.StringType{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
 			"group":            basetypes.StringType{},
 			"guardrail_preset": basetypes.StringType{},
 			"has_overlay":      basetypes.BoolType{},
 			"is_global":        basetypes.BoolType{},
 			"long_context":     basetypes.BoolType{},
 			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
 			"reasoning_effort": basetypes.StringType{},
@@ -1514,15 +1684,69 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"assigned_skills": basetypes.ListType{
 				ElemType: types.StringType,
 			},
-			"created_at":       basetypes.StringType{},
-			"created_by":       basetypes.StringType{},
-			"description":      basetypes.StringType{},
+			"created_at":  basetypes.StringType{},
+			"created_by":  basetypes.StringType{},
+			"description": basetypes.StringType{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
 			"group":            basetypes.StringType{},
 			"guardrail_preset": basetypes.StringType{},
 			"has_overlay":      basetypes.BoolType{},
 			"is_global":        basetypes.BoolType{},
 			"long_context":     basetypes.BoolType{},
 			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
+			"model_id":         basetypes.StringType{},
+			"name":             basetypes.StringType{},
+			"reasoning_effort": basetypes.StringType{},
+			"system_prompt":    basetypes.StringType{},
+			"temperature":      basetypes.NumberType{},
+			"updated_at":       basetypes.StringType{},
+		}), diags
+	}
+
+	var filterPoliciesVal basetypes.ListValue
+	switch {
+	case v.FilterPolicies.IsUnknown():
+		filterPoliciesVal = types.ListUnknown(types.StringType)
+	case v.FilterPolicies.IsNull():
+		filterPoliciesVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		filterPoliciesVal, d = types.ListValue(types.StringType, v.FilterPolicies.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"agent_id": basetypes.StringType{},
+			"allowed_collections": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"allowed_tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"assigned_skills": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"created_at":  basetypes.StringType{},
+			"created_by":  basetypes.StringType{},
+			"description": basetypes.StringType{},
+			"filter_policies": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"group":            basetypes.StringType{},
+			"guardrail_preset": basetypes.StringType{},
+			"has_overlay":      basetypes.BoolType{},
+			"is_global":        basetypes.BoolType{},
+			"long_context":     basetypes.BoolType{},
+			"max_tokens":       basetypes.Int64Type{},
+			"mcp_servers": basetypes.ListType{
+				ElemType: McpServersValue{}.Type(ctx),
+			},
 			"model_id":         basetypes.StringType{},
 			"name":             basetypes.StringType{},
 			"reasoning_effort": basetypes.StringType{},
@@ -1543,15 +1767,21 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 		"assigned_skills": basetypes.ListType{
 			ElemType: types.StringType,
 		},
-		"created_at":       basetypes.StringType{},
-		"created_by":       basetypes.StringType{},
-		"description":      basetypes.StringType{},
+		"created_at":  basetypes.StringType{},
+		"created_by":  basetypes.StringType{},
+		"description": basetypes.StringType{},
+		"filter_policies": basetypes.ListType{
+			ElemType: types.StringType,
+		},
 		"group":            basetypes.StringType{},
 		"guardrail_preset": basetypes.StringType{},
 		"has_overlay":      basetypes.BoolType{},
 		"is_global":        basetypes.BoolType{},
 		"long_context":     basetypes.BoolType{},
 		"max_tokens":       basetypes.Int64Type{},
+		"mcp_servers": basetypes.ListType{
+			ElemType: McpServersValue{}.Type(ctx),
+		},
 		"model_id":         basetypes.StringType{},
 		"name":             basetypes.StringType{},
 		"reasoning_effort": basetypes.StringType{},
@@ -1578,12 +1808,14 @@ func (v AgentValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, d
 			"created_at":          v.CreatedAt,
 			"created_by":          v.CreatedBy,
 			"description":         v.Description,
+			"filter_policies":     filterPoliciesVal,
 			"group":               v.Group,
 			"guardrail_preset":    v.GuardrailPreset,
 			"has_overlay":         v.HasOverlay,
 			"is_global":           v.IsGlobal,
 			"long_context":        v.LongContext,
 			"max_tokens":          v.MaxTokens,
+			"mcp_servers":         mcpServers,
 			"model_id":            v.ModelId,
 			"name":                v.Name,
 			"reasoning_effort":    v.ReasoningEffort,
@@ -1638,6 +1870,10 @@ func (v AgentValue) Equal(o attr.Value) bool {
 		return false
 	}
 
+	if !v.FilterPolicies.Equal(other.FilterPolicies) {
+		return false
+	}
+
 	if !v.Group.Equal(other.Group) {
 		return false
 	}
@@ -1659,6 +1895,10 @@ func (v AgentValue) Equal(o attr.Value) bool {
 	}
 
 	if !v.MaxTokens.Equal(other.MaxTokens) {
+		return false
+	}
+
+	if !v.McpServers.Equal(other.McpServers) {
 		return false
 	}
 
@@ -1709,15 +1949,21 @@ func (v AgentValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 		"assigned_skills": basetypes.ListType{
 			ElemType: types.StringType,
 		},
-		"created_at":       basetypes.StringType{},
-		"created_by":       basetypes.StringType{},
-		"description":      basetypes.StringType{},
+		"created_at":  basetypes.StringType{},
+		"created_by":  basetypes.StringType{},
+		"description": basetypes.StringType{},
+		"filter_policies": basetypes.ListType{
+			ElemType: types.StringType,
+		},
 		"group":            basetypes.StringType{},
 		"guardrail_preset": basetypes.StringType{},
 		"has_overlay":      basetypes.BoolType{},
 		"is_global":        basetypes.BoolType{},
 		"long_context":     basetypes.BoolType{},
 		"max_tokens":       basetypes.Int64Type{},
+		"mcp_servers": basetypes.ListType{
+			ElemType: McpServersValue{}.Type(ctx),
+		},
 		"model_id":         basetypes.StringType{},
 		"name":             basetypes.StringType{},
 		"reasoning_effort": basetypes.StringType{},
@@ -2132,3 +2378,26 @@ func (v McpServersValue) AttributeTypes(ctx context.Context) map[string]attr.Typ
 		},
 	}
 }
+
+var _ basetypes.ObjectTypable = McpServersType{}
+
+
+
+
+
+
+
+
+
+
+
+var _ basetypes.ObjectValuable = McpServersValue{}
+
+
+
+
+
+
+
+
+
