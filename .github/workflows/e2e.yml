@@ -61,8 +61,9 @@ jobs:
           QUANTCDN_E2E_REGION: ${{ vars.QUANTCDN_E2E_REGION }}
           # Fail instead of skipping when the staging credentials are missing.
           E2E_REQUIRED: '1'
+          # Through env, not inline: an input in the script is shell injection.
+          STACKS: ${{ inputs.stacks || 'all' }}
         run: |
-          STACKS="${{ inputs.stacks || 'all' }}"
           if [ "$STACKS" = "all" ]; then
             go test -v -tags=e2e -timeout=45m ./e2e/
           else
