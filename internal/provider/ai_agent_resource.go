@@ -209,13 +209,9 @@ func callAiAgentCreateAPI(ctx context.Context, r *aiAgentResource, data *resourc
 	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
 		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
 	}
-	if !data.FilterPolicies.IsNull() && !data.FilterPolicies.IsUnknown() {
-		var policies []string
-		diags.Append(data.FilterPolicies.ElementsAs(ctx, &policies, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetFilterPolicies(policies)
+	diags.Append(applyAgentPoliciesAndMcp(ctx, data, sdkReq)...)
+	if diags.HasError() {
+		return
 	}
 
 	sdkResp, httpResp, err := r.client.Instance.AIAgentsAPI.CreateAIAgent(r.client.AuthContext, org).
@@ -339,13 +335,9 @@ func callAiAgentUpdateAPI(ctx context.Context, r *aiAgentResource, data *resourc
 	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
 		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
 	}
-	if !data.FilterPolicies.IsNull() && !data.FilterPolicies.IsUnknown() {
-		var policies []string
-		diags.Append(data.FilterPolicies.ElementsAs(ctx, &policies, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetFilterPolicies(policies)
+	diags.Append(applyAgentPoliciesAndMcp(ctx, data, sdkReq)...)
+	if diags.HasError() {
+		return
 	}
 
 	sdkResp, httpResp, err := r.client.Instance.AIAgentsAPI.UpdateAIAgent(r.client.AuthContext, org, data.AgentId.ValueString()).
@@ -518,6 +510,9 @@ func mapAiAgentResponse(ctx context.Context, agent *quantadmingo.GetAIAgent200Re
 	if data.FilterPolicies.IsUnknown() || data.FilterPolicies.IsNull() || data.FilterPolicies.ElementType(ctx) == nil {
 		data.FilterPolicies = types.ListNull(types.StringType)
 	}
+	mcp, d := agentMcpServersValue(ctx, agent.AdditionalProperties, data.McpServers)
+	diags.Append(d...)
+	data.McpServers = mcp
 
 	// Nested agent object — all computed, mirrors the top-level fields plus
 	// read-only metadata (agentId, isGlobal, hasOverlay, timestamps).
@@ -583,4 +578,85 @@ func timePtrToString(t *time.Time) basetypes.StringValue {
 		return basetypes.NewStringNull()
 	}
 	return basetypes.NewStringValue(t.Format("2006-01-02T15:04:05Z07:00"))
+}
+
+// agentMcpAttachments converts the planned mcp_servers list to the API shape.
+func agentMcpAttachments(ctx context.Context, list types.List) ([]quantadmingo.CreateAIAgentRequestMcpServersInner, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var elems []resource_ai_agent.McpServersValue
+	diags.Append(list.ElementsAs(ctx, &elems, false)...)
+	out := make([]quantadmingo.CreateAIAgentRequestMcpServersInner, 0, len(elems))
+	for _, e := range elems {
+		a, d := mcpAttachment(ctx, e.Server, e.Tools)
+		diags.Append(d...)
+		out = append(out, a)
+	}
+	return out, diags
+}
+
+// agentMcpServersValue reads mcp_servers from the agent response. The SDK's
+// agent model has no mcpServers field, so the value comes from the response's
+// additional properties. When the response has none (the API stores no empty
+// list on create), the planned value stays, else null.
+func agentMcpServersValue(ctx context.Context, props map[string]interface{}, planned types.List) (types.List, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	elemType := resource_ai_agent.McpServersType{
+		ObjectType: types.ObjectType{AttrTypes: resource_ai_agent.McpServersValue{}.AttributeTypes(ctx)},
+	}
+	raw, ok := props["mcpServers"].([]interface{})
+	if !ok {
+		if known(planned) {
+			return planned, diags
+		}
+		return types.ListNull(elemType), diags
+	}
+	attrTypes := resource_ai_agent.McpServersValue{}.AttributeTypes(ctx)
+	elems := make([]attr.Value, 0, len(raw))
+	for _, item := range raw {
+		v, d := resource_ai_agent.NewMcpServersValue(attrTypes, mcpServerAttrs(ctx, storedAttachment(item)))
+		diags.Append(d...)
+		elems = append(elems, v)
+	}
+	list, d := types.ListValue(elemType, elems)
+	diags.Append(d...)
+	return list, diags
+}
+
+// storedAttachment reads one {server, tools?} object from a decoded JSON value.
+func storedAttachment(item interface{}) quantadmingo.GetAgentOverlay200ResponseOverlayMcpServersInner {
+	out := quantadmingo.GetAgentOverlay200ResponseOverlayMcpServersInner{}
+	m, ok := item.(map[string]interface{})
+	if !ok {
+		return out
+	}
+	if server, ok := m["server"].(string); ok {
+		out.Server = &server
+	}
+	if tools, ok := m["tools"].([]interface{}); ok {
+		out.Tools = stringSliceFromInterface(tools)
+	}
+	return out
+}
+
+// agentListSetter is the part of the agent create and update requests that
+// applyAgentPoliciesAndMcp sets.
+type agentListSetter interface {
+	SetFilterPolicies([]string)
+	SetMcpServers([]quantadmingo.CreateAIAgentRequestMcpServersInner)
+}
+
+// applyAgentPoliciesAndMcp sets filter_policies and mcp_servers when the plan
+// knows them. The agent update changes only the fields it sends.
+func applyAgentPoliciesAndMcp(ctx context.Context, data *resource_ai_agent.AiAgentModel, req agentListSetter) (diags diag.Diagnostics) {
+	if known(data.FilterPolicies) {
+		var policies []string
+		diags.Append(data.FilterPolicies.ElementsAs(ctx, &policies, false)...)
+		req.SetFilterPolicies(policies)
+	}
+	if known(data.McpServers) {
+		attachments, d := agentMcpAttachments(ctx, data.McpServers)
+		diags.Append(d...)
+		req.SetMcpServers(attachments)
+	}
+	return
 }
