@@ -50,6 +50,9 @@ resource "quant_ai_agent" "support" {
 * `assigned_skills` (List of String) - (Optional) Skill IDs to assign to this agent.
 * `created_by` (String) - (Optional) User identifier who created the agent.
 * `filter_policies` (List of String) - (Optional) Filter policy IDs to apply to this agent's inference requests.
+* `mcp_servers` (List of Object) - (Optional) Registered MCP servers to attach. The agent gets the tools of each attached server in dashboard chat, agent chat and QuantCode. Each object has:
+  * `server` (String) - (Required) The registered server name (lowercase letters, digits and hyphens).
+  * `tools` (List of String) - (Optional) Only these tools of the server. Omit for every tool the server allows. An empty list allows none.
 * `group` (String) - (Optional) Group label for the agent.
 * `guardrail_preset` (String) - (Optional) Guardrail preset name. Valid values: `official`, `official-sensitive`, `protected`.
 * `long_context` (Boolean) - (Optional) Enable 1M context window support.

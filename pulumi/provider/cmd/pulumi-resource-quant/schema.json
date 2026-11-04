@@ -206,6 +206,33 @@
                 }
             }
         },
+        "quant:index/AiAgentMcpServer:AiAgentMcpServer": {
+            "properties": {
+                "server": {
+                    "type": "string",
+                    "description": "The registered server name\n"
+                },
+                "tools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Optional. Only these tools of the server. Omit for every tool the server allows; an empty array allows none.\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "server"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "server",
+                        "tools"
+                    ]
+                }
+            }
+        },
         "quant:index/AiAgentOverlayBase:AiAgentOverlayBase": {
             "properties": {
                 "agentId": {
@@ -243,6 +270,33 @@
                 }
             }
         },
+        "quant:index/AiAgentOverlayMcpServer:AiAgentOverlayMcpServer": {
+            "properties": {
+                "server": {
+                    "type": "string",
+                    "description": "The registered server name\n"
+                },
+                "tools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Optional. Only these tools of the server. Omit for every tool the server allows; an empty array allows none.\n"
+                }
+            },
+            "type": "object",
+            "required": [
+                "server"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "server",
+                        "tools"
+                    ]
+                }
+            }
+        },
         "quant:index/AiAgentOverlayOverlay:AiAgentOverlayOverlay": {
             "properties": {
                 "additionalSkills": {
@@ -275,11 +329,26 @@
                         "type": "string"
                     }
                 },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "guardrailPreset": {
                     "type": "string"
                 },
+                "longContext": {
+                    "type": "boolean"
+                },
                 "maxTokens": {
                     "type": "integer"
+                },
+                "mcpServers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiAgentOverlayOverlayMcpServer:AiAgentOverlayOverlayMcpServer"
+                    }
                 },
                 "modelId": {
                     "type": "string"
@@ -307,13 +376,38 @@
                         "allowedCollections",
                         "disabledSkills",
                         "disabledTools",
+                        "filterPolicies",
                         "guardrailPreset",
+                        "longContext",
                         "maxTokens",
+                        "mcpServers",
                         "modelId",
                         "reasoningEffort",
                         "systemPromptAppend",
                         "temperature",
                         "version"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiAgentOverlayOverlayMcpServer:AiAgentOverlayOverlayMcpServer": {
+            "properties": {
+                "server": {
+                    "type": "string"
+                },
+                "tools": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "type": "object",
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "server",
+                        "tools"
                     ]
                 }
             }
@@ -3510,6 +3604,13 @@
                 "maxTokens": {
                     "type": "integer"
                 },
+                "mcpServers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiAgentMcpServer:AiAgentMcpServer"
+                    },
+                    "description": "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. On update, an empty array removes every attachment."
+                },
                 "message": {
                     "type": "string"
                 },
@@ -3550,6 +3651,7 @@
                 "guardrailPreset",
                 "longContext",
                 "maxTokens",
+                "mcpServers",
                 "message",
                 "modelId",
                 "name",
@@ -3610,6 +3712,13 @@
                 },
                 "maxTokens": {
                     "type": "integer"
+                },
+                "mcpServers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiAgentMcpServer:AiAgentMcpServer"
+                    },
+                    "description": "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. On update, an empty array removes every attachment."
                 },
                 "modelId": {
                     "type": "string"
@@ -3694,6 +3803,13 @@
                     "maxTokens": {
                         "type": "integer"
                     },
+                    "mcpServers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/AiAgentMcpServer:AiAgentMcpServer"
+                        },
+                        "description": "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. On update, an empty array removes every attachment."
+                    },
                     "message": {
                         "type": "string"
                     },
@@ -3769,13 +3885,31 @@
                     },
                     "description": "Tool names to remove"
                 },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Filter policy IDs applied to this agent's requests for this organisation, with any organisation-wide mandatory policies"
+                },
                 "guardrailPreset": {
                     "type": "string",
                     "description": "Guardrail preset"
                 },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Force the 1M context window on (true) or off (false) for this organisation. Omit or null to use the platform default."
+                },
                 "maxTokens": {
                     "type": "integer",
                     "description": "Override max tokens"
+                },
+                "mcpServers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiAgentOverlayMcpServer:AiAgentOverlayMcpServer"
+                    },
+                    "description": "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. The overlay PUT replaces the whole overlay: omit the field or send an empty array to remove every attachment."
                 },
                 "modelId": {
                     "type": "string",
@@ -3813,8 +3947,11 @@
                 "base",
                 "disabledSkills",
                 "disabledTools",
+                "filterPolicies",
                 "guardrailPreset",
+                "longContext",
                 "maxTokens",
+                "mcpServers",
                 "modelId",
                 "organisation",
                 "overlay",
@@ -3863,13 +4000,31 @@
                     },
                     "description": "Tool names to remove"
                 },
+                "filterPolicies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Filter policy IDs applied to this agent's requests for this organisation, with any organisation-wide mandatory policies"
+                },
                 "guardrailPreset": {
                     "type": "string",
                     "description": "Guardrail preset"
                 },
+                "longContext": {
+                    "type": "boolean",
+                    "description": "Force the 1M context window on (true) or off (false) for this organisation. Omit or null to use the platform default."
+                },
                 "maxTokens": {
                     "type": "integer",
                     "description": "Override max tokens"
+                },
+                "mcpServers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/types/quant:index/AiAgentOverlayMcpServer:AiAgentOverlayMcpServer"
+                    },
+                    "description": "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. The overlay PUT replaces the whole overlay: omit the field or send an empty array to remove every attachment."
                 },
                 "modelId": {
                     "type": "string",
@@ -3942,13 +4097,31 @@
                         },
                         "description": "Tool names to remove"
                     },
+                    "filterPolicies": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Filter policy IDs applied to this agent's requests for this organisation, with any organisation-wide mandatory policies"
+                    },
                     "guardrailPreset": {
                         "type": "string",
                         "description": "Guardrail preset"
                     },
+                    "longContext": {
+                        "type": "boolean",
+                        "description": "Force the 1M context window on (true) or off (false) for this organisation. Omit or null to use the platform default."
+                    },
                     "maxTokens": {
                         "type": "integer",
                         "description": "Override max tokens"
+                    },
+                    "mcpServers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/types/quant:index/AiAgentOverlayMcpServer:AiAgentOverlayMcpServer"
+                        },
+                        "description": "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. The overlay PUT replaces the whole overlay: omit the field or send an empty array to remove every attachment."
                     },
                     "modelId": {
                         "type": "string",

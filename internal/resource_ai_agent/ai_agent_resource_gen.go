@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -170,6 +171,36 @@ func AiAgentResourceSchema(ctx context.Context) schema.Schema {
 					int64validator.Between(1, 200000),
 				},
 			},
+			"mcp_servers": schema.ListNestedAttribute{
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"server": schema.StringAttribute{
+							Required:            true,
+							Description:         "The registered server name",
+							MarkdownDescription: "The registered server name",
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,62}$"), ""),
+							},
+						},
+						"tools": schema.ListAttribute{
+							ElementType:         types.StringType,
+							Optional:            true,
+							Computed:            true,
+							Description:         "Optional. Only these tools of the server. Omit for every tool the server allows; an empty array allows none.",
+							MarkdownDescription: "Optional. Only these tools of the server. Omit for every tool the server allows; an empty array allows none.",
+						},
+					},
+					CustomType: McpServersType{
+						ObjectType: types.ObjectType{
+							AttrTypes: McpServersValue{}.AttributeTypes(ctx),
+						},
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. On update, an empty array removes every attachment.",
+				MarkdownDescription: "Registered MCP servers to attach. The agent gets the tools of each server in dashboard chat and in QuantCode. On update, an empty array removes every attachment.",
+			},
 			"message": schema.StringAttribute{
 				Computed: true,
 			},
@@ -227,6 +258,7 @@ type AiAgentModel struct {
 	GuardrailPreset    types.String `tfsdk:"guardrail_preset"`
 	LongContext        types.Bool   `tfsdk:"long_context"`
 	MaxTokens          types.Int64  `tfsdk:"max_tokens"`
+	McpServers         types.List   `tfsdk:"mcp_servers"`
 	Message            types.String `tfsdk:"message"`
 	ModelId            types.String `tfsdk:"model_id"`
 	Name               types.String `tfsdk:"name"`
@@ -1692,5 +1724,411 @@ func (v AgentValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
 		"system_prompt":    basetypes.StringType{},
 		"temperature":      basetypes.NumberType{},
 		"updated_at":       basetypes.StringType{},
+	}
+}
+
+var _ basetypes.ObjectTypable = McpServersType{}
+
+type McpServersType struct {
+	basetypes.ObjectType
+}
+
+func (t McpServersType) Equal(o attr.Type) bool {
+	other, ok := o.(McpServersType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t McpServersType) String() string {
+	return "McpServersType"
+}
+
+func (t McpServersType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	serverAttribute, ok := attributes["server"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`server is missing from object`)
+
+		return nil, diags
+	}
+
+	serverVal, ok := serverAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`server expected to be basetypes.StringValue, was: %T`, serverAttribute))
+	}
+
+	toolsAttribute, ok := attributes["tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tools is missing from object`)
+
+		return nil, diags
+	}
+
+	toolsVal, ok := toolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tools expected to be basetypes.ListValue, was: %T`, toolsAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return McpServersValue{
+		Server: serverVal,
+		Tools:  toolsVal,
+		state:  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewMcpServersValueNull() McpServersValue {
+	return McpServersValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewMcpServersValueUnknown() McpServersValue {
+	return McpServersValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewMcpServersValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (McpServersValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing McpServersValue Attribute Value",
+				"While creating a McpServersValue value, a missing attribute value was detected. "+
+					"A McpServersValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("McpServersValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid McpServersValue Attribute Type",
+				"While creating a McpServersValue value, an invalid attribute value was detected. "+
+					"A McpServersValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("McpServersValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("McpServersValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra McpServersValue Attribute Value",
+				"While creating a McpServersValue value, an extra attribute value was detected. "+
+					"A McpServersValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra McpServersValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	serverAttribute, ok := attributes["server"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`server is missing from object`)
+
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	serverVal, ok := serverAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`server expected to be basetypes.StringValue, was: %T`, serverAttribute))
+	}
+
+	toolsAttribute, ok := attributes["tools"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`tools is missing from object`)
+
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	toolsVal, ok := toolsAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`tools expected to be basetypes.ListValue, was: %T`, toolsAttribute))
+	}
+
+	if diags.HasError() {
+		return NewMcpServersValueUnknown(), diags
+	}
+
+	return McpServersValue{
+		Server: serverVal,
+		Tools:  toolsVal,
+		state:  attr.ValueStateKnown,
+	}, diags
+}
+
+func NewMcpServersValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) McpServersValue {
+	object, diags := NewMcpServersValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewMcpServersValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t McpServersType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewMcpServersValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewMcpServersValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewMcpServersValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewMcpServersValueMust(McpServersValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t McpServersType) ValueType(ctx context.Context) attr.Value {
+	return McpServersValue{}
+}
+
+var _ basetypes.ObjectValuable = McpServersValue{}
+
+type McpServersValue struct {
+	Server basetypes.StringValue `tfsdk:"server"`
+	Tools  basetypes.ListValue   `tfsdk:"tools"`
+	state  attr.ValueState
+}
+
+func (v McpServersValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["server"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["tools"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.Server.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["server"] = val
+
+		val, err = v.Tools.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["tools"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v McpServersValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v McpServersValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v McpServersValue) String() string {
+	return "McpServersValue"
+}
+
+func (v McpServersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var toolsVal basetypes.ListValue
+	switch {
+	case v.Tools.IsUnknown():
+		toolsVal = types.ListUnknown(types.StringType)
+	case v.Tools.IsNull():
+		toolsVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		toolsVal, d = types.ListValue(types.StringType, v.Tools.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"server": basetypes.StringType{},
+			"tools": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+		}), diags
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"server": basetypes.StringType{},
+		"tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"server": v.Server,
+			"tools":  toolsVal,
+		})
+
+	return objVal, diags
+}
+
+func (v McpServersValue) Equal(o attr.Value) bool {
+	other, ok := o.(McpServersValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Server.Equal(other.Server) {
+		return false
+	}
+
+	if !v.Tools.Equal(other.Tools) {
+		return false
+	}
+
+	return true
+}
+
+func (v McpServersValue) Type(ctx context.Context) attr.Type {
+	return McpServersType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v McpServersValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"server": basetypes.StringType{},
+		"tools": basetypes.ListType{
+			ElemType: types.StringType,
+		},
 	}
 }

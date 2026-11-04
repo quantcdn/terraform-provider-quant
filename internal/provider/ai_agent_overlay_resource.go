@@ -193,8 +193,12 @@ func (r *aiAgentOverlayResource) ImportState(ctx context.Context, req resource.I
 // API helpers
 // ---------------------------------------------------------------------------
 
-// upsert builds an UpsertAgentOverlayRequest from the model and calls the API.
-// Version is passed through for optimistic concurrency when present.
+// upsert sends the overlay PUT. The API replaces the whole overlay, so a field
+// the request leaves out is deleted. The request therefore starts from the
+// stored overlay and then takes every value the plan sets: an attribute that
+// the configuration does not set keeps its stored value (for example filter
+// policies or MCP attachments set in the dashboard). To clear a list, set it
+// to []; to clear a string, set it to "".
 func (r *aiAgentOverlayResource) upsert(ctx context.Context, data *resource_ai_agent_overlay.AiAgentOverlayModel) (diags diag.Diagnostics) {
 	org := r.getOrg(data)
 
@@ -204,93 +208,23 @@ func (r *aiAgentOverlayResource) upsert(ctx context.Context, data *resource_ai_a
 	}
 	agentId := data.AgentId.ValueString()
 
-	sdkReq := quantadmingo.NewUpsertAgentOverlayRequest()
-
-	// model_id
-	if !data.ModelId.IsNull() && !data.ModelId.IsUnknown() {
-		sdkReq.SetModelId(data.ModelId.ValueString())
+	stored, d := r.storedOverlay(org, agentId)
+	diags.Append(d...)
+	if diags.HasError() {
+		return
 	}
 
-	// reasoning_effort
-	if !data.ReasoningEffort.IsNull() && !data.ReasoningEffort.IsUnknown() {
-		sdkReq.SetReasoningEffort(data.ReasoningEffort.ValueString())
+	sdkReq := storedOverlayRequest(stored)
+	applyPlannedScalars(data, sdkReq)
+	diags.Append(applyPlannedLists(ctx, data, sdkReq)...)
+	diags.Append(applyPlannedMcpServers(ctx, data, sdkReq)...)
+	if diags.HasError() {
+		return
 	}
 
-	// temperature — types.Number -> *float32
-	if !data.Temperature.IsNull() && !data.Temperature.IsUnknown() {
-		bf := data.Temperature.ValueBigFloat()
-		if bf != nil {
-			f32, _ := bf.Float32()
-			sdkReq.SetTemperature(f32)
-		}
-	}
-
-	// max_tokens
-	if !data.MaxTokens.IsNull() && !data.MaxTokens.IsUnknown() {
-		sdkReq.SetMaxTokens(int32(data.MaxTokens.ValueInt64()))
-	}
-
-	// disabled_skills
-	if !data.DisabledSkills.IsNull() && !data.DisabledSkills.IsUnknown() {
-		var vals []string
-		diags.Append(data.DisabledSkills.ElementsAs(ctx, &vals, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetDisabledSkills(vals)
-	}
-
-	// additional_skills
-	if !data.AdditionalSkills.IsNull() && !data.AdditionalSkills.IsUnknown() {
-		var vals []string
-		diags.Append(data.AdditionalSkills.ElementsAs(ctx, &vals, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetAdditionalSkills(vals)
-	}
-
-	// additional_tools
-	if !data.AdditionalTools.IsNull() && !data.AdditionalTools.IsUnknown() {
-		var vals []string
-		diags.Append(data.AdditionalTools.ElementsAs(ctx, &vals, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetAdditionalTools(vals)
-	}
-
-	// disabled_tools
-	if !data.DisabledTools.IsNull() && !data.DisabledTools.IsUnknown() {
-		var vals []string
-		diags.Append(data.DisabledTools.ElementsAs(ctx, &vals, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetDisabledTools(vals)
-	}
-
-	// system_prompt_append
-	if !data.SystemPromptAppend.IsNull() && !data.SystemPromptAppend.IsUnknown() {
-		sdkReq.SetSystemPromptAppend(data.SystemPromptAppend.ValueString())
-	}
-
-	// allowed_collections
-	if !data.AllowedCollections.IsNull() && !data.AllowedCollections.IsUnknown() {
-		var vals []string
-		diags.Append(data.AllowedCollections.ElementsAs(ctx, &vals, false)...)
-		if diags.HasError() {
-			return
-		}
-		sdkReq.SetAllowedCollections(vals)
-	}
-
-	// guardrail_preset
-	if !data.GuardrailPreset.IsNull() && !data.GuardrailPreset.IsUnknown() {
-		sdkReq.SetGuardrailPreset(data.GuardrailPreset.ValueString())
-	}
-
-	// version — only pass when non-null and > 0 (compare-and-swap).
+	// version — the state's version (compare-and-swap) when there is one, else
+	// the version just read, so a change made between the read and the PUT
+	// returns 409 instead of being overwritten.
 	if !data.Version.IsNull() && !data.Version.IsUnknown() && data.Version.ValueInt64() > 0 {
 		sdkReq.SetVersion(int32(data.Version.ValueInt64()))
 	}
@@ -298,23 +232,150 @@ func (r *aiAgentOverlayResource) upsert(ctx context.Context, data *resource_ai_a
 	_, httpResp, err := r.client.Instance.AIAgentsAPI.UpsertAgentOverlay(r.client.AuthContext, org, agentId).
 		UpsertAgentOverlayRequest(*sdkReq).Execute()
 	if err != nil {
-		if httpResp != nil && httpResp.StatusCode == http.StatusConflict {
-			body, _ := io.ReadAll(httpResp.Body)
-			diags.AddError("Overlay version conflict",
-				fmt.Sprintf("The overlay was modified concurrently (HTTP 409). Refresh state (terraform refresh) and retry. Response: %s", string(body)))
-			return
+		diags.Append(overlayUpsertError(httpResp, err)...)
+	}
+	return
+}
+
+// storedOverlay reads the overlay the API stores now. No overlay (404, or an
+// empty overlay) returns nil without an error.
+func (r *aiAgentOverlayResource) storedOverlay(org, agentId string) (*quantadmingo.GetAgentOverlay200ResponseOverlay, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	apiResp, httpResp, err := r.client.Instance.AIAgentsAPI.GetAgentOverlay(r.client.AuthContext, org, agentId).Execute()
+	if err == nil {
+		return apiResp.Overlay.Get(), diags
+	}
+	if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+		return nil, diags
+	}
+	if httpResp != nil {
+		body, _ := io.ReadAll(httpResp.Body)
+		diags.AddError("Unable to read the stored AI agent overlay",
+			fmt.Sprintf("The overlay PUT replaces the whole overlay, so the provider reads it first and the read failed. API returned %d: %s", httpResp.StatusCode, string(body)))
+		return nil, diags
+	}
+	diags.AddError("Unable to read the stored AI agent overlay", fmt.Sprintf("Error: %s", err.Error()))
+	return nil, diags
+}
+
+// storedOverlayRequest starts a PUT request from every field of the stored
+// overlay, including its version.
+func storedOverlayRequest(o *quantadmingo.GetAgentOverlay200ResponseOverlay) *quantadmingo.UpsertAgentOverlayRequest {
+	req := quantadmingo.NewUpsertAgentOverlayRequest()
+	if o == nil {
+		return req
+	}
+	req.ModelId = o.ModelId
+	req.Temperature = o.Temperature
+	req.MaxTokens = o.MaxTokens
+	req.SystemPromptAppend = o.SystemPromptAppend
+	req.DisabledSkills = o.DisabledSkills
+	req.AdditionalSkills = o.AdditionalSkills
+	req.AdditionalTools = o.AdditionalTools
+	req.DisabledTools = o.DisabledTools
+	req.AllowedCollections = o.AllowedCollections
+	req.FilterPolicies = o.FilterPolicies
+	req.McpServers = mcpAttachmentsFromStored(o.McpServers)
+	req.Version = o.Version
+	if o.GuardrailPreset != nil {
+		req.SetGuardrailPreset(*o.GuardrailPreset)
+	}
+	if o.LongContext != nil {
+		req.SetLongContext(*o.LongContext)
+	}
+	if effort, ok := o.GetReasoningEffortOk(); ok && effort != nil {
+		req.SetReasoningEffort(*effort)
+	}
+	return req
+}
+
+// applyPlannedScalars sets each single-value attribute the plan knows.
+func applyPlannedScalars(data *resource_ai_agent_overlay.AiAgentOverlayModel, req *quantadmingo.UpsertAgentOverlayRequest) {
+	if known(data.ModelId) {
+		req.SetModelId(data.ModelId.ValueString())
+	}
+	if known(data.ReasoningEffort) {
+		req.SetReasoningEffort(data.ReasoningEffort.ValueString())
+	}
+	if known(data.Temperature) && data.Temperature.ValueBigFloat() != nil {
+		f32, _ := data.Temperature.ValueBigFloat().Float32()
+		req.SetTemperature(f32)
+	}
+	if known(data.MaxTokens) {
+		req.SetMaxTokens(int32(data.MaxTokens.ValueInt64()))
+	}
+	if known(data.SystemPromptAppend) {
+		req.SetSystemPromptAppend(data.SystemPromptAppend.ValueString())
+	}
+	if known(data.GuardrailPreset) {
+		req.SetGuardrailPreset(data.GuardrailPreset.ValueString())
+	}
+	if known(data.LongContext) {
+		req.SetLongContext(data.LongContext.ValueBool())
+	}
+}
+
+// applyPlannedLists sets each string list the plan knows. A configured empty
+// list replaces the stored one, which clears it.
+func applyPlannedLists(ctx context.Context, data *resource_ai_agent_overlay.AiAgentOverlayModel, req *quantadmingo.UpsertAgentOverlayRequest) (diags diag.Diagnostics) {
+	lists := []struct {
+		value types.List
+		set   func([]string)
+	}{
+		{data.DisabledSkills, req.SetDisabledSkills},
+		{data.AdditionalSkills, req.SetAdditionalSkills},
+		{data.AdditionalTools, req.SetAdditionalTools},
+		{data.DisabledTools, req.SetDisabledTools},
+		{data.AllowedCollections, req.SetAllowedCollections},
+		{data.FilterPolicies, req.SetFilterPolicies},
+	}
+	for _, l := range lists {
+		if !known(l.value) {
+			continue
 		}
-		if httpResp != nil {
-			body, _ := io.ReadAll(httpResp.Body)
-			diags.AddError("Unable to upsert AI agent overlay",
-				fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(body)))
-		} else {
-			diags.AddError("Unable to upsert AI agent overlay", fmt.Sprintf("Error: %s", err.Error()))
-		}
+		vals := []string{}
+		diags.Append(l.value.ElementsAs(ctx, &vals, false)...)
+		l.set(vals)
+	}
+	return
+}
+
+// applyPlannedMcpServers sets the MCP attachments when the plan knows them.
+func applyPlannedMcpServers(ctx context.Context, data *resource_ai_agent_overlay.AiAgentOverlayModel, req *quantadmingo.UpsertAgentOverlayRequest) (diags diag.Diagnostics) {
+	if !known(data.McpServers) {
 		return
 	}
-
+	var elems []resource_ai_agent_overlay.McpServersValue
+	diags.Append(data.McpServers.ElementsAs(ctx, &elems, false)...)
+	out := make([]quantadmingo.CreateAIAgentRequestMcpServersInner, 0, len(elems))
+	for _, e := range elems {
+		a, d := mcpAttachment(ctx, e.Server, e.Tools)
+		diags.Append(d...)
+		out = append(out, a)
+	}
+	req.SetMcpServers(out)
 	return
+}
+
+func overlayUpsertError(httpResp *http.Response, err error) (diags diag.Diagnostics) {
+	if httpResp == nil {
+		diags.AddError("Unable to upsert AI agent overlay", fmt.Sprintf("Error: %s", err.Error()))
+		return
+	}
+	body, _ := io.ReadAll(httpResp.Body)
+	if httpResp.StatusCode == http.StatusConflict {
+		diags.AddError("Overlay version conflict",
+			fmt.Sprintf("The overlay was modified concurrently (HTTP 409). Refresh state (terraform refresh) and retry. Response: %s", string(body)))
+		return
+	}
+	diags.AddError("Unable to upsert AI agent overlay",
+		fmt.Sprintf("API returned %d: %s", httpResp.StatusCode, string(body)))
+	return
+}
+
+// known reports whether a plan value is set (not null and not unknown).
+func known(v attr.Value) bool {
+	return !v.IsNull() && !v.IsUnknown()
 }
 
 // read fetches the overlay and populates the model. On 404 it returns a diag
@@ -387,81 +448,41 @@ func populateBase(ctx context.Context, base *quantadmingo.GetAgentOverlay200Resp
 }
 
 // populateOverlay sets both the top-level overlay fields and the computed
-// data.Overlay nested struct from the SDK overlay response.
+// data.Overlay nested struct from the SDK overlay response. A value cleared
+// with "" or [] reads back as absent; the planned empty value then stays, so
+// Terraform sees the result it planned.
 func populateOverlay(ctx context.Context, overlay *quantadmingo.GetAgentOverlay200ResponseOverlay, data *resource_ai_agent_overlay.AiAgentOverlayModel) (diags diag.Diagnostics) {
-	if overlay == nil {
-		// No overlay — null the top-level overlay fields and the nested Overlay.
-		data.ModelId = types.StringNull()
-		data.Temperature = types.NumberNull()
-		data.MaxTokens = types.Int64Null()
-		data.DisabledSkills = types.ListNull(types.StringType)
-		data.AdditionalSkills = types.ListNull(types.StringType)
-		data.AdditionalTools = types.ListNull(types.StringType)
-		data.DisabledTools = types.ListNull(types.StringType)
-		data.SystemPromptAppend = types.StringNull()
-		data.AllowedCollections = types.ListNull(types.StringType)
-		data.GuardrailPreset = types.StringNull()
-		data.ReasoningEffort = types.StringNull()
-		data.Version = types.Int64Null()
-		data.Overlay = resource_ai_agent_overlay.NewOverlayValueNull()
-		return
+	noOverlay := overlay == nil
+	if noOverlay {
+		overlay = &quantadmingo.GetAgentOverlay200ResponseOverlay{}
 	}
 
-	// model_id
-	if overlay.ModelId != nil {
-		data.ModelId = types.StringValue(*overlay.ModelId)
-	} else {
-		data.ModelId = types.StringNull()
-	}
-
-	// temperature — *float32 -> types.Number
-	if overlay.Temperature != nil {
-		rounded := math.Round(float64(*overlay.Temperature)*100) / 100
-		data.Temperature = types.NumberValue(big.NewFloat(rounded))
-	} else {
-		data.Temperature = types.NumberNull()
-	}
-
-	// max_tokens
-	if overlay.MaxTokens != nil {
-		data.MaxTokens = types.Int64Value(int64(*overlay.MaxTokens))
-	} else {
-		data.MaxTokens = types.Int64Null()
-	}
-
-	data.DisabledSkills = stringListFromSlice(ctx, overlay.DisabledSkills)
-	data.AdditionalSkills = stringListFromSlice(ctx, overlay.AdditionalSkills)
-	data.AdditionalTools = stringListFromSlice(ctx, overlay.AdditionalTools)
-	data.DisabledTools = stringListFromSlice(ctx, overlay.DisabledTools)
-
-	// system_prompt_append
-	if overlay.SystemPromptAppend != nil {
-		data.SystemPromptAppend = types.StringValue(*overlay.SystemPromptAppend)
-	} else {
-		data.SystemPromptAppend = types.StringNull()
-	}
-
-	data.AllowedCollections = stringListFromSlice(ctx, overlay.AllowedCollections)
-
-	// guardrail_preset
-	if overlay.GuardrailPreset != nil {
-		data.GuardrailPreset = types.StringValue(*overlay.GuardrailPreset)
-	} else {
-		data.GuardrailPreset = types.StringNull()
-	}
-
-	// reasoning_effort
+	data.ModelId = keptString(overlay.ModelId, data.ModelId)
+	data.SystemPromptAppend = keptString(overlay.SystemPromptAppend, data.SystemPromptAppend)
+	data.GuardrailPreset = keptString(overlay.GuardrailPreset, data.GuardrailPreset)
 	effort, _ := overlay.GetReasoningEffortOk()
 	data.ReasoningEffort = optionalStringPtrValue(effort)
+	data.Temperature = roundedNumber(overlay.Temperature)
+	data.MaxTokens = int64PtrValue(overlay.MaxTokens)
+	data.LongContext = boolPtrToValue(overlay.LongContext)
+	data.Version = int64PtrValue(overlay.Version)
 
-	// version
-	if overlay.Version != nil {
-		data.Version = types.Int64Value(int64(*overlay.Version))
-	} else {
-		data.Version = types.Int64Null()
+	data.DisabledSkills = keptList(ctx, overlay.DisabledSkills, data.DisabledSkills)
+	data.AdditionalSkills = keptList(ctx, overlay.AdditionalSkills, data.AdditionalSkills)
+	data.AdditionalTools = keptList(ctx, overlay.AdditionalTools, data.AdditionalTools)
+	data.DisabledTools = keptList(ctx, overlay.DisabledTools, data.DisabledTools)
+	data.AllowedCollections = keptList(ctx, overlay.AllowedCollections, data.AllowedCollections)
+	data.FilterPolicies = keptList(ctx, overlay.FilterPolicies, data.FilterPolicies)
+
+	mcp, d := overlayMcpServersValue(ctx, overlay.McpServers)
+	diags.Append(d...)
+	if overlay.McpServers == nil && plannedEmpty(data.McpServers) {
+		mcp = data.McpServers
 	}
+	data.McpServers = mcp
 
-	if diags.HasError() {
+	if noOverlay || diags.HasError() {
+		data.Overlay = resource_ai_agent_overlay.NewOverlayValueNull()
 		return
 	}
 
@@ -474,6 +495,9 @@ func populateOverlay(ctx context.Context, overlay *quantadmingo.GetAgentOverlay2
 		"disabled_tools":       data.DisabledTools,
 		"guardrail_preset":     data.GuardrailPreset,
 		"reasoning_effort":     data.ReasoningEffort,
+		"long_context":         data.LongContext,
+		"filter_policies":      data.FilterPolicies,
+		"mcp_servers":          data.McpServers,
 		"max_tokens":           data.MaxTokens,
 		"model_id":             data.ModelId,
 		"system_prompt_append": data.SystemPromptAppend,
@@ -490,6 +514,43 @@ func populateOverlay(ctx context.Context, overlay *quantadmingo.GetAgentOverlay2
 	return
 }
 
+// plannedEmpty reports whether a list value is a known, empty list.
+func plannedEmpty(v types.List) bool {
+	return known(v) && len(v.Elements()) == 0
+}
+
+// keptString is the stored string, or the planned "" when the API stores none.
+func keptString(stored *string, planned types.String) types.String {
+	if stored == nil && known(planned) && planned.ValueString() == "" {
+		return planned
+	}
+	return optionalStringPtrValue(stored)
+}
+
+// keptList is the stored list, or the planned [] when the API stores none.
+func keptList(ctx context.Context, stored []string, planned types.List) types.List {
+	if stored == nil && plannedEmpty(planned) {
+		return planned
+	}
+	return stringListFromSlice(ctx, stored)
+}
+
+// roundedNumber converts a float32 to a Number rounded to 2 decimal places, to
+// avoid float32 to float64 drift (0.3 reads as 0.30000001192092896).
+func roundedNumber(f *float32) types.Number {
+	if f == nil {
+		return types.NumberNull()
+	}
+	return types.NumberValue(big.NewFloat(math.Round(float64(*f)*100) / 100))
+}
+
+func int64PtrValue(n *int32) types.Int64 {
+	if n == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(*n))
+}
+
 // ---------------------------------------------------------------------------
 // small helpers
 // ---------------------------------------------------------------------------
@@ -499,4 +560,31 @@ func stringValueOrEmpty(s *string) types.String {
 		return types.StringValue("")
 	}
 	return types.StringValue(*s)
+}
+
+// overlayMcpServersType is the element type of the overlay's mcp_servers list.
+func overlayMcpServersType(ctx context.Context) attr.Type {
+	return resource_ai_agent_overlay.McpServersType{
+		ObjectType: types.ObjectType{AttrTypes: resource_ai_agent_overlay.McpServersValue{}.AttributeTypes(ctx)},
+	}
+}
+
+// overlayMcpServersValue converts the stored attachments to the mcp_servers
+// list. No attachments read as null.
+func overlayMcpServersValue(ctx context.Context, stored []quantadmingo.GetAgentOverlay200ResponseOverlayMcpServersInner) (types.List, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	elemType := overlayMcpServersType(ctx)
+	if stored == nil {
+		return types.ListNull(elemType), diags
+	}
+	attrTypes := resource_ai_agent_overlay.McpServersValue{}.AttributeTypes(ctx)
+	elems := make([]attr.Value, 0, len(stored))
+	for _, s := range stored {
+		v, d := resource_ai_agent_overlay.NewMcpServersValue(attrTypes, mcpServerAttrs(ctx, s))
+		diags.Append(d...)
+		elems = append(elems, v)
+	}
+	list, d := types.ListValue(elemType, elems)
+	diags.Append(d...)
+	return list, diags
 }
