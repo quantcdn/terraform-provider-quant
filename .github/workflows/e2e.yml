@@ -30,7 +30,8 @@ jobs:
   e2e:
     name: Pulumi E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The full suite takes about 29 minutes. v5.19.0 went over 30.
+    timeout-minutes: 50
     environment: staging
     steps:
       - uses: actions/checkout@v6
@@ -60,13 +61,14 @@ jobs:
           QUANTCDN_E2E_REGION: ${{ vars.QUANTCDN_E2E_REGION }}
           # Fail instead of skipping when the staging credentials are missing.
           E2E_REQUIRED: '1'
+          # Through env, not inline: an input in the script is shell injection.
+          STACKS: ${{ inputs.stacks || 'all' }}
         run: |
-          STACKS="${{ inputs.stacks || 'all' }}"
           if [ "$STACKS" = "all" ]; then
-            go test -v -tags=e2e -timeout=30m ./e2e/
+            go test -v -tags=e2e -timeout=45m ./e2e/
           else
             # Convert comma-separated stack names to -run regex
             # e.g. "project,domain" → "TestE2E_(Project|Domain)"
             PATTERN=$(echo "$STACKS" | sed 's/\b\w/\U&/g; s/,/|/g; s/app-stack/AppStack/g')
-            go test -v -tags=e2e -timeout=30m -run "TestE2E_($PATTERN)" ./e2e/
+            go test -v -tags=e2e -timeout=45m -run "TestE2E_($PATTERN)" ./e2e/
           fi
