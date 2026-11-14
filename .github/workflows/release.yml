@@ -180,7 +180,7 @@ jobs:
 
       # tfgen runs `pulumi package gen-sdk`; ubuntu-latest (26.04) no longer ships the Pulumi CLI.
       - name: Install Pulumi CLI
-        uses: pulumi/actions@v6
+        uses: pulumi/actions@8582a9e8cc630786854029b4e09281acd6794b58 # v6.6.1
         with:
           pulumi-version: latest
 
