@@ -129,6 +129,28 @@
                     }
                 }
             },
+            "quant_ai_auto_mode": {
+                "current": "quant:index:AiAutoMode",
+                "fields": {
+                    "group": {
+                        "fields": {
+                            "roles": {
+                                "fields": {
+                                    "deep": {
+                                        "maxItemsOne": false
+                                    },
+                                    "fast": {
+                                        "maxItemsOne": false
+                                    },
+                                    "standard": {
+                                        "maxItemsOne": false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "quant_ai_custom_tool": {
                 "current": "quant:index:AiCustomTool"
             },

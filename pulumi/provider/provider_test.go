@@ -352,6 +352,30 @@ resources:
 `)
 }
 
+// Exercises the hand-registered AiAutoMode resource through the Pulumi schema
+// + bridge.
+func TestPreview_AiAutoMode(t *testing.T) {
+	previewProgram(t, "test-ai-auto-mode", `
+name: test-ai-auto-mode
+runtime: yaml
+resources:
+  testAuto:
+    type: quant:index:AiAutoMode
+    properties:
+      organisation: preview-test-org
+      enabled: true
+      orchestratorModel: orch-model
+      watcherIntervalMinutes: 5
+      enforcement: default
+      autonomousDefault: false
+      group:
+        roles:
+          fast: ["a", "b"]
+          standard: ["s1"]
+          deep: ["d1"]
+`)
+}
+
 // Exercises the v4.19.0 governance spend-limit maps end-to-end through the
 // Pulumi schema + bridge: interface_limits (per-interface caps),
 // user_overrides (named per-user caps incl. unlimited), and the v4.20.0
@@ -518,7 +542,7 @@ func TestDataSource_GetKvLedgerTokens(t *testing.T) {
 
 func TestProviderInfo_HandRegisteredKVResources(t *testing.T) {
 	info := Provider()
-	for tf, tok := range map[string]string{"quant_kv_index": "quant:index:KvIndex", "quant_kv_ledger": "quant:index:KvLedger"} {
+	for tf, tok := range map[string]string{"quant_kv_index": "quant:index:KvIndex", "quant_kv_ledger": "quant:index:KvLedger", "quant_ai_auto_mode": "quant:index:AiAutoMode"} {
 		res, ok := info.Resources[tf]
 		require.True(t, ok, "%s not mapped", tf)
 		assert.Equal(t, tok, string(res.Tok))
@@ -650,4 +674,17 @@ func TestIntIDComputeID_Missing(t *testing.T) {
 	_, err := intIDComputeID(ctx, state)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing id")
+}
+
+// The runtime binary reads single-nested overrides from .Fields; tfgen reads
+// .Elem.Fields. RuntimeProvider mirrors the one onto the other.
+func TestRuntimeProvider_MirrorsAutoModeRoleNames(t *testing.T) {
+	tfgen := Provider().Resources["quant_ai_auto_mode"].Fields["group"]
+	assert.Nil(t, tfgen.Fields, "tfgen validation rejects .Fields on a nested attribute")
+	runtime := RuntimeProvider().Resources["quant_ai_auto_mode"].Fields["group"]
+	roles := runtime.Fields["roles"].Fields
+	for _, n := range []string{"fast", "standard", "deep"} {
+		require.Contains(t, roles, n)
+		assert.Equal(t, n, roles[n].Name)
+	}
 }

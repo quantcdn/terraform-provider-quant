@@ -13,6 +13,7 @@ func handRegisteredResources() []func() resource.Resource {
 	return []func() resource.Resource{
 		NewKVIndexResource,
 		NewKVLedgerResource,
+		NewAiAutoModeResource,
 	}
 }
 
