@@ -284,6 +284,40 @@ func TestAiAutoMode_PortalDeleteRecreates(t *testing.T) {
 	})
 }
 
+func TestAiAutoMode_OrganisationChangeReplaces(t *testing.T) {
+	org, other := "test-org", "other-org"
+	f := mockAiAutoModeServer(t, org)
+	g := mockAiAutoModeServer(t, other)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Unset organisation takes the provider default.
+			{Config: autoModeConfig(org, ""), Check: resource.TestCheckResourceAttr(autoModeRes, "organisation", org)},
+			// Unset again, or set to the same organisation: no replace, no diff.
+			{Config: autoModeConfig(org, ""), PlanOnly: true},
+			{Config: autoModeConfig(org, `organisation = "test-org"`), PlanOnly: true},
+			{
+				Config: autoModeConfig(org, `organisation = "other-org"`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
+					plancheck.ExpectResourceAction(autoModeRes, plancheck.ResourceActionDestroyBeforeCreate),
+				}},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(autoModeRes, "organisation", other),
+					resource.TestCheckResourceAttr(autoModeRes, "group.revision", "1"),
+					checkPutRevision(t, g, nil),
+					func(*terraform.State) error {
+						if f.deletes != 1 || f.cfg != nil {
+							return fmt.Errorf("the old organisation's setting was not deleted: deletes=%d", f.deletes)
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
 func TestAiAutoMode_400ListsIneligibleModels(t *testing.T) {
 	org := "test-org"
 	f := mockAiAutoModeServer(t, org)

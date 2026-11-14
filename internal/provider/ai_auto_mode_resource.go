@@ -71,6 +71,10 @@ func (r *aiAutoModeResource) Schema(ctx context.Context, _ resource.SchemaReques
 	addUseStateForUnknown(s.Attributes)
 	// These change on every save, so they must not carry state forward.
 	clearPlanModifiers(s.Attributes, "updated_at", "updated_by")
+	// A setting belongs to one organisation: a new organisation is a new
+	// setting. UseStateForUnknown runs first, so an unset organisation keeps
+	// the state value and does not force a replace.
+	addRequiresReplace(s.Attributes, "organisation")
 	makeAutoModeRevisionComputed(s.Attributes)
 	resp.Schema = s
 }
