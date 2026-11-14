@@ -93,8 +93,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 					"failover_origin_status_codes": schema.ListAttribute{
 						ElementType:         types.StringType,
 						Computed:            true,
-						Description:         "Status codes for failover (default: 200,404,301,302,304)",
-						MarkdownDescription: "Status codes for failover (default: 200,404,301,302,304)",
+						Description:         "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With failover_mode true, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422 (it would fail over on every response). A PATCH replaces the list.",
+						MarkdownDescription: "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With failover_mode true, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422 (it would fail over on every response). A PATCH replaces the list.",
 					},
 					"failover_origin_ttfb": schema.StringAttribute{
 						Computed:            true,
@@ -588,8 +588,8 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
-				Description:         "Origin status codes that trigger failover",
-				MarkdownDescription: "Origin status codes that trigger failover",
+				Description:         "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With failover_mode true, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422. A PATCH replaces the list.",
+				MarkdownDescription: "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With failover_mode true, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422. A PATCH replaces the list.",
 			},
 			"failover_origin_ttfb": schema.StringAttribute{
 				Optional:            true,
