@@ -451,6 +451,57 @@
                 }
             }
         },
+        "quant:index/AiAutoModeGroup:AiAutoModeGroup": {
+            "properties": {
+                "revision": {
+                    "type": "integer",
+                    "description": "Revision of the setting. The provider sends it on update; a stale value returns 409.\n"
+                },
+                "roles": {
+                    "$ref": "#/types/quant:index/AiAutoModeGroupRoles:AiAutoModeGroupRoles"
+                }
+            },
+            "type": "object",
+            "required": [
+                "roles"
+            ],
+            "language": {
+                "nodejs": {
+                    "requiredOutputs": [
+                        "revision",
+                        "roles"
+                    ]
+                }
+            }
+        },
+        "quant:index/AiAutoModeGroupRoles:AiAutoModeGroupRoles": {
+            "properties": {
+                "deeps": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "fasts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "standards": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "type": "object",
+            "required": [
+                "deeps",
+                "fasts",
+                "standards"
+            ]
+        },
         "quant:index/AiCustomToolTool:AiCustomToolTool": {
             "properties": {
                 "category": {
@@ -2470,7 +2521,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Status codes for failover (default: 200,404,301,302,304)\n"
+                    "description": "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With\u003cspan pulumi-lang-nodejs=\" failoverMode \" pulumi-lang-dotnet=\" FailoverMode \" pulumi-lang-go=\" failoverMode \" pulumi-lang-python=\" failover_mode \" pulumi-lang-yaml=\" failoverMode \" pulumi-lang-java=\" failoverMode \" pulumi-lang-hcl=\" failover_mode \"\u003e failoverMode \u003c/span\u003etrue, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422 (it would fail over on every response). A PATCH replaces the list.\n"
                 },
                 "failoverOriginTtfb": {
                     "type": "string",
@@ -4188,6 +4239,131 @@
                     "version": {
                         "type": "integer",
                         "description": "Current version for optimistic concurrency"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "quant:index:AiAutoMode": {
+            "properties": {
+                "autonomousDefault": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "enforcement": {
+                    "type": "string"
+                },
+                "group": {
+                    "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup"
+                },
+                "maxParallelTasks": {
+                    "type": "integer"
+                },
+                "orchestratorModel": {
+                    "type": "string",
+                    "description": "Required when enabled is true. May be left out when enabled is false."
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "description": "When the setting was last saved."
+                },
+                "updatedBy": {
+                    "type": "string",
+                    "description": "Who last saved the setting."
+                },
+                "watcherIntervalMinutes": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "autonomousDefault",
+                "enabled",
+                "enforcement",
+                "group",
+                "maxParallelTasks",
+                "orchestratorModel",
+                "organisation",
+                "updatedAt",
+                "updatedBy",
+                "watcherIntervalMinutes"
+            ],
+            "inputProperties": {
+                "autonomousDefault": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "enforcement": {
+                    "type": "string"
+                },
+                "group": {
+                    "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup"
+                },
+                "maxParallelTasks": {
+                    "type": "integer"
+                },
+                "orchestratorModel": {
+                    "type": "string",
+                    "description": "Required when enabled is true. May be left out when enabled is false."
+                },
+                "organisation": {
+                    "type": "string",
+                    "description": "The organisation ID"
+                },
+                "watcherIntervalMinutes": {
+                    "type": "integer"
+                }
+            },
+            "requiredInputs": [
+                "autonomousDefault",
+                "enabled",
+                "enforcement",
+                "group",
+                "watcherIntervalMinutes"
+            ],
+            "stateInputs": {
+                "description": "Input properties used for looking up and filtering AiAutoMode resources.\n",
+                "properties": {
+                    "autonomousDefault": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "enforcement": {
+                        "type": "string"
+                    },
+                    "group": {
+                        "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup"
+                    },
+                    "maxParallelTasks": {
+                        "type": "integer"
+                    },
+                    "orchestratorModel": {
+                        "type": "string",
+                        "description": "Required when enabled is true. May be left out when enabled is false."
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "The organisation ID"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "description": "When the setting was last saved."
+                    },
+                    "updatedBy": {
+                        "type": "string",
+                        "description": "Who last saved the setting."
+                    },
+                    "watcherIntervalMinutes": {
+                        "type": "integer"
                     }
                 },
                 "type": "object"
@@ -11002,7 +11178,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Origin status codes that trigger failover"
+                    "description": "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With\u003cspan pulumi-lang-nodejs=\" failoverMode \" pulumi-lang-dotnet=\" FailoverMode \" pulumi-lang-go=\" failoverMode \" pulumi-lang-python=\" failover_mode \" pulumi-lang-yaml=\" failoverMode \" pulumi-lang-java=\" failoverMode \" pulumi-lang-hcl=\" failover_mode \"\u003e failoverMode \u003c/span\u003etrue, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422. A PATCH replaces the list."
                 },
                 "failoverOriginTtfb": {
                     "type": "string",
@@ -11337,7 +11513,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Origin status codes that trigger failover"
+                    "description": "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With\u003cspan pulumi-lang-nodejs=\" failoverMode \" pulumi-lang-dotnet=\" FailoverMode \" pulumi-lang-go=\" failoverMode \" pulumi-lang-python=\" failover_mode \" pulumi-lang-yaml=\" failoverMode \" pulumi-lang-java=\" failoverMode \" pulumi-lang-hcl=\" failover_mode \"\u003e failoverMode \u003c/span\u003etrue, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422. A PATCH replaces the list."
                 },
                 "failoverOriginTtfb": {
                     "type": "string",
@@ -11619,7 +11795,7 @@
                         "items": {
                             "type": "string"
                         },
-                        "description": "Origin status codes that trigger failover"
+                        "description": "Origin statuses that do not trigger failover. Any other origin status switches the rule to the static copy. With\u003cspan pulumi-lang-nodejs=\" failoverMode \" pulumi-lang-dotnet=\" FailoverMode \" pulumi-lang-go=\" failoverMode \" pulumi-lang-python=\" failover_mode \" pulumi-lang-yaml=\" failoverMode \" pulumi-lang-java=\" failoverMode \" pulumi-lang-hcl=\" failover_mode \"\u003e failoverMode \u003c/span\u003etrue, a list left out gets the default 200, 301, 302, 304, 404, and an empty list is refused with 422. A PATCH replaces the list."
                     },
                     "failoverOriginTtfb": {
                         "type": "string",

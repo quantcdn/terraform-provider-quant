@@ -22,6 +22,8 @@ func handRegisteredResources() map[string]*tfbridge.ResourceInfo {
 	return map[string]*tfbridge.ResourceInfo{
 		"quant_kv_index":  {Tok: "quant:index:KvIndex", ComputeID: importID, Fields: keepName},
 		"quant_kv_ledger": {Tok: "quant:index:KvLedger", ComputeID: importID, Fields: keepName},
+		// The import ID is the organisation machine name.
+		"quant_ai_auto_mode": {Tok: "quant:index:AiAutoMode", ComputeID: fieldComputeID("organisation")},
 	}
 }
 
