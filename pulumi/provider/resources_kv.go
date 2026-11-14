@@ -23,7 +23,11 @@ func handRegisteredResources() map[string]*tfbridge.ResourceInfo {
 		"quant_kv_index":  {Tok: "quant:index:KvIndex", ComputeID: importID, Fields: keepName},
 		"quant_kv_ledger": {Tok: "quant:index:KvLedger", ComputeID: importID, Fields: keepName},
 		// The import ID is the organisation machine name.
-		"quant_ai_auto_mode": {Tok: "quant:index:AiAutoMode", ComputeID: fieldComputeID("organisation")},
+		"quant_ai_auto_mode": {
+			Tok:       "quant:index:AiAutoMode",
+			ComputeID: fieldComputeID("organisation"),
+			Fields:    autoModeFields(),
+		},
 	}
 }
 
@@ -51,4 +55,37 @@ func resourceMap() map[string]*tfbridge.ResourceInfo {
 		m[k] = v
 	}
 	return m
+}
+
+// autoModeFields keeps the TF names of the role lists (fast, standard, deep);
+// the bridge would pluralise them. group and group.roles are single-nested
+// attributes: tfgen reads their overrides from .Elem.Fields.
+func autoModeFields() map[string]*tfbridge.SchemaInfo {
+	roles := map[string]*tfbridge.SchemaInfo{"fast": {Name: "fast"}, "standard": {Name: "standard"}, "deep": {Name: "deep"}}
+	group := map[string]*tfbridge.SchemaInfo{"roles": {Elem: &tfbridge.SchemaInfo{Fields: roles}}}
+	return map[string]*tfbridge.SchemaInfo{"group": {Elem: &tfbridge.SchemaInfo{Fields: group}}}
+}
+
+// RuntimeProvider is Provider for the resource binary. In the bridge version
+// pinned in pulumi/go.mod (checked on v3.137.0 and v3.143.0), the PF runtime
+// (pkg/convert schemaPropContext.Object) reads single-nested overrides from
+// .Fields, while tfgen reads .Elem.Fields and its validation rejects .Fields.
+// So the runtime copy mirrors .Elem.Fields onto .Fields. Remove this when the
+// bridge reads one form in both places.
+func RuntimeProvider() tfbridge.ProviderInfo {
+	p := Provider()
+	for _, f := range p.Resources["quant_ai_auto_mode"].Fields {
+		mirrorElemFields(f)
+	}
+	return p
+}
+
+func mirrorElemFields(s *tfbridge.SchemaInfo) {
+	if s == nil || s.Elem == nil {
+		return
+	}
+	s.Fields = s.Elem.Fields
+	for _, f := range s.Fields {
+		mirrorElemFields(f)
+	}
 }

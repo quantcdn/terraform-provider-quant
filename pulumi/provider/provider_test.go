@@ -370,9 +370,9 @@ resources:
       autonomousDefault: false
       group:
         roles:
-          fasts: ["a", "b"]
-          standards: ["s1"]
-          deeps: ["d1"]
+          fast: ["a", "b"]
+          standard: ["s1"]
+          deep: ["d1"]
 `)
 }
 
@@ -674,4 +674,17 @@ func TestIntIDComputeID_Missing(t *testing.T) {
 	_, err := intIDComputeID(ctx, state)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing id")
+}
+
+// The runtime binary reads single-nested overrides from .Fields; tfgen reads
+// .Elem.Fields. RuntimeProvider mirrors the one onto the other.
+func TestRuntimeProvider_MirrorsAutoModeRoleNames(t *testing.T) {
+	tfgen := Provider().Resources["quant_ai_auto_mode"].Fields["group"]
+	assert.Nil(t, tfgen.Fields, "tfgen validation rejects .Fields on a nested attribute")
+	runtime := RuntimeProvider().Resources["quant_ai_auto_mode"].Fields["group"]
+	roles := runtime.Fields["roles"].Fields
+	for _, n := range []string{"fast", "standard", "deep"} {
+		require.Contains(t, roles, n)
+		assert.Equal(t, n, roles[n].Name)
+	}
 }

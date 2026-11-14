@@ -14,5 +14,5 @@ var schema []byte
 
 func main() {
 	meta := tfbridge.ProviderMetadata{PackageSchema: schema}
-	tfbridge.Main(context.Background(), "quant", quant.Provider(), meta)
+	tfbridge.Main(context.Background(), "quant", quant.RuntimeProvider(), meta)
 }

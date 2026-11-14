@@ -476,19 +476,19 @@
         },
         "quant:index/AiAutoModeGroupRoles:AiAutoModeGroupRoles": {
             "properties": {
-                "deeps": {
+                "deep": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
-                "fasts": {
+                "fast": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
-                "standards": {
+                "standard": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -497,9 +497,9 @@
             },
             "type": "object",
             "required": [
-                "deeps",
-                "fasts",
-                "standards"
+                "deep",
+                "fast",
+                "standard"
             ]
         },
         "quant:index/AiCustomToolTool:AiCustomToolTool": {
