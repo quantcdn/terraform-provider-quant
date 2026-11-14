@@ -63,9 +63,9 @@ resource "quant_ai_auto_mode" "example" {
 
 ### Optional
 
-* `orchestrator_model` (String) - (Optional) The orchestrator model ID. Required when `enabled` is `true`.
-* `max_parallel_tasks` (Number) - (Optional) Maximum parallel tasks, 1 to 16. When unset, the provider does not send it and the platform default applies.
-* `organisation` (String) - (Optional) The organisation machine name. Defaults to the provider organisation.
+* `orchestrator_model` (String) - (Optional) The orchestrator model ID. Required when `enabled` is `true`. Must not be empty. If you remove it from the configuration, the last value is kept (see Notes).
+* `max_parallel_tasks` (Number) - (Optional) Maximum parallel tasks, 1 to 16. If it was never set, the provider does not send it and the platform default applies. If you remove it from the configuration after a value was set, the last value is kept (see Notes).
+* `organisation` (String) - (Optional) The organisation machine name (the import ID). Defaults to the provider organisation. A change replaces the resource: the setting is deleted from the old organisation and created in the new one.
 
 ## Attribute Reference
 
@@ -82,7 +82,8 @@ In addition to all arguments above, the following attributes are exported:
 * If the setting changes in the Portal, the next plan shows the change and apply restores the configuration.
 * If the setting is deleted in the Portal, the next plan creates it again.
 * `terraform destroy` deletes the setting. The organisation then has no auto-mode setting.
-* If the organisation already has a setting, create fails. Import the setting instead.
+* If the organisation already has a setting, create fails. Import the setting instead (see Import).
+* If the setting changed after the last refresh, the save fails with a 409. Refresh the state, then apply again. `terraform apply` refreshes first. With Pulumi, run `pulumi up --refresh`.
 * `orchestrator_model` and `max_parallel_tasks` keep their last value when you remove them from the configuration. The provider continues to send that value. To change the value, set a new one in the configuration.
 
 ## Import
@@ -91,4 +92,10 @@ Import the setting with the organisation machine name. The import fails if the o
 
 ```bash
 terraform import quant_ai_auto_mode.example example-org
+```
+
+With Pulumi:
+
+```bash
+pulumi import quant:index:AiAutoMode example example-org
 ```

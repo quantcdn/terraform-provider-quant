@@ -4247,27 +4247,32 @@
         "quant:index:AiAutoMode": {
             "properties": {
                 "autonomousDefault": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Whether autonomous runs use auto mode by default."
                 },
                 "enabled": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Whether auto mode is on for the organisation."
                 },
                 "enforcement": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Auto-mode enforcement: default or required. QuantGov accepts required only."
                 },
                 "group": {
-                    "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup"
+                    "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup",
+                    "description": "The model group. roles lists the models of each role (fast, standard, deep), in order of preference, up to 5 each."
                 },
                 "maxParallelTasks": {
-                    "type": "integer"
+                    "type": "integer",
+                    "description": "Maximum parallel tasks, 1 to 16. If never set, it is not sent and the platform default applies. If removed from the configuration, the last value is kept."
                 },
                 "orchestratorModel": {
                     "type": "string",
-                    "description": "Required when enabled is true. May be left out when enabled is false."
+                    "description": "The orchestrator model ID. Required when enabled is true. If removed from the configuration, the last value is kept."
                 },
                 "organisation": {
                     "type": "string",
-                    "description": "The organisation ID"
+                    "description": "The organisation machine name (the import ID). Defaults to the provider organisation. A change replaces the resource."
                 },
                 "updatedAt": {
                     "type": "string",
@@ -4278,7 +4283,8 @@
                     "description": "Who last saved the setting."
                 },
                 "watcherIntervalMinutes": {
-                    "type": "integer"
+                    "type": "integer",
+                    "description": "Minutes between watcher checks, 0 to 60."
                 }
             },
             "required": [
@@ -4295,30 +4301,36 @@
             ],
             "inputProperties": {
                 "autonomousDefault": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Whether autonomous runs use auto mode by default."
                 },
                 "enabled": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Whether auto mode is on for the organisation."
                 },
                 "enforcement": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Auto-mode enforcement: default or required. QuantGov accepts required only."
                 },
                 "group": {
-                    "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup"
+                    "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup",
+                    "description": "The model group. roles lists the models of each role (fast, standard, deep), in order of preference, up to 5 each."
                 },
                 "maxParallelTasks": {
-                    "type": "integer"
+                    "type": "integer",
+                    "description": "Maximum parallel tasks, 1 to 16. If never set, it is not sent and the platform default applies. If removed from the configuration, the last value is kept."
                 },
                 "orchestratorModel": {
                     "type": "string",
-                    "description": "Required when enabled is true. May be left out when enabled is false."
+                    "description": "The orchestrator model ID. Required when enabled is true. If removed from the configuration, the last value is kept."
                 },
                 "organisation": {
                     "type": "string",
-                    "description": "The organisation ID"
+                    "description": "The organisation machine name (the import ID). Defaults to the provider organisation. A change replaces the resource."
                 },
                 "watcherIntervalMinutes": {
-                    "type": "integer"
+                    "type": "integer",
+                    "description": "Minutes between watcher checks, 0 to 60."
                 }
             },
             "requiredInputs": [
@@ -4332,27 +4344,32 @@
                 "description": "Input properties used for looking up and filtering AiAutoMode resources.\n",
                 "properties": {
                     "autonomousDefault": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Whether autonomous runs use auto mode by default."
                     },
                     "enabled": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Whether auto mode is on for the organisation."
                     },
                     "enforcement": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Auto-mode enforcement: default or required. QuantGov accepts required only."
                     },
                     "group": {
-                        "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup"
+                        "$ref": "#/types/quant:index/AiAutoModeGroup:AiAutoModeGroup",
+                        "description": "The model group. roles lists the models of each role (fast, standard, deep), in order of preference, up to 5 each."
                     },
                     "maxParallelTasks": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "Maximum parallel tasks, 1 to 16. If never set, it is not sent and the platform default applies. If removed from the configuration, the last value is kept."
                     },
                     "orchestratorModel": {
                         "type": "string",
-                        "description": "Required when enabled is true. May be left out when enabled is false."
+                        "description": "The orchestrator model ID. Required when enabled is true. If removed from the configuration, the last value is kept."
                     },
                     "organisation": {
                         "type": "string",
-                        "description": "The organisation ID"
+                        "description": "The organisation machine name (the import ID). Defaults to the provider organisation. A change replaces the resource."
                     },
                     "updatedAt": {
                         "type": "string",
@@ -4363,7 +4380,8 @@
                         "description": "Who last saved the setting."
                     },
                     "watcherIntervalMinutes": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "Minutes between watcher checks, 0 to 60."
                     }
                 },
                 "type": "object"

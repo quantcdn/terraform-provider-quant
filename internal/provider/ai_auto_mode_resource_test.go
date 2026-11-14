@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 
@@ -368,12 +369,50 @@ func TestAiAutoMode_409OnCreateSaysImport(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config:      autoModeConfig(org, ""),
-			ExpectError: regexp.MustCompile(`(?s)already has an auto-mode setting.*terraform import quant_ai_auto_mode.<name> test-org`),
+			ExpectError: regexp.MustCompile(`(?s)already has an auto-mode setting.*terraform\s+import\s+quant_ai_auto_mode.<name>\s+test-org.*pulumi\s+import\s+quant:index:AiAutoMode\s+<name>\s+test-org`),
 		}},
 	})
 	if _, ok := f.puts[0]["group"].(map[string]any)["revision"]; ok {
 		t.Fatal("create sent a revision")
 	}
+}
+
+func TestAiAutoMode_409OnUpdateSaysRefresh(t *testing.T) {
+	org := "test-org"
+	f := mockAiAutoModeServer(t, org)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: autoModeConfig(org, "")},
+			{
+				PreConfig: func() {
+					f.mu.Lock()
+					defer f.mu.Unlock()
+					f.putStatus = 409
+					f.putBody = map[string]any{"error": "The setting changed since it was read"}
+				},
+				Config:      autoModeConfig(org, "max_parallel_tasks = 4"),
+				ExpectError: regexp.MustCompile(`(?s)The setting changed since it was read.*Refresh the state, then apply\s+again.*terraform apply.*pulumi\s+up\s+--refresh`),
+			},
+		},
+	})
+	if got := f.lastPut(t)["group"].(map[string]any)["revision"]; got != float64(1) {
+		t.Fatalf("update sent revision %v, want 1", got)
+	}
+}
+
+func TestAiAutoMode_EmptyOrchestratorModelRejected(t *testing.T) {
+	org := "test-org"
+	mockAiAutoModeServer(t, org)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      strings.Replace(autoModeConfig(org, ""), `"orch-model"`, `""`, 1),
+			ExpectError: regexp.MustCompile(`(?s)orchestrator_model.*at least 1`),
+		}},
+	})
 }
 
 func TestAiAutoMode_ImportWithoutSettingFails(t *testing.T) {

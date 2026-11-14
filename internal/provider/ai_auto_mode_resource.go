@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -76,7 +77,50 @@ func (r *aiAutoModeResource) Schema(ctx context.Context, _ resource.SchemaReques
 	// the state value and does not force a replace.
 	addRequiresReplace(s.Attributes, "organisation")
 	makeAutoModeRevisionComputed(s.Attributes)
+	setAutoModeDescriptions(s.Attributes)
+	// "" would come back as null and fail with an inconsistent result.
+	if a, ok := s.Attributes["orchestrator_model"].(schema.StringAttribute); ok {
+		a.Validators = append(a.Validators, stringvalidator.LengthAtLeast(1))
+		s.Attributes["orchestrator_model"] = a
+	}
 	resp.Schema = s
+}
+
+// aiAutoModeDescriptions replace or add the descriptions of the generated
+// top-level attributes. Pulumi takes its SDK docs from these.
+var aiAutoModeDescriptions = map[string]string{
+	"organisation":             "The organisation machine name (the import ID). Defaults to the provider organisation. A change replaces the resource.",
+	"enabled":                  "Whether auto mode is on for the organisation.",
+	"orchestrator_model":       "The orchestrator model ID. Required when enabled is true. If removed from the configuration, the last value is kept.",
+	"watcher_interval_minutes": "Minutes between watcher checks, 0 to 60.",
+	"max_parallel_tasks":       "Maximum parallel tasks, 1 to 16. If never set, it is not sent and the platform default applies. If removed from the configuration, the last value is kept.",
+	"enforcement":              "Auto-mode enforcement: default or required. QuantGov accepts required only.",
+	"autonomous_default":       "Whether autonomous runs use auto mode by default.",
+	"group":                    "The model group. roles lists the models of each role (fast, standard, deep), in order of preference, up to 5 each.",
+}
+
+func setAutoModeDescriptions(attrs map[string]schema.Attribute) {
+	for name, text := range aiAutoModeDescriptions {
+		attrs[name] = withDescription(attrs[name], text)
+	}
+}
+
+func withDescription(a schema.Attribute, text string) schema.Attribute {
+	switch v := a.(type) {
+	case schema.StringAttribute:
+		v.Description, v.MarkdownDescription = text, text
+		return v
+	case schema.BoolAttribute:
+		v.Description, v.MarkdownDescription = text, text
+		return v
+	case schema.Int64Attribute:
+		v.Description, v.MarkdownDescription = text, text
+		return v
+	case schema.SingleNestedAttribute:
+		v.Description, v.MarkdownDescription = text, text
+		return v
+	}
+	return a
 }
 
 // makeAutoModeRevisionComputed makes group.revision computed only. The API
@@ -387,11 +431,11 @@ func autoModePutErrorText(resp *http.Response, err error, org string, create boo
 	case resp.StatusCode == http.StatusBadRequest:
 		return msg + ineligibleModelsText(e)
 	case resp.StatusCode == http.StatusConflict && strings.Contains(msg, aiAutoModeGovernanceFirst):
-		return fmt.Sprintf("%s\n\nApply quant_ai_governance for organisation %q first, and add depends_on = [quant_ai_governance.<name>] to this quant_ai_auto_mode resource.", msg, org)
+		return fmt.Sprintf("%s\n\nApply quant_ai_governance for organisation %q first, and add depends_on = [quant_ai_governance.<name>] to this quant_ai_auto_mode resource (Pulumi: dependsOn the AiGovernance resource).", msg, org)
 	case resp.StatusCode == http.StatusConflict && create:
-		return fmt.Sprintf("%s\n\nOrganisation %q already has an auto-mode setting. Import it instead of creating it:\n\n  terraform import quant_ai_auto_mode.<name> %s", msg, org, org)
+		return fmt.Sprintf("%s\n\nOrganisation %q already has an auto-mode setting. Import it instead of creating it:\n\n  terraform import quant_ai_auto_mode.<name> %s\n  pulumi import quant:index:AiAutoMode <name> %s", msg, org, org, org)
 	case resp.StatusCode == http.StatusConflict:
-		return msg + "\n\nThe setting changed outside Terraform after the last refresh. Run terraform apply again."
+		return msg + "\n\nThe setting changed after the last refresh. Refresh the state, then apply again: terraform apply (it refreshes first), or pulumi up --refresh."
 	}
 	return fmt.Sprintf("API returned %d: %s", resp.StatusCode, msg)
 }
