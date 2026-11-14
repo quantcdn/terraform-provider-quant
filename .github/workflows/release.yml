@@ -178,6 +178,12 @@ jobs:
           go build -ldflags "-X github.com/quantcdn/terraform-provider-quant/v5/pulumi/provider/pkg/version.Version=${VERSION}" \
             -o ../bin/pulumi-tfgen-quant ./provider/cmd/pulumi-tfgen-quant
 
+      # tfgen runs `pulumi package gen-sdk`; ubuntu-latest (26.04) no longer ships the Pulumi CLI.
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: latest
+
       - name: Generate Node.js SDK
         run: cd pulumi && ../bin/pulumi-tfgen-quant nodejs --out sdk/nodejs
 
