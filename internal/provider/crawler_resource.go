@@ -182,6 +182,43 @@ func (r *crawlerResource) Delete(ctx context.Context, req resource.DeleteRequest
 // buildCrawlerRequest maps model fields to SDK request using mapper for simple
 // fields and manual handling for complex types (maps, int lists, nested objects).
 // ---------------------------------------------------------------------------
+// maskedSecret is what the API returns in place of a stored secret value.
+const maskedSecret = "********"
+
+// knownOrNull returns v, or null when v is unknown. A value that is still
+// unknown after an apply is an error in Terraform, so a secret that the
+// provider cannot read and the configuration does not set is stored as null.
+func knownOrNull(v types.String) types.String {
+	if v.IsUnknown() {
+		return types.StringNull()
+	}
+	return v
+}
+
+// unmaskHeaders maps the header values the API returned to state values. The
+// API masks header values for a token that may not edit crawlers. A masked
+// value takes the value the plan or the state holds for that header; with
+// none it is left out, so the mask is never stored and never sent back as a
+// real header value.
+func unmaskHeaders(fromAPI map[string]string, saved types.Map) map[string]attr.Value {
+	known := map[string]attr.Value{}
+	if !saved.IsNull() && !saved.IsUnknown() {
+		known = saved.Elements()
+	}
+
+	out := make(map[string]attr.Value, len(fromAPI))
+	for name, value := range fromAPI {
+		if value != maskedSecret {
+			out[name] = types.StringValue(value)
+			continue
+		}
+		if kept, ok := known[name]; ok {
+			out[name] = kept
+		}
+	}
+	return out
+}
+
 func buildCrawlerRequest(ctx context.Context, crawler *resource_crawler.CrawlerModel) (*quantadmingo.V2CrawlerRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -463,6 +500,7 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	savedInclude := crawler.Include
 	savedAllowedDomains := crawler.AllowedDomains
 	savedHeaders := crawler.Headers
+	savedWebhookAuthHeader := crawler.WebhookAuthHeader
 
 	// mapper.FromSDK handles: Id, Name, Domain, DomainVerified, Uuid,
 	// ProjectId, BrowserMode, Workers, Delay, Depth, MaxHits, MaxHtml,
@@ -489,6 +527,11 @@ func callCrawlerReadAPI(ctx context.Context, r *crawlerResource, crawler *resour
 	}
 	if api.WebhookAuthHeader == nil || *api.WebhookAuthHeader == "" {
 		crawler.WebhookAuthHeader = types.StringNull()
+	} else if *api.WebhookAuthHeader == maskedSecret {
+		// The API never returns this secret: a read gives a fixed mask when a
+		// value is set. Keep the value from the plan or the state, so the
+		// mask is not stored and does not show as a change.
+		crawler.WebhookAuthHeader = knownOrNull(savedWebhookAuthHeader)
 	}
 	if api.WebhookExtraVars == nil || *api.WebhookExtraVars == "" {
 		crawler.WebhookExtraVars = types.StringNull()
@@ -664,11 +707,7 @@ func parseCrawlerConfig(ctx context.Context, configYAML string, crawler *resourc
 
 	// Headers — preserve from plan/state when API returns empty (sensitive headers).
 	if len(cfg.Headers) > 0 {
-		headersMap := make(map[string]attr.Value, len(cfg.Headers))
-		for k, v := range cfg.Headers {
-			headersMap[k] = types.StringValue(v)
-		}
-		crawler.Headers = types.MapValueMust(types.StringType, headersMap)
+		crawler.Headers = types.MapValueMust(types.StringType, unmaskHeaders(cfg.Headers, crawler.Headers))
 	} else if crawler.Headers.IsUnknown() || crawler.Headers.ElementType(ctx) == nil {
 		crawler.Headers = types.MapValueMust(types.StringType, map[string]attr.Value{})
 	}
