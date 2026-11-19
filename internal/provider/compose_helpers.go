@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -28,25 +29,26 @@ type composeFields struct {
 // containerFields is a portable intermediate representation of the Terraform
 // ContainersValue fields.
 type containerFields struct {
-	Command                basetypes.ListValue
-	Cpu                    basetypes.Int64Value
-	DependsOn              basetypes.ListValue
-	EntryPoint             basetypes.ListValue
-	Environment            basetypes.ListValue
-	Essential              basetypes.BoolValue
-	ExposedPorts           basetypes.ListValue
-	HealthCheck            basetypes.ObjectValue
-	ImageReference         basetypes.ObjectValue
-	Memory                 basetypes.Int64Value
-	MemoryReservation      basetypes.Int64Value
-	MountPoints            basetypes.ListValue
-	Name                   basetypes.StringValue
-	OriginProtection       basetypes.BoolValue
-	OriginProtectionConfig basetypes.ObjectValue
-	ReadonlyRootFilesystem basetypes.BoolValue
-	Secrets                basetypes.ListValue
-	User                   basetypes.StringValue
-	WorkingDirectory       basetypes.StringValue
+	Command                 basetypes.ListValue
+	Cpu                     basetypes.Int64Value
+	DependsOn               basetypes.ListValue
+	EntryPoint              basetypes.ListValue
+	Environment             basetypes.ListValue
+	Essential               basetypes.BoolValue
+	ExposedPorts            basetypes.ListValue
+	HealthCheck             basetypes.ObjectValue
+	LoadBalancerHealthCheck basetypes.ObjectValue
+	ImageReference          basetypes.ObjectValue
+	Memory                  basetypes.Int64Value
+	MemoryReservation       basetypes.Int64Value
+	MountPoints             basetypes.ListValue
+	Name                    basetypes.StringValue
+	OriginProtection        basetypes.BoolValue
+	OriginProtectionConfig  basetypes.ObjectValue
+	ReadonlyRootFilesystem  basetypes.BoolValue
+	Secrets                 basetypes.ListValue
+	User                    basetypes.StringValue
+	WorkingDirectory        basetypes.StringValue
 }
 
 // buildSDKCompose converts the portable compose fields into a quantadmingo.Compose struct.
@@ -207,6 +209,11 @@ func extractContainerFields(obj basetypes.ObjectValue) containerFields {
 	if v, ok := attrs["origin_protection_config"]; ok {
 		if ov, ok := v.(basetypes.ObjectValue); ok {
 			cf.OriginProtectionConfig = ov
+		}
+	}
+	if v, ok := attrs["load_balancer_health_check"]; ok {
+		if ov, ok := v.(basetypes.ObjectValue); ok {
+			cf.LoadBalancerHealthCheck = ov
 		}
 	}
 	if v, ok := attrs["exposed_ports"]; ok {
@@ -501,5 +508,23 @@ func buildSDKContainer(ctx context.Context, cf containerFields, index int) (quan
 		container.SetOriginProtectionConfig(*opc)
 	}
 
+	// LoadBalancerHealthCheck — object with path/interval_seconds. Null leaves it out: the platform default.
+	if !cf.LoadBalancerHealthCheck.IsNull() && !cf.LoadBalancerHealthCheck.IsUnknown() {
+		container.SetLoadBalancerHealthCheck(*buildSDKLoadBalancerHealthCheck(cf.LoadBalancerHealthCheck.Attributes()))
+	}
+
 	return container, diags
+}
+
+// buildSDKLoadBalancerHealthCheck maps the load_balancer_health_check attributes to the SDK model.
+func buildSDKLoadBalancerHealthCheck(attrs map[string]attr.Value) *quantadmingo.ContainerLoadBalancerHealthCheck {
+	// Not NewContainerLoadBalancerHealthCheck(): it fills in the spec defaults, and only set values may be sent.
+	lb := &quantadmingo.ContainerLoadBalancerHealthCheck{}
+	if sv, ok := attrs["path"].(basetypes.StringValue); ok && !sv.IsNull() && !sv.IsUnknown() {
+		lb.SetPath(sv.ValueString())
+	}
+	if iv, ok := attrs["interval_seconds"].(basetypes.Int64Value); ok && !iv.IsNull() && !iv.IsUnknown() {
+		lb.SetIntervalSeconds(int32(iv.ValueInt64()))
+	}
+	return lb
 }
