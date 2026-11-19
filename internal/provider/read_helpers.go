@@ -154,6 +154,12 @@ type originProtectionConfigRead struct {
 	RedirectHost *string    `tfsdk:"redirect_host"`
 }
 
+// loadBalancerHealthCheckRead maps SDK ContainerLoadBalancerHealthCheck → nested object.
+type loadBalancerHealthCheckRead struct {
+	Path            *string `tfsdk:"path"`
+	IntervalSeconds *int64  `tfsdk:"interval_seconds"`
+}
+
 // containerEnvRead maps SDK ContainerEnvironmentInner → TF EnvironmentValue.
 type containerEnvRead struct {
 	Name  *string `tfsdk:"name"`
@@ -181,25 +187,26 @@ type containerMountPointRead struct {
 
 // containerRead maps SDK Container → TF ContainersValue.
 type containerRead struct {
-	Command                types.List   `tfsdk:"command"`
-	Cpu                    *int64       `tfsdk:"cpu"`
-	DependsOn              types.List   `tfsdk:"depends_on"`
-	EntryPoint             types.List   `tfsdk:"entry_point"`
-	Environment            types.List   `tfsdk:"environment"`
-	Essential              *bool        `tfsdk:"essential"`
-	ExposedPorts           types.List   `tfsdk:"exposed_ports"`
-	HealthCheck            types.Object `tfsdk:"health_check"`
-	ImageReference         types.Object `tfsdk:"image_reference"`
-	Memory                 *int64       `tfsdk:"memory"`
-	MemoryReservation      *int64       `tfsdk:"memory_reservation"`
-	MountPoints            types.List   `tfsdk:"mount_points"`
-	Name                   string       `tfsdk:"name"`
-	OriginProtection       *bool        `tfsdk:"origin_protection"`
-	OriginProtectionConfig types.Object `tfsdk:"origin_protection_config"`
-	ReadonlyRootFilesystem *bool        `tfsdk:"readonly_root_filesystem"`
-	Secrets                types.List   `tfsdk:"secrets"`
-	User                   *string      `tfsdk:"user"`
-	WorkingDirectory       *string      `tfsdk:"working_directory"`
+	Command                 types.List   `tfsdk:"command"`
+	Cpu                     *int64       `tfsdk:"cpu"`
+	DependsOn               types.List   `tfsdk:"depends_on"`
+	EntryPoint              types.List   `tfsdk:"entry_point"`
+	Environment             types.List   `tfsdk:"environment"`
+	Essential               *bool        `tfsdk:"essential"`
+	ExposedPorts            types.List   `tfsdk:"exposed_ports"`
+	HealthCheck             types.Object `tfsdk:"health_check"`
+	ImageReference          types.Object `tfsdk:"image_reference"`
+	Memory                  *int64       `tfsdk:"memory"`
+	MemoryReservation       *int64       `tfsdk:"memory_reservation"`
+	MountPoints             types.List   `tfsdk:"mount_points"`
+	Name                    string       `tfsdk:"name"`
+	OriginProtection        *bool        `tfsdk:"origin_protection"`
+	OriginProtectionConfig  types.Object `tfsdk:"origin_protection_config"`
+	LoadBalancerHealthCheck types.Object `tfsdk:"load_balancer_health_check"`
+	ReadonlyRootFilesystem  *bool        `tfsdk:"readonly_root_filesystem"`
+	Secrets                 types.List   `tfsdk:"secrets"`
+	User                    *string      `tfsdk:"user"`
+	WorkingDirectory        *string      `tfsdk:"working_directory"`
 }
 
 // composeRead maps SDK Compose → TF ComposeDefinitionValue.
@@ -299,6 +306,19 @@ func buildOriginProtectionConfigObject(ctx context.Context, c *quantadmingo.Cont
 	})
 	diags.Append(d...)
 	return obj, diags
+}
+
+// buildLoadBalancerHealthCheckObject builds a types.Object for ContainerLoadBalancerHealthCheck, or null when the
+// container uses the platform default.
+func buildLoadBalancerHealthCheckObject(ctx context.Context, c *quantadmingo.Container, attrTypes map[string]attr.Type) (basetypes.ObjectValue, diag.Diagnostics) {
+	lb, ok := c.GetLoadBalancerHealthCheckOk()
+	if !ok || lb == nil {
+		return types.ObjectNull(attrTypes), nil
+	}
+	return types.ObjectValueFrom(ctx, attrTypes, loadBalancerHealthCheckRead{
+		Path:            ptrStr(lb.GetPathOk()),
+		IntervalSeconds: ptrInt32AsInt64(lb.GetIntervalSecondsOk()),
+	})
 }
 
 // buildSpotConfigObject builds a types.Object for SpotConfiguration.
@@ -459,6 +479,10 @@ func buildAppContainerValue(ctx context.Context, c *quantadmingo.Container) (res
 	opcObj, d := buildOriginProtectionConfigObject(ctx, c, opcAttrTypes)
 	diags.Append(d...)
 
+	lbhcAttrTypes := resource_application.LoadBalancerHealthCheckValue{}.AttributeTypes(ctx)
+	lbhcObj, d := buildLoadBalancerHealthCheckObject(ctx, c, lbhcAttrTypes)
+	diags.Append(d...)
+
 	// Primitive lists
 	exposedPorts, d := buildExposedPortsList(ctx, c)
 	diags.Append(d...)
@@ -533,25 +557,26 @@ func buildAppContainerValue(ctx context.Context, c *quantadmingo.Container) (res
 	result, d := autoMap(ctx,
 		resource_application.ContainersValue{}.AttributeTypes(ctx),
 		containerRead{
-			Command:                commandList,
-			Cpu:                    ptrInt32AsInt64(c.GetCpuOk()),
-			DependsOn:              depsList,
-			EntryPoint:             entryPointList,
-			Environment:            envList,
-			Essential:              ptrBool(c.GetEssentialOk()),
-			ExposedPorts:           exposedPorts,
-			HealthCheck:            hcObj,
-			ImageReference:         irObj,
-			Memory:                 ptrInt32AsInt64(c.GetMemoryOk()),
-			MemoryReservation:      ptrInt32AsInt64(c.GetMemoryReservationOk()),
-			MountPoints:            mpList,
-			Name:                   c.GetName(),
-			OriginProtection:       ptrBool(c.GetOriginProtectionOk()),
-			OriginProtectionConfig: opcObj,
-			ReadonlyRootFilesystem: ptrBool(c.GetReadonlyRootFilesystemOk()),
-			Secrets:                secretsList,
-			User:                   ptrStr(c.GetUserOk()),
-			WorkingDirectory:       ptrStr(c.GetWorkingDirectoryOk()),
+			Command:                 commandList,
+			Cpu:                     ptrInt32AsInt64(c.GetCpuOk()),
+			DependsOn:               depsList,
+			EntryPoint:              entryPointList,
+			Environment:             envList,
+			Essential:               ptrBool(c.GetEssentialOk()),
+			ExposedPorts:            exposedPorts,
+			HealthCheck:             hcObj,
+			ImageReference:          irObj,
+			Memory:                  ptrInt32AsInt64(c.GetMemoryOk()),
+			MemoryReservation:       ptrInt32AsInt64(c.GetMemoryReservationOk()),
+			MountPoints:             mpList,
+			Name:                    c.GetName(),
+			OriginProtection:        ptrBool(c.GetOriginProtectionOk()),
+			OriginProtectionConfig:  opcObj,
+			LoadBalancerHealthCheck: lbhcObj,
+			ReadonlyRootFilesystem:  ptrBool(c.GetReadonlyRootFilesystemOk()),
+			Secrets:                 secretsList,
+			User:                    ptrStr(c.GetUserOk()),
+			WorkingDirectory:        ptrStr(c.GetWorkingDirectoryOk()),
 		},
 		resource_application.NewContainersValue,
 	)
@@ -635,6 +660,10 @@ func buildEnvContainerValue(ctx context.Context, c *quantadmingo.Container) (res
 	opcObj, d := buildOriginProtectionConfigObject(ctx, c, opcAttrTypes)
 	diags.Append(d...)
 
+	lbhcAttrTypes := resource_environment.LoadBalancerHealthCheckValue{}.AttributeTypes(ctx)
+	lbhcObj, d := buildLoadBalancerHealthCheckObject(ctx, c, lbhcAttrTypes)
+	diags.Append(d...)
+
 	// Primitive lists
 	exposedPorts, d := buildExposedPortsList(ctx, c)
 	diags.Append(d...)
@@ -709,25 +738,26 @@ func buildEnvContainerValue(ctx context.Context, c *quantadmingo.Container) (res
 	result, d := autoMap(ctx,
 		resource_environment.ContainersValue{}.AttributeTypes(ctx),
 		containerRead{
-			Command:                commandList,
-			Cpu:                    ptrInt32AsInt64(c.GetCpuOk()),
-			DependsOn:              depsList,
-			EntryPoint:             entryPointList,
-			Environment:            envList,
-			Essential:              ptrBool(c.GetEssentialOk()),
-			ExposedPorts:           exposedPorts,
-			HealthCheck:            hcObj,
-			ImageReference:         irObj,
-			Memory:                 ptrInt32AsInt64(c.GetMemoryOk()),
-			MemoryReservation:      ptrInt32AsInt64(c.GetMemoryReservationOk()),
-			MountPoints:            mpList,
-			Name:                   c.GetName(),
-			OriginProtection:       ptrBool(c.GetOriginProtectionOk()),
-			OriginProtectionConfig: opcObj,
-			ReadonlyRootFilesystem: ptrBool(c.GetReadonlyRootFilesystemOk()),
-			Secrets:                secretsList,
-			User:                   ptrStr(c.GetUserOk()),
-			WorkingDirectory:       ptrStr(c.GetWorkingDirectoryOk()),
+			Command:                 commandList,
+			Cpu:                     ptrInt32AsInt64(c.GetCpuOk()),
+			DependsOn:               depsList,
+			EntryPoint:              entryPointList,
+			Environment:             envList,
+			Essential:               ptrBool(c.GetEssentialOk()),
+			ExposedPorts:            exposedPorts,
+			HealthCheck:             hcObj,
+			ImageReference:          irObj,
+			Memory:                  ptrInt32AsInt64(c.GetMemoryOk()),
+			MemoryReservation:       ptrInt32AsInt64(c.GetMemoryReservationOk()),
+			MountPoints:             mpList,
+			Name:                    c.GetName(),
+			OriginProtection:        ptrBool(c.GetOriginProtectionOk()),
+			OriginProtectionConfig:  opcObj,
+			LoadBalancerHealthCheck: lbhcObj,
+			ReadonlyRootFilesystem:  ptrBool(c.GetReadonlyRootFilesystemOk()),
+			Secrets:                 secretsList,
+			User:                    ptrStr(c.GetUserOk()),
+			WorkingDirectory:        ptrStr(c.GetWorkingDirectoryOk()),
 		},
 		resource_environment.NewContainersValue,
 	)

@@ -231,6 +231,40 @@ func EnvironmentResourceSchema(ctx context.Context) schema.Schema {
 									},
 									Required: true,
 								},
+								"load_balancer_health_check": schema.SingleNestedAttribute{
+									Attributes: map[string]schema.Attribute{
+										"interval_seconds": schema.Int64Attribute{
+											Optional:            true,
+											Computed:            true,
+											Description:         "Seconds between checks.",
+											MarkdownDescription: "Seconds between checks.",
+											Validators: []validator.Int64{
+												int64validator.Between(15, 300),
+											},
+											Default: int64default.StaticInt64(45),
+										},
+										"path": schema.StringAttribute{
+											Optional:            true,
+											Computed:            true,
+											Description:         "Path the load balancer requests. Starts with /.",
+											MarkdownDescription: "Path the load balancer requests. Starts with /.",
+											Validators: []validator.String{
+												stringvalidator.LengthAtMost(1024),
+												stringvalidator.RegexMatches(regexp.MustCompile("^/[A-Za-z0-9._~\\-/]*(\\?[A-Za-z0-9._~\\-=&]*)?$"), ""),
+											},
+											Default: stringdefault.StaticString("/"),
+										},
+									},
+									CustomType: LoadBalancerHealthCheckType{
+										ObjectType: types.ObjectType{
+											AttrTypes: LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+										},
+									},
+									Optional:            true,
+									Computed:            true,
+									Description:         "Load balancer health check for the ports this container exposes. Null or omitted uses the platform default (GET / every 45 seconds). Each property is optional; an omitted or null property takes its default. The check passes when the response status is 2xx or one of 300, 301, 302, 304, 308, 400, 401, 403 and 404, so it confirms the container answers, not that the application is correct. A change applies to the load balancer when it is saved. Distinct from healthCheck, which is the container-level command check. Quant base images (app-apache-php and images built on it) serve /_quant/health as a static response without running the application or reading shared volumes: use it when rendering the home page is expensive. On a container update, the object replaces the stored one; null resets it to the default. Compose import maps the service labels quant.healthcheck.path and quant.healthcheck.interval to it.",
+									MarkdownDescription: "Load balancer health check for the ports this container exposes. Null or omitted uses the platform default (GET / every 45 seconds). Each property is optional; an omitted or null property takes its default. The check passes when the response status is 2xx or one of 300, 301, 302, 304, 308, 400, 401, 403 and 404, so it confirms the container answers, not that the application is correct. A change applies to the load balancer when it is saved. Distinct from healthCheck, which is the container-level command check. Quant base images (app-apache-php and images built on it) serve /_quant/health as a static response without running the application or reading shared volumes: use it when rendering the home page is expensive. On a container update, the object replaces the stored one; null resets it to the default. Compose import maps the service labels quant.healthcheck.path and quant.healthcheck.interval to it.",
+								},
 								"memory": schema.Int64Attribute{
 									Optional:            true,
 									Computed:            true,
@@ -2213,6 +2247,24 @@ func (t ContainersType) ValueFromObject(ctx context.Context, in basetypes.Object
 			fmt.Sprintf(`image_reference expected to be basetypes.ObjectValue, was: %T`, imageReferenceAttribute))
 	}
 
+	loadBalancerHealthCheckAttribute, ok := attributes["load_balancer_health_check"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`load_balancer_health_check is missing from object`)
+
+		return nil, diags
+	}
+
+	loadBalancerHealthCheckVal, ok := loadBalancerHealthCheckAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`load_balancer_health_check expected to be basetypes.ObjectValue, was: %T`, loadBalancerHealthCheckAttribute))
+	}
+
 	memoryAttribute, ok := attributes["memory"]
 
 	if !ok {
@@ -2398,26 +2450,27 @@ func (t ContainersType) ValueFromObject(ctx context.Context, in basetypes.Object
 	}
 
 	return ContainersValue{
-		Command:                commandVal,
-		Cpu:                    cpuVal,
-		DependsOn:              dependsOnVal,
-		EntryPoint:             entryPointVal,
-		Environment:            environmentVal,
-		Essential:              essentialVal,
-		ExposedPorts:           exposedPortsVal,
-		HealthCheck:            healthCheckVal,
-		ImageReference:         imageReferenceVal,
-		Memory:                 memoryVal,
-		MemoryReservation:      memoryReservationVal,
-		MountPoints:            mountPointsVal,
-		Name:                   nameVal,
-		OriginProtection:       originProtectionVal,
-		OriginProtectionConfig: originProtectionConfigVal,
-		ReadonlyRootFilesystem: readonlyRootFilesystemVal,
-		Secrets:                secretsVal,
-		User:                   userVal,
-		WorkingDirectory:       workingDirectoryVal,
-		state:                  attr.ValueStateKnown,
+		Command:                 commandVal,
+		Cpu:                     cpuVal,
+		DependsOn:               dependsOnVal,
+		EntryPoint:              entryPointVal,
+		Environment:             environmentVal,
+		Essential:               essentialVal,
+		ExposedPorts:            exposedPortsVal,
+		HealthCheck:             healthCheckVal,
+		ImageReference:          imageReferenceVal,
+		LoadBalancerHealthCheck: loadBalancerHealthCheckVal,
+		Memory:                  memoryVal,
+		MemoryReservation:       memoryReservationVal,
+		MountPoints:             mountPointsVal,
+		Name:                    nameVal,
+		OriginProtection:        originProtectionVal,
+		OriginProtectionConfig:  originProtectionConfigVal,
+		ReadonlyRootFilesystem:  readonlyRootFilesystemVal,
+		Secrets:                 secretsVal,
+		User:                    userVal,
+		WorkingDirectory:        workingDirectoryVal,
+		state:                   attr.ValueStateKnown,
 	}, diags
 }
 
@@ -2646,6 +2699,24 @@ func NewContainersValue(attributeTypes map[string]attr.Type, attributes map[stri
 			fmt.Sprintf(`image_reference expected to be basetypes.ObjectValue, was: %T`, imageReferenceAttribute))
 	}
 
+	loadBalancerHealthCheckAttribute, ok := attributes["load_balancer_health_check"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`load_balancer_health_check is missing from object`)
+
+		return NewContainersValueUnknown(), diags
+	}
+
+	loadBalancerHealthCheckVal, ok := loadBalancerHealthCheckAttribute.(basetypes.ObjectValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`load_balancer_health_check expected to be basetypes.ObjectValue, was: %T`, loadBalancerHealthCheckAttribute))
+	}
+
 	memoryAttribute, ok := attributes["memory"]
 
 	if !ok {
@@ -2831,26 +2902,27 @@ func NewContainersValue(attributeTypes map[string]attr.Type, attributes map[stri
 	}
 
 	return ContainersValue{
-		Command:                commandVal,
-		Cpu:                    cpuVal,
-		DependsOn:              dependsOnVal,
-		EntryPoint:             entryPointVal,
-		Environment:            environmentVal,
-		Essential:              essentialVal,
-		ExposedPorts:           exposedPortsVal,
-		HealthCheck:            healthCheckVal,
-		ImageReference:         imageReferenceVal,
-		Memory:                 memoryVal,
-		MemoryReservation:      memoryReservationVal,
-		MountPoints:            mountPointsVal,
-		Name:                   nameVal,
-		OriginProtection:       originProtectionVal,
-		OriginProtectionConfig: originProtectionConfigVal,
-		ReadonlyRootFilesystem: readonlyRootFilesystemVal,
-		Secrets:                secretsVal,
-		User:                   userVal,
-		WorkingDirectory:       workingDirectoryVal,
-		state:                  attr.ValueStateKnown,
+		Command:                 commandVal,
+		Cpu:                     cpuVal,
+		DependsOn:               dependsOnVal,
+		EntryPoint:              entryPointVal,
+		Environment:             environmentVal,
+		Essential:               essentialVal,
+		ExposedPorts:            exposedPortsVal,
+		HealthCheck:             healthCheckVal,
+		ImageReference:          imageReferenceVal,
+		LoadBalancerHealthCheck: loadBalancerHealthCheckVal,
+		Memory:                  memoryVal,
+		MemoryReservation:       memoryReservationVal,
+		MountPoints:             mountPointsVal,
+		Name:                    nameVal,
+		OriginProtection:        originProtectionVal,
+		OriginProtectionConfig:  originProtectionConfigVal,
+		ReadonlyRootFilesystem:  readonlyRootFilesystemVal,
+		Secrets:                 secretsVal,
+		User:                    userVal,
+		WorkingDirectory:        workingDirectoryVal,
+		state:                   attr.ValueStateKnown,
 	}, diags
 }
 
@@ -2922,30 +2994,31 @@ func (t ContainersType) ValueType(ctx context.Context) attr.Value {
 var _ basetypes.ObjectValuable = ContainersValue{}
 
 type ContainersValue struct {
-	Command                basetypes.ListValue   `tfsdk:"command"`
-	Cpu                    basetypes.Int64Value  `tfsdk:"cpu"`
-	DependsOn              basetypes.ListValue   `tfsdk:"depends_on"`
-	EntryPoint             basetypes.ListValue   `tfsdk:"entry_point"`
-	Environment            basetypes.ListValue   `tfsdk:"environment"`
-	Essential              basetypes.BoolValue   `tfsdk:"essential"`
-	ExposedPorts           basetypes.ListValue   `tfsdk:"exposed_ports"`
-	HealthCheck            basetypes.ObjectValue `tfsdk:"health_check"`
-	ImageReference         basetypes.ObjectValue `tfsdk:"image_reference"`
-	Memory                 basetypes.Int64Value  `tfsdk:"memory"`
-	MemoryReservation      basetypes.Int64Value  `tfsdk:"memory_reservation"`
-	MountPoints            basetypes.ListValue   `tfsdk:"mount_points"`
-	Name                   basetypes.StringValue `tfsdk:"name"`
-	OriginProtection       basetypes.BoolValue   `tfsdk:"origin_protection"`
-	OriginProtectionConfig basetypes.ObjectValue `tfsdk:"origin_protection_config"`
-	ReadonlyRootFilesystem basetypes.BoolValue   `tfsdk:"readonly_root_filesystem"`
-	Secrets                basetypes.ListValue   `tfsdk:"secrets"`
-	User                   basetypes.StringValue `tfsdk:"user"`
-	WorkingDirectory       basetypes.StringValue `tfsdk:"working_directory"`
-	state                  attr.ValueState
+	Command                 basetypes.ListValue   `tfsdk:"command"`
+	Cpu                     basetypes.Int64Value  `tfsdk:"cpu"`
+	DependsOn               basetypes.ListValue   `tfsdk:"depends_on"`
+	EntryPoint              basetypes.ListValue   `tfsdk:"entry_point"`
+	Environment             basetypes.ListValue   `tfsdk:"environment"`
+	Essential               basetypes.BoolValue   `tfsdk:"essential"`
+	ExposedPorts            basetypes.ListValue   `tfsdk:"exposed_ports"`
+	HealthCheck             basetypes.ObjectValue `tfsdk:"health_check"`
+	ImageReference          basetypes.ObjectValue `tfsdk:"image_reference"`
+	LoadBalancerHealthCheck basetypes.ObjectValue `tfsdk:"load_balancer_health_check"`
+	Memory                  basetypes.Int64Value  `tfsdk:"memory"`
+	MemoryReservation       basetypes.Int64Value  `tfsdk:"memory_reservation"`
+	MountPoints             basetypes.ListValue   `tfsdk:"mount_points"`
+	Name                    basetypes.StringValue `tfsdk:"name"`
+	OriginProtection        basetypes.BoolValue   `tfsdk:"origin_protection"`
+	OriginProtectionConfig  basetypes.ObjectValue `tfsdk:"origin_protection_config"`
+	ReadonlyRootFilesystem  basetypes.BoolValue   `tfsdk:"readonly_root_filesystem"`
+	Secrets                 basetypes.ListValue   `tfsdk:"secrets"`
+	User                    basetypes.StringValue `tfsdk:"user"`
+	WorkingDirectory        basetypes.StringValue `tfsdk:"working_directory"`
+	state                   attr.ValueState
 }
 
 func (v ContainersValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 19)
+	attrTypes := make(map[string]tftypes.Type, 20)
 
 	var val tftypes.Value
 	var err error
@@ -2973,6 +3046,9 @@ func (v ContainersValue) ToTerraformValue(ctx context.Context) (tftypes.Value, e
 	attrTypes["image_reference"] = basetypes.ObjectType{
 		AttrTypes: ImageReferenceValue{}.AttributeTypes(ctx),
 	}.TerraformType(ctx)
+	attrTypes["load_balancer_health_check"] = basetypes.ObjectType{
+		AttrTypes: LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+	}.TerraformType(ctx)
 	attrTypes["memory"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["memory_reservation"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["mount_points"] = basetypes.ListType{
@@ -2994,7 +3070,7 @@ func (v ContainersValue) ToTerraformValue(ctx context.Context) (tftypes.Value, e
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 19)
+		vals := make(map[string]tftypes.Value, 20)
 
 		val, err = v.Command.ToTerraformValue(ctx)
 
@@ -3067,6 +3143,14 @@ func (v ContainersValue) ToTerraformValue(ctx context.Context) (tftypes.Value, e
 		}
 
 		vals["image_reference"] = val
+
+		val, err = v.LoadBalancerHealthCheck.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["load_balancer_health_check"] = val
 
 		val, err = v.Memory.ToTerraformValue(ctx)
 
@@ -3277,6 +3361,27 @@ func (v ContainersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVal
 		)
 	}
 
+	var loadBalancerHealthCheck basetypes.ObjectValue
+
+	if v.LoadBalancerHealthCheck.IsNull() {
+		loadBalancerHealthCheck = types.ObjectNull(
+			LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if v.LoadBalancerHealthCheck.IsUnknown() {
+		loadBalancerHealthCheck = types.ObjectUnknown(
+			LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+		)
+	}
+
+	if !v.LoadBalancerHealthCheck.IsNull() && !v.LoadBalancerHealthCheck.IsUnknown() {
+		loadBalancerHealthCheck = types.ObjectValueMust(
+			LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+			v.LoadBalancerHealthCheck.Attributes(),
+		)
+	}
+
 	mountPoints := types.ListValueMust(
 		MountPointsType{
 			basetypes.ObjectType{
@@ -3393,6 +3498,9 @@ func (v ContainersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVal
 			"image_reference": basetypes.ObjectType{
 				AttrTypes: ImageReferenceValue{}.AttributeTypes(ctx),
 			},
+			"load_balancer_health_check": basetypes.ObjectType{
+				AttrTypes: LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+			},
 			"memory":             basetypes.Int64Type{},
 			"memory_reservation": basetypes.Int64Type{},
 			"mount_points": basetypes.ListType{
@@ -3448,6 +3556,9 @@ func (v ContainersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVal
 			},
 			"image_reference": basetypes.ObjectType{
 				AttrTypes: ImageReferenceValue{}.AttributeTypes(ctx),
+			},
+			"load_balancer_health_check": basetypes.ObjectType{
+				AttrTypes: LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
 			},
 			"memory":             basetypes.Int64Type{},
 			"memory_reservation": basetypes.Int64Type{},
@@ -3505,6 +3616,9 @@ func (v ContainersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVal
 			"image_reference": basetypes.ObjectType{
 				AttrTypes: ImageReferenceValue{}.AttributeTypes(ctx),
 			},
+			"load_balancer_health_check": basetypes.ObjectType{
+				AttrTypes: LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+			},
 			"memory":             basetypes.Int64Type{},
 			"memory_reservation": basetypes.Int64Type{},
 			"mount_points": basetypes.ListType{
@@ -3548,6 +3662,9 @@ func (v ContainersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVal
 		"image_reference": basetypes.ObjectType{
 			AttrTypes: ImageReferenceValue{}.AttributeTypes(ctx),
 		},
+		"load_balancer_health_check": basetypes.ObjectType{
+			AttrTypes: LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
+		},
 		"memory":             basetypes.Int64Type{},
 		"memory_reservation": basetypes.Int64Type{},
 		"mount_points": basetypes.ListType{
@@ -3577,25 +3694,26 @@ func (v ContainersValue) ToObjectValue(ctx context.Context) (basetypes.ObjectVal
 	objVal, diags := types.ObjectValue(
 		attributeTypes,
 		map[string]attr.Value{
-			"command":                  commandVal,
-			"cpu":                      v.Cpu,
-			"depends_on":               dependsOn,
-			"entry_point":              entryPointVal,
-			"environment":              environment,
-			"essential":                v.Essential,
-			"exposed_ports":            exposedPortsVal,
-			"health_check":             healthCheck,
-			"image_reference":          imageReference,
-			"memory":                   v.Memory,
-			"memory_reservation":       v.MemoryReservation,
-			"mount_points":             mountPoints,
-			"name":                     v.Name,
-			"origin_protection":        v.OriginProtection,
-			"origin_protection_config": originProtectionConfig,
-			"readonly_root_filesystem": v.ReadonlyRootFilesystem,
-			"secrets":                  secrets,
-			"user":                     v.User,
-			"working_directory":        v.WorkingDirectory,
+			"command":                    commandVal,
+			"cpu":                        v.Cpu,
+			"depends_on":                 dependsOn,
+			"entry_point":                entryPointVal,
+			"environment":                environment,
+			"essential":                  v.Essential,
+			"exposed_ports":              exposedPortsVal,
+			"health_check":               healthCheck,
+			"image_reference":            imageReference,
+			"load_balancer_health_check": loadBalancerHealthCheck,
+			"memory":                     v.Memory,
+			"memory_reservation":         v.MemoryReservation,
+			"mount_points":               mountPoints,
+			"name":                       v.Name,
+			"origin_protection":          v.OriginProtection,
+			"origin_protection_config":   originProtectionConfig,
+			"readonly_root_filesystem":   v.ReadonlyRootFilesystem,
+			"secrets":                    secrets,
+			"user":                       v.User,
+			"working_directory":          v.WorkingDirectory,
 		})
 
 	return objVal, diags
@@ -3649,6 +3767,10 @@ func (v ContainersValue) Equal(o attr.Value) bool {
 	}
 
 	if !v.ImageReference.Equal(other.ImageReference) {
+		return false
+	}
+
+	if !v.LoadBalancerHealthCheck.Equal(other.LoadBalancerHealthCheck) {
 		return false
 	}
 
@@ -3727,6 +3849,9 @@ func (v ContainersValue) AttributeTypes(ctx context.Context) map[string]attr.Typ
 		},
 		"image_reference": basetypes.ObjectType{
 			AttrTypes: ImageReferenceValue{}.AttributeTypes(ctx),
+		},
+		"load_balancer_health_check": basetypes.ObjectType{
+			AttrTypes: LoadBalancerHealthCheckValue{}.AttributeTypes(ctx),
 		},
 		"memory":             basetypes.Int64Type{},
 		"memory_reservation": basetypes.Int64Type{},
@@ -5455,6 +5580,385 @@ func (v ImageReferenceValue) AttributeTypes(ctx context.Context) map[string]attr
 	return map[string]attr.Type{
 		"identifier": basetypes.StringType{},
 		"type":       basetypes.StringType{},
+	}
+}
+
+var _ basetypes.ObjectTypable = LoadBalancerHealthCheckType{}
+
+type LoadBalancerHealthCheckType struct {
+	basetypes.ObjectType
+}
+
+func (t LoadBalancerHealthCheckType) Equal(o attr.Type) bool {
+	other, ok := o.(LoadBalancerHealthCheckType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t LoadBalancerHealthCheckType) String() string {
+	return "LoadBalancerHealthCheckType"
+}
+
+func (t LoadBalancerHealthCheckType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	intervalSecondsAttribute, ok := attributes["interval_seconds"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`interval_seconds is missing from object`)
+
+		return nil, diags
+	}
+
+	intervalSecondsVal, ok := intervalSecondsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`interval_seconds expected to be basetypes.Int64Value, was: %T`, intervalSecondsAttribute))
+	}
+
+	pathAttribute, ok := attributes["path"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`path is missing from object`)
+
+		return nil, diags
+	}
+
+	pathVal, ok := pathAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`path expected to be basetypes.StringValue, was: %T`, pathAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return LoadBalancerHealthCheckValue{
+		IntervalSeconds: intervalSecondsVal,
+		Path:            pathVal,
+		state:           attr.ValueStateKnown,
+	}, diags
+}
+
+func NewLoadBalancerHealthCheckValueNull() LoadBalancerHealthCheckValue {
+	return LoadBalancerHealthCheckValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewLoadBalancerHealthCheckValueUnknown() LoadBalancerHealthCheckValue {
+	return LoadBalancerHealthCheckValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewLoadBalancerHealthCheckValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (LoadBalancerHealthCheckValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing LoadBalancerHealthCheckValue Attribute Value",
+				"While creating a LoadBalancerHealthCheckValue value, a missing attribute value was detected. "+
+					"A LoadBalancerHealthCheckValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("LoadBalancerHealthCheckValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid LoadBalancerHealthCheckValue Attribute Type",
+				"While creating a LoadBalancerHealthCheckValue value, an invalid attribute value was detected. "+
+					"A LoadBalancerHealthCheckValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("LoadBalancerHealthCheckValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("LoadBalancerHealthCheckValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra LoadBalancerHealthCheckValue Attribute Value",
+				"While creating a LoadBalancerHealthCheckValue value, an extra attribute value was detected. "+
+					"A LoadBalancerHealthCheckValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra LoadBalancerHealthCheckValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewLoadBalancerHealthCheckValueUnknown(), diags
+	}
+
+	intervalSecondsAttribute, ok := attributes["interval_seconds"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`interval_seconds is missing from object`)
+
+		return NewLoadBalancerHealthCheckValueUnknown(), diags
+	}
+
+	intervalSecondsVal, ok := intervalSecondsAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`interval_seconds expected to be basetypes.Int64Value, was: %T`, intervalSecondsAttribute))
+	}
+
+	pathAttribute, ok := attributes["path"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`path is missing from object`)
+
+		return NewLoadBalancerHealthCheckValueUnknown(), diags
+	}
+
+	pathVal, ok := pathAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`path expected to be basetypes.StringValue, was: %T`, pathAttribute))
+	}
+
+	if diags.HasError() {
+		return NewLoadBalancerHealthCheckValueUnknown(), diags
+	}
+
+	return LoadBalancerHealthCheckValue{
+		IntervalSeconds: intervalSecondsVal,
+		Path:            pathVal,
+		state:           attr.ValueStateKnown,
+	}, diags
+}
+
+func NewLoadBalancerHealthCheckValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) LoadBalancerHealthCheckValue {
+	object, diags := NewLoadBalancerHealthCheckValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewLoadBalancerHealthCheckValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t LoadBalancerHealthCheckType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewLoadBalancerHealthCheckValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewLoadBalancerHealthCheckValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewLoadBalancerHealthCheckValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewLoadBalancerHealthCheckValueMust(LoadBalancerHealthCheckValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t LoadBalancerHealthCheckType) ValueType(ctx context.Context) attr.Value {
+	return LoadBalancerHealthCheckValue{}
+}
+
+var _ basetypes.ObjectValuable = LoadBalancerHealthCheckValue{}
+
+type LoadBalancerHealthCheckValue struct {
+	IntervalSeconds basetypes.Int64Value  `tfsdk:"interval_seconds"`
+	Path            basetypes.StringValue `tfsdk:"path"`
+	state           attr.ValueState
+}
+
+func (v LoadBalancerHealthCheckValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["interval_seconds"] = basetypes.Int64Type{}.TerraformType(ctx)
+	attrTypes["path"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.IntervalSeconds.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["interval_seconds"] = val
+
+		val, err = v.Path.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["path"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v LoadBalancerHealthCheckValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v LoadBalancerHealthCheckValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v LoadBalancerHealthCheckValue) String() string {
+	return "LoadBalancerHealthCheckValue"
+}
+
+func (v LoadBalancerHealthCheckValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"interval_seconds": basetypes.Int64Type{},
+		"path":             basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"interval_seconds": v.IntervalSeconds,
+			"path":             v.Path,
+		})
+
+	return objVal, diags
+}
+
+func (v LoadBalancerHealthCheckValue) Equal(o attr.Value) bool {
+	other, ok := o.(LoadBalancerHealthCheckValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.IntervalSeconds.Equal(other.IntervalSeconds) {
+		return false
+	}
+
+	if !v.Path.Equal(other.Path) {
+		return false
+	}
+
+	return true
+}
+
+func (v LoadBalancerHealthCheckValue) Type(ctx context.Context) attr.Type {
+	return LoadBalancerHealthCheckType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v LoadBalancerHealthCheckValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"interval_seconds": basetypes.Int64Type{},
+		"path":             basetypes.StringType{},
 	}
 }
 
