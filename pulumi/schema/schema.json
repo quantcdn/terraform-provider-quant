@@ -2579,6 +2579,10 @@
                     "type": "string",
                     "description": "Failover TTFB threshold\n"
                 },
+                "failoverThreshold": {
+                    "type": "integer",
+                    "description": "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3).\n"
+                },
                 "host": {
                     "type": "string",
                     "description": "Host header override\n"
@@ -2673,6 +2677,7 @@
                         "failoverMode",
                         "failoverOriginStatusCodes",
                         "failoverOriginTtfb",
+                        "failoverThreshold",
                         "host",
                         "injectHeaders",
                         "notify",
@@ -11254,6 +11259,10 @@
                     "type": "string",
                     "description": "Failover TTFB threshold in milliseconds"
                 },
+                "failoverThreshold": {
+                    "type": "integer",
+                    "description": "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3)."
+                },
                 "host": {
                     "type": "string",
                     "description": "Host header override"
@@ -11448,6 +11457,7 @@
                 "failoverMode",
                 "failoverOriginStatusCodes",
                 "failoverOriginTtfb",
+                "failoverThreshold",
                 "host",
                 "injectHeaders",
                 "ip",
@@ -11588,6 +11598,10 @@
                 "failoverOriginTtfb": {
                     "type": "string",
                     "description": "Failover TTFB threshold in milliseconds"
+                },
+                "failoverThreshold": {
+                    "type": "integer",
+                    "description": "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3)."
                 },
                 "host": {
                     "type": "string",
@@ -11870,6 +11884,10 @@
                     "failoverOriginTtfb": {
                         "type": "string",
                         "description": "Failover TTFB threshold in milliseconds"
+                    },
+                    "failoverThreshold": {
+                        "type": "integer",
+                        "description": "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3)."
                     },
                     "host": {
                         "type": "string",
