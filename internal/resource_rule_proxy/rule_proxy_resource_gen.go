@@ -102,6 +102,11 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 						MarkdownDescription: "Failover TTFB threshold",
 						Default:             stringdefault.StaticString("2000"),
 					},
+					"failover_threshold": schema.Int64Attribute{
+						Computed:            true,
+						Description:         "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3).",
+						MarkdownDescription: "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3).",
+					},
 					"host": schema.StringAttribute{
 						Computed:            true,
 						Description:         "Host header override",
@@ -597,6 +602,15 @@ func RuleProxyResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Failover TTFB threshold in milliseconds",
 				MarkdownDescription: "Failover TTFB threshold in milliseconds",
 				Default:             stringdefault.StaticString("2000"),
+			},
+			"failover_threshold": schema.Int64Attribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3).",
+				MarkdownDescription: "Failures (a status outside failover_origin_status_codes, a connection error or no first byte inside failover_origin_ttfb) within 10 seconds before failover starts. Null or 0 uses the default (3).",
+				Validators: []validator.Int64{
+					int64validator.Between(1, 100),
+				},
 			},
 			"host": schema.StringAttribute{
 				Optional:            true,
@@ -1125,6 +1139,7 @@ type RuleProxyModel struct {
 	FailoverMode               types.Bool        `tfsdk:"failover_mode"`
 	FailoverOriginStatusCodes  types.List        `tfsdk:"failover_origin_status_codes"`
 	FailoverOriginTtfb         types.String      `tfsdk:"failover_origin_ttfb"`
+	FailoverThreshold          types.Int64       `tfsdk:"failover_threshold"`
 	Host                       types.String      `tfsdk:"host"`
 	InjectHeaders              types.Map         `tfsdk:"inject_headers"`
 	Ip                         types.String      `tfsdk:"ip"`
@@ -1417,6 +1432,24 @@ func (t ActionConfigType) ValueFromObject(ctx context.Context, in basetypes.Obje
 		diags.AddError(
 			"Attribute Wrong Type",
 			fmt.Sprintf(`failover_origin_ttfb expected to be basetypes.StringValue, was: %T`, failoverOriginTtfbAttribute))
+	}
+
+	failoverThresholdAttribute, ok := attributes["failover_threshold"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`failover_threshold is missing from object`)
+
+		return nil, diags
+	}
+
+	failoverThresholdVal, ok := failoverThresholdAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`failover_threshold expected to be basetypes.Int64Value, was: %T`, failoverThresholdAttribute))
 	}
 
 	hostAttribute, ok := attributes["host"]
@@ -1725,6 +1758,7 @@ func (t ActionConfigType) ValueFromObject(ctx context.Context, in basetypes.Obje
 		FailoverMode:               failoverModeVal,
 		FailoverOriginStatusCodes:  failoverOriginStatusCodesVal,
 		FailoverOriginTtfb:         failoverOriginTtfbVal,
+		FailoverThreshold:          failoverThresholdVal,
 		Host:                       hostVal,
 		InjectHeaders:              injectHeadersVal,
 		Notify:                     notifyVal,
@@ -2042,6 +2076,24 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 			fmt.Sprintf(`failover_origin_ttfb expected to be basetypes.StringValue, was: %T`, failoverOriginTtfbAttribute))
 	}
 
+	failoverThresholdAttribute, ok := attributes["failover_threshold"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`failover_threshold is missing from object`)
+
+		return NewActionConfigValueUnknown(), diags
+	}
+
+	failoverThresholdVal, ok := failoverThresholdAttribute.(basetypes.Int64Value)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`failover_threshold expected to be basetypes.Int64Value, was: %T`, failoverThresholdAttribute))
+	}
+
 	hostAttribute, ok := attributes["host"]
 
 	if !ok {
@@ -2348,6 +2400,7 @@ func NewActionConfigValue(attributeTypes map[string]attr.Type, attributes map[st
 		FailoverMode:               failoverModeVal,
 		FailoverOriginStatusCodes:  failoverOriginStatusCodesVal,
 		FailoverOriginTtfb:         failoverOriginTtfbVal,
+		FailoverThreshold:          failoverThresholdVal,
 		Host:                       hostVal,
 		InjectHeaders:              injectHeadersVal,
 		Notify:                     notifyVal,
@@ -2449,6 +2502,7 @@ type ActionConfigValue struct {
 	FailoverMode               basetypes.BoolValue   `tfsdk:"failover_mode"`
 	FailoverOriginStatusCodes  basetypes.ListValue   `tfsdk:"failover_origin_status_codes"`
 	FailoverOriginTtfb         basetypes.StringValue `tfsdk:"failover_origin_ttfb"`
+	FailoverThreshold          basetypes.Int64Value  `tfsdk:"failover_threshold"`
 	Host                       basetypes.StringValue `tfsdk:"host"`
 	InjectHeaders              basetypes.MapValue    `tfsdk:"inject_headers"`
 	Notify                     basetypes.StringValue `tfsdk:"notify"`
@@ -2469,7 +2523,7 @@ type ActionConfigValue struct {
 }
 
 func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
-	attrTypes := make(map[string]tftypes.Type, 29)
+	attrTypes := make(map[string]tftypes.Type, 30)
 
 	var val tftypes.Value
 	var err error
@@ -2489,6 +2543,7 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 		ElemType: types.StringType,
 	}.TerraformType(ctx)
 	attrTypes["failover_origin_ttfb"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["failover_threshold"] = basetypes.Int64Type{}.TerraformType(ctx)
 	attrTypes["host"] = basetypes.StringType{}.TerraformType(ctx)
 	attrTypes["inject_headers"] = basetypes.MapType{
 		ElemType: types.StringType,
@@ -2524,7 +2579,7 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 
 	switch v.state {
 	case attr.ValueStateKnown:
-		vals := make(map[string]tftypes.Value, 29)
+		vals := make(map[string]tftypes.Value, 30)
 
 		val, err = v.ApplicationContainer.ToTerraformValue(ctx)
 
@@ -2629,6 +2684,14 @@ func (v ActionConfigValue) ToTerraformValue(ctx context.Context) (tftypes.Value,
 		}
 
 		vals["failover_origin_ttfb"] = val
+
+		val, err = v.FailoverThreshold.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["failover_threshold"] = val
 
 		val, err = v.Host.ToTerraformValue(ctx)
 
@@ -2879,6 +2942,7 @@ func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectV
 				ElemType: types.StringType,
 			},
 			"failover_origin_ttfb": basetypes.StringType{},
+			"failover_threshold":   basetypes.Int64Type{},
 			"host":                 basetypes.StringType{},
 			"inject_headers": basetypes.MapType{
 				ElemType: types.StringType,
@@ -2941,6 +3005,7 @@ func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectV
 				ElemType: types.StringType,
 			},
 			"failover_origin_ttfb": basetypes.StringType{},
+			"failover_threshold":   basetypes.Int64Type{},
 			"host":                 basetypes.StringType{},
 			"inject_headers": basetypes.MapType{
 				ElemType: types.StringType,
@@ -3003,6 +3068,7 @@ func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectV
 				ElemType: types.StringType,
 			},
 			"failover_origin_ttfb": basetypes.StringType{},
+			"failover_threshold":   basetypes.Int64Type{},
 			"host":                 basetypes.StringType{},
 			"inject_headers": basetypes.MapType{
 				ElemType: types.StringType,
@@ -3065,6 +3131,7 @@ func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectV
 				ElemType: types.StringType,
 			},
 			"failover_origin_ttfb": basetypes.StringType{},
+			"failover_threshold":   basetypes.Int64Type{},
 			"host":                 basetypes.StringType{},
 			"inject_headers": basetypes.MapType{
 				ElemType: types.StringType,
@@ -3127,6 +3194,7 @@ func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectV
 				ElemType: types.StringType,
 			},
 			"failover_origin_ttfb": basetypes.StringType{},
+			"failover_threshold":   basetypes.Int64Type{},
 			"host":                 basetypes.StringType{},
 			"inject_headers": basetypes.MapType{
 				ElemType: types.StringType,
@@ -3176,6 +3244,7 @@ func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectV
 			ElemType: types.StringType,
 		},
 		"failover_origin_ttfb": basetypes.StringType{},
+		"failover_threshold":   basetypes.Int64Type{},
 		"host":                 basetypes.StringType{},
 		"inject_headers": basetypes.MapType{
 			ElemType: types.StringType,
@@ -3232,6 +3301,7 @@ func (v ActionConfigValue) ToObjectValue(ctx context.Context) (basetypes.ObjectV
 			"failover_mode":                  v.FailoverMode,
 			"failover_origin_status_codes":   failoverOriginStatusCodesVal,
 			"failover_origin_ttfb":           v.FailoverOriginTtfb,
+			"failover_threshold":             v.FailoverThreshold,
 			"host":                           v.Host,
 			"inject_headers":                 injectHeadersVal,
 			"notify":                         v.Notify,
@@ -3317,6 +3387,10 @@ func (v ActionConfigValue) Equal(o attr.Value) bool {
 	}
 
 	if !v.FailoverOriginTtfb.Equal(other.FailoverOriginTtfb) {
+		return false
+	}
+
+	if !v.FailoverThreshold.Equal(other.FailoverThreshold) {
 		return false
 	}
 
@@ -3412,6 +3486,7 @@ func (v ActionConfigValue) AttributeTypes(ctx context.Context) map[string]attr.T
 			ElemType: types.StringType,
 		},
 		"failover_origin_ttfb": basetypes.StringType{},
+		"failover_threshold":   basetypes.Int64Type{},
 		"host":                 basetypes.StringType{},
 		"inject_headers": basetypes.MapType{
 			ElemType: types.StringType,

@@ -131,6 +131,7 @@ func setProxyFailoverFromAPI(ctx context.Context, actionConfig quantadmingo.V2Ru
 	data.FailoverMode = types.BoolValue(actionConfig.GetFailoverMode())
 	data.FailoverLifetime = nonZeroStringOrPrior(actionConfig.GetFailoverLifetime(), data.FailoverLifetime)
 	data.FailoverOriginTtfb = nonZeroStringOrPrior(actionConfig.GetFailoverOriginTtfb(), data.FailoverOriginTtfb)
+	data.FailoverThreshold = failoverThresholdFromAPI(actionConfig)
 
 	codes := actionConfig.GetFailoverOriginStatusCodes()
 	if codes == nil {
@@ -167,4 +168,16 @@ func setProxyStaticErrorPageFromAPI(ctx context.Context, actionConfig quantadmin
 		data.StaticErrorPageStatusCodes = types.ListNull(types.StringType)
 	}
 	return diags
+}
+
+// failoverThresholdFromAPI reads failover_threshold: the failures within 10 s
+// before failover starts. The API stores null for the edge default (3), so an
+// absent, null or non-positive value reads as null. The attribute is
+// Optional+Computed, so it must never stay unknown after apply.
+func failoverThresholdFromAPI(actionConfig quantadmingo.V2RuleProxyAction) types.Int64 {
+	v, ok := actionConfig.GetFailoverThresholdOk()
+	if !ok || v == nil || *v <= 0 {
+		return types.Int64Null()
+	}
+	return types.Int64Value(int64(*v))
 }
