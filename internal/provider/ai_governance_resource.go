@@ -272,7 +272,7 @@ func callGovernancePutAPI(ctx context.Context, r *aiGovernanceResource, data *re
 	}
 
 	// Map the typed SDK response directly — no HTTP body re-read needed.
-	diags.Append(mapGovernanceConfigFromMap(ctx, sdkResp.GetConfig(), org, data)...)
+	diags.Append(mapGovernanceConfigFromMap(ctx, governanceConfigOf(sdkResp.GetConfig()), org, data)...)
 
 	// Computed-only fields from the response envelope.
 	data.Success = types.BoolValue(sdkResp.GetSuccess())
@@ -386,6 +386,18 @@ func nullableInt32ToInt64(n quantadmingo.NullableInt32) types.Int64 {
 		return types.Int64Value(int64(*n.Get()))
 	}
 	return types.Int64Null()
+}
+
+// governanceConfigOf returns the governance object of an UpdateGovernanceConfig
+// answer. The portal returns the AI API answer as it is, so "config" holds
+// {"config": {...}} rather than the governance object itself. Reading the outer
+// map left model_policy, model_list, version and spend_limits null in state after
+// every apply, so each plan showed an update. A flat answer is used as it is.
+func governanceConfigOf(config map[string]interface{}) map[string]interface{} {
+	if inner, ok := config["config"].(map[string]interface{}); ok {
+		return inner
+	}
+	return config
 }
 
 // mapGovernanceConfigFromMap maps the config map from the UpdateGovernanceConfig
