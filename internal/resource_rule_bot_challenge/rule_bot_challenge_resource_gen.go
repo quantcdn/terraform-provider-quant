@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -214,6 +216,110 @@ func RuleBotChallengeResourceSchema(ctx context.Context) schema.Schema {
 				Description:         "Rule ID",
 				MarkdownDescription: "Rule ID",
 			},
+			"schedule": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"mode": schema.StringAttribute{
+						Required:            true,
+						Description:         "active_during: the rule applies only inside the windows. inactive_during: the rule applies only outside them.",
+						MarkdownDescription: "active_during: the rule applies only inside the windows. inactive_during: the rule applies only outside them.",
+						Validators: []validator.String{
+							stringvalidator.OneOf(
+								"active_during",
+								"inactive_during",
+							),
+						},
+					},
+					"once": schema.ListNestedAttribute{
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"end": schema.StringAttribute{
+									Required:            true,
+									Description:         "Local date and time after start, YYYY-MM-DDTHH:MM, no offset.",
+									MarkdownDescription: "Local date and time after start, YYYY-MM-DDTHH:MM, no offset.",
+									Validators: []validator.String{
+										stringvalidator.RegexMatches(regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]$"), ""),
+									},
+								},
+								"start": schema.StringAttribute{
+									Required:            true,
+									Description:         "Local date and time, YYYY-MM-DDTHH:MM, no offset.",
+									MarkdownDescription: "Local date and time, YYYY-MM-DDTHH:MM, no offset.",
+									Validators: []validator.String{
+										stringvalidator.RegexMatches(regexp.MustCompile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]$"), ""),
+									},
+								},
+							},
+							CustomType: OnceType{
+								ObjectType: types.ObjectType{
+									AttrTypes: OnceValue{}.AttributeTypes(ctx),
+								},
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "One-off ranges. Stored as an empty list when omitted.",
+						MarkdownDescription: "One-off ranges. Stored as an empty list when omitted.",
+						Validators: []validator.List{
+							listvalidator.SizeAtMost(50),
+						},
+					},
+					"timezone": schema.StringAttribute{
+						Required:            true,
+						Description:         "IANA time zone name, or UTC. Invalid values return 422.",
+						MarkdownDescription: "IANA time zone name, or UTC. Invalid values return 422.",
+					},
+					"weekly": schema.ListNestedAttribute{
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"days": schema.ListAttribute{
+									ElementType: types.StringType,
+									Required:    true,
+									Validators: []validator.List{
+										listvalidator.SizeAtLeast(1),
+									},
+								},
+								"end": schema.StringAttribute{
+									Required:            true,
+									Description:         "Local time HH:MM, 00:00 to 24:00.",
+									MarkdownDescription: "Local time HH:MM, 00:00 to 24:00.",
+									Validators: []validator.String{
+										stringvalidator.RegexMatches(regexp.MustCompile("^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$"), ""),
+									},
+								},
+								"start": schema.StringAttribute{
+									Required:            true,
+									Description:         "Local time HH:MM, 00:00 to 23:59.",
+									MarkdownDescription: "Local time HH:MM, 00:00 to 23:59.",
+									Validators: []validator.String{
+										stringvalidator.RegexMatches(regexp.MustCompile("^([01][0-9]|2[0-3]):[0-5][0-9]$"), ""),
+									},
+								},
+							},
+							CustomType: WeeklyType{
+								ObjectType: types.ObjectType{
+									AttrTypes: WeeklyValue{}.AttributeTypes(ctx),
+								},
+							},
+						},
+						Optional:            true,
+						Computed:            true,
+						Description:         "Weekly windows. Stored as an empty list when omitted.",
+						MarkdownDescription: "Weekly windows. Stored as an empty list when omitted.",
+						Validators: []validator.List{
+							listvalidator.SizeAtMost(50),
+						},
+					},
+				},
+				CustomType: ScheduleType{
+					ObjectType: types.ObjectType{
+						AttrTypes: ScheduleValue{}.AttributeTypes(ctx),
+					},
+				},
+				Optional:            true,
+				Computed:            true,
+				Description:         "Weekly windows and one-off ranges in local wall time for one IANA time zone. Start is inclusive, end is exclusive. A weekly window whose end is not later than its start crosses midnight. With no windows the rule always applies.",
+				MarkdownDescription: "Weekly windows and one-off ranges in local wall time for one IANA time zone. Start is inclusive, end is exclusive. A weekly window whose end is not later than its start crosses midnight. With no windows the rule always applies.",
+			},
 			"traffic_source": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -320,6 +426,7 @@ type RuleBotChallengeModel struct {
 	RobotChallengeVerificationTtl types.Int64       `tfsdk:"robot_challenge_verification_ttl"`
 	Rule                          types.String      `tfsdk:"rule"`
 	RuleId                        types.String      `tfsdk:"rule_id"`
+	Schedule                      ScheduleValue     `tfsdk:"schedule"`
 	TrafficSource                 types.String      `tfsdk:"traffic_source"`
 	TrafficSourceIs               types.List        `tfsdk:"traffic_source_is"`
 	TrafficSourceIsNot            types.List        `tfsdk:"traffic_source_is_not"`
@@ -762,5 +869,1405 @@ func (v ActionConfigValue) AttributeTypes(ctx context.Context) map[string]attr.T
 		"robot_challenge_challenge_ttl":    basetypes.Int64Type{},
 		"robot_challenge_type":             basetypes.StringType{},
 		"robot_challenge_verification_ttl": basetypes.Int64Type{},
+	}
+}
+
+var _ basetypes.ObjectTypable = ScheduleType{}
+
+type ScheduleType struct {
+	basetypes.ObjectType
+}
+
+func (t ScheduleType) Equal(o attr.Type) bool {
+	other, ok := o.(ScheduleType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t ScheduleType) String() string {
+	return "ScheduleType"
+}
+
+func (t ScheduleType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	modeAttribute, ok := attributes["mode"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`mode is missing from object`)
+
+		return nil, diags
+	}
+
+	modeVal, ok := modeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`mode expected to be basetypes.StringValue, was: %T`, modeAttribute))
+	}
+
+	onceAttribute, ok := attributes["once"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`once is missing from object`)
+
+		return nil, diags
+	}
+
+	onceVal, ok := onceAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`once expected to be basetypes.ListValue, was: %T`, onceAttribute))
+	}
+
+	timezoneAttribute, ok := attributes["timezone"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`timezone is missing from object`)
+
+		return nil, diags
+	}
+
+	timezoneVal, ok := timezoneAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`timezone expected to be basetypes.StringValue, was: %T`, timezoneAttribute))
+	}
+
+	weeklyAttribute, ok := attributes["weekly"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`weekly is missing from object`)
+
+		return nil, diags
+	}
+
+	weeklyVal, ok := weeklyAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`weekly expected to be basetypes.ListValue, was: %T`, weeklyAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return ScheduleValue{
+		Mode:     modeVal,
+		Once:     onceVal,
+		Timezone: timezoneVal,
+		Weekly:   weeklyVal,
+		state:    attr.ValueStateKnown,
+	}, diags
+}
+
+func NewScheduleValueNull() ScheduleValue {
+	return ScheduleValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewScheduleValueUnknown() ScheduleValue {
+	return ScheduleValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewScheduleValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (ScheduleValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing ScheduleValue Attribute Value",
+				"While creating a ScheduleValue value, a missing attribute value was detected. "+
+					"A ScheduleValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ScheduleValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid ScheduleValue Attribute Type",
+				"While creating a ScheduleValue value, an invalid attribute value was detected. "+
+					"A ScheduleValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("ScheduleValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("ScheduleValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra ScheduleValue Attribute Value",
+				"While creating a ScheduleValue value, an extra attribute value was detected. "+
+					"A ScheduleValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra ScheduleValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewScheduleValueUnknown(), diags
+	}
+
+	modeAttribute, ok := attributes["mode"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`mode is missing from object`)
+
+		return NewScheduleValueUnknown(), diags
+	}
+
+	modeVal, ok := modeAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`mode expected to be basetypes.StringValue, was: %T`, modeAttribute))
+	}
+
+	onceAttribute, ok := attributes["once"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`once is missing from object`)
+
+		return NewScheduleValueUnknown(), diags
+	}
+
+	onceVal, ok := onceAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`once expected to be basetypes.ListValue, was: %T`, onceAttribute))
+	}
+
+	timezoneAttribute, ok := attributes["timezone"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`timezone is missing from object`)
+
+		return NewScheduleValueUnknown(), diags
+	}
+
+	timezoneVal, ok := timezoneAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`timezone expected to be basetypes.StringValue, was: %T`, timezoneAttribute))
+	}
+
+	weeklyAttribute, ok := attributes["weekly"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`weekly is missing from object`)
+
+		return NewScheduleValueUnknown(), diags
+	}
+
+	weeklyVal, ok := weeklyAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`weekly expected to be basetypes.ListValue, was: %T`, weeklyAttribute))
+	}
+
+	if diags.HasError() {
+		return NewScheduleValueUnknown(), diags
+	}
+
+	return ScheduleValue{
+		Mode:     modeVal,
+		Once:     onceVal,
+		Timezone: timezoneVal,
+		Weekly:   weeklyVal,
+		state:    attr.ValueStateKnown,
+	}, diags
+}
+
+func NewScheduleValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) ScheduleValue {
+	object, diags := NewScheduleValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewScheduleValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t ScheduleType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewScheduleValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewScheduleValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewScheduleValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewScheduleValueMust(ScheduleValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t ScheduleType) ValueType(ctx context.Context) attr.Value {
+	return ScheduleValue{}
+}
+
+var _ basetypes.ObjectValuable = ScheduleValue{}
+
+type ScheduleValue struct {
+	Mode     basetypes.StringValue `tfsdk:"mode"`
+	Once     basetypes.ListValue   `tfsdk:"once"`
+	Timezone basetypes.StringValue `tfsdk:"timezone"`
+	Weekly   basetypes.ListValue   `tfsdk:"weekly"`
+	state    attr.ValueState
+}
+
+func (v ScheduleValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 4)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["mode"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["once"] = basetypes.ListType{
+		ElemType: OnceValue{}.Type(ctx),
+	}.TerraformType(ctx)
+	attrTypes["timezone"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["weekly"] = basetypes.ListType{
+		ElemType: WeeklyValue{}.Type(ctx),
+	}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 4)
+
+		val, err = v.Mode.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["mode"] = val
+
+		val, err = v.Once.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["once"] = val
+
+		val, err = v.Timezone.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["timezone"] = val
+
+		val, err = v.Weekly.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["weekly"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v ScheduleValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v ScheduleValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v ScheduleValue) String() string {
+	return "ScheduleValue"
+}
+
+func (v ScheduleValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	once := types.ListValueMust(
+		OnceType{
+			basetypes.ObjectType{
+				AttrTypes: OnceValue{}.AttributeTypes(ctx),
+			},
+		},
+		v.Once.Elements(),
+	)
+
+	if v.Once.IsNull() {
+		once = types.ListNull(
+			OnceType{
+				basetypes.ObjectType{
+					AttrTypes: OnceValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	if v.Once.IsUnknown() {
+		once = types.ListUnknown(
+			OnceType{
+				basetypes.ObjectType{
+					AttrTypes: OnceValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	weekly := types.ListValueMust(
+		WeeklyType{
+			basetypes.ObjectType{
+				AttrTypes: WeeklyValue{}.AttributeTypes(ctx),
+			},
+		},
+		v.Weekly.Elements(),
+	)
+
+	if v.Weekly.IsNull() {
+		weekly = types.ListNull(
+			WeeklyType{
+				basetypes.ObjectType{
+					AttrTypes: WeeklyValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	if v.Weekly.IsUnknown() {
+		weekly = types.ListUnknown(
+			WeeklyType{
+				basetypes.ObjectType{
+					AttrTypes: WeeklyValue{}.AttributeTypes(ctx),
+				},
+			},
+		)
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"mode": basetypes.StringType{},
+		"once": basetypes.ListType{
+			ElemType: OnceValue{}.Type(ctx),
+		},
+		"timezone": basetypes.StringType{},
+		"weekly": basetypes.ListType{
+			ElemType: WeeklyValue{}.Type(ctx),
+		},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"mode":     v.Mode,
+			"once":     once,
+			"timezone": v.Timezone,
+			"weekly":   weekly,
+		})
+
+	return objVal, diags
+}
+
+func (v ScheduleValue) Equal(o attr.Value) bool {
+	other, ok := o.(ScheduleValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Mode.Equal(other.Mode) {
+		return false
+	}
+
+	if !v.Once.Equal(other.Once) {
+		return false
+	}
+
+	if !v.Timezone.Equal(other.Timezone) {
+		return false
+	}
+
+	if !v.Weekly.Equal(other.Weekly) {
+		return false
+	}
+
+	return true
+}
+
+func (v ScheduleValue) Type(ctx context.Context) attr.Type {
+	return ScheduleType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v ScheduleValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"mode": basetypes.StringType{},
+		"once": basetypes.ListType{
+			ElemType: OnceValue{}.Type(ctx),
+		},
+		"timezone": basetypes.StringType{},
+		"weekly": basetypes.ListType{
+			ElemType: WeeklyValue{}.Type(ctx),
+		},
+	}
+}
+
+var _ basetypes.ObjectTypable = OnceType{}
+
+type OnceType struct {
+	basetypes.ObjectType
+}
+
+func (t OnceType) Equal(o attr.Type) bool {
+	other, ok := o.(OnceType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t OnceType) String() string {
+	return "OnceType"
+}
+
+func (t OnceType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	endAttribute, ok := attributes["end"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`end is missing from object`)
+
+		return nil, diags
+	}
+
+	endVal, ok := endAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`end expected to be basetypes.StringValue, was: %T`, endAttribute))
+	}
+
+	startAttribute, ok := attributes["start"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`start is missing from object`)
+
+		return nil, diags
+	}
+
+	startVal, ok := startAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`start expected to be basetypes.StringValue, was: %T`, startAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return OnceValue{
+		End:   endVal,
+		Start: startVal,
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewOnceValueNull() OnceValue {
+	return OnceValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewOnceValueUnknown() OnceValue {
+	return OnceValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewOnceValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (OnceValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing OnceValue Attribute Value",
+				"While creating a OnceValue value, a missing attribute value was detected. "+
+					"A OnceValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("OnceValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid OnceValue Attribute Type",
+				"While creating a OnceValue value, an invalid attribute value was detected. "+
+					"A OnceValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("OnceValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("OnceValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra OnceValue Attribute Value",
+				"While creating a OnceValue value, an extra attribute value was detected. "+
+					"A OnceValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra OnceValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewOnceValueUnknown(), diags
+	}
+
+	endAttribute, ok := attributes["end"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`end is missing from object`)
+
+		return NewOnceValueUnknown(), diags
+	}
+
+	endVal, ok := endAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`end expected to be basetypes.StringValue, was: %T`, endAttribute))
+	}
+
+	startAttribute, ok := attributes["start"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`start is missing from object`)
+
+		return NewOnceValueUnknown(), diags
+	}
+
+	startVal, ok := startAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`start expected to be basetypes.StringValue, was: %T`, startAttribute))
+	}
+
+	if diags.HasError() {
+		return NewOnceValueUnknown(), diags
+	}
+
+	return OnceValue{
+		End:   endVal,
+		Start: startVal,
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewOnceValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) OnceValue {
+	object, diags := NewOnceValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewOnceValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t OnceType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewOnceValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewOnceValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewOnceValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewOnceValueMust(OnceValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t OnceType) ValueType(ctx context.Context) attr.Value {
+	return OnceValue{}
+}
+
+var _ basetypes.ObjectValuable = OnceValue{}
+
+type OnceValue struct {
+	End   basetypes.StringValue `tfsdk:"end"`
+	Start basetypes.StringValue `tfsdk:"start"`
+	state attr.ValueState
+}
+
+func (v OnceValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 2)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["end"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["start"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 2)
+
+		val, err = v.End.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["end"] = val
+
+		val, err = v.Start.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["start"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v OnceValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v OnceValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v OnceValue) String() string {
+	return "OnceValue"
+}
+
+func (v OnceValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributeTypes := map[string]attr.Type{
+		"end":   basetypes.StringType{},
+		"start": basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"end":   v.End,
+			"start": v.Start,
+		})
+
+	return objVal, diags
+}
+
+func (v OnceValue) Equal(o attr.Value) bool {
+	other, ok := o.(OnceValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.End.Equal(other.End) {
+		return false
+	}
+
+	if !v.Start.Equal(other.Start) {
+		return false
+	}
+
+	return true
+}
+
+func (v OnceValue) Type(ctx context.Context) attr.Type {
+	return OnceType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v OnceValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"end":   basetypes.StringType{},
+		"start": basetypes.StringType{},
+	}
+}
+
+var _ basetypes.ObjectTypable = WeeklyType{}
+
+type WeeklyType struct {
+	basetypes.ObjectType
+}
+
+func (t WeeklyType) Equal(o attr.Type) bool {
+	other, ok := o.(WeeklyType)
+
+	if !ok {
+		return false
+	}
+
+	return t.ObjectType.Equal(other.ObjectType)
+}
+
+func (t WeeklyType) String() string {
+	return "WeeklyType"
+}
+
+func (t WeeklyType) ValueFromObject(ctx context.Context, in basetypes.ObjectValue) (basetypes.ObjectValuable, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	attributes := in.Attributes()
+
+	daysAttribute, ok := attributes["days"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`days is missing from object`)
+
+		return nil, diags
+	}
+
+	daysVal, ok := daysAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`days expected to be basetypes.ListValue, was: %T`, daysAttribute))
+	}
+
+	endAttribute, ok := attributes["end"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`end is missing from object`)
+
+		return nil, diags
+	}
+
+	endVal, ok := endAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`end expected to be basetypes.StringValue, was: %T`, endAttribute))
+	}
+
+	startAttribute, ok := attributes["start"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`start is missing from object`)
+
+		return nil, diags
+	}
+
+	startVal, ok := startAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`start expected to be basetypes.StringValue, was: %T`, startAttribute))
+	}
+
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	return WeeklyValue{
+		Days:  daysVal,
+		End:   endVal,
+		Start: startVal,
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewWeeklyValueNull() WeeklyValue {
+	return WeeklyValue{
+		state: attr.ValueStateNull,
+	}
+}
+
+func NewWeeklyValueUnknown() WeeklyValue {
+	return WeeklyValue{
+		state: attr.ValueStateUnknown,
+	}
+}
+
+func NewWeeklyValue(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) (WeeklyValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// Reference: https://github.com/hashicorp/terraform-plugin-framework/issues/521
+	ctx := context.Background()
+
+	for name, attributeType := range attributeTypes {
+		attribute, ok := attributes[name]
+
+		if !ok {
+			diags.AddError(
+				"Missing WeeklyValue Attribute Value",
+				"While creating a WeeklyValue value, a missing attribute value was detected. "+
+					"A WeeklyValue must contain values for all attributes, even if null or unknown. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("WeeklyValue Attribute Name (%s) Expected Type: %s", name, attributeType.String()),
+			)
+
+			continue
+		}
+
+		if !attributeType.Equal(attribute.Type(ctx)) {
+			diags.AddError(
+				"Invalid WeeklyValue Attribute Type",
+				"While creating a WeeklyValue value, an invalid attribute value was detected. "+
+					"A WeeklyValue must use a matching attribute type for the value. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("WeeklyValue Attribute Name (%s) Expected Type: %s\n", name, attributeType.String())+
+					fmt.Sprintf("WeeklyValue Attribute Name (%s) Given Type: %s", name, attribute.Type(ctx)),
+			)
+		}
+	}
+
+	for name := range attributes {
+		_, ok := attributeTypes[name]
+
+		if !ok {
+			diags.AddError(
+				"Extra WeeklyValue Attribute Value",
+				"While creating a WeeklyValue value, an extra attribute value was detected. "+
+					"A WeeklyValue must not contain values beyond the expected attribute types. "+
+					"This is always an issue with the provider and should be reported to the provider developers.\n\n"+
+					fmt.Sprintf("Extra WeeklyValue Attribute Name: %s", name),
+			)
+		}
+	}
+
+	if diags.HasError() {
+		return NewWeeklyValueUnknown(), diags
+	}
+
+	daysAttribute, ok := attributes["days"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`days is missing from object`)
+
+		return NewWeeklyValueUnknown(), diags
+	}
+
+	daysVal, ok := daysAttribute.(basetypes.ListValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`days expected to be basetypes.ListValue, was: %T`, daysAttribute))
+	}
+
+	endAttribute, ok := attributes["end"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`end is missing from object`)
+
+		return NewWeeklyValueUnknown(), diags
+	}
+
+	endVal, ok := endAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`end expected to be basetypes.StringValue, was: %T`, endAttribute))
+	}
+
+	startAttribute, ok := attributes["start"]
+
+	if !ok {
+		diags.AddError(
+			"Attribute Missing",
+			`start is missing from object`)
+
+		return NewWeeklyValueUnknown(), diags
+	}
+
+	startVal, ok := startAttribute.(basetypes.StringValue)
+
+	if !ok {
+		diags.AddError(
+			"Attribute Wrong Type",
+			fmt.Sprintf(`start expected to be basetypes.StringValue, was: %T`, startAttribute))
+	}
+
+	if diags.HasError() {
+		return NewWeeklyValueUnknown(), diags
+	}
+
+	return WeeklyValue{
+		Days:  daysVal,
+		End:   endVal,
+		Start: startVal,
+		state: attr.ValueStateKnown,
+	}, diags
+}
+
+func NewWeeklyValueMust(attributeTypes map[string]attr.Type, attributes map[string]attr.Value) WeeklyValue {
+	object, diags := NewWeeklyValue(attributeTypes, attributes)
+
+	if diags.HasError() {
+		// This could potentially be added to the diag package.
+		diagsStrings := make([]string, 0, len(diags))
+
+		for _, diagnostic := range diags {
+			diagsStrings = append(diagsStrings, fmt.Sprintf(
+				"%s | %s | %s",
+				diagnostic.Severity(),
+				diagnostic.Summary(),
+				diagnostic.Detail()))
+		}
+
+		panic("NewWeeklyValueMust received error(s): " + strings.Join(diagsStrings, "\n"))
+	}
+
+	return object
+}
+
+func (t WeeklyType) ValueFromTerraform(ctx context.Context, in tftypes.Value) (attr.Value, error) {
+	if in.Type() == nil {
+		return NewWeeklyValueNull(), nil
+	}
+
+	if !in.Type().Equal(t.TerraformType(ctx)) {
+		return nil, fmt.Errorf("expected %s, got %s", t.TerraformType(ctx), in.Type())
+	}
+
+	if !in.IsKnown() {
+		return NewWeeklyValueUnknown(), nil
+	}
+
+	if in.IsNull() {
+		return NewWeeklyValueNull(), nil
+	}
+
+	attributes := map[string]attr.Value{}
+
+	val := map[string]tftypes.Value{}
+
+	err := in.As(&val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range val {
+		a, err := t.AttrTypes[k].ValueFromTerraform(ctx, v)
+
+		if err != nil {
+			return nil, err
+		}
+
+		attributes[k] = a
+	}
+
+	return NewWeeklyValueMust(WeeklyValue{}.AttributeTypes(ctx), attributes), nil
+}
+
+func (t WeeklyType) ValueType(ctx context.Context) attr.Value {
+	return WeeklyValue{}
+}
+
+var _ basetypes.ObjectValuable = WeeklyValue{}
+
+type WeeklyValue struct {
+	Days  basetypes.ListValue   `tfsdk:"days"`
+	End   basetypes.StringValue `tfsdk:"end"`
+	Start basetypes.StringValue `tfsdk:"start"`
+	state attr.ValueState
+}
+
+func (v WeeklyValue) ToTerraformValue(ctx context.Context) (tftypes.Value, error) {
+	attrTypes := make(map[string]tftypes.Type, 3)
+
+	var val tftypes.Value
+	var err error
+
+	attrTypes["days"] = basetypes.ListType{
+		ElemType: types.StringType,
+	}.TerraformType(ctx)
+	attrTypes["end"] = basetypes.StringType{}.TerraformType(ctx)
+	attrTypes["start"] = basetypes.StringType{}.TerraformType(ctx)
+
+	objectType := tftypes.Object{AttributeTypes: attrTypes}
+
+	switch v.state {
+	case attr.ValueStateKnown:
+		vals := make(map[string]tftypes.Value, 3)
+
+		val, err = v.Days.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["days"] = val
+
+		val, err = v.End.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["end"] = val
+
+		val, err = v.Start.ToTerraformValue(ctx)
+
+		if err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		vals["start"] = val
+
+		if err := tftypes.ValidateValue(objectType, vals); err != nil {
+			return tftypes.NewValue(objectType, tftypes.UnknownValue), err
+		}
+
+		return tftypes.NewValue(objectType, vals), nil
+	case attr.ValueStateNull:
+		return tftypes.NewValue(objectType, nil), nil
+	case attr.ValueStateUnknown:
+		return tftypes.NewValue(objectType, tftypes.UnknownValue), nil
+	default:
+		panic(fmt.Sprintf("unhandled Object state in ToTerraformValue: %s", v.state))
+	}
+}
+
+func (v WeeklyValue) IsNull() bool {
+	return v.state == attr.ValueStateNull
+}
+
+func (v WeeklyValue) IsUnknown() bool {
+	return v.state == attr.ValueStateUnknown
+}
+
+func (v WeeklyValue) String() string {
+	return "WeeklyValue"
+}
+
+func (v WeeklyValue) ToObjectValue(ctx context.Context) (basetypes.ObjectValue, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	var daysVal basetypes.ListValue
+	switch {
+	case v.Days.IsUnknown():
+		daysVal = types.ListUnknown(types.StringType)
+	case v.Days.IsNull():
+		daysVal = types.ListNull(types.StringType)
+	default:
+		var d diag.Diagnostics
+		daysVal, d = types.ListValue(types.StringType, v.Days.Elements())
+		diags.Append(d...)
+	}
+
+	if diags.HasError() {
+		return types.ObjectUnknown(map[string]attr.Type{
+			"days": basetypes.ListType{
+				ElemType: types.StringType,
+			},
+			"end":   basetypes.StringType{},
+			"start": basetypes.StringType{},
+		}), diags
+	}
+
+	attributeTypes := map[string]attr.Type{
+		"days": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"end":   basetypes.StringType{},
+		"start": basetypes.StringType{},
+	}
+
+	if v.IsNull() {
+		return types.ObjectNull(attributeTypes), diags
+	}
+
+	if v.IsUnknown() {
+		return types.ObjectUnknown(attributeTypes), diags
+	}
+
+	objVal, diags := types.ObjectValue(
+		attributeTypes,
+		map[string]attr.Value{
+			"days":  daysVal,
+			"end":   v.End,
+			"start": v.Start,
+		})
+
+	return objVal, diags
+}
+
+func (v WeeklyValue) Equal(o attr.Value) bool {
+	other, ok := o.(WeeklyValue)
+
+	if !ok {
+		return false
+	}
+
+	if v.state != other.state {
+		return false
+	}
+
+	if v.state != attr.ValueStateKnown {
+		return true
+	}
+
+	if !v.Days.Equal(other.Days) {
+		return false
+	}
+
+	if !v.End.Equal(other.End) {
+		return false
+	}
+
+	if !v.Start.Equal(other.Start) {
+		return false
+	}
+
+	return true
+}
+
+func (v WeeklyValue) Type(ctx context.Context) attr.Type {
+	return WeeklyType{
+		basetypes.ObjectType{
+			AttrTypes: v.AttributeTypes(ctx),
+		},
+	}
+}
+
+func (v WeeklyValue) AttributeTypes(ctx context.Context) map[string]attr.Type {
+	return map[string]attr.Type{
+		"days": basetypes.ListType{
+			ElemType: types.StringType,
+		},
+		"end":   basetypes.StringType{},
+		"start": basetypes.StringType{},
 	}
 }
